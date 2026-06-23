@@ -99,6 +99,17 @@ No paid APIs required. Optional free FRED API key for richer US data.
 
 - Company switcher in Ratios tab, ratio explanations, professional PDF export
 - Watchlist, SMA indicators (20/50/200), URL deep-linking, CSV export, macro regime detector
+- Portfolio builder (#1), sector heatmap (#3), watchlist price alerts (#4),
+  multi-factor screener (#7), relative-strength rankings (#9), backend health
+  dashboard (#18) — all yfinance-backed
+- Earnings/dividend/split chart overlays (#2), news feed with keyword sentiment
+  (#10), configurable benchmark override (#19)
+- Country comparison cards (#11), yield-curve visualizer with inversion badge
+  (#12), IMF WEO forecast overlays (#13), inflation heatmap (#14)
+- Mobile bottom navigation (#20); theme persistence (#17) confirmed
+
+Note: AI-powered company summary (#6) intentionally not implemented — keeps the
+app free of paid-API dependencies.
 
 ---
 
