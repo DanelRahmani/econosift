@@ -95,6 +95,13 @@ No paid APIs required. Optional free FRED API key for richer US data.
 
 ---
 
+## Recently Shipped Features
+
+- Company switcher in Ratios tab, ratio explanations, professional PDF export
+- Watchlist, SMA indicators (20/50/200), URL deep-linking, CSV export, macro regime detector
+
+---
+
 ## Development Notes
 
 - All external API calls are cached 60 min via `@cached` in `backend/backend/cache.py`
@@ -102,3 +109,16 @@ No paid APIs required. Optional free FRED API key for richer US data.
 - Frontend API client is at `frontend/lib/api.ts` — add new endpoint calls here
 - Shared TypeScript types live in `frontend/lib/types.ts`
 - To add a new backend route: create a router in `backend/backend/routers/`, register it in `main.py`
+
+---
+
+## Workflow Instructions
+
+### Git & GitHub
+- Commit to GitHub regularly — after every meaningful unit of work (a feature, a fix, a refactor). Don't batch unrelated changes into one commit.
+- Use clear, descriptive commit messages focused on the "why", not just the "what".
+- Push to `main` after each commit unless told otherwise.
+
+### Skills
+- Automatically invoke available skills whenever they are relevant to the task at hand — do not wait to be asked.
+- Examples: use `/senior-frontend` or `/senior-backend` when implementing features, `/api-design-reviewer` when adding routes, `/financial-analyst` when working on finance-related features, `/ui-ux-pro-max` for UI work, `/security-review` before pushing sensitive changes, `/spec-driven-workflow` for planning larger features.

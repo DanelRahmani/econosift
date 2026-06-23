@@ -114,6 +114,51 @@ def get_info(ticker: str) -> dict:
     return out
 
 
+@cached("yf_events")
+def get_events(ticker: str) -> dict:
+    """Upcoming earnings date, recent dividends, and stock splits for a ticker."""
+    t = yf.Ticker(ticker)
+    out: dict = {"ticker": ticker, "earnings": None, "dividends": [], "splits": []}
+
+    try:
+        cal = t.calendar
+        ed = None
+        if isinstance(cal, dict):
+            ed = cal.get("Earnings Date")
+            if isinstance(ed, (list, tuple)) and ed:
+                ed = ed[0]
+        elif cal is not None and hasattr(cal, "loc") and "Earnings Date" in getattr(cal, "index", []):
+            ed = cal.loc["Earnings Date"].iloc[0]
+        if ed is not None:
+            out["earnings"] = pd.to_datetime(str(ed)).strftime("%Y-%m-%d")
+    except Exception:
+        pass
+
+    try:
+        divs = t.dividends
+        if divs is not None and len(divs):
+            divs = divs.tail(12)
+            out["dividends"] = [
+                {"date": pd.to_datetime(d).strftime("%Y-%m-%d"), "amount": round(float(v), 4)}
+                for d, v in divs.items()
+            ]
+    except Exception:
+        pass
+
+    try:
+        splits = t.splits
+        if splits is not None and len(splits):
+            splits = splits.tail(8)
+            out["splits"] = [
+                {"date": pd.to_datetime(d).strftime("%Y-%m-%d"), "ratio": round(float(v), 4)}
+                for d, v in splits.items()
+            ]
+    except Exception:
+        pass
+
+    return out
+
+
 def _safe_stmt(t, name: str):
     try:
         df = getattr(t, name)

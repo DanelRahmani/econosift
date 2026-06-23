@@ -4,7 +4,10 @@ from __future__ import annotations
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .routers import market, valuation, ratios, search, macro
+from .routers import (
+    market, valuation, ratios, search, macro,
+    portfolio, screener, admin,
+)
 
 app = FastAPI(title="Axiom Finance API", version="1.0.0")
 
@@ -28,3 +31,6 @@ app.include_router(valuation.router)
 app.include_router(ratios.router)
 app.include_router(search.router)
 app.include_router(macro.router)
+app.include_router(portfolio.router)
+app.include_router(screener.router)
+app.include_router(admin.router)

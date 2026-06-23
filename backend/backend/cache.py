@@ -19,6 +19,29 @@ def _get_cache(name: str) -> TTLCache:
     return _caches[name]
 
 
+# Hit/miss counters keyed by cache name, for the health dashboard.
+_stats: dict[str, dict[str, int]] = {}
+
+
+def _record(name: str, hit: bool) -> None:
+    s = _stats.setdefault(name, {"hits": 0, "misses": 0})
+    s["hits" if hit else "misses"] += 1
+
+
+def stats() -> dict:
+    """Per-cache hit/miss counts and current size, for /api/admin/health."""
+    out = {}
+    for name, s in _stats.items():
+        total = s["hits"] + s["misses"]
+        out[name] = {
+            "hits": s["hits"],
+            "misses": s["misses"],
+            "hitRate": round(s["hits"] / total, 4) if total else None,
+            "size": len(_caches[name]) if name in _caches else 0,
+        }
+    return out
+
+
 def _make_key(args, kwargs) -> tuple:
     return args + tuple(sorted(kwargs.items()))
 
@@ -34,7 +57,9 @@ def cached(name: str | None = None):
         def wrapper(*args, **kwargs):
             key = _make_key(args, kwargs)
             if key in cache:
+                _record(cache_name, True)
                 return cache[key]
+            _record(cache_name, False)
             result = func(*args, **kwargs)
             cache[key] = result
             return result
@@ -56,10 +81,13 @@ def async_cached(name: str | None = None):
         async def wrapper(*args, **kwargs):
             key = _make_key(args, kwargs)
             if key in cache:
+                _record(cache_name, True)
                 return cache[key]
             async with lock:
                 if key in cache:
+                    _record(cache_name, True)
                     return cache[key]
+                _record(cache_name, False)
                 result = await func(*args, **kwargs)
                 cache[key] = result
                 return result

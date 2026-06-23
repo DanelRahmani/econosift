@@ -15,6 +15,22 @@ def _parse_tickers(tickers: str) -> list[str]:
     return [t.strip().upper() for t in tickers.split(",") if t.strip()]
 
 
+# S&P 500 sector SPDR ETFs used as sector performance proxies.
+SECTOR_ETFS = [
+    ("XLK", "Technology"), ("XLF", "Financials"), ("XLV", "Health Care"),
+    ("XLE", "Energy"), ("XLI", "Industrials"), ("XLY", "Consumer Discretionary"),
+    ("XLP", "Consumer Staples"), ("XLU", "Utilities"), ("XLB", "Materials"),
+    ("XLRE", "Real Estate"), ("XLC", "Communication Services"),
+]
+
+
+def _pct_change(series: pd.Series) -> float | None:
+    s = series.dropna()
+    if len(s) < 2 or s.iloc[0] == 0:
+        return None
+    return round((float(s.iloc[-1]) / float(s.iloc[0]) - 1.0) * 100.0, 2)
+
+
 @router.get("/prices")
 async def prices(tickers: str = Query(...), period: str = "1y"):
     syms = _parse_tickers(tickers)
@@ -49,6 +65,60 @@ async def prices(tickers: str = Query(...), period: str = "1y"):
 @router.get("/quote/{ticker}")
 async def quote(ticker: str):
     return await asyncio.to_thread(yfs.get_quote, ticker.upper())
+
+
+@router.get("/events/{ticker}")
+async def events(ticker: str):
+    """Upcoming earnings, recent dividends and splits for event overlays."""
+    return await asyncio.to_thread(yfs.get_events, ticker.upper())
+
+
+@router.get("/sectors")
+async def sectors(period: str = "1mo"):
+    """Performance of the 11 S&P 500 sector SPDR ETFs over a period."""
+    syms = tuple(e[0] for e in SECTOR_ETFS)
+    frame = await asyncio.to_thread(yfs.get_close_frame, syms, period)
+    rows = []
+    for sym, name in SECTOR_ETFS:
+        change = _pct_change(frame[sym]) if frame is not None and sym in frame.columns else None
+        rows.append({"ticker": sym, "sector": name, "changePercent": change})
+    rows.sort(key=lambda r: (r["changePercent"] is None, -(r["changePercent"] or 0)))
+    return {"period": period, "sectors": rows}
+
+
+@router.get("/relative-strength")
+async def relative_strength(tickers: str = Query(...)):
+    """Rank tickers by 1/3/6-month returns vs their benchmark."""
+    syms = _parse_tickers(tickers)
+    benchmarks = sorted({yfs.benchmark_for(s) for s in syms})
+    all_syms = tuple(dict.fromkeys(syms + benchmarks))
+    frame = await asyncio.to_thread(yfs.get_close_frame, all_syms, "1y")
+
+    windows = {"ret1m": 21, "ret3m": 63, "ret6m": 126}
+    rows = []
+    if frame is not None and not frame.empty:
+        for sym in syms:
+            if sym not in frame.columns:
+                continue
+            s = frame[sym].dropna()
+            bench = yfs.benchmark_for(sym)
+            b = frame[bench].dropna() if bench in frame.columns else None
+            row = {"ticker": sym, "benchmark": bench}
+            for key, n in windows.items():
+                row[key] = _trailing_return(s, n)
+                bret = _trailing_return(b, n) if b is not None else None
+                row[key + "Rel"] = (round(row[key] - bret, 2)
+                                    if row[key] is not None and bret is not None else None)
+            rows.append(row)
+    rows.sort(key=lambda r: (r.get("ret3m") is None, -(r.get("ret3m") or 0)))
+    return {"rankings": rows}
+
+
+def _trailing_return(series: pd.Series, n: int) -> float | None:
+    s = series.dropna()
+    if len(s) <= n or s.iloc[-n - 1] == 0:
+        return None
+    return round((float(s.iloc[-1]) / float(s.iloc[-n - 1]) - 1.0) * 100.0, 2)
 
 
 @router.get("/risk")
