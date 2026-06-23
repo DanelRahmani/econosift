@@ -22,7 +22,7 @@ function pearson(a: number[], b: number[]): number {
 }
 
 function color(c: number): string {
-  if (Number.isNaN(c)) return "#252840";
+  if (Number.isNaN(c)) return "rgba(128,128,128,0.1)";
   // red (-1) -> surface (0) -> green (+1)
   if (c >= 0) {
     const g = Math.round(40 + c * (197 - 40));

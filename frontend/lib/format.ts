@@ -40,7 +40,9 @@ export function currencySymbol(code: string | undefined): string {
   return CURRENCY_SYMBOLS[code] || `${code} `;
 }
 
+// Brand-led series palette: crimson first, then complementary hues that read
+// well on both the light (#fff) and dark (#0f0608) Axiom backgrounds.
 export const CHART_COLORS = [
-  "#4f46e5", "#22c55e", "#ef4444", "#eab308",
-  "#06b6d4", "#a855f7", "#f97316", "#ec4899",
+  "#c4394a", "#0065cb", "#16a34a", "#ca8a04",
+  "#0891b2", "#9333ea", "#ea580c", "#db2777",
 ];

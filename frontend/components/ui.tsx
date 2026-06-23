@@ -42,14 +42,23 @@ export function ZScoreBadge({ z }: { z: number | null }) {
   );
 }
 
-export function chartTooltipStyle() {
+// Theme-aware chart colors. Recharts needs concrete values, so we resolve them
+// from the active theme rather than relying on CSS variables in SVG.
+export function chartPalette(theme: "light" | "dark") {
+  return theme === "dark"
+    ? { grid: "#32171c", axis: "#c49aa0", tooltipBg: "#1a0a0c", tooltipBorder: "#c4394a", tooltipText: "#f5eeef" }
+    : { grid: "#ecdcdf", axis: "#8a6770", tooltipBg: "#ffffff", tooltipBorder: "#6b0f1a", tooltipText: "#1a0a0c" };
+}
+
+export function chartTooltipStyle(theme: "light" | "dark" = "dark") {
+  const p = chartPalette(theme);
   return {
     contentStyle: {
-      backgroundColor: "#1a1d2e",
-      border: "1px solid #4f46e5",
+      backgroundColor: p.tooltipBg,
+      border: `1px solid ${p.tooltipBorder}`,
       borderRadius: "8px",
-      color: "#f1f5f9",
+      color: p.tooltipText,
     },
-    labelStyle: { color: "#94a3b8" },
+    labelStyle: { color: p.axis },
   };
 }

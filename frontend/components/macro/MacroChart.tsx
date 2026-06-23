@@ -5,9 +5,12 @@ import {
 } from "recharts";
 import type { MacroResponse } from "@/lib/types";
 import { CHART_COLORS } from "@/lib/format";
-import { chartTooltipStyle } from "@/components/ui";
+import { chartTooltipStyle, chartPalette } from "@/components/ui";
+import { useTheme } from "@/components/ThemeProvider";
 
 export function MacroChart({ data }: { data: MacroResponse }) {
+  const { theme } = useTheme();
+  const pal = chartPalette(theme);
   const { series } = data;
   if (!series.length || series.every((s) => s.data.length === 0)) {
     return <div className="text-text-muted text-sm">No data for this selection.</div>;
@@ -32,11 +35,11 @@ export function MacroChart({ data }: { data: MacroResponse }) {
       <div className="h-96 w-full">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={rows}>
-            <CartesianGrid stroke="#2e3150" strokeDasharray="3 3" />
-            <XAxis dataKey="year" tick={{ fill: "#94a3b8", fontSize: 12 }} />
-            <YAxis tick={{ fill: "#94a3b8", fontSize: 12 }}
+            <CartesianGrid stroke={pal.grid} strokeDasharray="3 3" />
+            <XAxis dataKey="year" tick={{ fill: pal.axis, fontSize: 12 }} />
+            <YAxis tick={{ fill: pal.axis, fontSize: 12 }}
               tickFormatter={(v) => `${v}${data.unit === "%" ? "%" : ""}`} />
-            <Tooltip {...chartTooltipStyle()} />
+            <Tooltip {...chartTooltipStyle(theme)} />
             <Legend wrapperStyle={{ fontSize: 12 }} />
             {series.map((s, i) => (
               <Line

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { ThemeToggle } from "./ThemeToggle";
 
 const tabs = [
   { href: "/markets", label: "Markets" },
@@ -13,8 +14,8 @@ export function Navbar() {
   return (
     <nav className="sticky top-0 z-50 bg-surface/80 border-b border-border backdrop-blur">
       <div className="max-w-7xl mx-auto px-4 h-14 flex items-center gap-8">
-        <Link href="/markets" className="font-bold text-lg tracking-tight">
-          <span className="text-accent-light">Axiom</span>{" "}
+        <Link href="/markets" className="font-display font-extrabold text-lg tracking-tight">
+          <span className="text-accent">Axiom</span>{" "}
           <span className="text-text-primary">Finance</span>
         </Link>
         <div className="flex gap-1">
@@ -34,6 +35,9 @@ export function Navbar() {
               </Link>
             );
           })}
+        </div>
+        <div className="ml-auto">
+          <ThemeToggle />
         </div>
       </div>
     </nav>

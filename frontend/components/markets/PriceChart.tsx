@@ -5,9 +5,12 @@ import {
 } from "recharts";
 import type { PricesResponse } from "@/lib/types";
 import { CHART_COLORS } from "@/lib/format";
-import { chartTooltipStyle } from "@/components/ui";
+import { chartTooltipStyle, chartPalette } from "@/components/ui";
+import { useTheme } from "@/components/ThemeProvider";
 
 export function PriceChart({ data }: { data: PricesResponse }) {
+  const { theme } = useTheme();
+  const pal = chartPalette(theme);
   const { prices, benchmarks } = data;
   if (!prices.length) {
     return <div className="text-text-muted text-sm">No price data.</div>;
@@ -35,10 +38,10 @@ export function PriceChart({ data }: { data: PricesResponse }) {
     <div className="h-96 w-full">
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={normalised}>
-          <CartesianGrid stroke="#2e3150" strokeDasharray="3 3" />
-          <XAxis dataKey="Date" tick={{ fill: "#94a3b8", fontSize: 12 }} minTickGap={40} />
-          <YAxis tick={{ fill: "#94a3b8", fontSize: 12 }} domain={["auto", "auto"]} />
-          <Tooltip {...chartTooltipStyle()} formatter={(v: number) => v?.toFixed(2)} />
+          <CartesianGrid stroke={pal.grid} strokeDasharray="3 3" />
+          <XAxis dataKey="Date" tick={{ fill: pal.axis, fontSize: 12 }} minTickGap={40} />
+          <YAxis tick={{ fill: pal.axis, fontSize: 12 }} domain={["auto", "auto"]} />
+          <Tooltip {...chartTooltipStyle(theme)} formatter={(v: number) => v?.toFixed(2)} />
           <Legend wrapperStyle={{ fontSize: 12 }} />
           {cols.map((c, i) => (
             <Line
