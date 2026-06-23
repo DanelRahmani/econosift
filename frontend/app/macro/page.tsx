@@ -9,6 +9,7 @@ import { IndicatorSelector } from "@/components/macro/IndicatorSelector";
 import { MacroChart } from "@/components/macro/MacroChart";
 import { MacroDashboard } from "@/components/macro/MacroDashboard";
 import { FxWidget } from "@/components/macro/FxWidget";
+import { RegimeDetector } from "@/components/macro/RegimeDetector";
 
 const CURRENT_YEAR = new Date().getFullYear();
 
@@ -87,7 +88,20 @@ export default function MacroPage() {
             </div>
           </Card>
 
-          {data && <MacroDashboard data={data} />}
+              {data && <MacroDashboard data={data} />}
+          {selected.length > 0 && countries.length > 0 && (
+            <Card>
+              <h2 className="text-sm font-semibold mb-3 text-text-secondary">Macro Regime</h2>
+              <div className="space-y-2">
+                {selected.map((iso) => {
+                  const c = countries.find((x) => x.iso2 === iso);
+                  return c ? (
+                    <RegimeDetector key={iso} country={iso} countryName={c.name} />
+                  ) : null;
+                })}
+              </div>
+            </Card>
+          )}
         </div>
       </div>
 

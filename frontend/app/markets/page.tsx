@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
 import type { PricesResponse, RiskResponse } from "@/lib/types";
 import { SearchBar } from "@/components/SearchBar";
@@ -11,21 +12,42 @@ import { RiskMetricsTable } from "@/components/markets/RiskMetricsTable";
 import { CorrelationMatrix } from "@/components/markets/CorrelationMatrix";
 import { ValuationTab } from "@/components/markets/ValuationTab";
 import { RatiosTab } from "@/components/markets/RatiosTab";
+import { Watchlist } from "@/components/Watchlist";
 
 const PERIODS = ["1mo", "3mo", "6mo", "1y", "2y", "5y"];
 const TABS = ["Overview", "Risk", "Valuation", "Ratios"] as const;
 type Tab = (typeof TABS)[number];
 
-export default function MarketsPage() {
-  const [tickers, setTickers] = useState<string[]>(["AAPL", "MSFT"]);
-  const [period, setPeriod] = useState("1y");
-  const [tab, setTab] = useState<Tab>("Overview");
+function MarketsPageInner() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const [tickers, setTickers] = useState<string[]>(() => {
+    const t = searchParams.get("t");
+    return t ? t.split(",").filter(Boolean) : ["AAPL", "MSFT"];
+  });
+  const [period, setPeriod] = useState<string>(() => searchParams.get("p") ?? "1y");
+  const [tab, setTab] = useState<Tab>(() => {
+    const v = searchParams.get("tab") ?? "";
+    return (TABS as readonly string[]).includes(v) ? (v as Tab) : "Overview";
+  });
+  const [showWatchlist, setShowWatchlist] = useState(false);
 
   const [prices, setPrices] = useState<PricesResponse | null>(null);
   const [risk, setRisk] = useState<RiskResponse | null>(null);
   const [loading, setLoading] = useState(false);
 
   const tickersKey = tickers.join(",");
+
+  // Keep URL in sync with current state so it can be bookmarked / shared
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (tickers.length) params.set("t", tickers.join(","));
+    params.set("p", period);
+    params.set("tab", tab);
+    router.replace(`/markets?${params.toString()}`, { scroll: false });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tickersKey, period, tab]);
 
   useEffect(() => {
     if (!tickers.length) {
@@ -60,7 +82,7 @@ export default function MarketsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center gap-4">
+      <div className="flex flex-wrap items-center gap-4" data-hide-print>
         <SearchBar onAdd={addTicker} />
         <div className="flex flex-wrap gap-2">
           {tickers.map((t) => (
@@ -70,9 +92,23 @@ export default function MarketsPage() {
             </span>
           ))}
         </div>
+        <button
+          onClick={() => setShowWatchlist((v) => !v)}
+          className={`ml-auto px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
+            showWatchlist
+              ? "bg-accent/10 border-accent/40 text-accent"
+              : "border-border text-text-secondary hover:text-text-primary hover:bg-surface-alt"
+          }`}
+        >
+          Watchlist
+        </button>
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-4">
+      {showWatchlist && (
+        <Watchlist onSelect={addTicker} />
+      )}
+
+      <div className="flex flex-wrap items-center justify-between gap-4" data-hide-print>
         <div className="flex gap-1">
           {TABS.map((t) => (
             <button
@@ -119,6 +155,18 @@ export default function MarketsPage() {
 
       {tab === "Risk" && tickers.length > 0 && (
         <div className="space-y-6">
+          <div className="flex justify-end" data-hide-print>
+            <button
+              onClick={() => {
+                document.body.classList.add("print-mode");
+                window.print();
+                document.body.classList.remove("print-mode");
+              }}
+              className="px-3 py-1 rounded-md text-xs font-medium border border-border text-text-secondary hover:text-text-primary hover:bg-surface-alt transition-colors"
+            >
+              Export PDF
+            </button>
+          </div>
           <Card>
             <h2 className="text-sm font-semibold mb-4 text-text-secondary">Risk Metrics</h2>
             {loading && !risk ? <Skeleton className="h-40" /> : risk && <RiskMetricsTable metrics={risk.metrics} />}
@@ -135,8 +183,16 @@ export default function MarketsPage() {
       )}
 
       {tab === "Ratios" && tickers.length > 0 && (
-        <RatiosTab ticker={tickers[0]} />
+        <RatiosTab tickers={tickers} />
       )}
     </div>
+  );
+}
+
+export default function MarketsPage() {
+  return (
+    <Suspense fallback={null}>
+      <MarketsPageInner />
+    </Suspense>
   );
 }
