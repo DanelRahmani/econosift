@@ -7,6 +7,7 @@ from fastapi import APIRouter, Query
 
 from ..config import COUNTRIES, INDICATORS
 from ..services import macro_service
+from ..services import regime_service
 from ..services import yfinance_service as yfs
 from ..sources import source_frankfurter, source_datareader, source_imf
 
@@ -115,6 +116,12 @@ async def yield_curve():
         "spread10y5y": spread_10y_5y,
         "inverted": inverted,
     }
+
+
+@router.get("/regime")
+async def regime(country: str = "US", start: int = 2000):
+    """2×2 Goldilocks regime classifier: quarterly GDP growth vs CPI inflation."""
+    return await asyncio.to_thread(regime_service.regime_series, country.upper(), start)
 
 
 @router.get("/fama-french")

@@ -16,6 +16,7 @@ import { PortfolioTab } from "@/components/markets/PortfolioTab";
 import { RankingsTab } from "@/components/markets/RankingsTab";
 import { SectorHeatmap } from "@/components/markets/SectorHeatmap";
 import { ScreenerTab } from "@/components/markets/ScreenerTab";
+import { FxRatesPanel } from "@/components/markets/FxRatesPanel";
 import { NewsFeed } from "@/components/markets/NewsFeed";
 import { Watchlist } from "@/components/Watchlist";
 
@@ -27,7 +28,7 @@ const BENCHMARKS = [
   { value: "^DJI", label: "Dow Jones" },
   { value: "^RUT", label: "Russell 2000" },
 ];
-const TABS = ["Overview", "Risk", "Valuation", "Ratios", "Portfolio", "Rankings", "Sectors", "Screener"] as const;
+const TABS = ["Overview", "Risk", "Valuation", "Ratios", "Portfolio", "Rankings", "Sectors", "Screener", "FX"] as const;
 type Tab = (typeof TABS)[number];
 
 function MarketsPageInner() {
@@ -180,7 +181,7 @@ function MarketsPageInner() {
         )}
       </div>
 
-      {!tickers.length && tab !== "Sectors" && tab !== "Screener" && (
+      {!tickers.length && tab !== "Sectors" && tab !== "Screener" && tab !== "FX" && (
         <Card><div className="text-text-muted">Search and add a ticker to begin.</div></Card>
       )}
 
@@ -242,6 +243,10 @@ function MarketsPageInner() {
 
       {tab === "Screener" && (
         <ScreenerTab />
+      )}
+
+      {tab === "FX" && (
+        <FxRatesPanel />
       )}
     </div>
   );

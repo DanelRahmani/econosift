@@ -111,6 +111,78 @@ export interface FxResponse {
   rates: Record<string, number>;
 }
 
+// --- Phase 0: Two-Stage DCF ---
+export interface DcfScenario {
+  scenario: "Bear" | "Base" | "Bull";
+  fcfGrowth: number;
+  wacc: number;
+  intrinsicValue: number | null;
+  upsidePct: number | null;
+}
+export interface DcfSensitivity {
+  fcfGrowthAxis: number[];
+  waccAxis: number[];
+  grid: (number | null)[][];
+}
+export interface DcfResponse {
+  ticker: string;
+  currency: string;
+  spotPrice: number | null;
+  intrinsicValue: number | null;
+  upsidePct: number | null;
+  locked: boolean;
+  reason?: string;
+  inputs: {
+    ttmFcf: number | null;
+    shares: number | null;
+    netDebt: number | null;
+    fcfGrowth: number;
+    terminalGrowth: number;
+    wacc: number;
+    stage1Years: number;
+  };
+  scenarios: DcfScenario[];
+  sensitivity: DcfSensitivity | Record<string, never>;
+  asOf: string;
+}
+
+// --- Phase 0: FX Rates panel ---
+export interface FxPair {
+  pair: string;
+  quote: string;
+  rate: number | null;
+  change1d: number | null;
+  change1w: number | null;
+  change1m: number | null;
+  change1y: number | null;
+  sparkline: number[];
+  inverted?: boolean;
+}
+export interface FxRatesResponse {
+  base: string;
+  asOf: string;
+  pairs: FxPair[];
+}
+
+// --- Phase 0: Regime Classifier (Goldilocks 2x2) ---
+export type RegimeQuadrant =
+  | "Goldilocks" | "Overheating" | "Slowdown" | "Stagflation";
+export interface RegimePoint {
+  date: string;
+  gdpGrowth: number | null;
+  cpiInflation: number | null;
+  quadrant: RegimeQuadrant | null;
+}
+export interface RegimeResponse {
+  country: string;
+  thresholds: { gdp: number; cpi: number };
+  series: RegimePoint[];
+  current: RegimePoint | null;
+  source: string;
+  asOf: string;
+  note: string | null;
+}
+
 // --- Portfolio ---
 export interface PortfolioHolding {
   ticker: string;

@@ -4,6 +4,7 @@ import type {
   PortfolioResponse, SectorsResponse, RelStrengthResponse, ScreenerResponse,
   EventsResponse, YieldCurveResponse, HealthResponse, NewsResponse,
   SnapshotResponse, ForecastResponse,
+  DcfResponse, FxRatesResponse, RegimeResponse,
 } from "./types";
 
 async function get<T>(path: string): Promise<T> {
@@ -97,4 +98,20 @@ export const api = {
 
   health: () =>
     get<HealthResponse>(`/admin/health`),
+
+  // --- Phase 0 ---
+  dcf: (
+    ticker: string,
+    p: { fcf_growth: number; terminal_growth: number; wacc: number; stage1_years: number },
+  ) =>
+    get<DcfResponse>(
+      `/valuation/dcf?ticker=${encodeURIComponent(ticker)}` +
+      `&fcf_growth=${p.fcf_growth}&terminal_growth=${p.terminal_growth}` +
+      `&wacc=${p.wacc}&stage1_years=${p.stage1_years}`),
+
+  fxRates: (base: string) =>
+    get<FxRatesResponse>(`/market/fx-rates?base=${encodeURIComponent(base)}`),
+
+  regime: (country: string, start = 2000) =>
+    get<RegimeResponse>(`/macro/regime?country=${encodeURIComponent(country)}&start=${start}`),
 };

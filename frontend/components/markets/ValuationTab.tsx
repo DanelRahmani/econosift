@@ -5,6 +5,7 @@ import { api } from "@/lib/api";
 import type { ValuationResponse } from "@/lib/types";
 import { Card, Skeleton, SignalBadge } from "@/components/ui";
 import { fmtNum, fmtPct, fmtPrice, currencySymbol } from "@/lib/format";
+import { DcfPanel } from "@/components/markets/DcfPanel";
 
 interface Params {
   risk_free: number;
@@ -90,6 +91,13 @@ export function ValuationTab({ tickers, period }: { tickers: string[]; period: s
           ))}
         </div>
       )}
+
+      <div>
+        <h2 className="text-sm font-semibold mb-3 text-text-secondary">
+          Two-Stage DCF
+        </h2>
+        <DcfPanel tickers={tickers} period={period} />
+      </div>
     </div>
   );
 }

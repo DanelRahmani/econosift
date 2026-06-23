@@ -10,6 +10,7 @@ import { MacroChart } from "@/components/macro/MacroChart";
 import { MacroDashboard } from "@/components/macro/MacroDashboard";
 import { FxWidget } from "@/components/macro/FxWidget";
 import { RegimeDetector } from "@/components/macro/RegimeDetector";
+import { RegimeClock } from "@/components/macro/RegimeClock";
 import { YieldCurve } from "@/components/macro/YieldCurve";
 import { CountryComparison } from "@/components/macro/CountryComparison";
 import { InflationHeatmap } from "@/components/macro/InflationHeatmap";
@@ -150,6 +151,18 @@ export default function MacroPage() {
         </div>
         {loading && !data ? <Skeleton className="h-96" /> : data && <MacroChart data={data} forecast={showForecast ? forecast : []} />}
       </Card>
+
+      {selected.length > 0 && (
+        <Card>
+          <h2 className="text-sm font-semibold mb-3 text-text-secondary">
+            Regime Clock · {(countries.find((c) => c.iso2 === selected[0])?.name) ?? selected[0]}
+          </h2>
+          <RegimeClock
+            country={selected[0]}
+            countryName={countries.find((c) => c.iso2 === selected[0])?.name ?? selected[0]}
+          />
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <CountryComparison selected={selected} countries={countries} />

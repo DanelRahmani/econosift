@@ -6,6 +6,7 @@ from fastapi import APIRouter, Query
 
 from ..services import yfinance_service as yfs
 from ..services import metrics
+from ..services.dcf_engine import two_stage_dcf
 
 router = APIRouter(prefix="/api/valuation", tags=["valuation"])
 
@@ -68,3 +69,22 @@ async def capm_dcf(
         })
 
     return {"valuations": valuations}
+
+
+@router.get("/dcf")
+async def dcf(
+    ticker: str,
+    fcf_growth: float = 0.08,
+    terminal_growth: float = 0.025,
+    wacc: float = 0.09,
+    stage1_years: int = 10,
+):
+    """Two-stage DCF valuation with scenario table and sensitivity heatmap."""
+    bundle = await asyncio.to_thread(yfs.get_info, ticker.strip().upper())
+    return two_stage_dcf(
+        bundle,
+        fcf_growth=fcf_growth,
+        terminal_growth=terminal_growth,
+        wacc=wacc,
+        stage1_years=stage1_years,
+    )

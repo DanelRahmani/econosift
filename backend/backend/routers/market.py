@@ -7,6 +7,7 @@ from fastapi import APIRouter, Query
 
 from ..services import yfinance_service as yfs
 from ..services import metrics
+from ..services import fx_service
 
 router = APIRouter(prefix="/api/market", tags=["market"])
 
@@ -133,6 +134,12 @@ def _trailing_return(series: pd.Series, n: int) -> float | None:
     if len(s) <= n or s.iloc[-n - 1] == 0:
         return None
     return round((float(s.iloc[-1]) / float(s.iloc[-n - 1]) - 1.0) * 100.0, 2)
+
+
+@router.get("/fx-rates")
+async def fx_rates_endpoint(base: str = "USD"):
+    """FX rates panel: 16 currency pairs vs base with changes and sparklines."""
+    return await asyncio.to_thread(fx_service.fx_rates, base.upper())
 
 
 @router.get("/risk")
