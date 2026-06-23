@@ -110,3 +110,119 @@ export interface FxResponse {
   date: string | null;
   rates: Record<string, number>;
 }
+
+// --- Portfolio ---
+export interface PortfolioHolding {
+  ticker: string;
+  weight: number | null;
+  totalReturn: number | null;
+  contribution: number | null;
+}
+
+export interface PortfolioMetrics {
+  totalReturn: number | null;
+  annReturn: number | null;
+  annVolatility: number | null;
+  sharpe: number | null;
+  sortino: number | null;
+  maxDrawdown: number | null;
+  var95: number | null;
+  beta: number | null;
+}
+
+export interface PortfolioResponse {
+  holdings: PortfolioHolding[];
+  series: { date: string; value: number }[];
+  metrics: PortfolioMetrics;
+  missing: string[];
+  benchmark?: string;
+}
+
+// --- Sector heatmap ---
+export interface SectorPerf {
+  ticker: string;
+  sector: string;
+  changePercent: number | null;
+}
+export interface SectorsResponse {
+  period: string;
+  sectors: SectorPerf[];
+}
+
+// --- Relative strength ---
+export interface RelStrengthRow {
+  ticker: string;
+  benchmark: string;
+  ret1m: number | null;
+  ret1mRel: number | null;
+  ret3m: number | null;
+  ret3mRel: number | null;
+  ret6m: number | null;
+  ret6mRel: number | null;
+}
+export interface RelStrengthResponse {
+  rankings: RelStrengthRow[];
+}
+
+// --- Screener ---
+export interface ScreenerRow {
+  ticker: string;
+  name: string;
+  sector: string | null;
+  sharpe: number | null;
+  beta: number | null;
+  zScore: number | null;
+  valuation: RatioGroup;
+  leverage: RatioGroup;
+  liquidity: RatioGroup;
+  profitability: RatioGroup;
+}
+export interface ScreenerResponse {
+  fields: string[];
+  filters: { field: string; op: string; value: number }[];
+  sort: string;
+  count: number;
+  screened: number;
+  results: ScreenerRow[];
+}
+
+// --- Events overlay ---
+export interface EventsResponse {
+  ticker: string;
+  earnings: string | null;
+  dividends: { date: string; amount: number }[];
+  splits: { date: string; ratio: number }[];
+}
+
+// --- Yield curve ---
+export interface YieldPoint {
+  tenor: string;
+  years: number;
+  yield: number | null;
+}
+export interface YieldCurveResponse {
+  points: YieldPoint[];
+  spread10y3m: number | null;
+  spread10y5y: number | null;
+  inverted: boolean;
+}
+
+// --- Admin health ---
+export interface CacheStat {
+  hits: number;
+  misses: number;
+  hitRate: number | null;
+  size: number;
+}
+export interface HealthResponse {
+  status: string;
+  uptimeSeconds: number;
+  cache: {
+    byName: Record<string, CacheStat>;
+    totalHits: number;
+    totalMisses: number;
+    overallHitRate: number | null;
+    ttlSeconds: number;
+  };
+  config: { fredApiKey: boolean };
+}

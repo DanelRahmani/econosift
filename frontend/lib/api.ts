@@ -1,10 +1,25 @@
 import type {
   PricesResponse, Quote, RiskResponse, ValuationResponse, RatiosResponse,
   SearchResult, Indicator, Country, MacroResponse, FxResponse,
+  PortfolioResponse, SectorsResponse, RelStrengthResponse, ScreenerResponse,
+  EventsResponse, YieldCurveResponse, HealthResponse,
 } from "./types";
 
 async function get<T>(path: string): Promise<T> {
   const res = await fetch(`/api${path}`, { cache: "no-store" });
+  if (!res.ok) {
+    throw new Error(`API ${path} failed: ${res.status}`);
+  }
+  return res.json() as Promise<T>;
+}
+
+async function post<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(`/api${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    cache: "no-store",
+  });
   if (!res.ok) {
     throw new Error(`API ${path} failed: ${res.status}`);
   }
@@ -47,4 +62,27 @@ export const api = {
 
   fx: (base: string, targets: string) =>
     get<FxResponse>(`/macro/fx?base=${base}&targets=${encodeURIComponent(targets)}`),
+
+  portfolio: (holdings: { ticker: string; weight: number }[], period: string, riskFree = 0.04) =>
+    post<PortfolioResponse>(`/portfolio/analyze`, { holdings, period, risk_free: riskFree }),
+
+  sectors: (period: string) =>
+    get<SectorsResponse>(`/market/sectors?period=${period}`),
+
+  relativeStrength: (tickers: string) =>
+    get<RelStrengthResponse>(`/market/relative-strength?tickers=${encodeURIComponent(tickers)}`),
+
+  screener: (universe: string, filters: string, sort: string, period: string) =>
+    get<ScreenerResponse>(
+      `/screener?universe=${encodeURIComponent(universe)}&filters=${encodeURIComponent(filters)}` +
+      `&sort=${sort}&period=${period}`),
+
+  events: (ticker: string) =>
+    get<EventsResponse>(`/market/events/${encodeURIComponent(ticker)}`),
+
+  yieldCurve: () =>
+    get<YieldCurveResponse>(`/macro/yield-curve`),
+
+  health: () =>
+    get<HealthResponse>(`/admin/health`),
 };

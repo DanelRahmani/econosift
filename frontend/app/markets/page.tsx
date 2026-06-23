@@ -12,10 +12,14 @@ import { RiskMetricsTable } from "@/components/markets/RiskMetricsTable";
 import { CorrelationMatrix } from "@/components/markets/CorrelationMatrix";
 import { ValuationTab } from "@/components/markets/ValuationTab";
 import { RatiosTab } from "@/components/markets/RatiosTab";
+import { PortfolioTab } from "@/components/markets/PortfolioTab";
+import { RankingsTab } from "@/components/markets/RankingsTab";
+import { SectorHeatmap } from "@/components/markets/SectorHeatmap";
+import { ScreenerTab } from "@/components/markets/ScreenerTab";
 import { Watchlist } from "@/components/Watchlist";
 
 const PERIODS = ["1mo", "3mo", "6mo", "1y", "2y", "5y"];
-const TABS = ["Overview", "Risk", "Valuation", "Ratios"] as const;
+const TABS = ["Overview", "Risk", "Valuation", "Ratios", "Portfolio", "Rankings", "Sectors", "Screener"] as const;
 type Tab = (typeof TABS)[number];
 
 function MarketsPageInner() {
@@ -122,7 +126,7 @@ function MarketsPageInner() {
             </button>
           ))}
         </div>
-        {(tab === "Overview" || tab === "Risk") && (
+        {(tab === "Overview" || tab === "Risk" || tab === "Portfolio") && (
           <div className="flex gap-1">
             {PERIODS.map((p) => (
               <button
@@ -139,7 +143,7 @@ function MarketsPageInner() {
         )}
       </div>
 
-      {!tickers.length && (
+      {!tickers.length && tab !== "Sectors" && tab !== "Screener" && (
         <Card><div className="text-text-muted">Search and add a ticker to begin.</div></Card>
       )}
 
@@ -184,6 +188,22 @@ function MarketsPageInner() {
 
       {tab === "Ratios" && tickers.length > 0 && (
         <RatiosTab tickers={tickers} />
+      )}
+
+      {tab === "Portfolio" && (
+        <PortfolioTab tickers={tickers} period={period} />
+      )}
+
+      {tab === "Rankings" && (
+        <RankingsTab tickers={tickers} />
+      )}
+
+      {tab === "Sectors" && (
+        <SectorHeatmap />
+      )}
+
+      {tab === "Screener" && (
+        <ScreenerTab />
       )}
     </div>
   );
