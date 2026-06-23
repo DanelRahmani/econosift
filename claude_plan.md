@@ -3,7 +3,7 @@
 ## Stack
 - **Backend**: Python FastAPI
 - **Frontend**: Next.js (TypeScript, React)
-- **Data**: All free — yfinance (primary), FRED (fredapi), Eurostat, World Bank, OECD, IMF WEO, Finnhub (free tier), FinanceDatabase, CFTC (direct file download), SEC EDGAR (edgartools), NY Fed (direct file download)
+- **Data**: All free — yfinance (primary), FRED (fredapi), Eurostat, World Bank, OECD, IMF WEO, Finnhub (free tier), FinanceDatabase, Wikipedia MediaWiki API, CFTC (direct file download), SEC EDGAR (edgartools), NY Fed (direct file download)
 - **Cost**: $0 — no paid APIs, no web scraping
 - **Rule**: Only use free APIs, pip-installable libraries, or direct structured file downloads (CSV/Excel/ZIP from stable government/institutional URLs). No HTML scraping of any kind.
 
@@ -25,6 +25,40 @@ Execute phases in order. Phase 0 unblocks user trust; Phases 1–10 build out th
 | 8 | Macro Expansion | Medium |
 | 9 | Snowflake Composite Score | Low |
 | 10 | Sector Performance Charts | Low |
+
+---
+
+## Index Constituent Lists — Wikipedia MediaWiki API
+
+All index constituent lists (S&P 500, Nasdaq 100, Dow 30) are fetched via the **Wikipedia MediaWiki Action API** — a free, structured JSON API, not HTML scraping.
+
+**Method**:
+1. Call the MediaWiki API with `action=parse&prop=wikitext&page=<page_title>&format=json` to retrieve raw wikitext for the relevant Wikipedia article.
+2. Parse the wikitext tables using `wikitextparser` (`pip install wikitextparser`) to extract structured rows (ticker, company name, sector, industry, date added etc.).
+3. Cache results weekly — index compositions change infrequently (~4× per year for S&P 500, less for others).
+
+**Wikipedia page titles**:
+- S&P 500: `"List of S&P 500 companies"`
+- Nasdaq 100: `"Nasdaq-100"`
+- Dow 30: `"Dow Jones Industrial Average"`
+
+**API endpoint**: `https://en.wikipedia.org/w/api.php?action=parse&prop=wikitext&page={title}&format=json`
+
+**Example** (Python):
+```python
+import requests, wikitextparser as wtp
+
+def fetch_sp500_constituents():
+    url = "https://en.wikipedia.org/w/api.php"
+    params = {"action": "parse", "prop": "wikitext", "page": "List of S&P 500 companies", "format": "json"}
+    r = requests.get(url, params=params, headers={"User-Agent": "AxiomFinance/1.0"})
+    wikitext = r.json()["parse"]["wikitext"]["*"]
+    parsed = wtp.parse(wikitext)
+    table = parsed.tables[0]  # first table = current constituents
+    return table.data()  # list of lists
+```
+
+This is a **JSON API call** — `requests` fetches JSON, `wikitextparser` parses wikitext syntax. No HTML is parsed at any point.
 
 ---
 
@@ -82,7 +116,7 @@ Implement 2×2 Goldilocks matrix: GDP trend (FRED `GDPC1`) × CPI trend (FRED `C
 
 ## Phase 2 — Market Breadth & Dashboard
 
-**2.1 Breadth Bar** — S&P 500 constituent list loaded from `backend/data/sp500_constituents.json` (static file, updated manually when index changes, ~4× per year). Nasdaq 100 from `backend/data/nasdaq100_constituents.json`. Dow 30 from `backend/data/dow30_constituents.json`. Batch-download 1Y daily prices via `yf.download()` in chunks of 100. Compute: Advancing/Declining, New Highs/Lows, % Above SMA50, % Above SMA200, McClellan Oscillator, Cumulative A/D Line. Display as segmented bars, sticky at top of Markets page.
+**2.1 Breadth Bar** — S&P 500 constituent list fetched via the Wikipedia MediaWiki API (see "Index Constituent Lists" section above), cached weekly. Batch-download 1Y daily prices via `yf.download()` in chunks of 100. Compute: Advancing/Declining, New Highs/Lows, % Above SMA50, % Above SMA200, McClellan Oscillator, Cumulative A/D Line. Display as segmented bars, sticky at top of Markets page.
 
 **McClellan Oscillator formula** — Ratio-adjusted version:
 - RANA = `(Advances − Declines) / (Advances + Declines)`
@@ -112,7 +146,7 @@ Verdicts: 0–20 Extreme Fear → 80–100 Extreme Greed. Speedometer gauge, 90-
 
 ## Phase 3 — S&P 500 Treemap
 
-Hierarchical JSON: S&P 500 → Sector → Industry → Stock. Constituent list from `backend/data/sp500_constituents.json`. Rectangle area = log(market cap), colour = daily return % on red-white-green diverging scale (−5% deep red, 0% white, +5% deep green).
+Hierarchical JSON: S&P 500 → Sector → Industry → Stock. Constituent list fetched via Wikipedia MediaWiki API (cached weekly). Rectangle area = log(market cap), colour = daily return % on red-white-green diverging scale (−5% deep red, 0% white, +5% deep green).
 
 Rendering: `d3-hierarchy` squarified treemap for layout; React renders SVG rects. Hover tooltip (name, price, 1D%, mkt cap, P/E, 52W range). Click stock → navigate to Markets tab. Click sector → drill down.
 
@@ -146,13 +180,13 @@ Route `/calendar`. Sub-tabs: Economic / Earnings / Dividends / IPO.
 ## Phase 5 — Screener Overhaul
 
 **Universes**:
-- S&P 500 — from `backend/data/sp500_constituents.json`
-- Nasdaq 100 — from `backend/data/nasdaq100_constituents.json`
-- Dow 30 — from `backend/data/dow30_constituents.json`
+- S&P 500 — Wikipedia MediaWiki API (`"List of S&P 500 companies"`) parsed with `wikitextparser`, cached weekly
+- Nasdaq 100 — Wikipedia MediaWiki API (`"Nasdaq-100"`) parsed with `wikitextparser`, cached weekly
+- Dow 30 — Wikipedia MediaWiki API (`"Dow Jones Industrial Average"`) parsed with `wikitextparser`, cached weekly
 - Small-Cap proxy — FinanceDatabase `Equities().select(country="United States")` filtered by market cap <$2B. Label as "Small-Cap Universe (~3,000–5,000 tickers)", **not** "Russell 2000", as results include OTC stocks and are approximate.
 - Custom — manual ticker entry.
 
-**Pipeline**: Overnight cron — load constituent list from JSON → batch-fetch fundamentals from yfinance → cache in Parquet/SQLite. Price metrics refresh daily; fundamentals weekly. Run with `ThreadPoolExecutor(max_workers=10)`.
+**Pipeline**: Overnight cron — fetch constituent list via Wikipedia MediaWiki API → batch-fetch fundamentals from yfinance → cache in Parquet/SQLite. Price metrics refresh daily; fundamentals weekly. Run with `ThreadPoolExecutor(max_workers=10)`.
 
 **Screener columns** (in addition to standard P/E, P/B, EV/EBITDA):
 - Short Float % — `Ticker.info["shortPercentOfFloat"]` (US only; `None` for most non-US)
@@ -241,7 +275,7 @@ Reorganise Macro tab: Overview | Rates & Yields | Inflation | Growth & Employmen
 **Leading Indicators sub-tab**:
 - **Conference Board LEI** (FRED `USSLIND`) — flag when YoY change turns negative.
 - **OECD CLI** — multi-country via OECD.Stat HTTP REST API (no key required). G7 + major EMs.
-- **GSCPI** (NY Fed) — monthly Excel file downloaded directly from `https://www.newyorkfed.org/medialibrary/research/interactives/gscpi/downloads/gscpi_data.xlsx` via `pandas.read_excel`. This is a direct structured file download from a stable institutional URL. Values above 0 = above-average supply chain pressure. If URL returns 404, log warning and serve last cached value.
+- **GSCPI** (NY Fed) — monthly Excel file downloaded directly from `https://www.newyorkfed.org/medialibrary/research/interactives/gscpi/downloads/gscpi_data.xlsx` via `pandas.read_excel`. Direct structured file download from a stable institutional URL. Values above 0 = above-average supply chain pressure. If URL returns 404, log warning and serve last cached value.
 - **CFNAI** (FRED `CFNAI`) — values below −0.70 historically precede recessions.
 - **ISM PMI** — historical data via FRED series `NAPM` (available through 2023); live/upcoming ISM Manufacturing and Services PMI readings via Finnhub `/calendar/economic` (provides actual, forecast, previous). Display as time series with 50-line expansion/contraction threshold; annotate the 2023 FRED data cutoff.
 
@@ -305,24 +339,6 @@ Rendering: `recharts RadarChart`. Click axis → navigate to relevant tab.
 
 ---
 
-## Static Data Files (bundled in repo, updated manually)
-
-These files replace any need for web scraping of index constituent lists:
-
-| File | Contents | Update Frequency |
-|---|---|---|
-| `backend/data/sp500_constituents.json` | S&P 500 tickers + sector/industry | ~4× per year (index rebalances) |
-| `backend/data/nasdaq100_constituents.json` | Nasdaq 100 tickers + sector | ~4× per year |
-| `backend/data/dow30_constituents.json` | Dow 30 tickers + sector | Rare (~1–2× per year) |
-| `backend/data/cb_meetings.json` | Central bank meeting dates (FOMC, ECB, BOE, BOJ etc.) | 2× per year |
-| `backend/data/event_impact.json` | Impact ratings for economic events | As needed |
-| `backend/data/damodaran_erp_2026.json` | Country equity risk premiums | Annually (Jan) |
-| `backend/data/sector_multiples.json` | Sector median EV/EBITDA multiples | Annually (Jan) |
-
-All constituent JSON files follow the schema: `[{"ticker": "AAPL", "name": "Apple Inc.", "sector": "Technology", "industry": "Consumer Electronics"}, ...]`
-
----
-
 ## Data Source Quick Reference
 
 | Source | Install / Access | Key | Used For |
@@ -335,6 +351,7 @@ All constituent JSON files follow the schema: `[{"ticker": "AAPL", "name": "Appl
 | IMF WEO | Direct Excel download (stable URL) | None | 190-country forecasts, debt (Apr/Oct) |
 | Finnhub | `pip install finnhub-python` | Free key required | Earnings/IPO calendar, live ISM PMI event data |
 | FinanceDatabase | `pip install financedatabase` | None | Small-cap universe construction, sector classification |
+| Wikipedia MediaWiki API | `pip install wikitextparser` + `requests` | None | S&P 500, Nasdaq 100, Dow 30 constituent lists (JSON API + wikitext parse) |
 | Damodaran | Direct Excel download (annual) | None | Country ERP, sector multiples |
 | CFTC | Direct ZIP download (`cftc.gov`) | None | COT positioning data |
 | SEC EDGAR | `pip install edgartools` | None | 13F institutional holdings, Form 4 insider trades |
@@ -348,11 +365,11 @@ All constituent JSON files follow the schema: `[{"ticker": "AAPL", "name": "Appl
 |---|---|
 | Every 15min (market hours), hourly (off-hours) | Index prices, FX, commodities, VIX, S&P 500 constituent prices |
 | Daily (11pm UTC) | Screener metrics, Fear & Greed, breadth stats + cumulative A/D, movers, options chains, sector ETFs, rolling risk, Snowflake scores |
-| Weekly (Friday after 6pm ET) | COT report (CFTC releases Fridays), earnings calendar |
+| Weekly (Friday after 6pm ET) | COT report (CFTC releases Fridays), earnings calendar, constituent lists (Wikipedia MediaWiki API) |
 | Weekly (Thursday) | Initial jobless claims (FRED `ICSA`) |
 | Monthly | OECD CLI, Eurostat, FRED monthly series, World Bank, GSCPI (NY Fed Excel), M2, LEI, CFNAI |
 | Quarterly | 13F institutional holdings (edgartools, 45-day lag) |
-| Annually (Jan) | Damodaran ERP + multiples; update static constituent JSON files |
+| Annually (Jan) | Damodaran ERP + multiples |
 | Biannually (Apr/Oct) | IMF WEO |
 
 Use `cachetools` for development, Redis for production. Cache key must include all relevant parameters (ticker, period, country). Expose `/api/admin/cache/clear` for manual invalidation.
@@ -361,9 +378,9 @@ Use `cachetools` for development, Redis for production. Cache key must include a
 
 ## Notes for Claude Code
 - **No web scraping** — never use `BeautifulSoup`, `requests` to parse HTML, `Selenium`, or any HTML parsing to extract data. All data must come from structured APIs, pip libraries, or direct file downloads (CSV/Excel/ZIP).
+- **Wikipedia constituent lists** — use the MediaWiki Action API (`action=parse&prop=wikitext`) + `wikitextparser` to extract tables as structured data. This is a JSON API call, not HTML scraping.
 - Always implement safe `.get()` with fallbacks on `yf.Ticker(t).info` — fields can return `None`
 - Use `yf.download()` for batch price requests; never loop individual `Ticker()` calls for large universes
-- Constituent lists come from static JSON files in `backend/data/` — never attempt to fetch them dynamically from the web
 - Phase 9 (Snowflake) depends on Phase 5 universe cache — implement Phase 5 first
 - For inapplicable valuation models, render a grey locked card with explanation — never hide it
 - Sector normalisation in Phase 9: percentile rank within sector peers; invert for "lower = better" metrics
