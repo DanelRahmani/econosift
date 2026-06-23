@@ -9,217 +9,228 @@
 
 ---
 
+## Global UX Rule — Information Hierarchy
+
+**Every data analysis section must follow this two-tier layout:**
+
+1. **Top tier — Key indicators** (always visible, no scroll): The 3–6 most intuitive, decision-relevant metrics for that section. These should be immediately readable by someone without a finance background. Examples: Price, Market Cap, P/E, Beta, Dividend Yield for a stock overview; CPI YoY, Unemployment Rate, Fed Funds Rate for macro.
+2. **Bottom tier — Full extended list** (below a divider or in expandable panels): Every computed metric, model output, and advanced indicator for that section. It is acceptable — and expected — for a metric like Beta to appear in both the top KPI row and again in the detailed Risk section below. Repetition in service of clarity is correct.
+
+This rule applies to: stock overview, valuation tab, risk tab, options tab, macro sub-tabs, screener columns, and portfolio analytics.
+
+---
+
+## Compute Classification Policy
+
+Every feature is classified by compute cost. This classification must be respected at implementation time.
+
+- 🟢 **Default** — runs automatically on page load and in overnight cron. Milliseconds per ticker.
+- 🟡 **On-demand** — shown as a greyed-out panel with a "Calculate" button. Triggered per user request, runs in 1–5 seconds. Never in cron.
+- 🔴 **User-triggered only** — shown as a locked panel with a prominent "Run Analysis" button and a warning: *"This calculation is compute-intensive and may take 15–60 seconds."* Never on page load, never in cron, never triggered automatically.
+
+---
+
 ## Phase Map
-Execute phases in order. Phase 0 unblocks user trust; Phases 1–10 build out the platform.
 
 | Phase | Feature | Priority |
 |---|---|---|
 | 0 | Critical Bug Fixes | Immediate |
-| 1 | Valuation Engine (8 models) | High |
+| 1 | Valuation Engine | High |
 | 2 | Market Breadth & Dashboard | High |
 | 3 | S&P 500 Treemap | High |
 | 4 | Economic Calendar | Medium |
 | 5 | Screener Overhaul | Medium |
-| 6 | Rolling Quantitative Metrics | Medium |
+| 6 | Risk & Rolling Metrics | Medium |
 | 7 | Options & IV Module | Medium |
 | 8 | Macro Expansion | Medium |
 | 9 | Snowflake Composite Score | Low |
 | 10 | Sector Performance Charts | Low |
+| 11 | Portfolio Analytics | Low |
+| 12 | Advanced Technicals | Low |
 
 ---
 
 ## Index Constituent Lists — Wikipedia MediaWiki API
 
-All index constituent lists (S&P 500, Nasdaq 100, Dow 30) are fetched via the **Wikipedia MediaWiki Action API** — a free, structured JSON API, not HTML scraping.
+All index constituent lists are fetched via the **Wikipedia MediaWiki Action API** — a free structured JSON API, not HTML scraping.
 
-**Method**:
-1. Call the MediaWiki API with `action=parse&prop=wikitext&page=<page_title>&format=json` to retrieve raw wikitext for the relevant Wikipedia article.
-2. Parse the wikitext tables using `wikitextparser` (`pip install wikitextparser`) to extract structured rows (ticker, company name, sector, industry, date added etc.).
-3. Cache results weekly — index compositions change infrequently (~4× per year for S&P 500, less for others).
+- Call `https://en.wikipedia.org/w/api.php?action=parse&prop=wikitext&page={title}&format=json`
+- Parse returned wikitext with `wikitextparser` (`pip install wikitextparser`) to extract table rows
+- Cache weekly. Pages: `"List of S&P 500 companies"`, `"Nasdaq-100"`, `"Dow Jones Industrial Average"`
 
-**Wikipedia page titles**:
-- S&P 500: `"List of S&P 500 companies"`
-- Nasdaq 100: `"Nasdaq-100"`
-- Dow 30: `"Dow Jones Industrial Average"`
-
-**API endpoint**: `https://en.wikipedia.org/w/api.php?action=parse&prop=wikitext&page={title}&format=json`
-
-**Example** (Python):
 ```python
 import requests, wikitextparser as wtp
-
-def fetch_sp500_constituents():
-    url = "https://en.wikipedia.org/w/api.php"
-    params = {"action": "parse", "prop": "wikitext", "page": "List of S&P 500 companies", "format": "json"}
-    r = requests.get(url, params=params, headers={"User-Agent": "AxiomFinance/1.0"})
-    wikitext = r.json()["parse"]["wikitext"]["*"]
-    parsed = wtp.parse(wikitext)
-    table = parsed.tables[0]  # first table = current constituents
-    return table.data()  # list of lists
+params = {"action": "parse", "prop": "wikitext", "page": "List of S&P 500 companies", "format": "json"}
+r = requests.get("https://en.wikipedia.org/w/api.php", params=params, headers={"User-Agent": "AxiomFinance/1.0"})
+table = wtp.parse(r.json()["parse"]["wikitext"]["*"]).tables[0]
+data = table.data()  # list of lists — no HTML parsed
 ```
-
-This is a **JSON API call** — `requests` fetches JSON, `wikitextparser` parses wikitext syntax. No HTML is parsed at any point.
 
 ---
 
 ## Phase 0 — Bug Fixes (Do First)
 
-**0.1 Valuation Tab — DCF panel is blank**
-Two-stage DCF using slider inputs (Risk-Free Rate, Market Premium, FCF Growth, Terminal Growth). Fetch TTM FCF and shares outstanding from `yfinance`. Output: intrinsic value per share, Bear/Base/Bull scenario table, 7×7 sensitivity heatmap (FCF Growth vs WACC), colour-coded by upside/downside vs current price.
+**0.1 DCF panel blank** — Two-stage DCF with slider inputs. Fetch TTM FCF + shares from yfinance. Output: intrinsic value, Bear/Base/Bull table, 7×7 sensitivity heatmap (FCF Growth vs WACC).
 
-**0.2 Macro Tab — FX Rates panel empty**
-Fetch 15+ major currency pairs via yfinance (`EURUSD=X` format). Show current rate, 1D/1W/1M/1Y change %, 30-day sparkline per pair. Add base currency switcher (USD/EUR/GBP).
+**0.2 FX Rates panel empty** — 15+ pairs via yfinance (`EURUSD=X`). Rate, 1D/1W/1M/1Y change%, 30-day sparkline, base currency switcher.
 
-**0.3 Macro Tab — Regime Classifier stuck on "Detecting..."**
-Implement 2×2 Goldilocks matrix: GDP trend (FRED `GDPC1`) × CPI trend (FRED `CPIAUCSL`) → Goldilocks / Reflation / Stagflation / Recession. Also for Eurozone (Eurostat API) and Japan (OECD.Stat API). Output: 4-quadrant scatter, animated dot, regime badge, time scrubber from 2000.
-
-**Data lag note**: Eurozone and Japan GDP/CPI are released 6–8 weeks after the reference period. The animated dot always reflects the latest *available* data period — label it "as of [latest available quarter/month]", never imply live data for non-US regions.
+**0.3 Regime Classifier stuck** — 2×2 Goldilocks matrix: FRED `GDPC1` × `CPIAUCSL` → Goldilocks/Reflation/Stagflation/Recession. Eurozone via Eurostat API, Japan via OECD.Stat. 4-quadrant scatter, animated dot, time scrubber from 2000. Label "as of [latest available period]" — Eurozone/Japan lag 6–8 weeks.
 
 ---
 
 ## Phase 1 — Valuation Engine
 
-**Architecture**: Single `CountrySelector` at top of Valuation tab auto-detects stock's listing country from Yahoo exchange code, fetches live 10Y government bond yield (FRED), applies Damodaran Jan 2026 ERP (store in `backend/data/damodaran_erp_2026.json`), computes WACC. All 8 models share these rates.
+**Architecture**: `CountrySelector` auto-detects listing country from Yahoo exchange code → fetches 10Y gov bond yield (FRED) → applies Damodaran 2026 ERP (`backend/data/damodaran_erp_2026.json`) → computes WACC. All models share these rates.
 
-**8 Valuation Models** (each as an expandable card in a 2×4 grid):
+### Stock Page — Top KPI Row 🟢
+Price, Market Cap, P/E (TTM), Forward P/E, EPS (TTM), Dividend Yield, 52W High/Low, Beta, Average Volume.
 
-1. **DCF (Two-Stage)** — 10-year FCF projection + terminal value. Heatmap + scenario table.
-2. **DDM (Gordon Growth)** — `P₀ = D₁ / (r − g)`. Only render if `dividendRate > 0`, else grey locked card.
-3. **Graham Formula** — `V* = EPS × (8.5 + 2g) × 4.4 / Y`. Y = live AAA yield from FRED series `AAA`. `g` is a whole number (e.g. 8 for 8% growth).
-4. **Graham Number** — `√(22.5 × EPS × BVPS)`. Requires EPS > 0 and BVPS > 0. 22.5 = Graham's max P/E (15) × max P/B (1.5).
-5. **Peter Lynch / PEG** — Fair value = `EPS × growth_rate` where `growth_rate` is a whole number (e.g. 15 for 15%). Cap at 20. PEG = `(P/E) / growth_rate`. PEG verdict badge.
-6. **EV/EBITDA Comps** — Static `sector_multiples.json` (Damodaran-sourced) is the **primary** source for sector median multiples. Live peer fetch via FinanceDatabase is an optional enhancement only — never block rendering on it. Not applicable for Financials sector.
-7. **Residual Income (RIM)** — `Intrinsic Value = BVPS + PV(RI stream)`. ROE sourced first from `Ticker.info["returnOnEquity"]`; if `None`, compute manually as `net_income / avg(equity_t, equity_t-1)` from `Ticker.financials` and `Ticker.balance_sheet`. If neither available, lock the card with explanation. Best for banks/REITs.
-8. **EPV (Earnings Power Value)** — `EPV (firm) = Adjusted NOPAT / WACC`. Per-share: `(EPV − net debt) / shares outstanding`. Net debt = total debt − cash.
+### Stock Page — Extended Fundamentals 🟢
+- **EV/FCF** — `enterpriseValue` / TTM FCF from `Ticker.cashflow`
+- **FCF Yield** — `(TTM FCF / shares) / price` %
+- **Short Float %** — `Ticker.info["shortPercentOfFloat"]`. >20% red, 10–20% orange. `N/A` if None
+- **Short Ratio** — `Ticker.info["shortRatio"]` (days to cover)
+- **Earnings Revision** — `Ticker.earnings_forecasts` (yfinance ≥0.2.28, guard with `hasattr`). ↑/↓/↔ badge vs 30/60/90 days ago
+- **ROIC** — `NOPAT / (equity + debt − cash)`. NOPAT = `EBIT × (1 − tax_rate)`
+- **CAPM Required Return** 🟢 — `Rf + β × (Rm − Rf)`. Rf = FRED `DGS10`, β from 60M regression vs `^GSPC`, Rm = 10% historical assumption. Display as "Required Return: X%" vs current earnings yield
+- **Cash Conversion Cycle** 🟢 — `DIO + DSO − DPO` from balance sheet. Lower = better capital efficiency
+- **DuPont Decomposition** 🟢 — ROE = Net Margin × Asset Turnover × Equity Multiplier (3-factor). Extended 5-factor: also Tax Burden × Interest Burden. Show waterfall breakdown
+- **Piotroski F-Score** 🟢 — 9-point binary score across profitability (4), leverage (3), efficiency (2). >7 = strong, <3 = weak. Fully computed from `Ticker.financials` + `Ticker.balance_sheet`
+- **Beneish M-Score** 🟢 — 8-variable earnings manipulation detection. M > −1.78 = possible manipulator. All inputs from yfinance
+- **Ohlson O-Score** 🟢 — bankruptcy probability logistic model. Complement to Altman Z-Score; more reliable for financial firms
+- **ESG Scores** 🟢 — `Ticker.sustainability` (Yahoo/Sustainalytics). Environment, Social, Governance scores + controversy level. `N/A` if unavailable
 
-**Axiom Fair Value** (Phase 1.9): Weighted composite of applicable models (DCF 30%, Comps 20%, RIM 15%, EPV 15%, Graham Formula 10%, Lynch 5%, DDM 5%). Verdict: Significantly Under/Modestly Under/Fair/Modestly Over/Significantly Overvalued. Gauge + needle at top of tab.
+### Analyst Data 🟢
+- **Price Target** — `Ticker.analyst_price_targets`: mean, high, low, upside% vs current price. Display as band on price chart
+- **Consensus Rating** — `Ticker.recommendations_summary`: Strong Buy/Buy/Hold/Sell/Strong Sell counts as bar. 12-month history of rating changes
+- **Earnings Surprise History** — `Ticker.earnings_history`: actual vs estimated EPS last 8 quarters, surprise % per quarter. Chart with beat/miss colour coding
+- **Forward Estimates Table** — `Ticker.earnings_estimate` + `revenue_estimate`: current Q, next Q, current year, next year
+- **Growth Estimates** — `Ticker.growth_estimates`: EPS growth vs sector and S&P 500
 
-**Stock page KPI additions** (alongside price/market cap row):
-- **EV/FCF** — `Ticker.info["enterpriseValue"]` / TTM FCF from `Ticker.cashflow`.
-- **FCF Yield** — `(TTM FCF / shares outstanding) / price`. Display as %.
-- **Short Float %** — `Ticker.info["shortPercentOfFloat"]`. Colour: >20% red, 10–20% orange, <10% neutral. `N/A` if `None` (common for non-US).
-- **Short Ratio** — `Ticker.info["shortRatio"]` (days to cover). `N/A` if `None`.
-- **Earnings Revision** — `Ticker.earnings_forecasts` (yfinance ≥0.2.28). Guard with `hasattr` + version check. Compare current EPS mean estimate to 30/60/90 days ago; display ↑ / ↓ / ↔ badge. `N/A` if unavailable.
-- **ROIC** — `NOPAT / (total equity + total debt − cash)`. NOPAT = `EBIT × (1 − effective_tax_rate)`. From `Ticker.financials` and `Ticker.balance_sheet`. `N/A` if any input is missing.
+### 8 Valuation Models (2×4 grid) 🟢
+1. **DCF (Two-Stage)** — 10Y FCF projection + terminal value. Heatmap + scenario table
+2. **DDM (Gordon Growth)** — `P₀ = D₁ / (r − g)`. Lock if `dividendRate = 0`
+3. **Graham Formula** — `V* = EPS × (8.5 + 2g) × 4.4 / Y`. Y = FRED `AAA`. g = whole number
+4. **Graham Number** — `√(22.5 × EPS × BVPS)`. Requires EPS > 0 and BVPS > 0
+5. **Peter Lynch / PEG** — Fair value = `EPS × growth_rate` (whole number, cap 20). PEG verdict badge
+6. **EV/EBITDA Comps** — `sector_multiples.json` primary; FinanceDatabase peer fetch optional only. Not for Financials
+7. **Residual Income (RIM)** — `BVPS + PV(RI stream)`. ROE from `Ticker.info` or computed from financials; lock if unavailable
+8. **EPV** — `Adjusted NOPAT / WACC` firm value; subtract net debt, divide by shares
 
-**Key files to create:**
-- `backend/routes/valuation.py`
-- `backend/services/valuation_engine.py`
-- `backend/services/discount_rates.py`
-- `backend/services/peer_fetcher.py`
-- `backend/data/damodaran_erp_2026.json`
-- `backend/data/sector_multiples.json`
-- `frontend/app/markets/tabs/Valuation.tsx`
-- `frontend/components/valuation/` (CountrySelector, CompositePanel, ValuationGauge, ModelCard, SensitivityHeatmap, ScenarioTable, WarningFlags)
+### Additional Valuation Models
+- **CAPM Implied Fair Value** 🟢 — back out price implied by CAPM required return vs forward EPS
+- **Fama-French 3-Factor** 🟡 — regress stock returns on market (MKT-RF), size (SMB), value (HML). Factor data from Ken French Data Library (direct CSV download, free). Show factor loadings + expected return
+- **Fama-French 5-Factor** 🟡 — extends 3F with profitability (RMW) and investment (CMA) factors
+
+**Axiom Fair Value** — weighted composite of applicable models (DCF 30%, Comps 20%, RIM 15%, EPV 15%, Graham Formula 10%, Lynch 5%, DDM 5%). Gauge + needle. Verdict: Significantly Under → Significantly Overvalued.
+
+**Key files**: `backend/routes/valuation.py`, `backend/services/valuation_engine.py`, `backend/services/discount_rates.py`, `backend/data/damodaran_erp_2026.json`, `backend/data/sector_multiples.json`
 
 ---
 
 ## Phase 2 — Market Breadth & Dashboard
 
-**2.1 Breadth Bar** — S&P 500 constituent list fetched via the Wikipedia MediaWiki API (see "Index Constituent Lists" section above), cached weekly. Batch-download 1Y daily prices via `yf.download()` in chunks of 100. Compute: Advancing/Declining, New Highs/Lows, % Above SMA50, % Above SMA200, McClellan Oscillator, Cumulative A/D Line. Display as segmented bars, sticky at top of Markets page.
+**2.1 Breadth Bar** — S&P 500 constituents via Wikipedia MediaWiki API, cached weekly. `yf.download()` in chunks of 100. Advancing/Declining, New Highs/Lows, % Above SMA50/200, McClellan Oscillator, Cumulative A/D Line. Sticky at top of Markets page.
 
-**McClellan Oscillator formula** — Ratio-adjusted version:
-- RANA = `(Advances − Declines) / (Advances + Declines)`
-- McClellan Oscillator = `19-day EMA of RANA − 39-day EMA of RANA`
-- 19-day EMA multiplier = 0.10; 39-day EMA multiplier = 0.05
+**McClellan Oscillator**: RANA = `(A−D)/(A+D)`. Oscillator = 19-day EMA(RANA) − 39-day EMA(RANA). Multipliers: 0.10 / 0.05.
 
-**Cumulative A/D Line** — Running cumulative sum of daily (Advances − Declines), 3-year lookback. Plot as time-series overlaid with S&P 500 price. Divergence (index new high but A/D not confirming) is a warning signal. Computed entirely from the existing constituent price cache — no additional data source.
+**Cumulative A/D Line**: 3Y rolling sum of (A−D). Overlaid on S&P 500 price. Divergence = warning signal.
 
-**2.2 Global Indices Table** — ~25 indices via yfinance (`^GSPC`, `^GDAXI`, `^N225` etc.). Price, 1D%, 5-day sparkline, 1M%, YTD%. Region tabs, sortable columns.
+**2.2 Global Indices** — ~25 indices via yfinance. Price, 1D%, 5-day sparkline, 1M%, YTD%. Region tabs.
 
-**2.3 Fear & Greed Index** — 7 signals scored 0–100, averaged:
-1. S&P 500 vs 125-day SMA (z-score normalised)
-2. New 52W Highs vs Lows ratio (from constituent cache)
-3. **McClellan Summation Index** (cumulative sum of ratio-adjusted McClellan Oscillator, percentile-ranked over 2Y lookback)
-4. Put/Call Ratio — SPY options chain from yfinance (`yf.Ticker("SPY").option_chain(nearest_expiry)`), aggregate put OI / call OI. Secondary: FRED `CBOE/PUTCALL` if available. Inverted.
-5. VIX (`^VIX`, inverted percentile over 2Y lookback)
-6. Stocks vs Bonds relative return (`^GSPC` vs `TLT`, 20-day rolling)
-7. HY Credit Spread (FRED `BAMLH0A0HYM2`, inverted)
+**2.3 Fear & Greed Index** — 7 signals scored 0–100:
+1. S&P 500 vs 125-day SMA (z-score)
+2. New 52W Highs vs Lows ratio
+3. McClellan Summation Index (percentile over 2Y)
+4. Put/Call Ratio — SPY options chain via yfinance, put OI / call OI. Inverted
+5. VIX (`^VIX`) inverted percentile over 2Y
+6. Stocks vs Bonds 20-day return (`^GSPC` vs `TLT`)
+7. HY Credit Spread (FRED `BAMLH0A0HYM2`) inverted
 
-Verdicts: 0–20 Extreme Fear → 80–100 Extreme Greed. Speedometer gauge, 90-day history chart, signal breakdown panel.
+Speedometer gauge, 90-day history, signal breakdown panel.
 
-**2.4 Dashboard Page** — New route `/dashboard` as default landing page. Layout: Breadth Bar → 3-column header (Fear&Greed / Session status / Regime badge) → Global Indices Table → Yield Curve + Top Movers → Sector bars → Mini calendar strip.
+**2.4 Dashboard** — `/dashboard` default landing. Breadth Bar → Fear&Greed / Regime badge / Session status → Global Indices → Yield Curve + Top Movers → Sector bars → Mini calendar strip.
 
-**2.5 Top Movers** — From constituent cache: Top 5 Gainers, Losers, Unusual Volume (>2× avg), 52W Highs/Lows. Tabbed compact table on dashboard.
+**2.5 Top Movers** — Gainers, Losers, Unusual Volume (>2× avg), 52W Highs/Lows from constituent cache.
 
 ---
 
 ## Phase 3 — S&P 500 Treemap
 
-Hierarchical JSON: S&P 500 → Sector → Industry → Stock. Constituent list fetched via Wikipedia MediaWiki API (cached weekly). Rectangle area = log(market cap), colour = daily return % on red-white-green diverging scale (−5% deep red, 0% white, +5% deep green).
-
-Rendering: `d3-hierarchy` squarified treemap for layout; React renders SVG rects. Hover tooltip (name, price, 1D%, mkt cap, P/E, 52W range). Click stock → navigate to Markets tab. Click sector → drill down.
-
-Controls: Period selector (1D/1W/1M/3M/YTD/1Y), Index selector (S&P 500/Nasdaq 100/Dow 30), Group by (Sector/Industry), Colour by (Return/Mkt Cap/Volume).
-
-Replace existing Sectors tab heatmap with treemap as primary view. Embed compact non-interactive version on Dashboard.
+S&P 500 → Sector → Industry → Stock. Constituent list via Wikipedia MediaWiki API. Area = log(market cap), colour = return% (−5% deep red, 0% white, +5% deep green). `d3-hierarchy` squarified layout. Hover tooltip: name, price, 1D%, mkt cap, P/E, 52W range. Controls: period, index (S&P/NDX/Dow), group by, colour by.
 
 ---
 
 ## Phase 4 — Economic Calendar
 
 Route `/calendar`. Sub-tabs: Economic / Earnings / Dividends / IPO.
+- **Macro**: Finnhub `/calendar/economic` primary + FRED release calendar
+- **CB dates**: `backend/data/cb_meetings.json`, updated 2× per year
+- **Earnings**: `yf.Ticker(t).calendar` + Finnhub `/calendar/earnings`. Overnight cron, `ThreadPoolExecutor(max_workers=10)`
+- **Dividends**: `Ticker.info["exDividendDate"]` batch in same cron
+- **IPO**: Finnhub `/calendar/ipo`
 
-**Data sources:**
-- **Macro events**: Finnhub `/calendar/economic` (primary — returns event name, date, actual, forecast, previous for all major economies). Supplement with FRED release calendar for US-specific events.
-- **Central bank meeting dates**: Store in `backend/data/cb_meetings.json` (FOMC, ECB, BOE, BOJ etc.), updated manually twice a year.
-- **Earnings**: `yf.Ticker(t).calendar` + Finnhub `/calendar/earnings`. Run as overnight background cron with `ThreadPoolExecutor(max_workers=10)` — never on-demand.
-- **Dividends**: `yf.Ticker(t).info["exDividendDate"]` batch computed in same overnight cron.
-- **IPO**: Finnhub `/calendar/ipo`.
-
-**UX**: Weekly grid Mon–Sun, today highlighted. Filter by impact (★★★/★★/★), country, category, timezone. Actual vs Consensus colouring (green = beat, red = miss). Countdown timers for events within 24h.
-
-**High-impact events** (hardcode impact=3 in `event_impact.json`):
-- US: NFP, CPI, Core PCE, GDP advance, Retail Sales, FOMC Decision, ISM PMI (via Finnhub calendar), Weekly Jobless Claims
-- EU: ECB Rate Decision, Eurozone CPI Flash, Eurozone GDP
-- UK: BOE Decision, UK CPI, UK GDP
-- JP: BOJ Decision, Japan CPI
+Weekly grid, today highlighted. Filter by impact (★★★/★★/★), country, timezone. Green/red beat/miss colouring. Countdown timers within 24h.
 
 ---
 
 ## Phase 5 — Screener Overhaul
 
-**Universes**:
-- S&P 500 — Wikipedia MediaWiki API (`"List of S&P 500 companies"`) parsed with `wikitextparser`, cached weekly
-- Nasdaq 100 — Wikipedia MediaWiki API (`"Nasdaq-100"`) parsed with `wikitextparser`, cached weekly
-- Dow 30 — Wikipedia MediaWiki API (`"Dow Jones Industrial Average"`) parsed with `wikitextparser`, cached weekly
-- Small-Cap proxy — FinanceDatabase `Equities().select(country="United States")` filtered by market cap <$2B. Label as "Small-Cap Universe (~3,000–5,000 tickers)", **not** "Russell 2000", as results include OTC stocks and are approximate.
-- Custom — manual ticker entry.
+**Universes**: S&P 500 / Nasdaq 100 / Dow 30 (Wikipedia MediaWiki API, weekly cache), Small-Cap proxy (FinanceDatabase, label "Small-Cap Universe ~3,000–5,000 tickers", not "Russell 2000"), Custom.
 
-**Pipeline**: Overnight cron — fetch constituent list via Wikipedia MediaWiki API → batch-fetch fundamentals from yfinance → cache in Parquet/SQLite. Price metrics refresh daily; fundamentals weekly. Run with `ThreadPoolExecutor(max_workers=10)`.
+**Pipeline**: Overnight cron → Wikipedia API fetch → yfinance batch fundamentals → Parquet/SQLite cache. `ThreadPoolExecutor(max_workers=10)`.
 
-**Screener columns** (in addition to standard P/E, P/B, EV/EBITDA):
-- Short Float % — `Ticker.info["shortPercentOfFloat"]` (US only; `None` for most non-US)
-- Short Ratio — `Ticker.info["shortRatio"]`
-- ROIC — computed (see Phase 1 definition); `N/A` if inputs missing
-- FCF Yield — computed
-- EV/FCF — computed
-- Earnings Revision 30D — `Ticker.earnings_forecasts` (guarded with `hasattr`)
+### Screener Top Columns (default visible) 🟢
+Ticker, Name, Price, 1D%, Market Cap, P/E, Forward P/E, EPS, Dividend Yield, Beta, Volume, Sector.
+
+### Screener Extended Columns 🟢
+P/B, EV/EBITDA, EV/FCF, FCF Yield, ROIC, Short Float%, Short Ratio, Gross Margin, Net Margin, ROE, ROA, Debt/Equity, Current Ratio, Revenue Growth YoY, EPS Growth YoY, Earnings Revision 30D, Piotroski F-Score, Altman Z-Score, ESG Score.
 
 **Preset Signal Pills**:
 - Price Action: Top Gainers, Biggest Losers, New 52W High/Low, Above/Below SMA200, Golden/Death Cross
-- Volume: Unusual Volume (>2× avg), Overbought (RSI>70), Oversold (RSI<30), High Beta
-- Fundamentals: Undervalued, High Dividend, High ROIC, Quality Growth, Deep Value, High Short Interest (>20% float)
-- Situations: Earnings This Week, Post-Earnings, Pre-Earnings Dip, Insider Buying (Form 4 code-P transactions in last 30 days)
+- Volume: Unusual Volume, Overbought (RSI>70), Oversold (RSI<30), High Beta
+- Fundamentals: Undervalued, High Dividend, High ROIC, Quality Growth, Deep Value, High Short Interest (>20%)
+- Situations: Earnings This Week, Post-Earnings, Pre-Earnings Dip, Insider Buying (Form 4 code-P last 30 days), Activist Target (SC 13D filed last 90 days)
 
 **Result View Tabs**: Overview | Performance | Technicals | Valuation | Profitability | Dividends | Financials | Balance Sheet | All Columns. Sortable, CSV-exportable.
 
-**Charts View**: Gallery of 200×120px sparkline thumbnails (last 3M closes + SMA50). Canvas-based rendering.
+**Charts View**: 200×120px sparkline gallery (3M closes + SMA50), canvas-based.
 
 ---
 
-## Phase 6 — Rolling Quantitative Metrics
+## Phase 6 — Risk & Rolling Metrics
 
-Rolling Metrics section on Risk tab. Window selector: 20D / 60D (default) / 120D / 252D.
+### Top Risk KPIs (always visible) 🟢
+Beta (vs S&P 500), 30-day Realised Volatility (annualised), Max Drawdown (3Y), Sharpe Ratio (1Y), VaR 95% (1-day parametric).
 
-**Metrics** (3Y history):
-- Rolling Sharpe Ratio (annualised, FRED `DGS10` as risk-free rate)
+### Rolling Metrics 🟢
+Window: 20D / 60D (default) / 120D / 252D. 3Y history.
+- Rolling Sharpe Ratio (FRED `DGS10` as Rf)
 - Rolling Volatility (stddev × √252)
 - Rolling Beta (vs `^GSPC`)
 - Rolling Sortino Ratio
 - Rolling Max Drawdown (filled area)
 - Rolling Correlation (between selected ticker pairs)
-- Rolling VaR 95% and 99%
+- Rolling VaR 95% and 99% (parametric)
+
+### Extended Risk Metrics 🟢
+- **Expected Shortfall / CVaR** — average loss beyond VaR threshold. More robust tail risk measure
+- **Calmar Ratio** — annualised return / max drawdown. Favoured by hedge funds
+- **Omega Ratio** — `∫(1−F(r))dr / ∫F(r)dr`. Captures full return distribution unlike Sharpe
+- **Treynor Ratio** — `(Rp − Rf) / β`. Sharpe but using systematic risk only
+- **Jensen's Alpha** — actual return minus CAPM-predicted return. Measures skill/outperformance
+- **Historical VaR** — non-parametric, uses actual return distribution (complement to parametric VaR above)
+- **CAPM Decomposition** — total risk split into systematic (β²×σ²_m) and idiosyncratic (residual) components
+
+### On-Demand Risk Models 🟡
+- **Hurst Exponent** — H > 0.5 = trending, H < 0.5 = mean-reverting, H ≈ 0.5 = random walk. ~2s per ticker
+- **Ornstein-Uhlenbeck Fit** — estimate mean-reversion speed θ, long-run mean μ, vol σ via MLE. Signal for pairs trading. ~2s per pair
+- **GARCH(1,1) Volatility Forecast** — conditional volatility model via `arch` library. Better forward vol estimate than rolling stddev. ~3s per ticker
+- **Pairs Cointegration Test** — Engle-Granger or Johansen test between two tickers. Spread z-score chart. ~3s per pair
+
+### User-Triggered Only 🔴
+- **Monte Carlo VaR** — 10,000 GBM simulations, show full P&L distribution. Never on page load
+- **Stress Testing** — simulate portfolio P&L under: 2008 GFC, 2020 COVID crash, 2022 rate shock, 2000 dot-com. Replay actual return sequences against user-defined portfolio weights
 
 Two views: Overlay (all tickers, metric selector) and Grid (2×3).
 
@@ -227,101 +238,112 @@ Two views: Overlay (all tickers, metric selector) and Grid (2×3).
 
 ## Phase 7 — Options Tab
 
-**KPI Cards**: IV30, IV Rank, IV Percentile, Put/Call OI Ratio, Max Pain, Implied Earnings Move.
+### Top Options KPIs (always visible) 🟢
+IV30, IV Rank, IV Percentile, Put/Call OI Ratio, Max Pain, Implied Earnings Move.
 
-**IV Rank formula**: `(current_IV − min_IV_52w) / (max_IV_52w − min_IV_52w) × 100`
+**IV Rank**: `(current_IV − min_52w) / (max_52w − min_52w) × 100`
+**IV30 interpolation**: linear interpolation between two expiries bracketing 30 DTE. Fallback: nearest single expiry ATM IV, labelled "nearest expiry IV".
 
-**IV30 interpolation**: Find the two expiries bracketing 30 DTE and linearly interpolate ATM IV. If fewer than 2 expiries bracket 30 DTE, fall back to nearest single expiry ATM IV and label as "nearest expiry IV" not "IV30".
+### Options Models 🟢
+- **Black-Scholes Pricing** — call/put theoretical price for each strike/expiry. Greeks: Delta (Δ), Gamma (Γ), Theta (Θ), Vega (V), Rho (ρ). Computed via closed-form formula (`scipy.stats.norm`). IV backsolve via `scipy.optimize.brentq`. Display BS theoretical vs market price to surface mispricing
+- **Binomial Tree Pricing** — American-style pricing (100-step CRR tree). Captures early-exercise premium that BS underestimates. On-demand per contract row
 
-**Charts**: IV Term Structure (ATM IV vs DTE, annotate earnings date) + IV Smile (IV vs moneyness 0.70–1.30).
+### Charts
+- IV Term Structure (ATM IV vs DTE, annotate earnings date)
+- IV Smile (IV vs moneyness 0.70–1.30)
+- OI Profile: horizontal bar, calls (green) right / puts (red) left, max pain line
 
-**Chain Table**: Calls | strikes | puts. ITM rows tinted. OTM-only toggle. Synced expiry selector.
+### Chain Table
+Calls | Strikes | Puts. ITM rows tinted. OTM-only toggle. Synced expiry selector. All from `yf.Ticker(t).option_chain(expiry)`. IV is decimal — multiply ×100 for display. Label "delayed ~15min".
 
-**OI Profile**: Horizontal bar chart, calls (green) right, puts (red) left. Max pain line annotated.
-
-All data from `yf.Ticker(t).option_chain(expiry)`. IV is decimal (0.34 = 34%) — multiply by 100 for display. Label data as "delayed ~15min".
+### User-Triggered Only 🔴
+- **Monte Carlo Options Pricing** — 10,000 GBM path simulations per option. Distribution of terminal prices, percentile payoff chart. Warning: compute-intensive.
 
 ---
 
 ## Phase 8 — Macro Expansion
 
-Reorganise Macro tab: Overview | Rates & Yields | Inflation | Growth & Employment | Commodities | FX | Leading Indicators | Positioning.
+Macro tab sub-tabs: Overview | Rates & Yields | Inflation | Growth & Employment | Housing | Commodities | FX | Leading Indicators | Financial Conditions | Positioning.
 
-**Commodities**: ~25 via yfinance futures (CL=F, GC=F, HG=F, ZC=F etc.). Dr. Copper vs World Bank GDP, Gold/Oil ratio with FRED recession shading (`USREC`), Axiom Commodity Index.
+### Each Sub-Tab Layout Rule
+Top section: 3–5 headline numbers (e.g. Fed Funds Rate, 10Y yield, 2Y10Y spread for Rates). Full chart section below.
 
-**Rates & Yields sub-tab**:
-- CB policy rates, yield curve spreads (2Y10Y, 3M10Y)
-- TIPS/breakeven: FRED `T5YIE`, `T10YIE`
-- Real yields: FRED `DFII10`
-- **SOFR** (FRED `SOFR`) — benchmark overnight rate. Chart vs Fed Funds Rate (`FEDFUNDS`).
-- **IG Credit Spread** (FRED `BAMLC0A0CM`) alongside HY spread (`BAMLH0A0HYM2`).
-- **TED Spread proxy** — FRED `DTB3` minus FRED `SOFR`. Spikes = interbank funding stress.
-- **Corporate bond yields by rating** — FRED BofA series: AAA (`BAMLC0A1CAAA`), AA (`BAMLC0A2CAA`), A (`BAMLC0A3CA`), BBB (`BAMLC0A4CBBB`), BB (`BAMLH0A1HYBB`), B (`BAMLH0A2HYB`). All on one chart.
+### Rates & Yields
+**Top**: Fed Funds Rate (`FEDFUNDS`), 10Y Treasury yield (`DGS10`), 2Y yield (`DGS2`), 2Y10Y spread, 30Y mortgage rate (`MORTGAGE30US`).
+**Full list**: Yield curve (3M–30Y), 3M10Y spread, TIPS breakeven 5Y (`T5YIE`) & 10Y (`T10YIE`), real yields (`DFII10`), SOFR (`SOFR`) vs Fed Funds, IG spread (`BAMLC0A0CM`), HY spread (`BAMLH0A0HYM2`), TED spread proxy (`DTB3` − `SOFR`), corporate bond yields by rating (AAA→B, FRED BofA series).
 
-**Growth & Employment sub-tab**:
-- GDP, unemployment rate, NFP
-- **Weekly Initial Jobless Claims** (FRED `ICSA`) — most frequent US labour signal. Chart with 4-week MA + recession shading.
-- **Continuing Claims** (FRED `CCSA`)
-- **M2 Money Supply** (FRED `M2SL`) — YoY growth rate, overlaid with CPI.
-- **Sahm Rule** (FRED `SAHMREALTIME`) — threshold 0.50. Shade chart red when ≥ 0.50.
+**Taylor Rule** 🟢 — `r = r* + π + 0.5(π − π*) + 0.5(Y − Y*)`. r* = 0.5%, π* = 2%, output gap from FRED `GDPC1` vs CBO potential. Chart implied rate vs actual `FEDFUNDS`. Gap = policy deviation signal.
 
-**Inflation sub-tab**:
-- CPI (FRED `CPIAUCSL`), Core CPI (`CPILFESL`)
-- **PCE** (FRED `PCEPI`) and Core PCE (`PCEPILFE`) — Fed's preferred gauge.
-- **PPI** (FRED `PPIACO`)
-- **5Y5Y Forward Inflation** (FRED `T5YIFR`)
-- Breakeven: 5Y (`T5YIE`), 10Y (`T10YIE`)
+**Yield Curve Decomposition (ACM)** 🟢 — NY Fed ACM model data (direct Excel download, free). Decompose 10Y yield into expectations component (avg future short rates) vs term premium. Chart both over time.
 
-**Leading Indicators sub-tab**:
-- **Conference Board LEI** (FRED `USSLIND`) — flag when YoY change turns negative.
-- **OECD CLI** — multi-country via OECD.Stat HTTP REST API (no key required). G7 + major EMs.
-- **GSCPI** (NY Fed) — monthly Excel file downloaded directly from `https://www.newyorkfed.org/medialibrary/research/interactives/gscpi/downloads/gscpi_data.xlsx` via `pandas.read_excel`. Direct structured file download from a stable institutional URL. Values above 0 = above-average supply chain pressure. If URL returns 404, log warning and serve last cached value.
-- **CFNAI** (FRED `CFNAI`) — values below −0.70 historically precede recessions.
-- **ISM PMI** — historical data via FRED series `NAPM` (available through 2023); live/upcoming ISM Manufacturing and Services PMI readings via Finnhub `/calendar/economic` (provides actual, forecast, previous). Display as time series with 50-line expansion/contraction threshold; annotate the 2023 FRED data cutoff.
+### Inflation
+**Top**: CPI YoY (`CPIAUCSL`), Core CPI YoY (`CPILFESL`), PCE YoY (`PCEPI`), Core PCE YoY (`PCEPILFE`), 5Y Breakeven (`T5YIE`).
+**Full list**: PPI (`PPIACO`), 5Y5Y Forward Inflation (`T5YIFR`), 10Y Breakeven (`T10YIE`), M2 YoY growth overlaid with CPI (`M2SL`).
 
-**FX sub-tab**: DXY (`DX-Y.NYB`), currency heatmap (grid of crosses, 1D change %), EM FX emphasis.
+**Quantity Theory of Money** 🟢 — MV = PQ. Plot M2 growth (`M2SL`) vs nominal GDP growth. Compute velocity of money V = nominal GDP / M2. Chart V over time — declining velocity explains "missing inflation" post-QE.
 
-**Positioning sub-tab**:
+### Growth & Employment
+**Top**: Real GDP YoY (`GDPC1`), Unemployment Rate (`UNRATE`), NFP MoM (`PAYEMS`), Initial Jobless Claims (`ICSA`), Labour Participation Rate (`CIVPART`).
+**Full list**: Continuing Claims (`CCSA`), Average Hourly Earnings YoY (`CES0500000003`), JOLTS Job Openings (`JTSJOL`), Quit Rate (`JTSQUR`), Sahm Rule (`SAHMREALTIME`) — shade red when ≥ 0.50, Industrial Production (`INDPRO`), Capacity Utilization (`TCU`), Trade Balance (`BOPGSTB`).
 
-**COT Report (Commitment of Traders)**
-- Source: CFTC direct ZIP file downloads — `https://www.cftc.gov/dcom/files/dcotnoc.zip` (current year) and `https://www.cftc.gov/files/dea/history/deacot_1986_2016.zip` (historical). Direct structured file downloads from a US government URL — no scraping.
-- Parse with `pandas.read_csv(skipinitialspace=True)`. Always `.strip()` all column names and string values — trailing spaces are endemic in CFTC files.
-- Key contracts: S&P 500 E-mini (code 13874+), Nasdaq 100 E-mini (209742), EUR/USD (099741), Gold (088691), WTI Crude (067651), 10Y Treasury Note (043602).
-- For each: chart net Non-Commercial (speculator) positioning over time.
-- **COT Index** = `(current_net_spec − min_52w) / (max_52w − min_52w) × 100`. >80% = extreme speculator longs (contrarian bearish).
+### Housing
+**Top**: Case-Shiller HPI YoY (`CSUSHPISA`), Housing Starts (`HOUST`), 30Y Mortgage Rate (`MORTGAGE30US`), Existing Home Sales (`EXHOSLUSM495S`).
+Housing starts lead construction sector by ~6 months. Chart all four with recession shading.
 
-**SEC Form 4 Insider Trades**
-- Source: SEC EDGAR REST API (free, no key required): `https://efts.sec.gov/LATEST/search-index?q="{ticker}"&forms=4&dateRange=custom&startdt={start}&enddt={end}`. JSON response — no HTML parsing.
-- Filter: code `P` = open-market buy, code `S` = open-market sell. Exclude code `A` (RSU award — not discretionary).
-- On stock pages: timeline chart overlaid on price (green arrow = buy, red = sell). Insider Buy/Sell ratio last 90 days as badge.
-- In screener: "Insider Buying" preset = tickers with at least one code-P transaction in last 30 days.
-- Rate limit: `time.sleep(0.15)` between EDGAR calls.
+### Commodities
+**Top**: WTI Crude (CL=F), Gold (GC=F), Natural Gas (NG=F), Copper (HG=F), Wheat (ZW=F).
+**Full list**: ~25 futures via yfinance. Dr. Copper vs World Bank GDP, Gold/Oil ratio with `USREC` shading, Axiom Commodity Index (equal-weighted). Bitcoin (`CBBTCUSD` from FRED) on this tab.
 
-**SEC 13F Institutional Holdings**
-- Source: `edgartools` library (`pip install edgartools`, free, no key). Queries SEC EDGAR JSON APIs under the hood — no HTML parsing. Usage: `from edgar import Company; Company(ticker).get_filings(form="13F-HR")`.
-- For stock pages: top 10 institutional holders — fund name | shares | % of float | QoQ change | filing date.
-- Label: "as of [quarter end] — 45-day reporting lag."
-- Rate limit: `time.sleep(0.1)` between calls.
+### FX
+**Top**: DXY (`DX-Y.NYB`), EUR/USD, USD/JPY, GBP/USD, USD/CNY.
+**Full list**: Currency heatmap (grid of crosses, 1D change%), EM FX emphasis.
+**PPP** 🟢 — for G10 pairs: compute PPP rate = (domestic CPI / foreign CPI) × base rate. Plot PPP vs spot. Over/undervaluation % badge. CPI data from FRED and Eurostat.
+
+### Leading Indicators
+**Top**: Conference Board LEI (`USSLIND`) YoY, OECD CLI (G7), CFNAI (`CFNAI`), ISM PMI (Finnhub calendar).
+**Full list**: GSCPI (NY Fed Excel download — `https://www.newyorkfed.org/medialibrary/research/interactives/gscpi/downloads/gscpi_data.xlsx`), ISM historical via FRED `NAPM` through 2023 with 50-line threshold.
+
+**IS-LM-PC Model** 🟢 — Interactive 3-panel chart:
+- IS curve: output (GDP gap) vs interest rate, derived from FRED GDP + FEDFUNDS
+- LM curve: money market equilibrium, M2 + nominal GDP
+- Phillips Curve: unemployment vs inflation (FRED `UNRATE` + `CPIAUCSL`), show current position dot + 10Y trail
+Annotate supply/demand shocks. Educational tool showing macro interdependencies.
+
+### Financial Conditions
+**Top**: NFCI (`NFCI`) — Chicago Fed National Financial Conditions Index, STLFSI4 (`STLFSI4`) — St. Louis Financial Stress Index, Fed Balance Sheet total assets (`WALCL`).
+**Full list**: Credit card delinquency rate (`DRCCLACBS`), consumer loan delinquency (`DRCLACBS`), C&I loans (`TOTCI`), Economic Policy Uncertainty (`USEPUINDXD`).
+NFCI < 0 = looser than average, > 0 = tighter. WALCL chart shows QE/QT cycles.
+
+### Positioning
+**COT Report** — CFTC ZIP downloads (`https://www.cftc.gov/dcom/files/dcotnoc.zip` current, historical archive). `pandas.read_csv(skipinitialspace=True)`, always `.strip()` columns. Key contracts: S&P 500 E-mini (13874+), NDX E-mini (209742), EUR/USD (099741), Gold (088691), WTI (067651), 10Y Note (043602). COT Index = `(net_spec − min_52w) / (max_52w − min_52w) × 100`.
+
+**SEC Form 4 Insider Trades** — EDGAR REST API (free, no key): `https://efts.sec.gov/LATEST/search-index?q="{ticker}"&forms=4`. Code P = buy, S = sell, A = award (exclude). Timeline on price chart. `time.sleep(0.15)` between calls.
+
+**SEC 13F Institutional Holdings** — `edgartools` (`pip install edgartools`). `Company(ticker).get_filings(form="13F-HR")`. Top 10 holders, QoQ change, filing date. Label "45-day reporting lag". `time.sleep(0.1)`.
+
+**SC 13D/G Beneficial Ownership** — `edgartools`. When entity accumulates >5% of shares — activist investor signal. Show on stock page as "Activist Watch" badge.
+
+**DEF 14A Executive Compensation** — `edgartools`. CEO total comp, pay ratio. Display on stock page fundamentals panel.
+
+**8-K Material Events** — `edgartools`. Earnings releases, M&A announcements, leadership changes. Timeline on stock page.
 
 ---
 
 ## Phase 9 — Snowflake Composite Score
 
-Pentagon radar chart, 0–10 per axis, sector-normalised (percentile rank within sector peers from Phase 5 cache):
+Pentagon radar chart, 0–10 per axis, sector-normalised (percentile rank within sector peers).
 
-1. **Value** — P/E, EV/EBITDA, EV/FCF, FCF Yield, P/B, PEG
-2. **Future Growth** — EPS growth estimate, revenue growth YoY, earnings revision 30D, R&D intensity
-3. **Past Performance** — 3Y revenue CAGR, 3Y EPS CAGR, ROE avg, gross margin trend, price alpha vs sector
-4. **Financial Health** — Altman Z-Score (>3.0 safe, 1.8–3.0 grey, <1.8 distress), ROIC vs WACC spread, interest coverage, current ratio, net cash, debt/equity
-5. **Dividend** — Yield vs peers, payout ratio, 5Y CAGR, consistency, FCF coverage. Score 0 if no dividend.
+**Top display**: Overall score badge + 5-axis radar. Verdict text + top 3 Rewards (✓) + top 3 Risks (⚠).
 
-Invert percentile for "lower = better" metrics. Fallback to industry → market-wide if <10 sector peers.
+1. **Value** 🟢 — P/E, EV/EBITDA, EV/FCF, FCF Yield, P/B, PEG
+2. **Future Growth** 🟢 — EPS growth estimate, revenue growth YoY, earnings revision 30D, R&D intensity
+3. **Past Performance** 🟢 — 3Y revenue CAGR, 3Y EPS CAGR, ROE avg, gross margin trend, price alpha vs sector
+4. **Financial Health** 🟢 — Altman Z-Score, Piotroski F-Score, Ohlson O-Score, Beneish M-Score flag, ROIC vs WACC spread, interest coverage, current ratio, net cash, debt/equity
+5. **Dividend** 🟢 — Yield vs peers, payout ratio, 5Y CAGR, consistency, FCF coverage. Score 0 if no dividend
 
-**Placement**: Overview tab (alongside price chart), screener Charts view thumbnail, Valuation tab next to Axiom Fair Value.
+Invert percentile for lower-is-better metrics. Fallback to industry → market-wide if <10 sector peers.
 
-**Additional**: Rules-based verdict text + top 3 Rewards (✓) and top 3 Risks (⚠) from sub-metric scores.
-
-Rendering: `recharts RadarChart`. Click axis → navigate to relevant tab.
+Placement: Overview tab, Screener Charts view thumbnail, Valuation tab next to Axiom Fair Value. `recharts RadarChart`. Click axis → navigate to relevant tab.
 
 ---
 
@@ -329,33 +351,87 @@ Rendering: `recharts RadarChart`. Click axis → navigate to relevant tab.
 
 11 SPDR ETFs (XLF, XLK, XLE, XLV, XLI, XLY, XLP, XLB, XLRE, XLC, XLU) from yfinance.
 
-**Bar Charts**: 6 horizontal bar charts (1D, 1W, 1M, 3M, YTD, 1Y). Sorted by return per chart. S&P 500 reference line.
+**Top**: 1D return bar chart for all 11 sectors at a glance.
+**Full**: 6 horizontal bar charts (1D/1W/1M/3M/YTD/1Y), sorted by return. Fundamentals table (Overview/Valuation/Performance/Volatility tabs). Industry drill-down: click sector → top-3 stocks per industry → Screener filtered view.
 
-**Fundamentals Table**: Overview / Valuation / Performance / Volatility tabs. ETF prices + median constituent fundamentals from Phase 5 cache.
+**Sector Rotation Clock**: Sam Stovall 4-quadrant (Early/Mid/Late/Recession). Sectors sized/coloured by relative performance vs S&P 500. Implied phase from 3M ETF returns. Cross-validate with Phase 0.3 Regime Clock.
 
-**Industry Drill-Down**: Click sector → industries (top-3 stocks by mkt cap per industry). Breadcrumb navigation → Screener filtered to industry.
+---
 
-**Sector Rotation Clock**: Sam Stovall 4-quadrant framework (Early/Mid/Late/Recession). Sectors placed canonically, sized/coloured by relative performance vs S&P 500. Implied phase from 3M ETF returns. Cross-validate with Phase 0.3 Regime Clock.
+## Phase 11 — Portfolio Analytics
+
+Route `/portfolio`. User inputs a list of tickers + weights (or equal-weight default).
+
+### Top Portfolio KPIs (always visible) 🟢
+Total Return, Annualised Return, Annualised Volatility, Sharpe Ratio, Max Drawdown, Beta vs S&P 500.
+
+### Portfolio Analytics 🟢
+- **Performance vs Benchmark** — portfolio return overlaid with `^GSPC` and `AGG` (bonds). Time period selector.
+- **CAPM Attribution** — portfolio alpha + beta vs market. Jensen's Alpha displayed prominently
+- **Correlation Matrix** — heatmap of pairwise correlations between holdings. `seaborn`-style diverging colour scale
+- **Contribution to Risk** — % of total portfolio variance contributed by each holding
+- **Drawdown Chart** — underwater equity curve, annotate recovery periods
+- **Rolling Metrics** — portfolio-level rolling Sharpe, Vol, Beta (same as Phase 6 but portfolio-level)
+
+### On-Demand 🟡
+- **Kelly Criterion Position Sizing** — `f* = (bp − q) / b`. Estimate win-rate + avg win/loss from historical returns. Display optimal sizing per holding. ~2s
+- **Fama-French Attribution** 🟡 — decompose portfolio returns into MKT-RF, SMB, HML (3F) or + RMW, CMA (5F). Factor data from Ken French Data Library (direct CSV download). ~3s
+
+### User-Triggered Only 🔴
+- **Efficient Frontier (MPT)** — `scipy.optimize` minimisation over covariance matrix. Plot minimum variance portfolio, maximum Sharpe portfolio, full frontier curve. Input: tickers from Phase 5 cache, lookback period selector. Warning: slow for >20 holdings
+- **Monte Carlo Portfolio Simulation** — 10,000 random weight portfolios. Scatter plot risk vs return, colour by Sharpe. Overlay efficient frontier
+- **Black-Litterman Model** — blend CAPM equilibrium returns with user-specified views (view input form: "I think AAPL will outperform by X%"). Output: BL posterior expected returns + optimal weights. Depends on efficient frontier
+- **Stress Testing** — replay 2008 GFC / 2020 COVID / 2022 rate shock / 2000 dot-com return sequences against portfolio weights. Show max drawdown per scenario table
+
+---
+
+## Phase 12 — Advanced Technicals
+
+All indicators 🟢 unless noted. Added to the existing chart/technical tab on stock pages and screener.
+
+### Top Technical Summary (always visible) 🟢
+Trend (SMA50 vs SMA200 → Bullish/Bearish), RSI (14-day), MACD signal, Volume vs 20-day avg, 52W position (% from high/low).
+
+### Extended Technical Indicators 🟢
+- **Bollinger Bands** — 20-day SMA ± 2σ. %B = `(price − lower) / (upper − lower)`. Bandwidth = `(upper − lower) / SMA`. Squeeze when Bandwidth at 6M low
+- **ATR (Average True Range)** — `max(H−L, |H−C_prev|, |L−C_prev|)` 14-day. Absolute volatility, stop-loss sizing reference
+- **OBV (On-Balance Volume)** — cumulative volume momentum. Divergence from price = early reversal signal
+- **Chaikin Money Flow (CMF)** — 20-period. Positive = buying pressure, negative = selling pressure
+- **VWAP** — Volume Weighted Average Price. Intraday institutional reference. Reset daily
+- **Stochastic RSI** — RSI of RSI(14). More sensitive overbought/oversold than standard RSI
+- **Williams %R** — momentum oscillator −100 to 0. <−80 = oversold, >−20 = overbought
+- **Ichimoku Cloud** — Tenkan (9), Kijun (26), Senkou A & B (52), Chikou. Price above cloud = uptrend; below = downtrend. Show toggleable overlay on price chart
+- **Fibonacci Retracement** — auto-detect last significant swing high/low from 1Y price data. Draw 23.6%, 38.2%, 50%, 61.8%, 78.6% levels
+- **Pivot Points** — daily/weekly/monthly classic pivot + S1/S2/R1/R2 from OHLC
+
+### Screener Technical Presets (additions to Phase 5)
+- Bollinger Squeeze Active
+- Ichimoku Bullish/Bearish Cross
+- OBV Divergence (price new high but OBV not confirming)
+- CMF Positive + RSI < 50 (accumulation before breakout)
 
 ---
 
 ## Data Source Quick Reference
 
 | Source | Install / Access | Key | Used For |
-|---|---|---|---|
-| yfinance | `pip install yfinance` | None | Prices, fundamentals, options, FX, commodities, short interest |
-| FRED | `pip install fredapi` | Free key required | All macro series: yields, inflation, employment, credit, M2, Sahm, LEI etc. |
+|---|---|---|
+| yfinance | `pip install yfinance` | None | Prices, fundamentals, options, FX, futures, ESG, analyst data |
+| FRED | `pip install fredapi` | Free key | All macro: yields, inflation, employment, credit, M2, housing etc. |
 | Eurostat | `pip install eurostat` | None | EU GDP, HICP, unemployment |
-| World Bank | `pip install wbdata` | None | Global GDP, debt, current account |
-| OECD.Stat | HTTP REST API (no install) | None | CLI, MEI, Japan macro |
-| IMF WEO | Direct Excel download (stable URL) | None | 190-country forecasts, debt (Apr/Oct) |
-| Finnhub | `pip install finnhub-python` | Free key required | Earnings/IPO calendar, live ISM PMI event data |
-| FinanceDatabase | `pip install financedatabase` | None | Small-cap universe construction, sector classification |
-| Wikipedia MediaWiki API | `pip install wikitextparser` + `requests` | None | S&P 500, Nasdaq 100, Dow 30 constituent lists (JSON API + wikitext parse) |
-| Damodaran | Direct Excel download (annual) | None | Country ERP, sector multiples |
-| CFTC | Direct ZIP download (`cftc.gov`) | None | COT positioning data |
-| SEC EDGAR | `pip install edgartools` | None | 13F institutional holdings, Form 4 insider trades |
-| NY Fed | Direct Excel download (stable URL) | None | GSCPI (supply chain pressure) |
+| World Bank | `pip install wbdata` | None | Global GDP, debt |
+| OECD.Stat | HTTP REST API | None | CLI, MEI, Japan macro |
+| IMF WEO | Direct Excel download | None | 190-country forecasts (Apr/Oct) |
+| Finnhub | `pip install finnhub-python` | Free key | Earnings/IPO/economic calendar |
+| FinanceDatabase | `pip install financedatabase` | None | Small-cap universe, sector classification |
+| Wikipedia MediaWiki API | `pip install wikitextparser` + `requests` | None | S&P 500, Nasdaq 100, Dow 30 constituent lists |
+| Damodaran | Direct Excel download | None | Country ERP, sector multiples |
+| CFTC | Direct ZIP download | None | COT positioning data |
+| SEC EDGAR | `pip install edgartools` | None | 13F, Form 4, 10-K/Q, 8-K, SC 13D, DEF 14A |
+| NY Fed | Direct Excel download | None | GSCPI, ACM yield curve decomposition |
+| Ken French | Direct CSV download | None | Fama-French factor returns (3F + 5F) |
+| `scipy` | `pip install scipy` | None | Optimisation (efficient frontier), Black-Scholes IV solve |
+| `arch` | `pip install arch` | None | GARCH(1,1) volatility modelling |
 
 ---
 
@@ -363,42 +439,50 @@ Rendering: `recharts RadarChart`. Click axis → navigate to relevant tab.
 
 | Frequency | What |
 |---|---|
-| Every 15min (market hours), hourly (off-hours) | Index prices, FX, commodities, VIX, S&P 500 constituent prices |
-| Daily (11pm UTC) | Screener metrics, Fear & Greed, breadth stats + cumulative A/D, movers, options chains, sector ETFs, rolling risk, Snowflake scores |
-| Weekly (Friday after 6pm ET) | COT report (CFTC releases Fridays), earnings calendar, constituent lists (Wikipedia MediaWiki API) |
-| Weekly (Thursday) | Initial jobless claims (FRED `ICSA`) |
-| Monthly | OECD CLI, Eurostat, FRED monthly series, World Bank, GSCPI (NY Fed Excel), M2, LEI, CFNAI |
-| Quarterly | 13F institutional holdings (edgartools, 45-day lag) |
-| Annually (Jan) | Damodaran ERP + multiples |
+| 15min (market hours) / hourly (off-hours) | Prices, FX, commodities, VIX, constituent prices |
+| Daily (11pm UTC) | Screener metrics, Fear & Greed, breadth, movers, options chains, sector ETFs, rolling risk, Snowflake scores |
+| Weekly (Fri 6pm ET) | COT (CFTC), earnings calendar, constituent lists (Wikipedia API) |
+| Weekly (Thu) | Initial jobless claims (`ICSA`) |
+| Monthly | OECD CLI, Eurostat, FRED monthly series, World Bank, GSCPI, M2, LEI, CFNAI, housing |
+| Quarterly | 13F holdings (edgartools, 45-day lag) |
+| Annually (Jan) | Damodaran ERP + multiples, Ken French factor data |
 | Biannually (Apr/Oct) | IMF WEO |
 
-Use `cachetools` for development, Redis for production. Cache key must include all relevant parameters (ticker, period, country). Expose `/api/admin/cache/clear` for manual invalidation.
+Dev: `cachetools`. Prod: Redis. Cache key must include all params. Expose `/api/admin/cache/clear`.
 
 ---
 
 ## Notes for Claude Code
-- **No web scraping** — never use `BeautifulSoup`, `requests` to parse HTML, `Selenium`, or any HTML parsing to extract data. All data must come from structured APIs, pip libraries, or direct file downloads (CSV/Excel/ZIP).
-- **Wikipedia constituent lists** — use the MediaWiki Action API (`action=parse&prop=wikitext`) + `wikitextparser` to extract tables as structured data. This is a JSON API call, not HTML scraping.
-- Always implement safe `.get()` with fallbacks on `yf.Ticker(t).info` — fields can return `None`
-- Use `yf.download()` for batch price requests; never loop individual `Ticker()` calls for large universes
-- Phase 9 (Snowflake) depends on Phase 5 universe cache — implement Phase 5 first
-- For inapplicable valuation models, render a grey locked card with explanation — never hide it
-- Sector normalisation in Phase 9: percentile rank within sector peers; invert for "lower = better" metrics
-- yfinance IV is always decimal (0.34 = 34%) — multiply by 100 before displaying
-- Peter Lynch growth rate and Graham Formula `g` are whole numbers (15 = 15%), not decimals
-- EPV produces a firm-level value — subtract net debt and divide by shares outstanding for per-share output
-- McClellan Oscillator: use ratio-adjusted net advances (RANA), not raw advances − declines
-- Form 4 codes: `P` = open-market buy, `S` = open-market sell, `A` = award (exclude)
-- edgartools calls: `time.sleep(0.1)` between requests
-- CFTC COT CSV: always `.strip()` all column names and string values on load
-- GSCPI: direct Excel URL `https://www.newyorkfed.org/medialibrary/research/interactives/gscpi/downloads/gscpi_data.xlsx` — use `pandas.read_excel`; if 404, log and serve last cached value
-- ISM PMI: use FRED `NAPM` for historical data through 2023; live readings via Finnhub calendar only
-- Sahm Rule: shade chart red when `SAHMREALTIME ≥ 0.50`
-- EV/EBITDA Comps: static `sector_multiples.json` is primary; live FinanceDatabase peer fetch is optional only
-- RIM: if `Ticker.info["returnOnEquity"]` is `None`, compute from financials; if still unavailable, lock the card
-- `Ticker.earnings_forecasts` requires yfinance ≥0.2.28 — guard with `hasattr` and version check
-- Small-cap screener universe: label "Small-Cap Universe (~3,000–5,000 tickers)", not "Russell 2000"
-- Eurozone/Japan macro data lags 6–8 weeks — label "as of [latest available period]"
+- **No web scraping** — never `BeautifulSoup`, HTML `requests`, or `Selenium`. APIs, pip libs, or direct file downloads only
+- **Wikipedia** — MediaWiki API (`action=parse&prop=wikitext`) + `wikitextparser`. JSON API call, not HTML scraping
+- **Compute policy** — 🟢 default on page load; 🟡 "Calculate" button, never in cron; 🔴 "Run Analysis" button with warning, never on page load or cron
+- **Information hierarchy** — every section: key indicators at top (3–6 metrics), full extended list below. Repetition is correct
+- Safe `.get()` with fallbacks on all `Ticker.info` fields — any can be `None`
+- `yf.download()` for batch price; never loop `Ticker()` for large universes
+- Phase 9 (Snowflake) depends on Phase 5 cache — implement Phase 5 first
+- Phase 11 (Portfolio) 🔴 features depend on Phase 5 cache for covariance matrix
+- Inapplicable valuation models → grey locked card with explanation, never hidden
+- Sector normalisation: percentile rank within sector peers; invert for lower-is-better metrics
+- yfinance IV is decimal (0.34 = 34%) — always ×100 for display
+- Peter Lynch `growth_rate` and Graham `g` are whole numbers (15 = 15%)
+- EPV: firm-level value — subtract net debt, divide by shares outstanding
+- McClellan Oscillator: use RANA (ratio-adjusted), not raw A−D
+- Form 4: P = open-market buy, S = open-market sell, A = award (exclude)
+- `edgartools` calls: `time.sleep(0.1)` between requests; Form 4: `time.sleep(0.15)`
+- CFTC COT CSV: `skipinitialspace=True` + `.strip()` all column names and values
+- GSCPI Excel URL: `https://www.newyorkfed.org/medialibrary/research/interactives/gscpi/downloads/gscpi_data.xlsx` — if 404, log + serve cached
+- ISM PMI: FRED `NAPM` for history through 2023; live via Finnhub calendar only
+- Sahm Rule: shade red when `SAHMREALTIME ≥ 0.50`
+- Black-Scholes IV backsolve: `scipy.optimize.brentq` on the BS price function
+- GARCH: use `arch` library, `arch_model(returns, vol='Garch', p=1, q=1)`
+- Fama-French factors: Ken French Data Library direct CSV — `http://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/F-F_Research_Data_Factors_daily_CSV.zip`
+- Efficient frontier: `scipy.optimize.minimize` with `method='SLSQP'`, constraints: weights sum to 1, all ≥ 0
+- Taylor Rule: r* = 0.5%, π* = 2%, output gap = `(GDPC1 − GDPPOT) / GDPPOT × 100` (FRED `GDPPOT`)
+- ACM data: NY Fed publishes at `https://www.newyorkfed.org/medialibrary/media/research/staff_reports/sr340.xls` — direct Excel download
+- Short Float%, Short Ratio, analyst data: US-listed tickers only; `N/A` for non-US
+- RIM: if `Ticker.info["returnOnEquity"]` is None, compute from financials; lock card if still unavailable
+- `Ticker.earnings_forecasts` requires yfinance ≥0.2.28 — guard with `hasattr` + version check
+- Small-cap label: "Small-Cap Universe (~3,000–5,000 tickers)", never "Russell 2000"
+- Eurozone/Japan macro: label "as of [latest available period]" — 6–8 week lag
 - 13F holdings: label "as of [quarter end] — 45-day reporting lag"
-- All financial data must display its "as of" date
-- Options data: label "delayed ~15min"
+- All financial data: display "as of" date. Options: label "delayed ~15min"
