@@ -8,7 +8,7 @@ from fastapi import APIRouter, Query
 from ..config import COUNTRIES, INDICATORS
 from ..services import macro_service
 from ..services import yfinance_service as yfs
-from ..sources import source_frankfurter, source_datareader
+from ..sources import source_frankfurter, source_datareader, source_imf
 
 router = APIRouter(prefix="/api/macro", tags=["macro"])
 
@@ -58,6 +58,31 @@ async def fx_history(
 ):
     tgt = tuple(t.strip().upper() for t in targets.split(",") if t.strip())
     return await source_frankfurter.history(base.upper(), tgt, start, end)
+
+
+@router.get("/snapshot")
+async def snapshot(countries: str = Query(...)):
+    """Latest headline indicators per country for side-by-side comparison cards."""
+    iso2_list = [c.strip().upper() for c in countries.split(",") if c.strip()][:4]
+    return await macro_service.get_snapshot(iso2_list, date.today().year)
+
+
+@router.get("/forecast")
+async def forecast(
+    countries: str = Query(...),
+    indicator: str = Query(...),
+    end: int = Query(default_factory=lambda: date.today().year + 5),
+):
+    """IMF World Economic Outlook projections for overlaying on historical charts."""
+    iso2_list = tuple(c.strip().upper() for c in countries.split(",") if c.strip())
+    start = date.today().year - 1
+    series = await source_imf.fetch(indicator, iso2_list, start, end)
+    return {
+        "indicator": indicator,
+        "unit": macro_service.get_unit(indicator),
+        "source": source_imf.SOURCE_LABEL,
+        "series": series or [],
+    }
 
 
 @router.get("/yield-curve")

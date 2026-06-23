@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import type { Country, Indicator, MacroResponse } from "@/lib/types";
+import type { Country, Indicator, MacroResponse, MacroSeries } from "@/lib/types";
 import { Card, Skeleton } from "@/components/ui";
 import { CountrySelector } from "@/components/macro/CountrySelector";
 import { IndicatorSelector } from "@/components/macro/IndicatorSelector";
@@ -10,8 +10,15 @@ import { MacroChart } from "@/components/macro/MacroChart";
 import { MacroDashboard } from "@/components/macro/MacroDashboard";
 import { FxWidget } from "@/components/macro/FxWidget";
 import { RegimeDetector } from "@/components/macro/RegimeDetector";
+import { YieldCurve } from "@/components/macro/YieldCurve";
+import { CountryComparison } from "@/components/macro/CountryComparison";
+import { InflationHeatmap } from "@/components/macro/InflationHeatmap";
 
 const CURRENT_YEAR = new Date().getFullYear();
+// Indicators with IMF World Economic Outlook projections available.
+const FORECASTABLE = new Set([
+  "gdp_growth", "inflation", "unemployment", "debt_gdp", "current_account", "gdp_per_capita",
+]);
 
 export default function MacroPage() {
   const [countries, setCountries] = useState<Country[]>([]);
@@ -23,11 +30,29 @@ export default function MacroPage() {
 
   const [data, setData] = useState<MacroResponse | null>(null);
   const [loading, setLoading] = useState(false);
+  const [showForecast, setShowForecast] = useState(false);
+  const [forecast, setForecast] = useState<MacroSeries[]>([]);
+  const [forecastLoading, setForecastLoading] = useState(false);
 
   useEffect(() => {
     api.countries().then((r) => setCountries(r.countries)).catch(() => {});
     api.indicators().then((r) => setIndicators(r.indicators)).catch(() => {});
   }, []);
+
+  const canForecast = FORECASTABLE.has(indicator);
+  const selKeyEarly = selected.join(",");
+
+  // Fetch IMF forecast overlay when enabled (best-effort; can be slow on first call).
+  useEffect(() => {
+    if (!showForecast || !canForecast || !selected.length) { setForecast([]); return; }
+    let active = true;
+    setForecastLoading(true);
+    api.forecast(selKeyEarly, indicator, CURRENT_YEAR + 5)
+      .then((r) => active && setForecast(r.series))
+      .catch(() => active && setForecast([]))
+      .finally(() => active && setForecastLoading(false));
+    return () => { active = false; };
+  }, [showForecast, canForecast, selKeyEarly, indicator]);
 
   const selKey = selected.join(",");
   useEffect(() => {
@@ -106,11 +131,32 @@ export default function MacroPage() {
       </div>
 
       <Card>
-        <h2 className="text-sm font-semibold mb-4 text-text-secondary">
-          {indicators.find((i) => i.id === indicator)?.label ?? indicator}
-        </h2>
-        {loading && !data ? <Skeleton className="h-96" /> : data && <MacroChart data={data} />}
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+          <h2 className="text-sm font-semibold text-text-secondary">
+            {indicators.find((i) => i.id === indicator)?.label ?? indicator}
+          </h2>
+          {canForecast && (
+            <button
+              onClick={() => setShowForecast((v) => !v)}
+              className={`px-3 py-1 rounded-md text-xs font-medium border transition-colors ${
+                showForecast
+                  ? "bg-accent/10 border-accent/40 text-accent"
+                  : "border-border text-text-secondary hover:text-text-primary hover:bg-surface-alt"
+              }`}
+            >
+              {forecastLoading ? "Loading forecast…" : "IMF Forecast"}
+            </button>
+          )}
+        </div>
+        {loading && !data ? <Skeleton className="h-96" /> : data && <MacroChart data={data} forecast={showForecast ? forecast : []} />}
       </Card>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <CountryComparison selected={selected} countries={countries} />
+        <YieldCurve />
+      </div>
+
+      <InflationHeatmap selected={selected} countries={countries} />
     </div>
   );
 }

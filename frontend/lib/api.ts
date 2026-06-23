@@ -3,6 +3,7 @@ import type {
   SearchResult, Indicator, Country, MacroResponse, FxResponse,
   PortfolioResponse, SectorsResponse, RelStrengthResponse, ScreenerResponse,
   EventsResponse, YieldCurveResponse, HealthResponse, NewsResponse,
+  SnapshotResponse, ForecastResponse,
 } from "./types";
 
 async function get<T>(path: string): Promise<T> {
@@ -87,6 +88,12 @@ export const api = {
 
   yieldCurve: () =>
     get<YieldCurveResponse>(`/macro/yield-curve`),
+
+  snapshot: (countries: string) =>
+    get<SnapshotResponse>(`/macro/snapshot?countries=${encodeURIComponent(countries)}`),
+
+  forecast: (countries: string, indicator: string, end: number) =>
+    get<ForecastResponse>(`/macro/forecast?countries=${encodeURIComponent(countries)}&indicator=${indicator}&end=${end}`),
 
   health: () =>
     get<HealthResponse>(`/admin/health`),

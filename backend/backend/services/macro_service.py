@@ -91,3 +91,44 @@ async def get_macro_data(indicator: str, countries: list[str],
 
 def get_unit(indicator: str) -> str:
     return INDICATOR_UNITS.get(indicator, "")
+
+
+# Headline indicators shown on the country comparison snapshot. All are well
+# covered by World Bank (fast); avoiding IMF-only series keeps the cards snappy.
+SNAPSHOT_INDICATORS = [
+    "gdp_growth", "inflation", "unemployment",
+    "debt_gdp", "current_account", "gdp_per_capita",
+]
+
+
+async def get_snapshot(countries: list[str], year: int) -> dict:
+    """Latest value of each headline indicator per country (for comparison cards).
+
+    Sourced directly from World Bank (fast, broad coverage) rather than the full
+    waterfall, so the cards stay responsive — gaps simply render as "—".
+    """
+    countries_t = tuple(countries)
+    tasks = {
+        ind: source_worldbank.fetch(ind, countries_t, year - 8, year)
+        for ind in SNAPSHOT_INDICATORS
+    }
+    gathered = await asyncio.gather(*tasks.values(), return_exceptions=True)
+
+    # indicator -> { iso2 -> {value, year} }
+    by_indicator: dict[str, dict] = {}
+    for ind, res in zip(tasks.keys(), gathered):
+        values: dict[str, dict] = {}
+        if isinstance(res, list):
+            for s in res:
+                if s["data"]:
+                    latest = s["data"][-1]
+                    values[s["country"]] = {"value": latest["value"], "year": latest["year"]}
+        by_indicator[ind] = values
+
+    return {
+        "countries": countries,
+        "indicators": [
+            {"id": ind, "unit": get_unit(ind), "values": by_indicator.get(ind, {})}
+            for ind in SNAPSHOT_INDICATORS
+        ],
+    }

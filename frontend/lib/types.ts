@@ -221,6 +221,25 @@ export interface YieldCurveResponse {
   inverted: boolean;
 }
 
+// --- Country snapshot comparison ---
+export interface SnapshotIndicator {
+  id: string;
+  unit: string;
+  values: Record<string, { value: number; year: number }>;
+}
+export interface SnapshotResponse {
+  countries: string[];
+  indicators: SnapshotIndicator[];
+}
+
+// --- IMF forecast overlay ---
+export interface ForecastResponse {
+  indicator: string;
+  unit: string;
+  source: string;
+  series: MacroSeries[];
+}
+
 // --- Admin health ---
 export interface CacheStat {
   hits: number;
