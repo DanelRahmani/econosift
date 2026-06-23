@@ -2,7 +2,7 @@ import type {
   PricesResponse, Quote, RiskResponse, ValuationResponse, RatiosResponse,
   SearchResult, Indicator, Country, MacroResponse, FxResponse,
   PortfolioResponse, SectorsResponse, RelStrengthResponse, ScreenerResponse,
-  EventsResponse, YieldCurveResponse, HealthResponse,
+  EventsResponse, YieldCurveResponse, HealthResponse, NewsResponse,
 } from "./types";
 
 async function get<T>(path: string): Promise<T> {
@@ -27,14 +27,16 @@ async function post<T>(path: string, body: unknown): Promise<T> {
 }
 
 export const api = {
-  prices: (tickers: string, period: string) =>
-    get<PricesResponse>(`/market/prices?tickers=${encodeURIComponent(tickers)}&period=${period}`),
+  prices: (tickers: string, period: string, benchmark?: string) =>
+    get<PricesResponse>(`/market/prices?tickers=${encodeURIComponent(tickers)}&period=${period}` +
+      (benchmark ? `&benchmark=${encodeURIComponent(benchmark)}` : "")),
 
   quote: (ticker: string) =>
     get<Quote>(`/market/quote/${encodeURIComponent(ticker)}`),
 
-  risk: (tickers: string, period: string, riskFree: number) =>
-    get<RiskResponse>(`/market/risk?tickers=${encodeURIComponent(tickers)}&period=${period}&risk_free=${riskFree}`),
+  risk: (tickers: string, period: string, riskFree: number, benchmark?: string) =>
+    get<RiskResponse>(`/market/risk?tickers=${encodeURIComponent(tickers)}&period=${period}&risk_free=${riskFree}` +
+      (benchmark ? `&benchmark=${encodeURIComponent(benchmark)}` : "")),
 
   valuation: (
     tickers: string, period: string,
@@ -79,6 +81,9 @@ export const api = {
 
   events: (ticker: string) =>
     get<EventsResponse>(`/market/events/${encodeURIComponent(ticker)}`),
+
+  news: (ticker: string) =>
+    get<NewsResponse>(`/market/news/${encodeURIComponent(ticker)}`),
 
   yieldCurve: () =>
     get<YieldCurveResponse>(`/macro/yield-curve`),

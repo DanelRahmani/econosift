@@ -114,6 +114,73 @@ def get_info(ticker: str) -> dict:
     return out
 
 
+# Lightweight keyword sentiment for headlines (no ML dependency).
+_POS_WORDS = {
+    "beat", "beats", "surge", "surges", "soar", "soars", "rally", "rallies",
+    "gain", "gains", "jump", "jumps", "upgrade", "upgrades", "record", "growth",
+    "profit", "profits", "strong", "rise", "rises", "boost", "outperform", "buy",
+    "bullish", "high", "wins", "win", "approval", "approved", "raises", "top",
+}
+_NEG_WORDS = {
+    "miss", "misses", "plunge", "plunges", "fall", "falls", "drop", "drops",
+    "slump", "slumps", "downgrade", "downgrades", "loss", "losses", "weak",
+    "cut", "cuts", "decline", "declines", "lawsuit", "probe", "warning", "warns",
+    "bearish", "low", "fraud", "recall", "sell", "slash", "slashes", "fears",
+}
+
+
+def _score_sentiment(title: str) -> str:
+    words = {w.strip(".,!?:;\"'()").lower() for w in title.split()}
+    pos = len(words & _POS_WORDS)
+    neg = len(words & _NEG_WORDS)
+    if pos > neg:
+        return "positive"
+    if neg > pos:
+        return "negative"
+    return "neutral"
+
+
+@cached("yf_news")
+def get_news(ticker: str) -> dict:
+    """Recent headlines for a ticker with keyword-based sentiment scoring."""
+    t = yf.Ticker(ticker)
+    items: list[dict] = []
+    try:
+        raw = t.news or []
+    except Exception:
+        raw = []
+
+    for n in raw[:12]:
+        # yfinance has two shapes: flat (legacy) and nested under "content".
+        content = n.get("content") if isinstance(n, dict) else None
+        if isinstance(content, dict):
+            title = content.get("title") or ""
+            pub = (content.get("provider") or {}).get("displayName") or ""
+            url = ((content.get("canonicalUrl") or {}).get("url")
+                   or (content.get("clickThroughUrl") or {}).get("url") or "")
+            ts = content.get("pubDate") or content.get("displayTime") or ""
+            published = str(ts)[:10] if ts else None
+        else:
+            title = n.get("title") or ""
+            pub = n.get("publisher") or ""
+            url = n.get("link") or ""
+            epoch = n.get("providerPublishTime")
+            published = (pd.to_datetime(epoch, unit="s").strftime("%Y-%m-%d")
+                         if epoch else None)
+
+        if not title:
+            continue
+        items.append({
+            "title": title,
+            "publisher": pub,
+            "url": url,
+            "published": published,
+            "sentiment": _score_sentiment(title),
+        })
+
+    return {"ticker": ticker, "news": items}
+
+
 @cached("yf_events")
 def get_events(ticker: str) -> dict:
     """Upcoming earnings date, recent dividends, and stock splits for a ticker."""

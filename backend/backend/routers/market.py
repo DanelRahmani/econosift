@@ -31,10 +31,18 @@ def _pct_change(series: pd.Series) -> float | None:
     return round((float(s.iloc[-1]) / float(s.iloc[0]) - 1.0) * 100.0, 2)
 
 
+def _benchmarks_for(syms: list[str], override: str | None) -> tuple[list[str], dict[str, str]]:
+    """Resolve a benchmark per symbol, honouring a manual override if given."""
+    ov = override.strip().upper() if override and override.strip() else None
+    mapping = {s: (ov or yfs.benchmark_for(s)) for s in syms}
+    return sorted(set(mapping.values())), mapping
+
+
 @router.get("/prices")
-async def prices(tickers: str = Query(...), period: str = "1y"):
+async def prices(tickers: str = Query(...), period: str = "1y",
+                 benchmark: str | None = None):
     syms = _parse_tickers(tickers)
-    benchmarks = sorted({yfs.benchmark_for(s) for s in syms})
+    benchmarks, _ = _benchmarks_for(syms, benchmark)
     all_syms = tuple(dict.fromkeys(syms + benchmarks))
 
     frame = await asyncio.to_thread(yfs.get_close_frame, all_syms, period)
@@ -71,6 +79,12 @@ async def quote(ticker: str):
 async def events(ticker: str):
     """Upcoming earnings, recent dividends and splits for event overlays."""
     return await asyncio.to_thread(yfs.get_events, ticker.upper())
+
+
+@router.get("/news/{ticker}")
+async def news(ticker: str):
+    """Recent headlines with keyword sentiment scoring."""
+    return await asyncio.to_thread(yfs.get_news, ticker.upper())
 
 
 @router.get("/sectors")
@@ -123,9 +137,9 @@ def _trailing_return(series: pd.Series, n: int) -> float | None:
 
 @router.get("/risk")
 async def risk(tickers: str = Query(...), period: str = "1y",
-               risk_free: float = 0.04):
+               risk_free: float = 0.04, benchmark: str | None = None):
     syms = _parse_tickers(tickers)
-    benchmarks = sorted({yfs.benchmark_for(s) for s in syms})
+    benchmarks, bench_map = _benchmarks_for(syms, benchmark)
     all_syms = tuple(dict.fromkeys(syms + benchmarks))
 
     frame = await asyncio.to_thread(yfs.get_close_frame, all_syms, period)
@@ -134,7 +148,7 @@ async def risk(tickers: str = Query(...), period: str = "1y",
         for sym in syms:
             if sym not in frame.columns:
                 continue
-            bench = yfs.benchmark_for(sym)
+            bench = bench_map[sym]
             bench_series = frame[bench] if bench in frame.columns else None
             m = metrics.risk_metrics(frame[sym], bench_series, risk_free)
             m["ticker"] = sym

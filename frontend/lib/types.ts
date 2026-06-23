@@ -186,6 +186,20 @@ export interface ScreenerResponse {
   results: ScreenerRow[];
 }
 
+// --- News feed ---
+export type Sentiment = "positive" | "neutral" | "negative";
+export interface NewsItem {
+  title: string;
+  publisher: string;
+  url: string;
+  published: string | null;
+  sentiment: Sentiment;
+}
+export interface NewsResponse {
+  ticker: string;
+  news: NewsItem[];
+}
+
 // --- Events overlay ---
 export interface EventsResponse {
   ticker: string;

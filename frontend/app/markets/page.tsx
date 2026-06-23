@@ -3,7 +3,7 @@
 import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
-import type { PricesResponse, RiskResponse } from "@/lib/types";
+import type { PricesResponse, RiskResponse, EventsResponse } from "@/lib/types";
 import { SearchBar } from "@/components/SearchBar";
 import { Card, Skeleton } from "@/components/ui";
 import { PriceChart } from "@/components/markets/PriceChart";
@@ -16,9 +16,17 @@ import { PortfolioTab } from "@/components/markets/PortfolioTab";
 import { RankingsTab } from "@/components/markets/RankingsTab";
 import { SectorHeatmap } from "@/components/markets/SectorHeatmap";
 import { ScreenerTab } from "@/components/markets/ScreenerTab";
+import { NewsFeed } from "@/components/markets/NewsFeed";
 import { Watchlist } from "@/components/Watchlist";
 
 const PERIODS = ["1mo", "3mo", "6mo", "1y", "2y", "5y"];
+const BENCHMARKS = [
+  { value: "", label: "Auto" },
+  { value: "^GSPC", label: "S&P 500" },
+  { value: "^NDX", label: "Nasdaq 100" },
+  { value: "^DJI", label: "Dow Jones" },
+  { value: "^RUT", label: "Russell 2000" },
+];
 const TABS = ["Overview", "Risk", "Valuation", "Ratios", "Portfolio", "Rankings", "Sectors", "Screener"] as const;
 type Tab = (typeof TABS)[number];
 
@@ -36,9 +44,11 @@ function MarketsPageInner() {
     return (TABS as readonly string[]).includes(v) ? (v as Tab) : "Overview";
   });
   const [showWatchlist, setShowWatchlist] = useState(false);
+  const [benchmark, setBenchmark] = useState<string>(() => searchParams.get("b") ?? "");
 
   const [prices, setPrices] = useState<PricesResponse | null>(null);
   const [risk, setRisk] = useState<RiskResponse | null>(null);
+  const [events, setEvents] = useState<EventsResponse[]>([]);
   const [loading, setLoading] = useState(false);
 
   const tickersKey = tickers.join(",");
@@ -49,9 +59,10 @@ function MarketsPageInner() {
     if (tickers.length) params.set("t", tickers.join(","));
     params.set("p", period);
     params.set("tab", tab);
+    if (benchmark) params.set("b", benchmark);
     router.replace(`/markets?${params.toString()}`, { scroll: false });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tickersKey, period, tab]);
+  }, [tickersKey, period, tab, benchmark]);
 
   useEffect(() => {
     if (!tickers.length) {
@@ -62,8 +73,8 @@ function MarketsPageInner() {
     let active = true;
     setLoading(true);
     Promise.all([
-      api.prices(tickersKey, period),
-      api.risk(tickersKey, period, 0.04),
+      api.prices(tickersKey, period, benchmark || undefined),
+      api.risk(tickersKey, period, 0.04, benchmark || undefined),
     ])
       .then(([p, r]) => {
         if (!active) return;
@@ -75,7 +86,17 @@ function MarketsPageInner() {
     return () => {
       active = false;
     };
-  }, [tickersKey, period]);
+  }, [tickersKey, period, benchmark]);
+
+  // Earnings / dividend / split events for chart overlays.
+  useEffect(() => {
+    if (!tickers.length) { setEvents([]); return; }
+    let active = true;
+    Promise.all(tickers.slice(0, 6).map((t) => api.events(t).catch(() => null)))
+      .then((res) => active && setEvents(res.filter((e): e is EventsResponse => e !== null)))
+      .catch(() => active && setEvents([]));
+    return () => { active = false; };
+  }, [tickersKey]);
 
   function addTicker(sym: string) {
     setTickers((prev) => (prev.includes(sym) ? prev : [...prev, sym]));
@@ -127,18 +148,34 @@ function MarketsPageInner() {
           ))}
         </div>
         {(tab === "Overview" || tab === "Risk" || tab === "Portfolio") && (
-          <div className="flex gap-1">
-            {PERIODS.map((p) => (
-              <button
-                key={p}
-                onClick={() => setPeriod(p)}
-                className={`px-2.5 py-1 rounded-md text-xs font-mono transition-colors ${
-                  period === p ? "bg-surface-alt text-text-primary" : "text-text-muted hover:text-text-primary"
-                }`}
-              >
-                {p}
-              </button>
-            ))}
+          <div className="flex items-center gap-3">
+            {(tab === "Overview" || tab === "Risk") && (
+              <label className="flex items-center gap-1.5 text-xs text-text-muted">
+                <span>Benchmark</span>
+                <select
+                  value={benchmark}
+                  onChange={(e) => setBenchmark(e.target.value)}
+                  className="rounded-md bg-surface-alt border border-border px-2 py-1 text-xs text-text-primary"
+                >
+                  {BENCHMARKS.map((b) => (
+                    <option key={b.value} value={b.value}>{b.label}</option>
+                  ))}
+                </select>
+              </label>
+            )}
+            <div className="flex gap-1">
+              {PERIODS.map((p) => (
+                <button
+                  key={p}
+                  onClick={() => setPeriod(p)}
+                  className={`px-2.5 py-1 rounded-md text-xs font-mono transition-colors ${
+                    period === p ? "bg-surface-alt text-text-primary" : "text-text-muted hover:text-text-primary"
+                  }`}
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
           </div>
         )}
       </div>
@@ -152,8 +189,9 @@ function MarketsPageInner() {
           <QuoteCards tickers={tickers} />
           <Card>
             <h2 className="text-sm font-semibold mb-4 text-text-secondary">Normalised Price (base 100)</h2>
-            {loading && !prices ? <Skeleton className="h-96" /> : prices && <PriceChart data={prices} />}
+            {loading && !prices ? <Skeleton className="h-96" /> : prices && <PriceChart data={prices} events={events} />}
           </Card>
+          <NewsFeed tickers={tickers} />
         </div>
       )}
 
