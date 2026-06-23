@@ -82,7 +82,7 @@ function MarketsPageInner() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center gap-4">
+      <div className="flex flex-wrap items-center gap-4" data-hide-print>
         <SearchBar onAdd={addTicker} />
         <div className="flex flex-wrap gap-2">
           {tickers.map((t) => (
@@ -108,7 +108,7 @@ function MarketsPageInner() {
         <Watchlist onSelect={addTicker} />
       )}
 
-      <div className="flex flex-wrap items-center justify-between gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-4" data-hide-print>
         <div className="flex gap-1">
           {TABS.map((t) => (
             <button
@@ -155,6 +155,18 @@ function MarketsPageInner() {
 
       {tab === "Risk" && tickers.length > 0 && (
         <div className="space-y-6">
+          <div className="flex justify-end" data-hide-print>
+            <button
+              onClick={() => {
+                document.body.classList.add("print-mode");
+                window.print();
+                document.body.classList.remove("print-mode");
+              }}
+              className="px-3 py-1 rounded-md text-xs font-medium border border-border text-text-secondary hover:text-text-primary hover:bg-surface-alt transition-colors"
+            >
+              Export PDF
+            </button>
+          </div>
           <Card>
             <h2 className="text-sm font-semibold mb-4 text-text-secondary">Risk Metrics</h2>
             {loading && !risk ? <Skeleton className="h-40" /> : risk && <RiskMetricsTable metrics={risk.metrics} />}
@@ -171,7 +183,7 @@ function MarketsPageInner() {
       )}
 
       {tab === "Ratios" && tickers.length > 0 && (
-        <RatiosTab ticker={tickers[0]} />
+        <RatiosTab tickers={tickers} />
       )}
     </div>
   );

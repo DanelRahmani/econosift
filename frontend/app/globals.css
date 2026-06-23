@@ -63,3 +63,42 @@ h1, h2, h3, .font-display {
     @apply animate-pulse bg-surface-alt rounded;
   }
 }
+
+/* ── Print / PDF export ──────────────────────────────────────────────────── */
+@media print {
+  /* Hide interactive chrome */
+  nav,
+  [data-hide-print] {
+    display: none !important;
+  }
+
+  /* Force white background and black text for readability */
+  body,
+  .print-mode {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  /* Cards: white background, thin border */
+  .card {
+    background: #ffffff !important;
+    border: 1px solid #cccccc !important;
+    box-shadow: none !important;
+    break-inside: avoid;
+  }
+
+  /* Keep success/danger colors */
+  .text-success { color: rgb(22 163 74) !important; }
+  .text-danger  { color: rgb(220 38 38) !important; }
+
+  /* Page breaks between major tab sections */
+  .space-y-6 > * + * {
+    break-before: auto;
+  }
+
+  /* Prevent orphaned section headers */
+  h2 { break-after: avoid; }
+
+  /* Recharts SVGs print fine — ensure they're not clipped */
+  svg { overflow: visible !important; }
+}
