@@ -13,3 +13,15 @@ numpy
 scipy
 python-dotenv
 cachetools
+# Phase 0-12 additions
+arch
+edgartools
+financedatabase
+wikitextparser
+eurostat
+finnhub-python
+openpyxl
+pyarrow
+# Testing
+pytest
+pytest-asyncio

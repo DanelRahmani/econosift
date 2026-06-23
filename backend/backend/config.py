@@ -7,6 +7,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 FRED_API_KEY = os.getenv("FRED_API_KEY") or None
+# Optional free-tier key; features that use it degrade gracefully when absent.
+FINNHUB_API_KEY = os.getenv("FINNHUB_API_KEY") or None
 
 # ISO2 -> ISO3 for sources that need 3-letter codes (DBnomics OECD/BIS etc.)
 ISO2_TO_ISO3: dict[str, str] = {

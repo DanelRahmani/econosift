@@ -1,0 +1,25 @@
+"""Shared pytest fixtures for the Axiom Finance backend test suite.
+
+Math/model tests run fully offline against synthetic data. Network-touching
+tests (yfinance, FRED, etc.) should be marked and skipped in CI; we keep the
+default suite deterministic and dependency-free.
+"""
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+import pytest
+from fastapi.testclient import TestClient
+
+# Ensure `backend` package is importable when running `pytest` from backend/.
+_ROOT = Path(__file__).resolve().parents[1]
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
+
+
+@pytest.fixture(scope="session")
+def client() -> TestClient:
+    from backend.main import app
+
+    return TestClient(app)
