@@ -1,0 +1,15 @@
+fastapi
+uvicorn[standard]
+yfinance>=0.2.40
+fredapi
+wbgapi
+ecbdata
+pandas-datareader
+imfp
+dbnomics
+httpx
+pandas
+numpy
+scipy
+python-dotenv
+cachetools
