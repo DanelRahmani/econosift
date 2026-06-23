@@ -48,12 +48,12 @@ Implement 2×2 Goldilocks matrix: GDP trend (FRED `GDPC1`) × CPI trend (FRED `C
 
 1. **DCF (Two-Stage)** — 10-year FCF projection + terminal value. Heatmap + scenario table.
 2. **DDM (Gordon Growth)** — `P₀ = D₁ / (r − g)`. Only render if `dividendRate > 0`, else grey locked card.
-3. **Graham Formula** — `V* = EPS × (8.5 + 2g) × 4.4 / Y`. Y = live AAA yield from FRED series `AAA`.
-4. **Graham Number** — `√(22.5 × EPS × BVPS)`. Requires EPS > 0 and BVPS > 0.
-5. **Peter Lynch / PEG** — Fair value = `EPS × growth_rate`. PEG verdict badge.
+3. **Graham Formula** — `V* = EPS × (8.5 + 2g) × 4.4 / Y`. Y = live AAA yield from FRED series `AAA`. `g` is expressed as a whole number (e.g. 8 for 8% growth).
+4. **Graham Number** — `√(22.5 × EPS × BVPS)`. Requires EPS > 0 and BVPS > 0. 22.5 = Graham's max P/E (15) × max P/B (1.5).
+5. **Peter Lynch / PEG** — Fair value = `EPS × growth_rate`, where `growth_rate` is expressed as a whole number (e.g. 15 for 15%). Cap growth_rate at 20 to prevent unrealistic valuations. PEG = `(P/E) / growth_rate`. PEG verdict badge.
 6. **EV/EBITDA Comps** — Sector median from live peers (FinanceDatabase) or fallback static `sector_multiples.json`. Not applicable for Financials sector.
 7. **Residual Income (RIM)** — `Intrinsic Value = BVPS + PV(RI stream)`. Best for banks/REITs.
-8. **EPV (Earnings Power Value)** — `Adjusted Earnings / WACC`. No-growth conservative floor.
+8. **EPV (Earnings Power Value)** — `EPV (firm) = Adjusted NOPAT / WACC`. To get per-share intrinsic value: `(EPV − net debt) / shares outstanding`. Net debt = total debt − cash. No-growth conservative floor.
 
 **Axiom Fair Value** (Phase 1.9): Weighted composite of applicable models (DCF 30%, Comps 20%, RIM 15%, EPV 15%, Graham Formula 10%, Lynch 5%, DDM 5%). Verdict: Significantly Under/Modestly Under/Fair/Modestly Over/Significantly Overvalued. Display as gauge + needle at top of tab.
 
@@ -73,15 +73,20 @@ Implement 2×2 Goldilocks matrix: GDP trend (FRED `GDPC1`) × CPI trend (FRED `C
 
 **2.1 Breadth Bar** — S&P 500 constituents from Wikipedia (`pandas.read_html`), cached weekly. Batch-download 1Y daily prices via `yf.download()` in chunks of 100. Compute: Advancing/Declining, New Highs/Lows, % Above SMA50, % Above SMA200, McClellan Oscillator. Display as 5 segmented bars, sticky at top of Markets page.
 
+**McClellan Oscillator formula** — Use the ratio-adjusted version for comparability across different constituent counts:
+- Ratio-Adjusted Net Advances (RANA) = `(Advances − Declines) / (Advances + Declines)`
+- McClellan Oscillator = `19-day EMA of RANA − 39-day EMA of RANA`
+- 19-day EMA multiplier = 0.10; 39-day EMA multiplier = 0.05
+
 **2.2 Global Indices Table** — ~25 indices across Americas/Europe/Asia-Pacific via yfinance (e.g. `^GSPC`, `^GDAXI`, `^N225`). Show price, 1D%, 5-day sparkline, 1M%, YTD%. Region tabs, sortable columns.
 
 **2.3 Fear & Greed Index** — 7 signals scored 0–100, averaged:
 1. S&P 500 vs 125-day SMA (z-score normalised)
 2. New 52W Highs vs Lows ratio
-3. McClellan Volume Summation Index (percentile)
-4. Put/Call Ratio (FRED `CBOE/PUTCALL` or SPY options, inverted)
-5. VIX (`^VIX`, inverted percentile)
-6. Stocks vs Bonds relative return (^GSPC vs TLT)
+3. **McClellan Summation Index** (running cumulative sum of the ratio-adjusted McClellan Oscillator, percentile-ranked over 2Y lookback). Note: this is advance-decline breadth based, not volume-based.
+4. Put/Call Ratio — primary source: SPY options chain from yfinance (`yf.Ticker("SPY").option_chain(nearest_expiry)`), aggregate put OI / call OI. Secondary/cross-check: FRED `CBOE/PUTCALL` if available. Inverted (high ratio = fear = low score).
+5. VIX (`^VIX`, inverted percentile over 2Y lookback)
+6. Stocks vs Bonds relative return (^GSPC vs TLT, 20-day rolling)
 7. HY Credit Spread (FRED `BAMLH0A0HYM2`, inverted)
 
 Verdicts: 0–20 Extreme Fear → 80–100 Extreme Greed. Speedometer gauge, 90-day history chart, 7 signal breakdown.
@@ -161,13 +166,15 @@ New tab "Options" in Markets page.
 
 **KPI Cards**: IV30 (ATM IV interpolated to 30 DTE), IV Rank (current vs 52W range), IV Percentile, Put/Call OI Ratio, Max Pain, Implied Earnings Move (straddle price / spot).
 
+**IV Rank formula**: `(current_IV − min_IV_52w) / (max_IV_52w − min_IV_52w) × 100`
+
 **Charts**: IV Term Structure (ATM IV vs DTE across all expiries, annotate earnings date) + IV Smile (IV vs moneyness 0.70–1.30 for selected expiry, with put/call skew KPI).
 
 **Chain Table**: Classic calls | strikes | puts layout. ITM rows tinted. OTM-only toggle. Synced expiry selector.
 
 **OI Profile Chart**: Horizontal bar chart, calls (green) right, puts (red) left, by strike. Max pain line annotated.
 
-All data from `yf.Ticker(t).option_chain(expiry)`. Note: data delayed ~15min.
+All data from `yf.Ticker(t).option_chain(expiry)`. Note: yfinance returns IV as a decimal (e.g. 0.34 = 34%) — multiply by 100 for display. Data delayed ~15min.
 
 ---
 
@@ -192,10 +199,10 @@ Pentagon radar chart scored 0–10 per axis, **sector-normalised** (percentile r
 1. **Value** — P/E, EV/EBITDA, FCF Yield, P/B, PEG vs sector medians
 2. **Future Growth** — EPS growth estimate, revenue growth YoY, earnings momentum, R&D intensity
 3. **Past Performance** — 3Y revenue CAGR, 3Y EPS CAGR, ROE avg, gross margin trend, price alpha vs sector
-4. **Financial Health** — Altman Z-Score, interest coverage, current ratio, net cash position, debt/equity
+4. **Financial Health** — Altman Z-Score (safe >3.0, grey 1.8–3.0, distress <1.8), interest coverage, current ratio, net cash position, debt/equity
 5. **Dividend** — Yield vs peers, payout ratio, 5Y dividend CAGR, consistency, FCF coverage. Score 0 if no dividend.
 
-Scoring: raw metric → sector percentile rank → map to 0–10. Fallback to industry-wide → market-wide if <10 sector peers.
+Scoring: raw metric → sector percentile rank → map to 0–10. Invert percentile for "lower = better" metrics (P/E, debt/equity etc.). Fallback to industry-wide → market-wide if <10 sector peers.
 
 **Placement**: Primary on Overview tab (Snapshot section alongside price chart). Compact thumbnail in screener Charts view. Also shown in Valuation tab next to Axiom Fair Value.
 
@@ -257,5 +264,9 @@ Use `cachetools` for development, Redis for production. Cache key must include a
 - Phase 9 (Snowflake) depends on Phase 5 universe cache — implement Phase 5 first
 - For inapplicable valuation models, render a grey locked card with explanation — never hide it
 - Sector normalisation in Phase 9 uses percentile rank within sector peers; invert percentile for "lower = better" metrics
+- yfinance IV is always in decimal format (0.34 = 34%) — multiply by 100 before displaying
+- Peter Lynch growth rate and Graham Formula `g` are whole numbers (15 = 15%), not decimals
+- EPV produces a firm-level value — always subtract net debt and divide by shares outstanding for per-share output
+- McClellan Oscillator: use ratio-adjusted net advances (RANA), not raw advances − declines
 - All financial data should display its "as of" date
 - Label all options data as "delayed ~15min"
