@@ -3,9 +3,9 @@
 ## Stack
 - **Backend**: Python FastAPI
 - **Frontend**: Next.js (TypeScript, React)
-- **Data**: All free — yfinance (primary), FRED (fredapi), Eurostat, World Bank, OECD, IMF WEO, Finnhub (free tier), FinanceDatabase, Wikipedia `pandas.read_html`, CFTC, SEC EDGAR (edgartools), NY Fed (direct file download)
-- **Cost**: $0 — no paid APIs
-- **No web scraping** — all data via structured APIs or direct file downloads (CSV/Excel/ZIP with stable URLs)
+- **Data**: All free — yfinance (primary), FRED (fredapi), Eurostat, World Bank, OECD, IMF WEO, Finnhub (free tier), FinanceDatabase, CFTC (direct file download), SEC EDGAR (edgartools), NY Fed (direct file download)
+- **Cost**: $0 — no paid APIs, no web scraping
+- **Rule**: Only use free APIs, pip-installable libraries, or direct structured file downloads (CSV/Excel/ZIP from stable government/institutional URLs). No HTML scraping of any kind.
 
 ---
 
@@ -82,7 +82,7 @@ Implement 2×2 Goldilocks matrix: GDP trend (FRED `GDPC1`) × CPI trend (FRED `C
 
 ## Phase 2 — Market Breadth & Dashboard
 
-**2.1 Breadth Bar** — S&P 500 constituents from Wikipedia (`pandas.read_html`, a structured data parse not scraping), cached weekly. Batch-download 1Y daily prices via `yf.download()` in chunks of 100. Compute: Advancing/Declining, New Highs/Lows, % Above SMA50, % Above SMA200, McClellan Oscillator, Cumulative A/D Line. Display as segmented bars, sticky at top of Markets page.
+**2.1 Breadth Bar** — S&P 500 constituent list loaded from `backend/data/sp500_constituents.json` (static file, updated manually when index changes, ~4× per year). Nasdaq 100 from `backend/data/nasdaq100_constituents.json`. Dow 30 from `backend/data/dow30_constituents.json`. Batch-download 1Y daily prices via `yf.download()` in chunks of 100. Compute: Advancing/Declining, New Highs/Lows, % Above SMA50, % Above SMA200, McClellan Oscillator, Cumulative A/D Line. Display as segmented bars, sticky at top of Markets page.
 
 **McClellan Oscillator formula** — Ratio-adjusted version:
 - RANA = `(Advances − Declines) / (Advances + Declines)`
@@ -112,7 +112,7 @@ Verdicts: 0–20 Extreme Fear → 80–100 Extreme Greed. Speedometer gauge, 90-
 
 ## Phase 3 — S&P 500 Treemap
 
-Hierarchical JSON: S&P 500 → Sector → Industry → Stock. Rectangle area = log(market cap), colour = daily return % on red-white-green diverging scale (−5% deep red, 0% white, +5% deep green).
+Hierarchical JSON: S&P 500 → Sector → Industry → Stock. Constituent list from `backend/data/sp500_constituents.json`. Rectangle area = log(market cap), colour = daily return % on red-white-green diverging scale (−5% deep red, 0% white, +5% deep green).
 
 Rendering: `d3-hierarchy` squarified treemap for layout; React renders SVG rects. Hover tooltip (name, price, 1D%, mkt cap, P/E, 52W range). Click stock → navigate to Markets tab. Click sector → drill down.
 
@@ -145,9 +145,14 @@ Route `/calendar`. Sub-tabs: Economic / Earnings / Dividends / IPO.
 
 ## Phase 5 — Screener Overhaul
 
-**Universes**: S&P 500 (Wikipedia `pandas.read_html`), Nasdaq 100 (Wikipedia), Dow 30 (static JSON), Small-Cap proxy (FinanceDatabase US equities, market cap <$2B — label as "Small-Cap Universe", not "Russell 2000", as it returns ~3,000–5,000 tickers including OTC stocks), Custom (manual).
+**Universes**:
+- S&P 500 — from `backend/data/sp500_constituents.json`
+- Nasdaq 100 — from `backend/data/nasdaq100_constituents.json`
+- Dow 30 — from `backend/data/dow30_constituents.json`
+- Small-Cap proxy — FinanceDatabase `Equities().select(country="United States")` filtered by market cap <$2B. Label as "Small-Cap Universe (~3,000–5,000 tickers)", **not** "Russell 2000", as results include OTC stocks and are approximate.
+- Custom — manual ticker entry.
 
-**Pipeline**: Weekly cron — scrape constituent list → batch-fetch fundamentals from yfinance → cache in Parquet/SQLite. Price metrics refresh daily; fundamentals weekly. Run with `ThreadPoolExecutor(max_workers=10)` overnight.
+**Pipeline**: Overnight cron — load constituent list from JSON → batch-fetch fundamentals from yfinance → cache in Parquet/SQLite. Price metrics refresh daily; fundamentals weekly. Run with `ThreadPoolExecutor(max_workers=10)`.
 
 **Screener columns** (in addition to standard P/E, P/B, EV/EBITDA):
 - Short Float % — `Ticker.info["shortPercentOfFloat"]` (US only; `None` for most non-US)
@@ -235,31 +240,31 @@ Reorganise Macro tab: Overview | Rates & Yields | Inflation | Growth & Employmen
 
 **Leading Indicators sub-tab**:
 - **Conference Board LEI** (FRED `USSLIND`) — flag when YoY change turns negative.
-- **OECD CLI** — multi-country via OECD.Stat HTTP API (no key). G7 + major EMs.
-- **GSCPI** (NY Fed) — monthly Excel file at `https://www.newyorkfed.org/medialibrary/research/interactives/gscpi/downloads/gscpi_data.xlsx`. Fetch with `pandas.read_excel`. This is a direct structured file download, not scraping. Values above 0 = above-average supply chain pressure.
+- **OECD CLI** — multi-country via OECD.Stat HTTP REST API (no key required). G7 + major EMs.
+- **GSCPI** (NY Fed) — monthly Excel file downloaded directly from `https://www.newyorkfed.org/medialibrary/research/interactives/gscpi/downloads/gscpi_data.xlsx` via `pandas.read_excel`. This is a direct structured file download from a stable institutional URL. Values above 0 = above-average supply chain pressure. If URL returns 404, log warning and serve last cached value.
 - **CFNAI** (FRED `CFNAI`) — values below −0.70 historically precede recessions.
-- **ISM PMI** — displayed on the calendar (Finnhub provides live actual vs forecast for ISM Manufacturing and Services as scheduled economic events). In the Leading Indicators chart section, show historical ISM Manufacturing Index via FRED series `NAPM` for pre-2023 data; acknowledge data ends 2023 and future readings come from the calendar module. Display with 50-line threshold.
+- **ISM PMI** — historical data via FRED series `NAPM` (available through 2023); live/upcoming ISM Manufacturing and Services PMI readings via Finnhub `/calendar/economic` (provides actual, forecast, previous). Display as time series with 50-line expansion/contraction threshold; annotate the 2023 FRED data cutoff.
 
 **FX sub-tab**: DXY (`DX-Y.NYB`), currency heatmap (grid of crosses, 1D change %), EM FX emphasis.
 
 **Positioning sub-tab**:
 
 **COT Report (Commitment of Traders)**
-- Source: CFTC direct ZIP download — `https://www.cftc.gov/dcom/files/dcotnoc.zip` (current year) and `https://www.cftc.gov/files/dea/history/deacot_1986_2016.zip` (historical). These are direct structured file downloads, not scraping.
+- Source: CFTC direct ZIP file downloads — `https://www.cftc.gov/dcom/files/dcotnoc.zip` (current year) and `https://www.cftc.gov/files/dea/history/deacot_1986_2016.zip` (historical). Direct structured file downloads from a US government URL — no scraping.
 - Parse with `pandas.read_csv(skipinitialspace=True)`. Always `.strip()` all column names and string values — trailing spaces are endemic in CFTC files.
 - Key contracts: S&P 500 E-mini (code 13874+), Nasdaq 100 E-mini (209742), EUR/USD (099741), Gold (088691), WTI Crude (067651), 10Y Treasury Note (043602).
 - For each: chart net Non-Commercial (speculator) positioning over time.
 - **COT Index** = `(current_net_spec − min_52w) / (max_52w − min_52w) × 100`. >80% = extreme speculator longs (contrarian bearish).
 
 **SEC Form 4 Insider Trades**
-- Source: SEC EDGAR REST API (free, no key): `https://efts.sec.gov/LATEST/search-index?q="{ticker}"&forms=4&dateRange=custom&startdt={start}&enddt={end}`
+- Source: SEC EDGAR REST API (free, no key required): `https://efts.sec.gov/LATEST/search-index?q="{ticker}"&forms=4&dateRange=custom&startdt={start}&enddt={end}`. JSON response — no HTML parsing.
 - Filter: code `P` = open-market buy, code `S` = open-market sell. Exclude code `A` (RSU award — not discretionary).
 - On stock pages: timeline chart overlaid on price (green arrow = buy, red = sell). Insider Buy/Sell ratio last 90 days as badge.
 - In screener: "Insider Buying" preset = tickers with at least one code-P transaction in last 30 days.
 - Rate limit: `time.sleep(0.15)` between EDGAR calls.
 
 **SEC 13F Institutional Holdings**
-- Source: `edgartools` (`pip install edgartools`, free, no key). Query 13F-HR filings by ticker: `from edgar import Company; Company(ticker).get_filings(form="13F-HR")`.
+- Source: `edgartools` library (`pip install edgartools`, free, no key). Queries SEC EDGAR JSON APIs under the hood — no HTML parsing. Usage: `from edgar import Company; Company(ticker).get_filings(form="13F-HR")`.
 - For stock pages: top 10 institutional holders — fund name | shares | % of float | QoQ change | filing date.
 - Label: "as of [quarter end] — 45-day reporting lag."
 - Rate limit: `time.sleep(0.1)` between calls.
@@ -300,6 +305,24 @@ Rendering: `recharts RadarChart`. Click axis → navigate to relevant tab.
 
 ---
 
+## Static Data Files (bundled in repo, updated manually)
+
+These files replace any need for web scraping of index constituent lists:
+
+| File | Contents | Update Frequency |
+|---|---|---|
+| `backend/data/sp500_constituents.json` | S&P 500 tickers + sector/industry | ~4× per year (index rebalances) |
+| `backend/data/nasdaq100_constituents.json` | Nasdaq 100 tickers + sector | ~4× per year |
+| `backend/data/dow30_constituents.json` | Dow 30 tickers + sector | Rare (~1–2× per year) |
+| `backend/data/cb_meetings.json` | Central bank meeting dates (FOMC, ECB, BOE, BOJ etc.) | 2× per year |
+| `backend/data/event_impact.json` | Impact ratings for economic events | As needed |
+| `backend/data/damodaran_erp_2026.json` | Country equity risk premiums | Annually (Jan) |
+| `backend/data/sector_multiples.json` | Sector median EV/EBITDA multiples | Annually (Jan) |
+
+All constituent JSON files follow the schema: `[{"ticker": "AAPL", "name": "Apple Inc.", "sector": "Technology", "industry": "Consumer Electronics"}, ...]`
+
+---
+
 ## Data Source Quick Reference
 
 | Source | Install / Access | Key | Used For |
@@ -308,15 +331,14 @@ Rendering: `recharts RadarChart`. Click axis → navigate to relevant tab.
 | FRED | `pip install fredapi` | Free key required | All macro series: yields, inflation, employment, credit, M2, Sahm, LEI etc. |
 | Eurostat | `pip install eurostat` | None | EU GDP, HICP, unemployment |
 | World Bank | `pip install wbdata` | None | Global GDP, debt, current account |
-| OECD.Stat | HTTP REST API | None | CLI, MEI, Japan macro |
-| IMF WEO | Direct Excel download | None | 190-country forecasts, debt (Apr/Oct) |
+| OECD.Stat | HTTP REST API (no install) | None | CLI, MEI, Japan macro |
+| IMF WEO | Direct Excel download (stable URL) | None | 190-country forecasts, debt (Apr/Oct) |
 | Finnhub | `pip install finnhub-python` | Free key required | Earnings/IPO calendar, live ISM PMI event data |
-| FinanceDatabase | `pip install financedatabase` | None | Universe construction, sector classification |
-| Wikipedia | `pandas.read_html` | None | S&P 500, Nasdaq 100, Dow 30 constituent lists |
+| FinanceDatabase | `pip install financedatabase` | None | Small-cap universe construction, sector classification |
 | Damodaran | Direct Excel download (annual) | None | Country ERP, sector multiples |
 | CFTC | Direct ZIP download (`cftc.gov`) | None | COT positioning data |
 | SEC EDGAR | `pip install edgartools` | None | 13F institutional holdings, Form 4 insider trades |
-| NY Fed | Direct Excel download | None | GSCPI (supply chain pressure) |
+| NY Fed | Direct Excel download (stable URL) | None | GSCPI (supply chain pressure) |
 
 ---
 
@@ -326,11 +348,11 @@ Rendering: `recharts RadarChart`. Click axis → navigate to relevant tab.
 |---|---|
 | Every 15min (market hours), hourly (off-hours) | Index prices, FX, commodities, VIX, S&P 500 constituent prices |
 | Daily (11pm UTC) | Screener metrics, Fear & Greed, breadth stats + cumulative A/D, movers, options chains, sector ETFs, rolling risk, Snowflake scores |
-| Weekly (Friday after 6pm ET) | COT report (CFTC releases Fridays), constituent lists, sector/industry classification, earnings calendar |
+| Weekly (Friday after 6pm ET) | COT report (CFTC releases Fridays), earnings calendar |
 | Weekly (Thursday) | Initial jobless claims (FRED `ICSA`) |
 | Monthly | OECD CLI, Eurostat, FRED monthly series, World Bank, GSCPI (NY Fed Excel), M2, LEI, CFNAI |
 | Quarterly | 13F institutional holdings (edgartools, 45-day lag) |
-| Annually (Jan) | Damodaran ERP + multiples |
+| Annually (Jan) | Damodaran ERP + multiples; update static constituent JSON files |
 | Biannually (Apr/Oct) | IMF WEO |
 
 Use `cachetools` for development, Redis for production. Cache key must include all relevant parameters (ticker, period, country). Expose `/api/admin/cache/clear` for manual invalidation.
@@ -338,8 +360,10 @@ Use `cachetools` for development, Redis for production. Cache key must include a
 ---
 
 ## Notes for Claude Code
+- **No web scraping** — never use `BeautifulSoup`, `requests` to parse HTML, `Selenium`, or any HTML parsing to extract data. All data must come from structured APIs, pip libraries, or direct file downloads (CSV/Excel/ZIP).
 - Always implement safe `.get()` with fallbacks on `yf.Ticker(t).info` — fields can return `None`
 - Use `yf.download()` for batch price requests; never loop individual `Ticker()` calls for large universes
+- Constituent lists come from static JSON files in `backend/data/` — never attempt to fetch them dynamically from the web
 - Phase 9 (Snowflake) depends on Phase 5 universe cache — implement Phase 5 first
 - For inapplicable valuation models, render a grey locked card with explanation — never hide it
 - Sector normalisation in Phase 9: percentile rank within sector peers; invert for "lower = better" metrics
@@ -350,8 +374,8 @@ Use `cachetools` for development, Redis for production. Cache key must include a
 - Form 4 codes: `P` = open-market buy, `S` = open-market sell, `A` = award (exclude)
 - edgartools calls: `time.sleep(0.1)` between requests
 - CFTC COT CSV: always `.strip()` all column names and string values on load
-- GSCPI: direct Excel URL `https://www.newyorkfed.org/medialibrary/research/interactives/gscpi/downloads/gscpi_data.xlsx` — use `pandas.read_excel`; if URL returns 404, log and use last cached value
-- ISM PMI: use FRED `NAPM` for historical data up to 2023; live/upcoming readings come from Finnhub calendar only
+- GSCPI: direct Excel URL `https://www.newyorkfed.org/medialibrary/research/interactives/gscpi/downloads/gscpi_data.xlsx` — use `pandas.read_excel`; if 404, log and serve last cached value
+- ISM PMI: use FRED `NAPM` for historical data through 2023; live readings via Finnhub calendar only
 - Sahm Rule: shade chart red when `SAHMREALTIME ≥ 0.50`
 - EV/EBITDA Comps: static `sector_multiples.json` is primary; live FinanceDatabase peer fetch is optional only
 - RIM: if `Ticker.info["returnOnEquity"]` is `None`, compute from financials; if still unavailable, lock the card
@@ -361,4 +385,3 @@ Use `cachetools` for development, Redis for production. Cache key must include a
 - 13F holdings: label "as of [quarter end] — 45-day reporting lag"
 - All financial data must display its "as of" date
 - Options data: label "delayed ~15min"
-- No web scraping anywhere in the codebase — all data via APIs or direct structured file downloads
