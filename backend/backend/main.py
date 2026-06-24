@@ -1,6 +1,9 @@
 """Axiom Finance FastAPI application entrypoint."""
 from __future__ import annotations
 
+import threading
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -8,8 +11,16 @@ from .routers import (
     market, valuation, ratios, search, macro,
     portfolio, screener, admin, dashboard, treemap, calendar,
 )
+from .services import screener_service
 
-app = FastAPI(title="Axiom Finance API", version="1.0.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    threading.Thread(target=screener_service.warm_all, daemon=True).start()
+    yield
+
+
+app = FastAPI(title="Axiom Finance API", version="1.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,

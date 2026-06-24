@@ -1,13 +1,20 @@
-"""Multi-factor stock screener over a user-defined ticker universe."""
+"""Multi-factor stock screener — legacy endpoint + Phase 5 cached-universe endpoints."""
 from __future__ import annotations
 
 import asyncio
-from fastapi import APIRouter, Query
+import json
+import threading
+from fastapi import APIRouter, HTTPException, Query
 
 from ..services import yfinance_service as yfs
 from ..services import metrics
+from ..services import screener_service
+from ..services import screener_cache
+from ..services import constituents as _constituents
 
 router = APIRouter(prefix="/api/screener", tags=["screener"])
+
+_VALID_INDICES = {"dow", "ndx", "sp500"}
 
 # Metrics exposed to the screener, with the path to pull them from.
 # group None means it lives at the top level of the row.
@@ -112,3 +119,74 @@ async def screen(
         "screened": len(rows),
         "results": matched,
     }
+
+
+# ---------------------------------------------------------------------------
+# Phase 5 — Cached-universe endpoints
+# ---------------------------------------------------------------------------
+
+@router.get("/presets")
+async def get_presets():
+    """Return the list of available preset signal definitions."""
+    return {"presets": screener_service.PRESETS}
+
+
+@router.get("/status")
+async def get_status(index: str = Query("dow")):
+    """Return cache freshness info for a given index universe."""
+    if index not in _VALID_INDICES:
+        raise HTTPException(status_code=422, detail=f"index must be one of {sorted(_VALID_INDICES)}")
+    members = _constituents.get_constituents(index)
+    symbols = [m["symbol"] for m in members]
+    return {
+        "index": index,
+        "rowCount": screener_cache.row_count(symbols),
+        "lastRefresh": screener_cache.last_refresh(symbols),
+        "stale": screener_cache.is_stale(symbols),
+    }
+
+
+@router.post("/refresh")
+async def trigger_refresh(index: str = Query("dow")):
+    """Kick a background cache refresh for the given index. Returns immediately."""
+    if index not in _VALID_INDICES:
+        raise HTTPException(status_code=422, detail=f"index must be one of {sorted(_VALID_INDICES)}")
+    t = threading.Thread(target=screener_service.refresh_universe, args=(index,), daemon=True)
+    t.start()
+    return {"index": index, "started": True}
+
+
+@router.get("/universe")
+async def get_universe(
+    index: str = Query("dow"),
+    presets: str = Query("", description="Comma-separated preset IDs"),
+    filters: str = Query("", description="JSON array of {field,op,value} objects"),
+    sort: str = Query("marketCap"),
+    dir: str = Query("desc"),
+    limit: int = Query(250),
+):
+    """Query the cached screener universe with optional preset/filter/sort."""
+    if index not in _VALID_INDICES:
+        raise HTTPException(status_code=422, detail=f"index must be one of {sorted(_VALID_INDICES)}")
+    if dir not in ("asc", "desc"):
+        dir = "desc"
+
+    preset_ids: list[str] = [p.strip() for p in presets.split(",") if p.strip()] if presets else []
+
+    parsed_filters: list[dict] = []
+    if filters:
+        try:
+            parsed_filters = json.loads(filters)
+            if not isinstance(parsed_filters, list):
+                parsed_filters = []
+        except (json.JSONDecodeError, ValueError):
+            parsed_filters = []
+
+    return screener_service.query(
+        index=index,
+        preset_ids=preset_ids,
+        filters=parsed_filters,
+        sort_key=sort,
+        direction=dir,
+        limit=limit,
+    )
