@@ -133,7 +133,17 @@ the repo).
   with real data (`/api/macro/rates`, `/inflation`, `/commodities`, `/positioning`,
   `/api/market/13f?ticker=AAPL`, `/api/market/form4?ticker=AAPL`).
 
-### ⏭️ Next: Phase 9 (`claude_plan.md`)
+- ✅ **Phase 9** (`9ec9d71`) — Snowflake Composite Score. Pentagon radar chart scoring each stock 0–10
+  on 5 axes (Value, Growth, Performance, Health, Dividend), sector-normalised via percentile ranking
+  within screener cache peer universe. Full endpoint `/api/snowflake?ticker=` uses yfinance historical
+  financials for 3Y CAGRs + full 9/9 Piotroski (prior-year support added to `fundamentals.py`) +
+  Ohlson O-Score + ROIC−WACC spread (FRED DGS10 via `discount_rates.py`) + interest coverage.
+  Batch endpoint `/api/snowflake/batch?tickers=` for lightweight screener SparkCard thumbnails.
+  Frontend: `SnowflakeChart` (full radar + strengths/risks panel) in Markets Overview + Valuation tabs
+  with axis-click tab navigation; `SnowflakeMini` (compact 100×100) in Screener Charts view.
+  **368 pytest pass. Verified live:** AAPL → 7.11 Strong; batch and pages HTTP 200.
+
+### ⏭️ Next: Phase 10 (`claude_plan.md`)
 
 ### Working agreements (carry these forward)
 
@@ -166,6 +176,7 @@ the repo).
 ### Backend module map (added by this build)
 
 `services/`: `dcf_engine`, `fx_service`, `regime_service`, `valuation_engine`,
+`snowflake_service` (Phase 9 — 5-axis composite scoring, full + batch modes),
 `discount_rates`, `fundamentals`, `analyst_service`, `fama_french`,
 `constituents`, `breadth_service`, `indices_service`, `feargreed_service`,
 `movers_service`, `treemap_service`, `finnhub_service`, `calendar_service`,
@@ -181,6 +192,7 @@ Routers: `valuation` (`/full`, `/dcf`, `/factors`), `dashboard` (`/breadth`,
 `options` (`/api/options/expiries`, `/ivmetrics`, `/chain`, `/termstructure`,
 `/smile`, `/oiprofile`, `/montecarlo`),
 `market_data` (`/api/market/13f`, `/api/market/form4`),
+`snowflake` (`/api/snowflake`, `/api/snowflake/batch`),
 `macro` — Phase 8 routes added: `/api/macro/rates`, `/inflation`, `/employment`,
 `/housing`, `/commodities`, `/fx/heatmap`, `/fx/ppp`, `/leading`,
 `/financial-conditions`, `/positioning`.
