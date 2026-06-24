@@ -6,6 +6,8 @@ import type {
   SnapshotResponse, ForecastResponse,
   DcfResponse, FxRatesResponse, RegimeResponse,
   ValuationFullResponse, FactorResponse,
+  BreadthResponse, IndicesResponse, FearGreedResponse, MoversResponse,
+  ConstituentsResponse,
 } from "./types";
 
 async function get<T>(path: string): Promise<T> {
@@ -122,4 +124,20 @@ export const api = {
 
   valuationFactors: (ticker: string, model: "3" | "5" = "3") =>
     get<FactorResponse>(`/valuation/factors?ticker=${encodeURIComponent(ticker)}&model=${model}`),
+
+  // --- Phase 2: Dashboard ---
+  breadth: (index = "sp500") =>
+    get<BreadthResponse>(`/dashboard/breadth?index=${index}`),
+
+  indices: () =>
+    get<IndicesResponse>(`/dashboard/indices`),
+
+  fearGreed: () =>
+    get<FearGreedResponse>(`/dashboard/fear-greed`),
+
+  movers: (index = "sp500", limit = 10) =>
+    get<MoversResponse>(`/dashboard/movers?index=${index}&limit=${limit}`),
+
+  constituents: (index = "sp500") =>
+    get<ConstituentsResponse>(`/dashboard/constituents?index=${index}`),
 };

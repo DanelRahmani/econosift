@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { ThemeToggle } from "./ThemeToggle";
 
 const tabs = [
+  { href: "/dashboard", label: "Dashboard" },
   { href: "/markets", label: "Markets" },
   { href: "/macro", label: "Macro" },
 ];

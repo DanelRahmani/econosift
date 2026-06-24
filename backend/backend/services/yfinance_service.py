@@ -58,6 +58,39 @@ def get_close_frame(symbols: tuple[str, ...], period: str) -> pd.DataFrame:
     return close
 
 
+@cached("yf_volume")
+def get_volume_frame(symbols: tuple[str, ...], period: str) -> pd.DataFrame:
+    """Return a DataFrame of daily share volume indexed by date.
+
+    Mirrors :func:`get_close_frame` but pulls the Volume field — used for
+    unusual-volume screening over a large constituent universe.
+    """
+    if not symbols:
+        return pd.DataFrame()
+    raw = yf.download(
+        list(symbols),
+        period=period,
+        interval="1d",
+        auto_adjust=True,
+        progress=False,
+        threads=True,
+    )
+    if raw is None or len(raw) == 0:
+        return pd.DataFrame()
+
+    if isinstance(raw.columns, pd.MultiIndex):
+        if "Volume" in raw.columns.get_level_values(0):
+            vol = raw["Volume"].copy()
+        else:
+            vol = raw.xs("Volume", axis=1, level=-1).copy()
+    else:
+        col = "Volume" if "Volume" in raw.columns else raw.columns[-1]
+        vol = raw[[col]].copy()
+        vol.columns = [symbols[0]]
+
+    return vol.dropna(how="all")
+
+
 @cached("yf_quote")
 def get_quote(ticker: str) -> dict:
     t = yf.Ticker(ticker)

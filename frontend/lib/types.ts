@@ -292,6 +292,79 @@ export interface FactorResponse {
   error?: string;
 }
 
+// --- Phase 2: Dashboard (breadth / indices / fear&greed / movers) ---
+export interface BreadthResponse {
+  index: string;
+  asOf: string | null;
+  total: number;
+  advancing: number;
+  declining: number;
+  unchanged: number;
+  newHighs: number;
+  newLows: number;
+  pctAboveSma50: number | null;
+  pctAboveSma200: number | null;
+  mcclellanOscillator: number | null;
+  mcclellanSummation: number | null;
+  cumulativeAdLine: { date: string; value: number }[];
+  advDeclHistory: { date: string; adv: number; dec: number }[];
+}
+
+export interface IndexRow {
+  symbol: string;
+  name: string;
+  region: string;
+  price: number | null;
+  change1d: number | null;
+  spark: number[];
+  change1m: number | null;
+  changeYtd: number | null;
+}
+export interface IndicesResponse {
+  asOf: string | null;
+  regions: string[];
+  indices: IndexRow[];
+}
+
+export interface FearGreedSignal {
+  key: string;
+  label: string;
+  score: number | null;
+  label_text: string | null;
+}
+export interface FearGreedResponse {
+  index: number | null;
+  label: string | null;
+  asOf: string | null;
+  signals: FearGreedSignal[];
+  history: { date: string; value: number }[];
+}
+
+export interface MoverRow {
+  ticker: string;
+  name: string;
+  price: number | null;
+  changePercent: number | null;
+  volume?: number;
+  avgVolume?: number;
+  volumeRatio?: number;
+}
+export interface MoversResponse {
+  index: string;
+  asOf: string | null;
+  gainers: MoverRow[];
+  losers: MoverRow[];
+  unusualVolume: MoverRow[];
+  newHighs: MoverRow[];
+  newLows: MoverRow[];
+}
+
+export interface ConstituentsResponse {
+  index: string;
+  count: number;
+  constituents: { symbol: string; name: string; sector: string | null }[];
+}
+
 // --- Portfolio ---
 export interface PortfolioHolding {
   ticker: string;
