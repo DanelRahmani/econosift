@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
-import type { PresetDef, ScreenerCacheRow, ScreenerUniverseResponse } from "@/lib/types";
+import type { PresetDef, ScreenerCacheRow, ScreenerUniverseResponse, SnowflakeBatchResponse } from "@/lib/types";
 import { Card, Skeleton } from "@/components/ui";
 import { PresetPills } from "@/components/screener/PresetPills";
 import { ResultTabs, RESULT_TABS } from "@/components/screener/ResultTabs";
@@ -10,6 +10,7 @@ import type { ResultTab } from "@/components/screener/ResultTabs";
 import { ScreenerTable } from "@/components/screener/ScreenerTable";
 import { Sparkline } from "@/components/screener/Sparkline";
 import { fmtNum, fmtPct, fmtLarge } from "@/lib/format";
+import { SnowflakeMini } from "@/components/markets/SnowflakeMini";
 
 // ─── Constants ────────────────────────────────────────────────────────────
 
@@ -52,7 +53,13 @@ function SegCtrl<T extends string>({
 
 // ─── Charts gallery card ──────────────────────────────────────────────────
 
-function SparkCard({ row }: { row: ScreenerCacheRow }) {
+function SparkCard({
+  row,
+  snowflake,
+}: {
+  row: ScreenerCacheRow;
+  snowflake?: SnowflakeBatchResponse[string];
+}) {
   const positive = (row.changePercent ?? 0) >= 0;
   return (
     <div className="bg-surface border border-border rounded-lg p-3 flex flex-col gap-1.5">
@@ -67,13 +74,22 @@ function SparkCard({ row }: { row: ScreenerCacheRow }) {
         </span>
       </div>
       <div className="text-xs text-text-muted truncate">{row.name}</div>
-      <Sparkline
-        data={row.spark ?? []}
-        positive={positive}
-        width={200}
-        height={72}
-        className="w-full"
-      />
+      <div className="flex gap-2 items-start">
+        <Sparkline
+          data={row.spark ?? []}
+          positive={positive}
+          width={200}
+          height={72}
+          className="flex-1"
+        />
+        {snowflake && (
+          <SnowflakeMini
+            scores={snowflake.scores}
+            overallScore={snowflake.overallScore}
+            size={72}
+          />
+        )}
+      </div>
       <div className="flex items-center justify-between text-xs text-text-secondary">
         <span>${fmtNum(row.price)}</span>
         <span className="text-text-muted">{fmtLarge(row.marketCap)}</span>
@@ -100,6 +116,7 @@ export default function ScreenerPage() {
   const [presetDefs, setPresetDefs] = useState<PresetDef[]>([]);
   const [data, setData] = useState<ScreenerUniverseResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [snowflakeScores, setSnowflakeScores] = useState<SnowflakeBatchResponse>({});
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -164,6 +181,16 @@ export default function ScreenerPage() {
   };
 
   const results = data?.results ?? [];
+
+  // Fetch snowflake batch scores when switching to charts view
+  useEffect(() => {
+    if (viewMode !== "charts" || results.length === 0) return;
+    const tickers = results.map((r) => r.symbol).slice(0, 100); // cap at 100
+    api.snowflakeBatch(tickers)
+      .then(setSnowflakeScores)
+      .catch(() => setSnowflakeScores({}));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewMode, data]);
 
   return (
     <main className="max-w-screen-2xl mx-auto px-4 py-6 space-y-6">
@@ -294,7 +321,7 @@ export default function ScreenerPage() {
             ) : (
               <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
                 {results.map((row) => (
-                  <SparkCard key={row.symbol} row={row} />
+                  <SparkCard key={row.symbol} row={row} snowflake={snowflakeScores[row.symbol]} />
                 ))}
               </div>
             )}

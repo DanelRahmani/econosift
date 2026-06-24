@@ -8,11 +8,18 @@ import { DcfPanel } from "@/components/markets/DcfPanel";
  * fundamentals + analyst data) leads, with the interactive two-stage DCF panel
  * (sliders + sensitivity heatmap) below for hands-on scenario work.
  */
-export function ValuationTab({ tickers }: { tickers: string[]; period?: string }) {
+export function ValuationTab({
+  tickers,
+  onNavigateTab,
+}: {
+  tickers: string[];
+  period?: string;
+  onNavigateTab?: (tab: string) => void;
+}) {
   if (!tickers.length) return null;
   return (
     <div className="space-y-8">
-      <ValuationEngine tickers={tickers} />
+      <ValuationEngine tickers={tickers} onNavigateTab={onNavigateTab} />
       <div>
         <h2 className="text-sm font-semibold mb-3 text-text-secondary">
           Interactive Two-Stage DCF

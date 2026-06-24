@@ -1055,6 +1055,50 @@ export interface Form4Response {
   error?: string | null;
 }
 
+// --- Snowflake Composite Score (Phase 9) ---
+export interface SnowflakeScores {
+  value: number | null;
+  growth: number | null;
+  performance: number | null;
+  health: number | null;
+  dividend: number | null;
+}
+export interface SnowflakeComponent {
+  label: string;
+  score: number | null;
+  value?: number | null;
+  percentile?: number | null;
+  detail?: string | null;
+  weight?: number;
+}
+export interface SnowflakeAxisDetail {
+  score: number | null;
+  components: SnowflakeComponent[];
+}
+export interface SnowflakeReward {
+  axis: string;
+  label: string;
+  score: number;
+}
+export interface SnowflakeResponse {
+  ticker: string;
+  sector: string | null;
+  industry: string | null;
+  sectorPeers: number;
+  overallScore: number | null;
+  verdict: string;
+  scores: SnowflakeScores;
+  rewards: SnowflakeReward[];
+  risks: SnowflakeReward[];
+  axisDetails: Record<string, SnowflakeAxisDetail>;
+}
+export interface SnowflakeBatchResponse {
+  [ticker: string]: {
+    overallScore: number | null;
+    scores: SnowflakeScores;
+  };
+}
+
 // --- Admin health ---
 export interface CacheStat {
   hits: number;

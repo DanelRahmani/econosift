@@ -196,13 +196,12 @@ def dupont(bundle: dict) -> dict:
 # 3. Piotroski F-Score
 # ---------------------------------------------------------------------------
 
-def piotroski_f(bundle: dict) -> dict:
+def piotroski_f(bundle: dict, prior_year: dict | None = None) -> dict:
     """Piotroski F-Score (0–9).
 
-    Only criteria computable from a single-period snapshot are scored.
-    Prior-year comparison criteria (ΔDebt ratio, ΔCurrentRatio,
-    ΔGrossMargin, ΔAssetTurnover, dilution check) require history not
-    present in the bundle and are returned as None/not scored.
+    Pass ``prior_year`` (a dict with keys ``financials``, ``balance_sheet``,
+    ``cashflow``, ``info`` — same structure as *bundle*) to enable the five
+    year-over-year criteria (F5–F9).  Without it those criteria are None.
 
     Returns
     -------
@@ -238,33 +237,69 @@ def piotroski_f(bundle: dict) -> dict:
     if op_cf is not None and net_income is not None:
         f4 = op_cf > net_income
 
-    # --- Leverage / Liquidity ---
-    # F5: Lower long-term debt ratio YoY — NEEDS PRIOR YEAR → None
+    # --- Leverage / Liquidity (require prior year) ---
     f5: bool | None = None
-
-    # F6: Higher current ratio YoY — NEEDS PRIOR YEAR → None
     f6: bool | None = None
-
-    # F7: No new shares issued YoY — NEEDS PRIOR YEAR shares count → None
     f7: bool | None = None
 
-    # --- Operating Efficiency ---
-    # F8: Higher gross margin YoY — NEEDS PRIOR YEAR → None
+    # --- Operating Efficiency (require prior year) ---
     f8: bool | None = None
-
-    # F9: Higher asset turnover YoY — NEEDS PRIOR YEAR → None
     f9: bool | None = None
+
+    if prior_year is not None:
+        _, py_fin, py_bs, _ = _unpack(prior_year)
+
+        # F5: Long-term debt / total assets decreased YoY
+        lt_debt = _clean(_g(bs, "Long Term Debt", "Long Term Debt And Capital Lease Obligation"))
+        py_lt_debt = _clean(_g(py_bs, "Long Term Debt", "Long Term Debt And Capital Lease Obligation"))
+        py_total_assets = _clean(_g(py_bs, "Total Assets"))
+        if (lt_debt is not None and total_assets and total_assets > 0
+                and py_lt_debt is not None and py_total_assets and py_total_assets > 0):
+            f5 = (lt_debt / total_assets) < (py_lt_debt / py_total_assets)
+
+        # F6: Current ratio increased YoY
+        cur_assets = _clean(_g(bs, "Current Assets"))
+        cur_liab = _clean(_g(bs, "Current Liabilities"))
+        py_cur_assets = _clean(_g(py_bs, "Current Assets"))
+        py_cur_liab = _clean(_g(py_bs, "Current Liabilities"))
+        if (cur_assets is not None and cur_liab and cur_liab > 0
+                and py_cur_assets is not None and py_cur_liab and py_cur_liab > 0):
+            f6 = (cur_assets / cur_liab) > (py_cur_assets / py_cur_liab)
+
+        # F7: No dilution — shares outstanding did not increase YoY
+        shares = _clean(info.get("sharesOutstanding") or info.get("impliedSharesOutstanding"))
+        py_info = prior_year.get("info") or {}
+        py_shares = _clean(py_info.get("sharesOutstanding") or py_info.get("impliedSharesOutstanding"))
+        if shares is not None and py_shares is not None and py_shares > 0:
+            f7 = shares <= py_shares * 1.01  # 1% tolerance for rounding
+
+        # F8: Gross margin improved YoY
+        revenue = _clean(_g(fin, "Total Revenue"))
+        gross_profit = _clean(_g(fin, "Gross Profit"))
+        py_revenue = _clean(_g(py_fin, "Total Revenue"))
+        py_gross_profit = _clean(_g(py_fin, "Gross Profit"))
+        if (gross_profit is not None and revenue and revenue > 0
+                and py_gross_profit is not None and py_revenue and py_revenue > 0):
+            f8 = (gross_profit / revenue) > (py_gross_profit / py_revenue)
+
+        # F9: Asset turnover (revenue / assets) improved YoY
+        revenue_cur = _clean(_g(fin, "Total Revenue"))
+        py_revenue_9 = _clean(_g(py_fin, "Total Revenue"))
+        py_ta_9 = _clean(_g(py_bs, "Total Assets"))
+        if (revenue_cur is not None and total_assets and total_assets > 0
+                and py_revenue_9 is not None and py_ta_9 and py_ta_9 > 0):
+            f9 = (revenue_cur / total_assets) > (py_revenue_9 / py_ta_9)
 
     criteria = {
         "positiveNetIncome": f1,
         "positiveROA": f2,
         "positiveOperatingCF": f3,
-        "accrualQuality": f4,          # OCF > NI
-        "lowerLTDebtRatio": f5,        # needs prior year
-        "higherCurrentRatio": f6,      # needs prior year
-        "noNewShares": f7,             # needs prior year
-        "higherGrossMargin": f8,       # needs prior year
-        "higherAssetTurnover": f9,     # needs prior year
+        "accrualQuality": f4,
+        "lowerLTDebtRatio": f5,
+        "higherCurrentRatio": f6,
+        "noNewShares": f7,
+        "higherGrossMargin": f8,
+        "higherAssetTurnover": f9,
     }
 
     scored = [v for v in criteria.values() if v is not None]

@@ -19,6 +19,7 @@ import { ScreenerTab } from "@/components/markets/ScreenerTab";
 import { FxRatesPanel } from "@/components/markets/FxRatesPanel";
 import { NewsFeed } from "@/components/markets/NewsFeed";
 import { Watchlist } from "@/components/Watchlist";
+import { SnowflakeChart } from "@/components/markets/SnowflakeChart";
 
 const PERIODS = ["1mo", "3mo", "6mo", "1y", "2y", "5y"];
 const BENCHMARKS = [
@@ -192,6 +193,10 @@ function MarketsPageInner() {
             <h2 className="text-sm font-semibold mb-4 text-text-secondary">Normalised Price (base 100)</h2>
             {loading && !prices ? <Skeleton className="h-96" /> : prices && <PriceChart data={prices} events={events} />}
           </Card>
+          <SnowflakeChart
+            ticker={tickers[0]}
+            onAxisClick={(t) => setTab(t as Tab)}
+          />
           <NewsFeed tickers={tickers} />
         </div>
       )}
@@ -222,7 +227,7 @@ function MarketsPageInner() {
       )}
 
       {tab === "Valuation" && tickers.length > 0 && (
-        <ValuationTab tickers={tickers} period={period} />
+        <ValuationTab tickers={tickers} period={period} onNavigateTab={(t) => setTab(t as Tab)} />
       )}
 
       {tab === "Ratios" && tickers.length > 0 && (

@@ -9,6 +9,7 @@ import { ValuationKpiPanel } from "@/components/markets/ValuationKpiPanel";
 import { ValuationModelsGrid } from "@/components/markets/ValuationModelsGrid";
 import { AxiomGauge } from "@/components/markets/AxiomGauge";
 import { AnalystPanel } from "@/components/markets/AnalystPanel";
+import { SnowflakeChart } from "@/components/markets/SnowflakeChart";
 
 /**
  * Phase 1 valuation engine container. Valuation is per-stock, so when several
@@ -16,7 +17,13 @@ import { AnalystPanel } from "@/components/markets/AnalystPanel";
  * full bundle (8 models + composite + fundamentals + analyst) on ticker change
  * (compute tier: runs on load). Fama-French attribution is on-demand (tier 🟡).
  */
-export function ValuationEngine({ tickers }: { tickers: string[] }) {
+export function ValuationEngine({
+  tickers,
+  onNavigateTab,
+}: {
+  tickers: string[];
+  onNavigateTab?: (tab: string) => void;
+}) {
   const [active, setActive] = useState<string>(tickers[0] ?? "");
   const [data, setData] = useState<ValuationFullResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -91,6 +98,8 @@ export function ValuationEngine({ tickers }: { tickers: string[] }) {
               />
             </Card>
           </div>
+
+          <SnowflakeChart ticker={active} onAxisClick={onNavigateTab} />
 
           <Card>
             <h3 className="text-sm font-semibold mb-3 text-text-secondary">Valuation Models</h3>

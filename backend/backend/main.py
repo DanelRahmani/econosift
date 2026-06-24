@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .routers import (
     market, valuation, ratios, search, macro,
     portfolio, screener, admin, dashboard, treemap, calendar, risk, options,
-    market_data,
+    market_data, snowflake,
 )
 from .services import screener_service
 
@@ -52,3 +52,4 @@ app.include_router(calendar.router)
 app.include_router(risk.router)
 app.include_router(options.router)
 app.include_router(market_data.router)
+app.include_router(snowflake.router)

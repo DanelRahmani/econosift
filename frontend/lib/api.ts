@@ -18,6 +18,7 @@ import type {
   RatesData, InflationData, EmploymentData, HousingData, CommoditiesData,
   FxHeatmapData, FxPppData, LeadingData, FinancialConditionsData, CotData,
   Holders13FResponse, Form4Response,
+  SnowflakeResponse, SnowflakeBatchResponse,
 } from "./types";
 
 async function get<T>(path: string): Promise<T> {
@@ -284,4 +285,10 @@ export const api = {
 
   marketForm4: (ticker: string) =>
     get<Form4Response>(`/market/form4?ticker=${encodeURIComponent(ticker)}`),
+
+  snowflake: (ticker: string) =>
+    get<SnowflakeResponse>(`/snowflake?ticker=${encodeURIComponent(ticker)}`),
+
+  snowflakeBatch: (tickers: string[]) =>
+    get<SnowflakeBatchResponse>(`/snowflake/batch?tickers=${tickers.map(encodeURIComponent).join(",")}`),
 };
