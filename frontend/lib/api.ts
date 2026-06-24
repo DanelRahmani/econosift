@@ -20,6 +20,9 @@ import type {
   Holders13FResponse, Form4Response,
   SnowflakeResponse, SnowflakeBatchResponse,
   SectorReturnsResponse, SectorFundamentalsResponse, SectorRotationResponse, SectorDrillResponse,
+  Holding,
+  PortfolioAnalysis, CorrelationData, RiskContribData, CAPMData, RollingData,
+  KellyData, FFData, FrontierData, MCData, BLData, StressScenario,
 } from "./types";
 
 async function get<T>(path: string): Promise<T> {
@@ -299,4 +302,38 @@ export const api = {
   sectorRotation: (): Promise<SectorRotationResponse> => get("/sector/rotation"),
   sectorDrill: (sector: string): Promise<SectorDrillResponse> =>
     get(`/sector/drill?sector=${encodeURIComponent(sector)}`),
+
+  // --- Phase 11: Portfolio Analytics ---
+  portfolioAnalyze: (holdings: Holding[], period: string): Promise<PortfolioAnalysis> =>
+    post("/portfolio/analyze", { holdings, period }),
+
+  portfolioCorrelation: (holdings: Holding[], period: string): Promise<CorrelationData> =>
+    post("/portfolio/correlation", { holdings, period }),
+
+  portfolioRiskContribution: (holdings: Holding[], period: string): Promise<RiskContribData> =>
+    post("/portfolio/risk-contribution", { holdings, period }),
+
+  portfolioCAPM: (holdings: Holding[], period: string): Promise<CAPMData> =>
+    post("/portfolio/capm", { holdings, period }),
+
+  portfolioRolling: (holdings: Holding[], period: string, window: number): Promise<RollingData> =>
+    post("/portfolio/rolling", { holdings, period, window }),
+
+  portfolioKelly: (holdings: Holding[], period: string): Promise<KellyData> =>
+    post("/portfolio/kelly", { holdings, period }),
+
+  portfolioFF: (holdings: Holding[], period: string, model: "3" | "5"): Promise<FFData> =>
+    post("/portfolio/ff", { holdings, period, model }),
+
+  portfolioFrontier: (holdings: Holding[], period: string): Promise<FrontierData> =>
+    post("/portfolio/frontier", { holdings, period }),
+
+  portfolioMonteCarlo: (holdings: Holding[], period: string): Promise<MCData> =>
+    post("/portfolio/montecarlo", { holdings, period }),
+
+  portfolioBL: (holdings: Holding[], views: { ticker: string; expectedReturn: number }[], period: string): Promise<BLData> =>
+    post("/portfolio/blacklitterman", { holdings, views, period }),
+
+  portfolioStress: (holdings: Holding[], period: string): Promise<StressScenario[]> =>
+    post("/portfolio/stress", { holdings, period }),
 };

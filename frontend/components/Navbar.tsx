@@ -10,6 +10,7 @@ const tabs = [
   { href: "/calendar", label: "Calendar" },
   { href: "/screener", label: "Screener" },
   { href: "/sectors", label: "Sectors" },
+  { href: "/portfolio", label: "Portfolio" },
   { href: "/markets", label: "Markets" },
   { href: "/risk", label: "Risk" },
   { href: "/options", label: "Options" },

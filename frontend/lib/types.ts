@@ -1154,6 +1154,150 @@ export interface IndustryGroup {
 }
 export type SectorDrillResponse = IndustryGroup[];
 
+// --- Phase 11: Portfolio Analytics ---
+export interface Holding {
+  ticker: string;
+  weight: number;
+}
+
+export interface PortfolioAnalysis {
+  holdings: { ticker: string; weight: number; totalReturn: number | null; contribution: number | null }[];
+  series: { date: string; value: number }[];
+  drawdownSeries: { date: string; value: number }[];
+  benchmarkSeries: {
+    gspc: { date: string; value: number }[];
+    agg: { date: string; value: number }[];
+  };
+  metrics: {
+    totalReturn: number | null;
+    annReturn: number | null;
+    annVolatility: number | null;
+    sharpe: number | null;
+    sortino: number | null;
+    maxDrawdown: number | null;
+    var95: number | null;
+    beta: number | null;
+  };
+  benchmark: string;
+  missing: string[];
+}
+
+// correlation matrix is a 2D array (tickers x tickers)
+export interface CorrelationData {
+  tickers: string[];
+  matrix: (number | null)[][];
+}
+
+// risk contribution returned as a flat list from backend
+export interface RiskContribItem {
+  ticker: string;
+  weight: number | null;
+  marginalContrib: number | null;
+  pctContrib: number | null;
+}
+export type RiskContribData = RiskContribItem[];
+
+export interface CAPMData {
+  alpha: number | null;         // daily alpha
+  annAlpha: number | null;      // annualised alpha
+  beta: number | null;
+  rSquared: number | null;
+  systematicVarPct: number | null;
+  idiosyncraticVarPct: number | null;
+  nObs?: number;
+  error?: string;
+}
+
+export interface DateValuePoint {
+  date: string;
+  value: number | null;
+}
+export interface RollingData {
+  window: number;
+  sharpe: DateValuePoint[];
+  volatility: DateValuePoint[];
+  beta: DateValuePoint[];
+}
+
+// Kelly returns a list (one per holding)
+export interface KellyRow {
+  ticker: string;
+  annReturn: number | null;
+  annVolatility: number | null;
+  kellyFraction: number | null;
+}
+export type KellyData = KellyRow[];
+
+export interface FFFactorRow {
+  factor: string;
+  loading: number | null;
+  tStat: number | null;
+}
+export interface FFData {
+  model: string;
+  alpha: number | null;
+  annAlpha: number | null;
+  rSquared: number | null;
+  factors: FFFactorRow[];
+  nObs?: number;
+  error?: string;
+}
+
+export interface FrontierPoint {
+  vol: number | null;
+  ret: number | null;
+  sharpe: number | null;
+}
+export interface FrontierData {
+  frontier: FrontierPoint[];
+  currentPortfolio: FrontierPoint | null;
+  maxSharpe: (FrontierPoint & { weights?: { ticker: string; weight: number }[] }) | null;
+  error?: string;
+  warning?: string;
+}
+
+export interface MCPortfolioPoint {
+  vol: number | null;
+  ret: number | null;
+  sharpe: number | null;
+}
+export interface MCData {
+  // backend returns 'points' key
+  points: MCPortfolioPoint[];
+  maxSharpe: (MCPortfolioPoint & { weights?: { ticker: string; weight: number }[] }) | null;
+  error?: string;
+}
+
+export interface BLReturnRow {
+  ticker: string;
+  equilibriumReturn: number | null;
+  blReturn: number | null;
+}
+export interface BLWeightRow {
+  ticker: string;
+  weight: number | null;
+}
+export interface BLData {
+  blReturns: BLReturnRow[];
+  optimalWeights: BLWeightRow[];
+  currentWeights: BLWeightRow[];
+  error?: string;
+}
+
+// Stress test returns a list of scenario objects
+export interface StressScenario {
+  scenario: string;
+  label: string;
+  start: string;
+  end: string;
+  totalReturn: number | null;
+  maxDrawdown: number | null;
+  returnsTimeSeries: DateValuePoint[];
+  benchmark: DateValuePoint[];
+  error?: string;
+}
+export type StressData = StressScenario[];
+
 // --- Admin health ---
 export interface CacheStat {
   hits: number;
