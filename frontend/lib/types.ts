@@ -745,6 +745,82 @@ export interface StressTestResponse {
   scenarios: StressScenarioResult[];
 }
 
+// ─── Phase 7: Options & IV Module ────────────────────────────────────────────
+
+export interface OptionsKPIs {
+  iv30: number | null;
+  iv30Approximate: boolean;
+  ivRank: number | null;
+  ivRankApproximate: boolean;
+  ivPercentile: number | null;
+  pcOIRatio: number | null;
+  maxPain: number | null;
+  impliedMove: number | null;
+  spot: number | null;
+  error?: string;
+}
+
+export interface OptionRow {
+  strike: number;
+  bid: number | null;
+  ask: number | null;
+  mid: number | null;
+  last: number | null;
+  volume: number | null;
+  openInterest: number | null;
+  iv: number | null;       // already ×100 (e.g. 28.5 means 28.5%)
+  delta: number | null;
+  bsPrice: number | null;
+  itm: boolean;
+}
+
+export interface OptionsChain {
+  ticker: string;
+  expiry: string;
+  spot: number;
+  calls: OptionRow[];
+  puts: OptionRow[];
+  error?: string;
+}
+
+export interface IVTermPoint {
+  expiry: string;
+  dte: number;
+  atmIV: number | null;
+  straddle: number | null;
+}
+
+export interface IVSmilePoint {
+  strike: number;
+  moneyness: number;
+  callIV: number | null;
+  putIV: number | null;
+}
+
+export interface OIProfile {
+  strikes: number[];
+  callOI: number[];
+  putOI: number[];
+  maxPain: number | null;
+  spot: number;
+  error?: string;
+}
+
+export interface MCOptionsResult {
+  price: number | null;
+  std: number | null;
+  var95: number | null;
+  var99: number | null;
+  distribution: { bin: number; count: number }[];
+  bsPrice: number | null;
+  ticker?: string;
+  strike?: number;
+  expiry?: string;
+  optType?: string;
+  spot?: number;
+  error?: string;
+}
+
 // --- Admin health ---
 export interface CacheStat {
   hits: number;

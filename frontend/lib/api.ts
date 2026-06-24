@@ -14,6 +14,7 @@ import type {
   RollingMetricsResponse, ExtendedRiskResponse, CorrelationResponse,
   GarchResult, HurstResult, OUResponse, CointegrationResult,
   MonteCarloResult, StressTestResponse,
+  OptionsKPIs, OptionsChain, IVTermPoint, IVSmilePoint, OIProfile, MCOptionsResult,
 } from "./types";
 
 async function get<T>(path: string): Promise<T> {
@@ -217,5 +218,30 @@ export const api = {
     post<StressTestResponse>(
       `/risk/stress?ticker=${encodeURIComponent(ticker)}&scenarios=${encodeURIComponent(scenarios)}` +
       (benchmark ? `&benchmark=${encodeURIComponent(benchmark)}` : ""), {}
+    ),
+
+  // --- Phase 7: Options & IV Module ---
+  optionsExpiries: (ticker: string) =>
+    get<string[]>(`/options/expiries?ticker=${encodeURIComponent(ticker)}`),
+
+  optionsKPIs: (ticker: string) =>
+    get<OptionsKPIs>(`/options/ivmetrics?ticker=${encodeURIComponent(ticker)}`),
+
+  optionsChain: (ticker: string, expiry: string) =>
+    get<OptionsChain>(`/options/chain?ticker=${encodeURIComponent(ticker)}&expiry=${encodeURIComponent(expiry)}`),
+
+  optionsTermStructure: (ticker: string) =>
+    get<IVTermPoint[]>(`/options/termstructure?ticker=${encodeURIComponent(ticker)}`),
+
+  optionsSmile: (ticker: string, expiry: string) =>
+    get<IVSmilePoint[]>(`/options/smile?ticker=${encodeURIComponent(ticker)}&expiry=${encodeURIComponent(expiry)}`),
+
+  optionsOIProfile: (ticker: string, expiry: string) =>
+    get<OIProfile>(`/options/oiprofile?ticker=${encodeURIComponent(ticker)}&expiry=${encodeURIComponent(expiry)}`),
+
+  optionsMonteCarlo: (ticker: string, strike: number, expiry: string, optType: string, sims = 10000) =>
+    post<MCOptionsResult>(
+      `/options/montecarlo?ticker=${encodeURIComponent(ticker)}&strike=${strike}&expiry=${encodeURIComponent(expiry)}&opt_type=${optType}&sims=${sims}`,
+      {}
     ),
 };

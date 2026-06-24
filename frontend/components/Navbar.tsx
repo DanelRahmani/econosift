@@ -11,6 +11,7 @@ const tabs = [
   { href: "/screener", label: "Screener" },
   { href: "/markets", label: "Markets" },
   { href: "/risk", label: "Risk" },
+  { href: "/options", label: "Options" },
   { href: "/macro", label: "Macro" },
 ];
 

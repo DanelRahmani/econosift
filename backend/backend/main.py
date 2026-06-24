@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .routers import (
     market, valuation, ratios, search, macro,
-    portfolio, screener, admin, dashboard, treemap, calendar, risk,
+    portfolio, screener, admin, dashboard, treemap, calendar, risk, options,
 )
 from .services import screener_service
 
@@ -49,3 +49,4 @@ app.include_router(dashboard.router)
 app.include_router(treemap.router)
 app.include_router(calendar.router)
 app.include_router(risk.router)
+app.include_router(options.router)
