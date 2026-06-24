@@ -821,6 +821,240 @@ export interface MCOptionsResult {
   error?: string;
 }
 
+// ─── Phase 8: Macro Expansion ────────────────────────────────────────────────
+
+export interface MacroTimeSeries {
+  date: string;
+  value: number | null;
+}
+
+// Rates & Yields
+export interface RatesData {
+  asOf: string | null;
+  yields: Record<string, number | null>;
+  spread_2y10y: number | null;
+  spread_3m10y: number | null;
+  inverted: boolean;
+  history: Record<string, MacroTimeSeries[]>;
+  taylor_rule: {
+    implied: MacroTimeSeries[];
+    actual: MacroTimeSeries[];
+  };
+  acm: {
+    expectations: MacroTimeSeries[];
+    term_premium: MacroTimeSeries[];
+    source: string;
+  };
+}
+
+// Inflation
+export interface InflationData {
+  asOf: string | null;
+  kpis: {
+    cpiYoY: number | null;
+    coreCpiYoY: number | null;
+    pceYoY: number | null;
+    corePceYoY: number | null;
+    breakeven5y: number | null;
+  };
+  history: {
+    cpiYoY: MacroTimeSeries[];
+    coreCpiYoY: MacroTimeSeries[];
+    pceYoY: MacroTimeSeries[];
+    corePceYoY: MacroTimeSeries[];
+    ppiYoY: MacroTimeSeries[];
+    breakeven5y: MacroTimeSeries[];
+    breakeven10y: MacroTimeSeries[];
+    forward5y5y: MacroTimeSeries[];
+    m2: MacroTimeSeries[];
+    m2Yoy: MacroTimeSeries[];
+  };
+  quantityTheory: {
+    nominalGdp: MacroTimeSeries[];
+    m2: MacroTimeSeries[];
+  };
+}
+
+// Employment
+export interface EmploymentData {
+  asOf: string | null;
+  kpis: {
+    gdpYoY: number | null;
+    unemploymentRate: number | null;
+    nfpLatest: number | null;
+    joblessClaims: number | null;
+    laborParticipation: number | null;
+  };
+  history: {
+    gdpYoY: MacroTimeSeries[];
+    unemploymentRate: MacroTimeSeries[];
+    nfp: MacroTimeSeries[];
+    joblessClaims: MacroTimeSeries[];
+    sahmRule: MacroTimeSeries[];
+    joltsOpenings: MacroTimeSeries[];
+    joltsQuits: MacroTimeSeries[];
+    indProd: MacroTimeSeries[];
+    capUtil: MacroTimeSeries[];
+  };
+  recessionPeriods: { start: string; end: string }[];
+}
+
+// Housing
+export interface HousingData {
+  asOf: string | null;
+  kpis: {
+    caseShillerYoY: number | null;
+    housingStarts: number | null;
+    mortgageRate: number | null;
+    existingHomeSales: number | null;
+  };
+  history: {
+    caseShillerYoY: MacroTimeSeries[];
+    housingStarts: MacroTimeSeries[];
+    mortgageRate: MacroTimeSeries[];
+    existingHomeSales: MacroTimeSeries[];
+  };
+  recessionPeriods: { start: string; end: string }[];
+}
+
+// Commodities
+export interface CommodityRow {
+  ticker: string;
+  name: string;
+  price: number | null;
+  change1d: number | null;
+  change1w: number | null;
+  change1m: number | null;
+  changeYtd: number | null;
+}
+export interface CommoditiesData {
+  asOf: string | null;
+  kpis: {
+    wti: number | null;
+    gold: number | null;
+    natGas: number | null;
+    copper: number | null;
+    wheat: number | null;
+    wtiChange1d: number | null;
+    goldChange1d: number | null;
+  };
+  table: CommodityRow[];
+  ratios: {
+    goldOilRatio: MacroTimeSeries[];
+  };
+  axiomIndex: MacroTimeSeries[];
+}
+
+// FX
+export interface FxCross {
+  pair: string;
+  change1d: number | null;
+}
+export interface FxHeatmapData {
+  crosses: FxCross[];
+  asOf: string | null;
+}
+export interface FxPppPair {
+  pair: string;
+  spot: number | null;
+  ppp: number | null;
+  overvaluation: number | null;
+}
+export interface FxPppData {
+  pairs: FxPppPair[];
+}
+
+// Leading Indicators
+export interface LeadingData {
+  asOf: string | null;
+  kpis: {
+    lei: number | null;
+    cfnai: number | null;
+    ismPmi: number | null;
+    gscpi: number | null;
+  };
+  history: {
+    lei: MacroTimeSeries[];
+    cfnai: MacroTimeSeries[];
+    ismPmi: MacroTimeSeries[];
+    gscpi: MacroTimeSeries[];
+  };
+  islmpc: {
+    gdp: MacroTimeSeries[];
+    gdpPot: MacroTimeSeries[];
+    fedFunds: MacroTimeSeries[];
+    m2: MacroTimeSeries[];
+    unrate: MacroTimeSeries[];
+    cpi: MacroTimeSeries[];
+  };
+}
+
+// Financial Conditions
+export interface FinancialConditionsData {
+  asOf: string | null;
+  kpis: {
+    nfci: number | null;
+    stlfsi: number | null;
+    fedBalanceSheet: number | null;
+  };
+  history: {
+    nfci: MacroTimeSeries[];
+    stlfsi: MacroTimeSeries[];
+    fedBalanceSheet: MacroTimeSeries[];
+    creditCardDelinquency: MacroTimeSeries[];
+    ciLoans: MacroTimeSeries[];
+    economicPolicyUncertainty: MacroTimeSeries[];
+  };
+}
+
+// COT Positioning
+export interface CotContract {
+  name: string;
+  code: string;
+  net_speculator: number | null;
+  net_commercial: number | null;
+  cot_index: number | null;
+  open_interest: number | null;
+  history: { date: string; net_spec: number }[];
+}
+export interface CotData {
+  asOf: string | null;
+  contracts: CotContract[];
+  source: string;
+  error?: string | null;
+}
+
+// EDGAR (for Markets page)
+export interface Holder13F {
+  name: string;
+  shares: number | null;
+  value: number | null;
+  pctFloat: number | null;
+  changeShares: number | null;
+  changePct: number | null;
+}
+export interface Holders13FResponse {
+  ticker: string;
+  asOf: string | null;
+  reportingLag: string;
+  holders: Holder13F[];
+  error?: string | null;
+}
+export interface InsiderTransaction {
+  insiderName: string;
+  title: string | null;
+  transactionType: "Buy" | "Sell";
+  shares: number;
+  pricePerShare: number | null;
+  totalValue: number | null;
+  date: string;
+}
+export interface Form4Response {
+  ticker: string;
+  transactions: InsiderTransaction[];
+  error?: string | null;
+}
+
 // --- Admin health ---
 export interface CacheStat {
   hits: number;

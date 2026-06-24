@@ -15,6 +15,9 @@ import type {
   GarchResult, HurstResult, OUResponse, CointegrationResult,
   MonteCarloResult, StressTestResponse,
   OptionsKPIs, OptionsChain, IVTermPoint, IVSmilePoint, OIProfile, MCOptionsResult,
+  RatesData, InflationData, EmploymentData, HousingData, CommoditiesData,
+  FxHeatmapData, FxPppData, LeadingData, FinancialConditionsData, CotData,
+  Holders13FResponse, Form4Response,
 } from "./types";
 
 async function get<T>(path: string): Promise<T> {
@@ -244,4 +247,41 @@ export const api = {
       `/options/montecarlo?ticker=${encodeURIComponent(ticker)}&strike=${strike}&expiry=${encodeURIComponent(expiry)}&opt_type=${optType}&sims=${sims}`,
       {}
     ),
+
+  // --- Phase 8: Macro Expansion ---
+  macroRates: () =>
+    get<RatesData>(`/macro/rates`),
+
+  macroInflation: () =>
+    get<InflationData>(`/macro/inflation`),
+
+  macroEmployment: () =>
+    get<EmploymentData>(`/macro/employment`),
+
+  macroHousing: () =>
+    get<HousingData>(`/macro/housing`),
+
+  macroCommodities: () =>
+    get<CommoditiesData>(`/macro/commodities`),
+
+  macroFxHeatmap: () =>
+    get<FxHeatmapData>(`/macro/fx/heatmap`),
+
+  macroFxPpp: () =>
+    get<FxPppData>(`/macro/fx/ppp`),
+
+  macroLeading: () =>
+    get<LeadingData>(`/macro/leading`),
+
+  macroFinancialConditions: () =>
+    get<FinancialConditionsData>(`/macro/financial-conditions`),
+
+  macroCot: () =>
+    get<CotData>(`/macro/positioning`),
+
+  market13f: (ticker: string) =>
+    get<Holders13FResponse>(`/market/13f?ticker=${encodeURIComponent(ticker)}`),
+
+  marketForm4: (ticker: string) =>
+    get<Form4Response>(`/market/form4?ticker=${encodeURIComponent(ticker)}`),
 };
