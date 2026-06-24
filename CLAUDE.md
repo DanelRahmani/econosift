@@ -143,7 +143,33 @@ the repo).
   with axis-click tab navigation; `SnowflakeMini` (compact 100×100) in Screener Charts view.
   **368 pytest pass. Verified live:** AAPL → 7.11 Strong; batch and pages HTTP 200.
 
-### ⏭️ Next: Phase 10 (`claude_plan.md`)
+### ⏭️ Next: Phase 10 — Sector Performance Charts
+
+**Goal**: Sector-level return comparison, rotation analysis, and industry drill-down.
+Full spec in `claude_plan.md` Phase 10. Summary:
+
+- **Data**: 11 SPDR ETFs via yfinance — XLF, XLK, XLE, XLV, XLI, XLY, XLP, XLB,
+  XLRE, XLC, XLU. All prices via `yf.download()` (not loop). Cached 15 min (market
+  hours) / 60 min (off-hours).
+- **Top KPIs** 🟢: 1D return bar chart for all 11 sectors (colour-coded red/green).
+- **Full charts** 🟢: 6 horizontal bar charts (1D / 1W / 1M / 3M / YTD / 1Y),
+  each sorted by return. Period tabs.
+- **Fundamentals table** 🟢: sector ETF rows with 4 sub-tabs —
+  Overview (price, 1D%, YTD%, AUM), Valuation (P/E, P/B, dividend yield),
+  Performance (1M/3M/6M/1Y), Volatility (beta, realised vol, max drawdown).
+- **Industry drill-down**: click a sector bar → show top-3 stocks per GICS industry
+  within that sector (from screener cache) → link to `/screener?preset=sector_X`.
+- **Sector Rotation Clock** 🟢: Sam Stovall 4-quadrant (Early / Mid / Late /
+  Recession). Sectors plotted as bubbles (size = AUM, colour = 3M return vs S&P 500).
+  Implied current phase derived from 3M ETF returns vs benchmark. Cross-validate
+  with the existing Phase 0.3 Regime Clock (`regime_service`).
+- **Placement**: new `/sectors` page + "Sectors" tab already exists in Markets page
+  (`SectorHeatmap` component at `frontend/components/markets/SectorHeatmap.tsx` —
+  read it first to see what's already built before adding new components).
+- **New backend**: `services/sector_service.py` + `routers/sector.py`
+  (`/api/sector/returns`, `/api/sector/fundamentals`, `/api/sector/rotation`).
+  Register in `main.py`. All 🟢 tier (run on load).
+- **Docker gate**: `pytest` + Docker rebuild + recreate + curl new endpoints before done.
 
 ### Working agreements (carry these forward)
 
@@ -158,9 +184,8 @@ the repo).
   Docker errors, sound an **audible alert** (`[console]::beep(880,600)`) so the
   user can fix the environment.
 - **Env keys on this machine:** `FRED_API_KEY` **is set** (FRED release calendar +
-  US FRED macro data work live). `FINNHUB_API_KEY` is **not** set → Finnhub-only
-  features (IPO calendar, economic calendar) degrade gracefully to empty with an
-  honest UI notice; never fabricate to fill them.
+  US FRED macro data work live). `FINNHUB_API_KEY` **is now set** (confirmed Phase 9
+  session) → Finnhub calendar, earnings, and economic endpoints are live.
 - **Compute tiers:** 🟢 runs on page load · 🟡 "Calculate" button · 🔴 "Run
   Analysis" button. Never auto-trigger 🟡/🔴.
 - **UI rule:** every section = 3–6 KPIs on top + full extended list below.
