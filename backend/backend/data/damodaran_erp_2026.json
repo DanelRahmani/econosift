@@ -1,0 +1,794 @@
+{
+  "asOf": "2026-01-01",
+  "source": "Aswath Damodaran \u2014 Country Equity Risk Premiums (ctryprem.xlsx), Regional breakdown sheet",
+  "sourceUrl": "https://pages.stern.nyu.edu/~adamodar/pc/datasets/ctryprem.xlsx",
+  "matureMarketERP": 4.46,
+  "note": "erp/crp/taxRate in percent. matureMarketERP = US total ERP. Updated annually each January.",
+  "countries": {
+    "Abu Dhabi": {
+      "erp": 4.869,
+      "crp": 0.639,
+      "taxRate": 9.0
+    },
+    "Albania": {
+      "erp": 8.886,
+      "crp": 4.656,
+      "taxRate": 15.0
+    },
+    "Andorra (Principality of)": {
+      "erp": 6.299,
+      "crp": 2.069,
+      "taxRate": 10.0
+    },
+    "Angola": {
+      "erp": 12.644,
+      "crp": 8.414,
+      "taxRate": 25.0
+    },
+    "Argentina": {
+      "erp": 13.938,
+      "crp": 9.708,
+      "taxRate": 35.0
+    },
+    "Armenia": {
+      "erp": 8.886,
+      "crp": 4.656,
+      "taxRate": 18.0
+    },
+    "Aruba": {
+      "erp": 7.075,
+      "crp": 2.845,
+      "taxRate": 22.0
+    },
+    "Australia": {
+      "erp": 4.23,
+      "crp": 0.0,
+      "taxRate": 30.0
+    },
+    "Austria": {
+      "erp": 4.586,
+      "crp": 0.356,
+      "taxRate": 23.0
+    },
+    "Azerbaijan": {
+      "erp": 7.075,
+      "crp": 2.845,
+      "taxRate": 20.0
+    },
+    "Bahamas": {
+      "erp": 10.058,
+      "crp": 5.828,
+      "taxRate": 0.0
+    },
+    "Bahrain": {
+      "erp": 11.351,
+      "crp": 7.121,
+      "taxRate": 0.0
+    },
+    "Bangladesh": {
+      "erp": 11.351,
+      "crp": 7.121,
+      "taxRate": 27.5
+    },
+    "Barbados": {
+      "erp": 11.351,
+      "crp": 7.121,
+      "taxRate": 9.0
+    },
+    "Belarus": {
+      "erp": 30.889,
+      "crp": 26.659,
+      "taxRate": 25.0
+    },
+    "Belgium": {
+      "erp": 5.006,
+      "crp": 0.776,
+      "taxRate": 25.0
+    },
+    "Belize": {
+      "erp": 13.938,
+      "crp": 9.708,
+      "taxRate": 0.0
+    },
+    "Benin": {
+      "erp": 10.058,
+      "crp": 5.828,
+      "taxRate": 30.0
+    },
+    "Bermuda": {
+      "erp": 5.326,
+      "crp": 1.096,
+      "taxRate": 0.0
+    },
+    "Bolivia": {
+      "erp": 19.765,
+      "crp": 15.535,
+      "taxRate": 25.0
+    },
+    "Bosnia and Herzegovina": {
+      "erp": 12.644,
+      "crp": 8.414,
+      "taxRate": 10.0
+    },
+    "Botswana": {
+      "erp": 6.299,
+      "crp": 2.069,
+      "taxRate": 22.0
+    },
+    "Brazil": {
+      "erp": 7.471,
+      "crp": 3.241,
+      "taxRate": 34.0
+    },
+    "Bulgaria": {
+      "erp": 6.299,
+      "crp": 2.069,
+      "taxRate": 10.0
+    },
+    "Burkina Faso": {
+      "erp": 13.938,
+      "crp": 9.708,
+      "taxRate": 27.5
+    },
+    "Cambodia": {
+      "erp": 11.351,
+      "crp": 7.121,
+      "taxRate": 20.0
+    },
+    "Cameroon": {
+      "erp": 13.938,
+      "crp": 9.708,
+      "taxRate": 33.0
+    },
+    "Canada": {
+      "erp": 4.23,
+      "crp": 0.0,
+      "taxRate": 26.14
+    },
+    "Cape Verde": {
+      "erp": 11.351,
+      "crp": 7.121,
+      "taxRate": 26.86
+    },
+    "Cayman Islands": {
+      "erp": 5.006,
+      "crp": 0.776,
+      "taxRate": 0.0
+    },
+    "Chile": {
+      "erp": 5.326,
+      "crp": 1.096,
+      "taxRate": 27.0
+    },
+    "China": {
+      "erp": 5.143,
+      "crp": 0.913,
+      "taxRate": 25.0
+    },
+    "Colombia": {
+      "erp": 7.075,
+      "crp": 2.845,
+      "taxRate": 35.0
+    },
+    "Congo (Democratic Republic of)": {
+      "erp": 12.644,
+      "crp": 8.414,
+      "taxRate": 30.0
+    },
+    "Congo (Republic of)": {
+      "erp": 15.885,
+      "crp": 11.655,
+      "taxRate": 26.86
+    },
+    "Cook Islands": {
+      "erp": 10.058,
+      "crp": 5.828,
+      "taxRate": 20.0
+    },
+    "Costa Rica": {
+      "erp": 8.125,
+      "crp": 3.895,
+      "taxRate": 30.0
+    },
+    "C\u00f4te d'Ivoire": {
+      "erp": 8.125,
+      "crp": 3.895,
+      "taxRate": 25.0
+    },
+    "Croatia": {
+      "erp": 5.782,
+      "crp": 1.552,
+      "taxRate": 18.0
+    },
+    "Cuba": {
+      "erp": 19.765,
+      "crp": 15.535,
+      "taxRate": 35.0
+    },
+    "Curacao": {
+      "erp": 7.075,
+      "crp": 2.845,
+      "taxRate": 22.0
+    },
+    "Cyprus": {
+      "erp": 5.782,
+      "crp": 1.552,
+      "taxRate": 12.5
+    },
+    "Czech Republic": {
+      "erp": 5.006,
+      "crp": 0.776,
+      "taxRate": 21.0
+    },
+    "Denmark": {
+      "erp": 4.23,
+      "crp": 0.0,
+      "taxRate": 22.0
+    },
+    "Dominican Republic": {
+      "erp": 8.125,
+      "crp": 3.895,
+      "taxRate": 27.0
+    },
+    "Ecuador": {
+      "erp": 17.179,
+      "crp": 12.949,
+      "taxRate": 25.0
+    },
+    "Egypt": {
+      "erp": 13.938,
+      "crp": 9.708,
+      "taxRate": 22.5
+    },
+    "El Salvador": {
+      "erp": 12.644,
+      "crp": 8.414,
+      "taxRate": 30.0
+    },
+    "Estonia": {
+      "erp": 5.143,
+      "crp": 0.913,
+      "taxRate": 20.0
+    },
+    "Ethiopia": {
+      "erp": 15.885,
+      "crp": 11.655,
+      "taxRate": 30.0
+    },
+    "Fiji": {
+      "erp": 10.058,
+      "crp": 5.828,
+      "taxRate": 25.0
+    },
+    "Finland": {
+      "erp": 4.586,
+      "crp": 0.356,
+      "taxRate": 20.0
+    },
+    "France": {
+      "erp": 5.006,
+      "crp": 0.776,
+      "taxRate": 25.83
+    },
+    "Gabon": {
+      "erp": 15.885,
+      "crp": 11.655,
+      "taxRate": 30.0
+    },
+    "Georgia": {
+      "erp": 8.125,
+      "crp": 3.895,
+      "taxRate": 15.0
+    },
+    "Germany": {
+      "erp": 4.23,
+      "crp": 0.0,
+      "taxRate": 29.93
+    },
+    "Ghana": {
+      "erp": 13.938,
+      "crp": 9.708,
+      "taxRate": 25.0
+    },
+    "Greece": {
+      "erp": 7.075,
+      "crp": 2.845,
+      "taxRate": 22.0
+    },
+    "Guatemala": {
+      "erp": 7.471,
+      "crp": 3.241,
+      "taxRate": 25.0
+    },
+    "Guernsey (States of)": {
+      "erp": 5.143,
+      "crp": 0.913,
+      "taxRate": 0.0
+    },
+    "Honduras": {
+      "erp": 10.058,
+      "crp": 5.828,
+      "taxRate": 30.0
+    },
+    "Hong Kong": {
+      "erp": 5.006,
+      "crp": 0.776,
+      "taxRate": 16.5
+    },
+    "Hungary": {
+      "erp": 6.695,
+      "crp": 2.465,
+      "taxRate": 9.0
+    },
+    "Iceland": {
+      "erp": 5.143,
+      "crp": 0.913,
+      "taxRate": 21.0
+    },
+    "India": {
+      "erp": 7.075,
+      "crp": 2.845,
+      "taxRate": 30.0
+    },
+    "Indonesia": {
+      "erp": 6.695,
+      "crp": 2.465,
+      "taxRate": 22.0
+    },
+    "Iraq": {
+      "erp": 13.938,
+      "crp": 9.708,
+      "taxRate": 15.0
+    },
+    "Ireland": {
+      "erp": 5.006,
+      "crp": 0.776,
+      "taxRate": 12.5
+    },
+    "Isle of Man": {
+      "erp": 5.006,
+      "crp": 0.776,
+      "taxRate": 0.0
+    },
+    "Israel": {
+      "erp": 6.299,
+      "crp": 2.069,
+      "taxRate": 23.0
+    },
+    "Italy": {
+      "erp": 6.695,
+      "crp": 2.465,
+      "taxRate": 27.81
+    },
+    "Jamaica": {
+      "erp": 8.886,
+      "crp": 4.656,
+      "taxRate": 25.0
+    },
+    "Japan": {
+      "erp": 5.143,
+      "crp": 0.913,
+      "taxRate": 29.74
+    },
+    "Jersey (States of)": {
+      "erp": 5.006,
+      "crp": 0.776,
+      "taxRate": 0.0
+    },
+    "Jordan": {
+      "erp": 8.886,
+      "crp": 4.656,
+      "taxRate": 20.0
+    },
+    "Kazakhstan": {
+      "erp": 6.299,
+      "crp": 2.069,
+      "taxRate": 20.0
+    },
+    "Kenya": {
+      "erp": 12.644,
+      "crp": 8.414,
+      "taxRate": 30.0
+    },
+    "Korea": {
+      "erp": 4.869,
+      "crp": 0.639,
+      "taxRate": 26.4
+    },
+    "Kuwait": {
+      "erp": 5.143,
+      "crp": 0.913,
+      "taxRate": 15.0
+    },
+    "Kyrgyzstan": {
+      "erp": 12.644,
+      "crp": 8.414,
+      "taxRate": 10.0
+    },
+    "Laos": {
+      "erp": 15.885,
+      "crp": 11.655,
+      "taxRate": 20.0
+    },
+    "Latvia": {
+      "erp": 5.782,
+      "crp": 1.552,
+      "taxRate": 20.0
+    },
+    "Lebanon": {
+      "erp": 30.889,
+      "crp": 26.659,
+      "taxRate": 17.0
+    },
+    "Liechtenstein": {
+      "erp": 4.23,
+      "crp": 0.0,
+      "taxRate": 12.5
+    },
+    "Lithuania": {
+      "erp": 5.326,
+      "crp": 1.096,
+      "taxRate": 15.0
+    },
+    "Luxembourg": {
+      "erp": 4.23,
+      "crp": 0.0,
+      "taxRate": 24.94
+    },
+    "Macao": {
+      "erp": 5.006,
+      "crp": 0.776,
+      "taxRate": 25.0
+    },
+    "Macedonia": {
+      "erp": 8.886,
+      "crp": 4.656,
+      "taxRate": 10.0
+    },
+    "Malaysia": {
+      "erp": 5.782,
+      "crp": 1.552,
+      "taxRate": 24.0
+    },
+    "Maldives": {
+      "erp": 15.885,
+      "crp": 11.655,
+      "taxRate": 15.0
+    },
+    "Mali": {
+      "erp": 15.885,
+      "crp": 11.655,
+      "taxRate": 30.0
+    },
+    "Malta": {
+      "erp": 5.326,
+      "crp": 1.096,
+      "taxRate": 35.0
+    },
+    "Mauritius": {
+      "erp": 7.075,
+      "crp": 2.845,
+      "taxRate": 15.0
+    },
+    "Mexico": {
+      "erp": 6.695,
+      "crp": 2.465,
+      "taxRate": 30.0
+    },
+    "Moldova": {
+      "erp": 12.644,
+      "crp": 8.414,
+      "taxRate": 12.0
+    },
+    "Mongolia": {
+      "erp": 10.058,
+      "crp": 5.828,
+      "taxRate": 25.0
+    },
+    "Montenegro": {
+      "erp": 10.058,
+      "crp": 5.828,
+      "taxRate": 15.0
+    },
+    "Montserrat": {
+      "erp": 7.075,
+      "crp": 2.845,
+      "taxRate": 30.0
+    },
+    "Morocco": {
+      "erp": 7.471,
+      "crp": 3.241,
+      "taxRate": 33.0
+    },
+    "Mozambique": {
+      "erp": 17.179,
+      "crp": 12.949,
+      "taxRate": 32.0
+    },
+    "Namibia": {
+      "erp": 10.058,
+      "crp": 5.828,
+      "taxRate": 32.0
+    },
+    "Nepal": {
+      "erp": 8.886,
+      "crp": 4.656,
+      "taxRate": 25.0
+    },
+    "Netherlands": {
+      "erp": 4.23,
+      "crp": 0.0,
+      "taxRate": 25.8
+    },
+    "New Zealand": {
+      "erp": 4.23,
+      "crp": 0.0,
+      "taxRate": 28.0
+    },
+    "Nicaragua": {
+      "erp": 11.351,
+      "crp": 7.121,
+      "taxRate": 30.0
+    },
+    "Niger": {
+      "erp": 17.179,
+      "crp": 12.949,
+      "taxRate": 30.0
+    },
+    "Nigeria": {
+      "erp": 12.644,
+      "crp": 8.414,
+      "taxRate": 30.0
+    },
+    "Norway": {
+      "erp": 4.23,
+      "crp": 0.0,
+      "taxRate": 22.0
+    },
+    "Oman": {
+      "erp": 7.075,
+      "crp": 2.845,
+      "taxRate": 15.0
+    },
+    "Pakistan": {
+      "erp": 13.938,
+      "crp": 9.708,
+      "taxRate": 29.0
+    },
+    "Panama": {
+      "erp": 7.075,
+      "crp": 2.845,
+      "taxRate": 25.0
+    },
+    "Papua New Guinea": {
+      "erp": 11.351,
+      "crp": 7.121,
+      "taxRate": 30.0
+    },
+    "Paraguay": {
+      "erp": 7.075,
+      "crp": 2.845,
+      "taxRate": 10.0
+    },
+    "Peru": {
+      "erp": 6.299,
+      "crp": 2.069,
+      "taxRate": 29.5
+    },
+    "Philippines": {
+      "erp": 6.695,
+      "crp": 2.465,
+      "taxRate": 25.0
+    },
+    "Poland": {
+      "erp": 5.326,
+      "crp": 1.096,
+      "taxRate": 19.0
+    },
+    "Portugal": {
+      "erp": 5.782,
+      "crp": 1.552,
+      "taxRate": 31.5
+    },
+    "Qatar": {
+      "erp": 4.869,
+      "crp": 0.639,
+      "taxRate": 10.0
+    },
+    "Ras Al Khaimah (Emirate of)": {
+      "erp": 5.782,
+      "crp": 1.552,
+      "taxRate": 18.94
+    },
+    "Romania": {
+      "erp": 7.075,
+      "crp": 2.845,
+      "taxRate": 16.0
+    },
+    "Rwanda": {
+      "erp": 11.351,
+      "crp": 7.121,
+      "taxRate": 28.0
+    },
+    "Saudi Arabia": {
+      "erp": 5.006,
+      "crp": 0.776,
+      "taxRate": 20.0
+    },
+    "Senegal": {
+      "erp": 13.938,
+      "crp": 9.708,
+      "taxRate": 30.0
+    },
+    "Serbia": {
+      "erp": 8.125,
+      "crp": 3.895,
+      "taxRate": 15.0
+    },
+    "Sharjah": {
+      "erp": 7.471,
+      "crp": 3.241,
+      "taxRate": 18.94
+    },
+    "Singapore": {
+      "erp": 4.23,
+      "crp": 0.0,
+      "taxRate": 17.0
+    },
+    "Slovakia": {
+      "erp": 5.782,
+      "crp": 1.552,
+      "taxRate": 21.0
+    },
+    "Slovenia": {
+      "erp": 5.782,
+      "crp": 1.552,
+      "taxRate": 22.0
+    },
+    "Solomon Islands": {
+      "erp": 13.938,
+      "crp": 9.708,
+      "taxRate": 30.0
+    },
+    "South Africa": {
+      "erp": 8.125,
+      "crp": 3.895,
+      "taxRate": 27.0
+    },
+    "Spain": {
+      "erp": 5.782,
+      "crp": 1.552,
+      "taxRate": 25.0
+    },
+    "Sri Lanka": {
+      "erp": 19.765,
+      "crp": 15.535,
+      "taxRate": 30.0
+    },
+    "St. Maarten": {
+      "erp": 8.125,
+      "crp": 3.895,
+      "taxRate": 20.0
+    },
+    "St. Vincent & the Grenadines": {
+      "erp": 12.644,
+      "crp": 8.414,
+      "taxRate": 28.0
+    },
+    "Suriname": {
+      "erp": 13.938,
+      "crp": 9.708,
+      "taxRate": 36.0
+    },
+    "Swaziland": {
+      "erp": 11.351,
+      "crp": 7.121,
+      "taxRate": 25.0
+    },
+    "Sweden": {
+      "erp": 4.23,
+      "crp": 0.0,
+      "taxRate": 20.6
+    },
+    "Switzerland": {
+      "erp": 4.23,
+      "crp": 0.0,
+      "taxRate": 19.61
+    },
+    "Taiwan": {
+      "erp": 5.006,
+      "crp": 0.776,
+      "taxRate": 20.0
+    },
+    "Tajikistan": {
+      "erp": 12.644,
+      "crp": 8.414,
+      "taxRate": 18.0
+    },
+    "Tanzania": {
+      "erp": 10.058,
+      "crp": 5.828,
+      "taxRate": 30.0
+    },
+    "Thailand": {
+      "erp": 6.299,
+      "crp": 2.069,
+      "taxRate": 20.0
+    },
+    "Togo": {
+      "erp": 12.644,
+      "crp": 8.414,
+      "taxRate": 27.0
+    },
+    "Trinidad and Tobago": {
+      "erp": 8.125,
+      "crp": 3.895,
+      "taxRate": 30.0
+    },
+    "Tunisia": {
+      "erp": 13.938,
+      "crp": 9.708,
+      "taxRate": 15.0
+    },
+    "Turkey": {
+      "erp": 8.886,
+      "crp": 4.656,
+      "taxRate": 25.0
+    },
+    "Turks and Caicos Islands": {
+      "erp": 6.299,
+      "crp": 2.069,
+      "taxRate": 0.0
+    },
+    "Uganda": {
+      "erp": 12.644,
+      "crp": 8.414,
+      "taxRate": 30.0
+    },
+    "Ukraine": {
+      "erp": 19.765,
+      "crp": 15.535,
+      "taxRate": 18.0
+    },
+    "United Arab Emirates": {
+      "erp": 4.869,
+      "crp": 0.639,
+      "taxRate": 9.0
+    },
+    "United Kingdom": {
+      "erp": 5.006,
+      "crp": 0.776,
+      "taxRate": 25.0
+    },
+    "United States": {
+      "erp": 4.46,
+      "crp": 0.233,
+      "taxRate": 25.0
+    },
+    "Uruguay": {
+      "erp": 6.299,
+      "crp": 2.069,
+      "taxRate": 25.0
+    },
+    "Uzbekistan": {
+      "erp": 8.886,
+      "crp": 4.656,
+      "taxRate": 15.0
+    },
+    "Venezuela": {
+      "erp": 30.889,
+      "crp": 26.659,
+      "taxRate": 34.0
+    },
+    "Vietnam": {
+      "erp": 8.125,
+      "crp": 3.895,
+      "taxRate": 20.0
+    },
+    "Zambia": {
+      "erp": 15.885,
+      "crp": 11.655,
+      "taxRate": 30.0
+    }
+  }
+}

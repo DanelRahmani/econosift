@@ -1,0 +1,163 @@
+{
+  "asOf": "2026-01-05",
+  "source": "Aswath Damodaran \u2014 EV/EBITDA by industry (vebitda.xls, US), aggregated to GICS sectors via median",
+  "sourceUrl": "https://pages.stern.nyu.edu/~adamodar/pc/datasets/vebitda.xls",
+  "note": "evEbitda is median across mapped Damodaran industries. Financials EV/EBITDA is not meaningful (banks report NaN); use with care.",
+  "sectors": {
+    "Technology": {
+      "evEbitda": 23.25,
+      "nIndustries": 12
+    },
+    "Financial Services": {
+      "evEbitda": 16.24,
+      "nIndustries": 11
+    },
+    "Healthcare": {
+      "evEbitda": 13.21,
+      "nIndustries": 4
+    },
+    "Consumer Cyclical": {
+      "evEbitda": 14.07,
+      "nIndustries": 14
+    },
+    "Consumer Defensive": {
+      "evEbitda": 12.12,
+      "nIndustries": 8
+    },
+    "Energy": {
+      "evEbitda": 10.37,
+      "nIndustries": 7
+    },
+    "Industrials": {
+      "evEbitda": 14.55,
+      "nIndustries": 10
+    },
+    "Basic Materials": {
+      "evEbitda": 11.03,
+      "nIndustries": 8
+    },
+    "Real Estate": {
+      "evEbitda": 17.29,
+      "nIndustries": 3
+    },
+    "Communication Services": {
+      "evEbitda": 10.11,
+      "nIndustries": 8
+    },
+    "Utilities": {
+      "evEbitda": 13.93,
+      "nIndustries": 2
+    }
+  },
+  "mapping": {
+    "Technology": [
+      "Computer Services",
+      "Computers/Peripherals",
+      "Drugs (Biotechnology)",
+      "Electronics (Consumer & Office)",
+      "Electronics (General)",
+      "Heathcare Information and Technology",
+      "Information Services",
+      "Semiconductor",
+      "Semiconductor Equip",
+      "Software (Entertainment)",
+      "Software (Internet)",
+      "Software (System & Application)"
+    ],
+    "Financial Services": [
+      "Bank (Money Center)",
+      "Banks (Regional)",
+      "Brokerage & Investment Banking",
+      "Financial Svcs. (Non-bank & Insurance)",
+      "Insurance (General)",
+      "Insurance (Life)",
+      "Insurance (Prop/Cas.)",
+      "Investments & Asset Management",
+      "R.E.I.T.",
+      "Reinsurance",
+      "Retail (REITs)"
+    ],
+    "Healthcare": [
+      "Drugs (Pharmaceutical)",
+      "Healthcare Products",
+      "Healthcare Support Services",
+      "Hospitals/Healthcare Facilities"
+    ],
+    "Consumer Cyclical": [
+      "Apparel",
+      "Auto & Truck",
+      "Auto Parts",
+      "Furn/Home Furnishings",
+      "Homebuilding",
+      "Hotel/Gaming",
+      "Recreation",
+      "Restaurant/Dining",
+      "Retail (Automotive)",
+      "Retail (Building Supply)",
+      "Retail (Distributors)",
+      "Retail (General)",
+      "Retail (Special Lines)",
+      "Shoe"
+    ],
+    "Consumer Defensive": [
+      "Beverage (Alcoholic)",
+      "Beverage (Soft)",
+      "Farming/Agriculture",
+      "Food Processing",
+      "Food Wholesalers",
+      "Household Products",
+      "Retail (Grocery and Food)",
+      "Tobacco"
+    ],
+    "Energy": [
+      "Coal & Related Energy",
+      "Green & Renewable Energy",
+      "Oil/Gas (Integrated)",
+      "Oil/Gas (Production and Exploration)",
+      "Oil/Gas Distribution",
+      "Oilfield Svcs/Equip.",
+      "Power"
+    ],
+    "Industrials": [
+      "Aerospace/Defense",
+      "Air Transport",
+      "Construction Supplies",
+      "Engineering/Construction",
+      "Environmental & Waste Services",
+      "Machinery",
+      "Shipbuilding & Marine",
+      "Transportation",
+      "Transportation (Railroads)",
+      "Trucking"
+    ],
+    "Basic Materials": [
+      "Building Materials",
+      "Chemical (Basic)",
+      "Chemical (Diversified)",
+      "Chemical (Specialty)",
+      "Metals & Mining",
+      "Paper/Forest Products",
+      "Precious Metals",
+      "Steel"
+    ],
+    "Real Estate": [
+      "Real Estate (Development)",
+      "Real Estate (General/Diversified)",
+      "Real Estate (Operations & Services)"
+    ],
+    "Communication Services": [
+      "Advertising",
+      "Broadcasting",
+      "Cable TV",
+      "Entertainment",
+      "Publishing & Newspapers",
+      "Telecom (Wireless)",
+      "Telecom. Equipment",
+      "Telecom. Services"
+    ],
+    "Utilities": [
+      "Utility (General)",
+      "Utility (Water)"
+    ]
+  }
+}

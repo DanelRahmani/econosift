@@ -51,10 +51,13 @@ def cached(name: str | None = None):
 
     def decorator(func):
         cache_name = name or func.__qualname__
-        cache = _get_cache(cache_name)
+        _get_cache(cache_name)  # ensure the cache exists
 
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
+            # Resolve the cache by name at call time so tests (and any runtime
+            # reset) that clear/replace _caches[name] actually take effect.
+            cache = _get_cache(cache_name)
             key = _make_key(args, kwargs)
             if key in cache:
                 _record(cache_name, True)
@@ -74,11 +77,12 @@ def async_cached(name: str | None = None):
 
     def decorator(func):
         cache_name = name or func.__qualname__
-        cache = _get_cache(cache_name)
+        _get_cache(cache_name)  # ensure the cache exists
         lock = _locks.setdefault(cache_name, asyncio.Lock())
 
         @functools.wraps(func)
         async def wrapper(*args, **kwargs):
+            cache = _get_cache(cache_name)
             key = _make_key(args, kwargs)
             if key in cache:
                 _record(cache_name, True)
