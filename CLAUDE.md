@@ -78,14 +78,40 @@ the repo).
     work (shipped JSON). Large universes (sp500) may be slow/throttled on cold load —
     same Yahoo caveat as the treemap mcaps.
 
-### ⏭️ Next: Phase 5 — Screener Overhaul (`claude_plan.md` line ~142)
+- ✅ **Phase 5** (`a9dbb8b`) — Screener Overhaul. High-performance screener at `/screener`:
+  universes (S&P 500 / Nasdaq 100 / Dow 30 via Wikipedia API + FinanceDatabase small-cap),
+  overnight-warmed Parquet/SQLite cache (`screener_cache.py`, `screener_service.py`),
+  preset signal pills (20+ presets incl. Golden Cross, High ROIC, Insider Buying, Activist
+  Target via EDGAR Form 4/SC 13D), 9 result tabs (Overview/Performance/Technicals/…),
+  canvas sparkline gallery (200×120px, 3M closes + SMA50). **Verified live in Docker.**
 
-High-performance screener: universes (S&P 500 / Nasdaq 100 / Dow 30 + ~3–5k
-small-cap via FinanceDatabase + custom), overnight cron → yfinance batch
-fundamentals → Parquet/SQLite cache, default + extended columns, preset signal
-pills, result tabs (Overview/Performance/Technicals/…), canvas sparkline gallery.
-Note: this is where the deferred treemap mcap fix (background-warmed shares cache)
-should land. Then Phases 6–12.
+- ✅ **Phase 6** (`dccc5f5`) — Risk & Rolling Metrics. Standalone `/risk` page with 5 tabs:
+  - **Rolling Metrics**: Sharpe, Vol, Beta, Sortino, MaxDD, VaR95/99 as time series —
+    window selector (20/60/120/252D), Overlay vs 2×3 Grid view.
+  - **Extended**: Calmar, Omega, Treynor, Jensen's Alpha, CAPM variance decomposition
+    (systematic vs idiosyncratic), CVaR 95%/99% — colour-coded, CSV export.
+  - **Correlation**: Rolling pairwise heatmap with date scrubber (requires 2+ tickers).
+  - **On-Demand 🟡**: GARCH(1,1) (`arch` library), Hurst exponent (R/S analysis),
+    Ornstein-Uhlenbeck fit (OLS), Engle-Granger cointegration — each has a Calculate button.
+  - **Stress & Monte Carlo 🔴**: GBM Monte Carlo VaR (configurable sims + horizon, histogram),
+    historical stress testing across 4 scenarios (2008 GFC / 2020 COVID / 2022 rate shock /
+    2000 dot-com) — replay actual price sequences, cumulative return chart per scenario.
+  New files: `services/advanced_risk.py`, `routers/risk.py` (8 endpoints under `/api/risk`),
+  7 React components in `frontend/components/risk/`. "Risk" added to desktop + mobile nav.
+  **368 pytest pass, tsc clean. Verified live in Docker:** `/risk` HTTP 200,
+  `/api/risk/rolling?tickers=AAPL&period=1y&window=252` returns real data,
+  `/api/risk/extended?tickers=AAPL&period=3y` returns full extended metrics.
+
+### ⏭️ Next: Phase 7 — Options & IV Module (`claude_plan.md` line ~182)
+
+Options chain with IV analytics, Greeks, and pricing models per stock.
+Key deliverables: IV30 KPI (linear interpolation between expiries bracketing 30 DTE),
+IV Rank/Percentile, Put/Call OI Ratio, Max Pain, Implied Earnings Move. Black-Scholes
+(closed-form via `scipy.stats.norm`, Greeks Δ/Γ/Θ/V/ρ, IV backsolve via
+`scipy.optimize.brentq`). Charts: IV Term Structure, IV Smile, OI Profile. Options chain
+table (Calls | Strikes | Puts, ITM tinted, OTM-only toggle, synced expiry selector).
+🔴 Monte Carlo Options Pricing (10,000 GBM paths per option). Note: yfinance options data
+labelled "delayed ~15min"; IV decimal → multiply ×100 for display.
 
 ### Working agreements (carry these forward)
 
@@ -120,12 +146,17 @@ should land. Then Phases 6–12.
 `services/`: `dcf_engine`, `fx_service`, `regime_service`, `valuation_engine`,
 `discount_rates`, `fundamentals`, `analyst_service`, `fama_french`,
 `constituents`, `breadth_service`, `indices_service`, `feargreed_service`,
-`movers_service`, `treemap_service`, `finnhub_service`, `calendar_service`.
+`movers_service`, `treemap_service`, `finnhub_service`, `calendar_service`,
+`screener_service`, `screener_cache`, `advanced_risk`.
 Routers: `valuation` (`/full`, `/dcf`, `/factors`), `dashboard` (`/breadth`,
 `/indices`, `/fear-greed`, `/movers`, `/constituents`),
 `treemap` (`/api/treemap?index=&period=`),
-`calendar` (`/api/calendar?index=&start=&end=`).
+`calendar` (`/api/calendar?index=&start=&end=`),
+`screener` (`/api/screener/universe`, `/presets`, `/status`, `/refresh`),
+`risk` (`/api/risk/rolling`, `/extended`, `/correlation`, `/garch`, `/hurst`,
+`/ou`, `/cointegration`, `/montecarlo`, `/stress`).
 All external calls cached via `@cached` / `@async_cached` in `cache.py`.
+🟡/🔴 endpoints in `risk.py` are intentionally uncached (compute-on-demand).
 
 ---
 
