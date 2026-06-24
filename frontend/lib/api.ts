@@ -5,6 +5,7 @@ import type {
   EventsResponse, YieldCurveResponse, HealthResponse, NewsResponse,
   SnapshotResponse, ForecastResponse,
   DcfResponse, FxRatesResponse, RegimeResponse,
+  ValuationFullResponse, FactorResponse,
 } from "./types";
 
 async function get<T>(path: string): Promise<T> {
@@ -114,4 +115,11 @@ export const api = {
 
   regime: (country: string, start = 2000) =>
     get<RegimeResponse>(`/macro/regime?country=${encodeURIComponent(country)}&start=${start}`),
+
+  // --- Phase 1 ---
+  valuationFull: (ticker: string) =>
+    get<ValuationFullResponse>(`/valuation/full?ticker=${encodeURIComponent(ticker)}`),
+
+  valuationFactors: (ticker: string, model: "3" | "5" = "3") =>
+    get<FactorResponse>(`/valuation/factors?ticker=${encodeURIComponent(ticker)}&model=${model}`),
 };

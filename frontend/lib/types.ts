@@ -183,6 +183,115 @@ export interface RegimeResponse {
   note: string | null;
 }
 
+// --- Phase 1: Valuation Engine ---
+export interface WaccInfo {
+  wacc: number | null;
+  costOfEquity: number | null;
+  costOfDebt: number | null;
+  taxRate: number | null;
+  beta: number | null;
+  country: string;
+  riskFree: number | null;
+  erp: number | null;
+  weightEquity: number | null;
+  weightDebt: number | null;
+}
+export interface ValModel {
+  model: string;
+  value: number | null;
+  locked: boolean;
+  reason: string | null;
+  detail?: Record<string, unknown>;
+}
+export type ValVerdict =
+  | "Significantly Undervalued" | "Undervalued" | "Fairly Valued"
+  | "Overvalued" | "Significantly Overvalued" | "Insufficient Data";
+export interface AxiomFairValue {
+  value: number | null;
+  upsidePct: number | null;
+  verdict: ValVerdict;
+  weightsUsed: Record<string, number>;
+}
+export interface ValuationCore {
+  ticker: string;
+  currency: string;
+  spotPrice: number | null;
+  wacc: WaccInfo;
+  models: ValModel[];
+  capmImplied: ValModel;
+  axiomFairValue: AxiomFairValue;
+  asOf: string;
+}
+export interface Fundamentals {
+  roic: { roic: number | null; nopat: number | null; investedCapital: number | null } | null;
+  dupont: {
+    threeFactor: Record<string, number | null>;
+    fiveFactor: Record<string, number | null>;
+  } | null;
+  piotroski: { score: number | null; maxScore: number | null; criteria: Record<string, boolean | null> } | null;
+  beneish: { mScore: number | null; note?: string } | null;
+  ohlson: { oScore: number | null; probDefault: number | null } | null;
+  cashConversionCycle: { ccc: number | null; dso: number | null; dio: number | null; dpo: number | null } | null;
+}
+export interface AnalystData {
+  ticker: string;
+  currency: string;
+  price: number | null;
+  priceTarget: {
+    meanPrice: number | null; highPrice: number | null; lowPrice: number | null;
+    medianPrice: number | null; numberOfAnalysts: number | null; upsidePct: number | null;
+  };
+  consensus: {
+    recommendationMean: number | null; recommendationKey: string | null;
+    history: { period: string; strongBuy: number; buy: number; hold: number; sell: number; strongSell: number }[];
+  };
+  earningsSurprises: { date: string; epsEstimate: number | null; epsActual: number | null; surprisePct: number | null }[];
+  estimates: Record<string, unknown>;
+  growthEstimates: Record<string, Record<string, number | null>> | null;
+  asOf: string;
+}
+export interface ValuationKpis {
+  price: number | null;
+  marketCap: number | null;
+  trailingPE: number | null;
+  forwardPE: number | null;
+  trailingEps: number | null;
+  forwardEps: number | null;
+  dividendYield: number | null;
+  fiftyTwoWeekHigh: number | null;
+  fiftyTwoWeekLow: number | null;
+  beta: number | null;
+  averageVolume: number | null;
+  bookValue: number | null;
+  evToFcf: number | null;
+  fcfYield: number | null;
+  shortPercentOfFloat: number | null;
+  shortRatio: number | null;
+  sector: string | null;
+  industry: string | null;
+  currency: string;
+}
+export interface ValuationFullResponse {
+  ticker: string;
+  kpis: ValuationKpis;
+  valuation: ValuationCore;
+  fundamentals: Fundamentals;
+  analyst: AnalystData;
+}
+export interface FactorResponse {
+  ticker: string;
+  model: string;
+  alpha?: number | null;
+  alphaDaily?: number | null;
+  betas?: Record<string, number | null>;
+  rSquared?: number | null;
+  tStats?: Record<string, number | null>;
+  nObs?: number;
+  period?: string;
+  asOf?: string;
+  error?: string;
+}
+
 // --- Portfolio ---
 export interface PortfolioHolding {
   ticker: string;

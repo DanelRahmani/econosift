@@ -7,8 +7,55 @@ from fastapi import APIRouter, Query
 from ..services import yfinance_service as yfs
 from ..services import metrics
 from ..services.dcf_engine import two_stage_dcf
+from ..services.valuation_engine import valuation_models
+from ..services.fundamentals import extended_fundamentals
+from ..services.analyst_service import analyst_data
+from ..services import fama_french
 
 router = APIRouter(prefix="/api/valuation", tags=["valuation"])
+
+
+def _kpis(info: dict) -> dict:
+    """Headline KPI + extended-fundamental fields straight from Ticker.info.
+
+    Every access is guarded; short data is US-listed only and may be absent.
+    """
+    g = info.get
+    mcap = g("marketCap")
+    fcf = g("freeCashflow")
+    ev = g("enterpriseValue")
+    return {
+        "price": g("currentPrice") or g("regularMarketPrice"),
+        "marketCap": mcap,
+        "trailingPE": g("trailingPE"),
+        "forwardPE": g("forwardPE"),
+        "trailingEps": g("trailingEps"),
+        "forwardEps": g("forwardEps"),
+        "dividendYield": g("dividendYield"),
+        "fiftyTwoWeekHigh": g("fiftyTwoWeekHigh"),
+        "fiftyTwoWeekLow": g("fiftyTwoWeekLow"),
+        "beta": g("beta"),
+        "averageVolume": g("averageVolume") or g("averageDailyVolume10Day"),
+        "bookValue": g("bookValue"),
+        "evToFcf": (ev / fcf) if (ev and fcf) else None,
+        "fcfYield": (fcf / mcap) if (fcf and mcap) else None,
+        "shortPercentOfFloat": g("shortPercentOfFloat"),
+        "shortRatio": g("shortRatio"),
+        "sector": g("sector"),
+        "industry": g("industry"),
+        "currency": g("currency") or "USD",
+    }
+
+
+def _beta_for(sym: str) -> float | None:
+    """Compute beta vs the symbol's benchmark over 2y of daily prices."""
+    bench = yfs.benchmark_for(sym)
+    frame = yfs.get_close_frame(tuple(dict.fromkeys([sym, bench])), "2y")
+    if frame is None or frame.empty or sym not in frame.columns:
+        return None
+    bench_series = frame[bench] if bench in frame.columns else None
+    m = metrics.risk_metrics(frame[sym], bench_series, 0.04)
+    return m.get("beta")
 
 
 def _signal(spot, target, expected_return) -> str:
@@ -87,4 +134,36 @@ async def dcf(
         terminal_growth=terminal_growth,
         wacc=wacc,
         stage1_years=stage1_years,
+    )
+
+
+@router.get("/full")
+async def full(ticker: str):
+    """Full valuation bundle (compute tier: runs on page load).
+
+    Combines the 8-model valuation engine + Axiom composite, extended
+    fundamentals (Piotroski / Beneish / Ohlson / DuPont / ROIC / CCC), and
+    analyst data (price targets, consensus, surprises, estimates).
+    """
+    sym = ticker.strip().upper()
+    bundle = await asyncio.to_thread(yfs.get_info, sym)
+    beta = await asyncio.to_thread(_beta_for, sym)
+    valuation = await asyncio.to_thread(valuation_models, bundle, beta)
+    fundamentals = await asyncio.to_thread(extended_fundamentals, bundle)
+    analyst = await asyncio.to_thread(analyst_data, sym)
+    return {
+        "ticker": sym,
+        "kpis": _kpis(bundle.get("info", {}) or {}),
+        "valuation": valuation,
+        "fundamentals": fundamentals,
+        "analyst": analyst,
+    }
+
+
+@router.get("/factors")
+async def factors(ticker: str, model: str = "3", period: str = "2y"):
+    """Fama-French 3F/5F per-ticker attribution (compute tier: on-demand)."""
+    sym = ticker.strip().upper()
+    return await asyncio.to_thread(
+        fama_french.factor_regression, sym, model, period
     )
