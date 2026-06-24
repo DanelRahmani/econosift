@@ -6,9 +6,9 @@ import { usePathname } from "next/navigation";
 const tabs = [
   { href: "/markets", label: "Markets", icon: "M3 13h4l3 7 4-14 3 7h4" },
   { href: "/screener", label: "Screener", icon: "M3 4h18M3 9h13M3 14h9M3 19h5M17 14l2 2 4-4" },
-  { href: "/calendar", label: "Calendar", icon: "M3 4h18v18H3zM3 9h18M8 2v4m8-4v4" },
-  { href: "/treemap", label: "Treemap", icon: "M3 3h7v7H3zm11 0h7v7h-7zM3 14h7v7H3zm11 0h7v7h-7z" },
+  { href: "/risk", label: "Risk", icon: "M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" },
   { href: "/macro", label: "Macro", icon: "M4 19V5m0 14h16M8 15l3-4 3 3 4-6" },
+  { href: "/dashboard", label: "Dashboard", icon: "M3 3h7v9H3zM14 3h7v5h-7zM14 12h7v9h-7zM3 16h7v6H3z" },
 ];
 
 export function MobileNav() {

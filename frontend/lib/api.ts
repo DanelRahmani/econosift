@@ -11,6 +11,9 @@ import type {
   TreemapResponse,
   CalendarResponse,
   ScreenerUniverseResponse, PresetDef, ScreenerStatus,
+  RollingMetricsResponse, ExtendedRiskResponse, CorrelationResponse,
+  GarchResult, HurstResult, OUResponse, CointegrationResult,
+  MonteCarloResult, StressTestResponse,
 } from "./types";
 
 async function get<T>(path: string): Promise<T> {
@@ -174,4 +177,45 @@ export const api = {
 
   screenerRefresh: (index: string) =>
     post<{ index: string; started: boolean }>(`/screener/refresh?index=${index}`, {}),
+
+  // --- Phase 6: Risk & Rolling Metrics ---
+  riskRolling: (tickers: string, period: string, window: number, benchmark?: string) =>
+    get<RollingMetricsResponse>(
+      `/risk/rolling?tickers=${encodeURIComponent(tickers)}&period=${period}&window=${window}` +
+      (benchmark ? `&benchmark=${encodeURIComponent(benchmark)}` : "")
+    ),
+
+  riskExtended: (tickers: string, period: string, benchmark?: string) =>
+    get<ExtendedRiskResponse>(
+      `/risk/extended?tickers=${encodeURIComponent(tickers)}&period=${period}` +
+      (benchmark ? `&benchmark=${encodeURIComponent(benchmark)}` : "")
+    ),
+
+  riskCorrelation: (tickers: string, period: string, window: number) =>
+    get<CorrelationResponse>(
+      `/risk/correlation?tickers=${encodeURIComponent(tickers)}&period=${period}&window=${window}`
+    ),
+
+  riskGarch: (ticker: string, period = "2y") =>
+    post<GarchResult>(`/risk/garch?ticker=${encodeURIComponent(ticker)}&period=${period}`, {}),
+
+  riskHurst: (ticker: string, period = "3y") =>
+    post<HurstResult>(`/risk/hurst?ticker=${encodeURIComponent(ticker)}&period=${period}`, {}),
+
+  riskOU: (tickers: string, period = "2y") =>
+    post<OUResponse>(`/risk/ou?tickers=${encodeURIComponent(tickers)}&period=${period}`, {}),
+
+  riskCointegration: (tickers: string, period = "3y") =>
+    post<CointegrationResult>(`/risk/cointegration?tickers=${encodeURIComponent(tickers)}&period=${period}`, {}),
+
+  riskMonteCarlo: (ticker: string, period = "2y", sims = 10000, horizon = 1) =>
+    post<MonteCarloResult>(
+      `/risk/montecarlo?ticker=${encodeURIComponent(ticker)}&period=${period}&sims=${sims}&horizon=${horizon}`, {}
+    ),
+
+  riskStress: (ticker: string, scenarios = "gfc,covid,rates,dotcom", benchmark?: string) =>
+    post<StressTestResponse>(
+      `/risk/stress?ticker=${encodeURIComponent(ticker)}&scenarios=${encodeURIComponent(scenarios)}` +
+      (benchmark ? `&benchmark=${encodeURIComponent(benchmark)}` : ""), {}
+    ),
 };

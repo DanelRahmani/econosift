@@ -614,6 +614,137 @@ export interface ScreenerStatus {
   stale: boolean;
 }
 
+// --- Phase 6: Risk & Rolling Metrics ---
+export interface RollingPoint {
+  date: string;
+  value: number | null;
+}
+
+export interface RollingTickerMetrics {
+  ticker: string;
+  benchmark: string;
+  window: number;
+  volatility: RollingPoint[];
+  sharpe: RollingPoint[];
+  sortino: RollingPoint[];
+  maxDrawdown: RollingPoint[];
+  var95: RollingPoint[];
+  var99: RollingPoint[];
+  beta: RollingPoint[];
+}
+
+export interface RollingMetricsResponse {
+  tickers: RollingTickerMetrics[];
+  period: string;
+  window: number;
+}
+
+export interface ExtendedRiskTicker {
+  ticker: string;
+  benchmark: string;
+  annReturn: number | null;
+  annVolatility: number | null;
+  maxDrawdown: number | null;
+  calmar: number | null;
+  omega: number | null;
+  beta: number | null;
+  alpha: number | null;
+  treynor: number | null;
+  systematicVar: number | null;
+  idiosyncraticVar: number | null;
+  rSquared: number | null;
+  var95Historical: number | null;
+  var99Historical: number | null;
+  cvar95: number | null;
+  cvar99: number | null;
+}
+
+export interface ExtendedRiskResponse {
+  tickers: ExtendedRiskTicker[];
+  period: string;
+}
+
+export interface CorrelationSnapshot {
+  date: string;
+  matrix: Record<string, Record<string, number | null>>;
+}
+
+export interface CorrelationResponse {
+  snapshots: CorrelationSnapshot[];
+  tickers: string[];
+  window: number;
+}
+
+export interface GarchResult {
+  omega: number | null;
+  alpha: number | null;
+  beta: number | null;
+  forecastVol: number | null;
+  annForecastVol: number | null;
+  error?: string;
+}
+
+export interface HurstResult {
+  hurst: number | null;
+  interpretation: string;
+}
+
+export interface OUResult {
+  ticker: string;
+  theta: number | null;
+  mu: number | null;
+  sigma: number | null;
+  halfLifeDays: number | null;
+}
+
+export interface OUResponse {
+  results: OUResult[];
+}
+
+export interface CointegrationResult {
+  ticker1: string;
+  ticker2: string;
+  pValue: number | null;
+  isCointegrated: boolean | null;
+  hedgeRatio: number | null;
+  spread: RollingPoint[];
+  error?: string;
+}
+
+export interface MonteCarloDistBin {
+  bin: number | null;
+  count: number;
+}
+
+export interface MonteCarloResult {
+  var95: number | null;
+  var99: number | null;
+  expected: number | null;
+  worstCase: number | null;
+  distribution: MonteCarloDistBin[];
+  sims: number;
+  horizon: number;
+  error?: string;
+}
+
+export interface StressScenarioResult {
+  scenario: string;
+  label: string;
+  start: string;
+  end: string;
+  totalReturn: number | null;
+  maxDrawdown: number | null;
+  returnsTimeSeries: RollingPoint[];
+  benchmark: RollingPoint[] | null;
+  error?: string;
+}
+
+export interface StressTestResponse {
+  ticker: string;
+  benchmark: string;
+  scenarios: StressScenarioResult[];
+}
+
 // --- Admin health ---
 export interface CacheStat {
   hits: number;
