@@ -17,6 +17,56 @@ No paid APIs required. Optional free FRED API key for richer US data.
 
 ---
 
+## Active Build: Phases 0–12 (see `claude_plan.md`)
+
+We are executing the `claude_plan.md` roadmap **one phase at a time, verifying
+each in Docker before the next**. This section is the source of truth for
+cross-machine continuation (the `~/.claude` auto-memory does **not** travel with
+the repo).
+
+### Progress
+
+- ✅ **Setup** (`02f5028`) — Phase 0–12 deps, pytest + Playwright harness, Finnhub config.
+- ✅ **Phase 0** (`390438b`) — two-stage DCF engine, FX rates panel, regime clock.
+- ✅ **Phase 1** (`b50afc1`, `4b21fae`) — valuation engine (8 models + Axiom
+  composite), extended fundamentals (Piotroski/Beneish/Ohlson/DuPont/ROIC/CCC),
+  analyst data, Fama-French attribution, Damodaran ERP + sector multiples.
+- ✅ **Phase 2** (`7937e9c`) — market breadth, ~25 global indices, 7-signal Fear &
+  Greed, top movers, `/dashboard` landing page. Foundational
+  `services/constituents.py` (S&P 500 / Nasdaq-100 / Dow via Wikipedia MediaWiki
+  API, weekly cache) is reused by Phases 3 & 5.
+- ⏭️ **Phase 3 — S&P 500 Treemap** is next. Then Phases 4–12.
+
+### Working agreements (carry these forward)
+
+- **Per-phase Docker gate:** after coding a phase, run `pytest` + `tsc`, then the
+  user does a **full no-cache rebuild** (`docker compose build --no-cache backend
+  frontend && docker compose up -d --force-recreate`) — cached builds silently
+  keep stale source. The user runs the rebuild and says when it's "live"; then
+  run live checks (curl the new endpoints + page HTTP 200) before moving on.
+- **Compute tiers:** 🟢 runs on page load · 🟡 "Calculate" button · 🔴 "Run
+  Analysis" button. Never auto-trigger 🟡/🔴.
+- **UI rule:** every section = 3–6 KPIs on top + full extended list below.
+- **yfinance safety:** always `.get()` with fallbacks; any field may be `None`.
+- **Never scrape HTML** (no BeautifulSoup/Selenium) — use MediaWiki API +
+  wikitextparser, direct CSV/Excel/ZIP downloads. **Never fabricate data**; on a
+  source failure, log + serve cached, then surface it.
+- **Commit + push to `main` after each phase**, message focused on the "why".
+- Optional: dispatch labelled sub-agents (Frontend/Backend/Math = sonnet,
+  Data = haiku) for parallel work on disjoint file sets; the orchestrator wires
+  shared files (`main.py`, `api.ts`, `types.ts`, pages, routers).
+
+### Backend module map (added by this build)
+
+`services/`: `dcf_engine`, `fx_service`, `regime_service`, `valuation_engine`,
+`discount_rates`, `fundamentals`, `analyst_service`, `fama_french`,
+`constituents`, `breadth_service`, `indices_service`, `feargreed_service`,
+`movers_service`. Routers: `valuation` (`/full`, `/dcf`, `/factors`),
+`dashboard` (`/breadth`, `/indices`, `/fear-greed`, `/movers`, `/constituents`).
+All external calls cached via `@cached` / `@async_cached` in `cache.py`.
+
+---
+
 ## Feature Ideas
 
 ### High-Impact / Core Enhancements
@@ -107,6 +157,9 @@ No paid APIs required. Optional free FRED API key for richer US data.
 - Country comparison cards (#11), yield-curve visualizer with inversion badge
   (#12), IMF WEO forecast overlays (#13), inflation heatmap (#14)
 - Mobile bottom navigation (#20); theme persistence (#17) confirmed
+- **Phase 0–2 build** (see "Active Build" above): two-stage DCF, FX panel, regime
+  clock; valuation engine + composite + fundamentals + analyst + Fama-French;
+  market breadth, global indices, Fear & Greed, top movers, `/dashboard` page.
 
 Note: AI-powered company summary (#6) intentionally not implemented — keeps the
 app free of paid-API dependencies.
