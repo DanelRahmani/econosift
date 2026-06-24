@@ -1,11 +1,21 @@
-"""Portfolio aggregation: weighted performance, P&L, and risk metrics."""
+"""Portfolio aggregation: weighted performance, P&L, risk metrics, and optimisation."""
 from __future__ import annotations
 
 import math
 import numpy as np
 import pandas as pd
+from scipy.optimize import minimize
 
 from . import metrics
+from .advanced_risk import (
+    _series_to_points,
+    rolling_sharpe,
+    rolling_volatility,
+    _rolling_beta_impl,
+    _STRESS_SCENARIOS,
+)
+from .fama_french import load_ff_factors, _ols
+from .discount_rates import risk_free_rate
 
 TRADING_DAYS = 252
 
@@ -21,6 +31,10 @@ def _clean(x):
         return None
     return f
 
+
+# ---------------------------------------------------------------------------
+# Core analysis (existing — unchanged)
+# ---------------------------------------------------------------------------
 
 def analyze(frame: pd.DataFrame, holdings: list[dict], bench_series: pd.Series | None,
             risk_free: float) -> dict:
@@ -95,9 +109,13 @@ def analyze(frame: pd.DataFrame, holdings: list[dict], bench_series: pd.Series |
             "contribution": _clean(weights[c] * h_total) if h_total is not None else None,
         })
 
+    # Drawdown series for extended response.
+    dd_series = drawdown_series(log_ret)
+
     return {
         "holdings": holding_rows,
         "series": series,
+        "drawdownSeries": dd_series,
         "metrics": {
             "totalReturn": _clean(total_return),
             "annReturn": _clean(ann_return),
@@ -110,3 +128,695 @@ def analyze(frame: pd.DataFrame, holdings: list[dict], bench_series: pd.Series |
         },
         "missing": [h["ticker"] for h in holdings if h["ticker"] not in frame.columns],
     }
+
+
+# ---------------------------------------------------------------------------
+# New service functions (Phase 11)
+# ---------------------------------------------------------------------------
+
+def drawdown_series(port_ret: pd.Series) -> list[dict]:
+    """Underwater drawdown curve from a daily return series.
+
+    Accepts either log or simple returns; computes cumulative wealth then
+    the percentage drawdown from the running peak at each point.
+    """
+    if port_ret is None or port_ret.empty:
+        return []
+    try:
+        cum = (1.0 + port_ret).cumprod()
+        dd = (cum / cum.cummax()) - 1.0
+        return [
+            {"date": str(idx)[:10], "value": _clean(float(v))}
+            for idx, v in dd.items()
+        ]
+    except Exception:
+        return []
+
+
+def benchmark_series(frame: pd.DataFrame, period: str = "1y") -> dict:
+    """Return base-100 cumulative return series for ^GSPC and AGG.
+
+    Both columns are expected to already be present in *frame* (the caller
+    should have loaded them alongside the portfolio tickers).
+    """
+    out: dict[str, list[dict]] = {"gspc": [], "agg": []}
+
+    def _to_base100(col: str) -> list[dict]:
+        if col not in frame.columns:
+            return []
+        px = frame[col].dropna().ffill()
+        if px.empty:
+            return []
+        cum = (px / px.iloc[0]) * 100.0
+        return [
+            {"date": str(idx)[:10], "value": round(float(v), 2)}
+            for idx, v in cum.items()
+        ]
+
+    out["gspc"] = _to_base100("^GSPC")
+    out["agg"] = _to_base100("AGG")
+    return out
+
+
+def correlation_matrix(holdings: list[dict], frame: pd.DataFrame) -> dict:
+    """Pairwise Pearson correlation from daily log returns."""
+    tickers = [h["ticker"] for h in holdings if h["ticker"] in frame.columns]
+    if len(tickers) < 2:
+        return {"tickers": tickers, "matrix": []}
+
+    px = frame[tickers].dropna(how="all").ffill()
+    log_ret = np.log(px / px.shift(1)).dropna(how="all")
+
+    corr = log_ret.corr()
+    matrix = [
+        [_clean(round(float(corr.loc[r, c]), 3)) if r in corr.index and c in corr.columns else None
+         for c in tickers]
+        for r in tickers
+    ]
+    return {"tickers": tickers, "matrix": matrix}
+
+
+def risk_contribution(holdings: list[dict], frame: pd.DataFrame) -> list[dict]:
+    """Marginal risk contribution per holding.
+
+    RC_i = w_i * (Σ w)_i / σ_p
+    where (Σ w)_i is the i-th component of the covariance-weight product vector.
+    """
+    present = [h for h in holdings if h["ticker"] in frame.columns]
+    if not present:
+        return []
+
+    total_w = sum(max(h["weight"], 0.0) for h in present) or 1.0
+    weights_list = [max(h["weight"], 0.0) / total_w for h in present]
+    tickers = [h["ticker"] for h in present]
+
+    px = frame[tickers].dropna(how="all").ffill()
+    log_ret = np.log(px / px.shift(1)).dropna(how="all")
+
+    w = np.array(weights_list)
+    cov = log_ret.cov().values * TRADING_DAYS  # annualise
+
+    port_var = float(w @ cov @ w)
+    port_vol = math.sqrt(port_var) if port_var > 0 else None
+
+    if port_vol is None or port_vol == 0:
+        return [
+            {"ticker": t, "weight": _clean(weights_list[i]),
+             "marginalContrib": None, "pctContrib": None}
+            for i, t in enumerate(tickers)
+        ]
+
+    sigma_w = cov @ w  # (Σ w) vector
+    mrc = w * sigma_w / port_vol  # marginal risk contribution
+
+    total_rc = mrc.sum() or 1.0
+    result = []
+    for i, t in enumerate(tickers):
+        result.append({
+            "ticker": t,
+            "weight": _clean(weights_list[i]),
+            "marginalContrib": _clean(float(mrc[i])),
+            "pctContrib": _clean(float(mrc[i] / total_rc)),
+        })
+    return result
+
+
+def capm_attribution(
+    holdings: list[dict],
+    frame: pd.DataFrame,
+    bench_col: str,
+    rf: float,
+) -> dict:
+    """OLS portfolio excess return ~ alpha + beta * bench_excess."""
+    present = [h for h in holdings if h["ticker"] in frame.columns]
+    if not present or bench_col not in frame.columns:
+        return {"error": "insufficient data"}
+
+    total_w = sum(max(h["weight"], 0.0) for h in present) or 1.0
+    weights = {h["ticker"]: max(h["weight"], 0.0) / total_w for h in present}
+    cols = list(weights.keys())
+
+    px = frame[cols].dropna(how="all").ffill()
+    log_ret_df = np.log(px / px.shift(1)).dropna(how="all")
+
+    w_vec = np.array([weights[c] for c in cols])
+    port_log_ret = log_ret_df[cols].to_numpy() @ w_vec
+    port_log_ret = pd.Series(port_log_ret, index=log_ret_df.index)
+
+    bench_px = frame[bench_col].dropna().ffill()
+    bench_log_ret = np.log(bench_px / bench_px.shift(1)).dropna()
+
+    joined = pd.concat([port_log_ret, bench_log_ret], axis=1, join="inner").dropna()
+    if len(joined) < 10:
+        return {"error": "insufficient aligned data"}
+
+    joined.columns = ["port", "bench"]
+    rf_daily = rf / TRADING_DAYS
+    port_excess = (joined["port"] - rf_daily).values
+    bench_excess = (joined["bench"] - rf_daily).values
+
+    # OLS
+    X = bench_excess.reshape(-1, 1)
+    ols = _ols(port_excess, X)
+
+    alpha_daily = ols["alpha"]
+    beta = ols["betas"][0] if ols["betas"] else None
+    r_sq = ols["r_squared"]
+
+    ann_alpha = alpha_daily * TRADING_DAYS if alpha_daily is not None else None
+
+    # CAPM variance decomposition
+    port_var = float(joined["port"].var(ddof=1))
+    bench_var = float(joined["bench"].var(ddof=1))
+    systematic_var_pct = None
+    idiosyncratic_var_pct = None
+    if beta is not None and port_var and port_var > 0 and bench_var and bench_var > 0:
+        sys_var = (beta ** 2) * bench_var
+        sys_pct = sys_var / port_var
+        systematic_var_pct = _clean(sys_pct)
+        idiosyncratic_var_pct = _clean(max(1.0 - sys_pct, 0.0))
+
+    return {
+        "alpha": _clean(alpha_daily),
+        "annAlpha": _clean(ann_alpha),
+        "beta": _clean(beta),
+        "rSquared": _clean(r_sq),
+        "systematicVarPct": systematic_var_pct,
+        "idiosyncraticVarPct": idiosyncratic_var_pct,
+        "nObs": len(joined),
+    }
+
+
+def rolling_portfolio_metrics(
+    holdings: list[dict],
+    frame: pd.DataFrame,
+    bench_col: str,
+    rf: float,
+    window: int,
+) -> dict:
+    """Rolling Sharpe, volatility, and beta for the portfolio."""
+    present = [h for h in holdings if h["ticker"] in frame.columns]
+    if not present:
+        return {"window": window, "sharpe": [], "volatility": [], "beta": []}
+
+    total_w = sum(max(h["weight"], 0.0) for h in present) or 1.0
+    weights = {h["ticker"]: max(h["weight"], 0.0) / total_w for h in present}
+    cols = list(weights.keys())
+
+    px = frame[cols].dropna(how="all").ffill()
+    log_ret_df = np.log(px / px.shift(1)).dropna(how="all")
+
+    w_vec = np.array([weights[c] for c in cols])
+    port_log_ret_vals = log_ret_df[cols].to_numpy() @ w_vec
+    port_log_ret = pd.Series(port_log_ret_vals, index=log_ret_df.index)
+
+    roll_sharpe = rolling_sharpe(port_log_ret, rf, window)
+    roll_vol = rolling_volatility(port_log_ret, window)
+
+    roll_beta_series: pd.Series | None = None
+    if bench_col in frame.columns:
+        bench_px = frame[bench_col].dropna().ffill()
+        bench_log_ret = np.log(bench_px / bench_px.shift(1)).dropna()
+        joined = pd.DataFrame({"a": port_log_ret, "b": bench_log_ret}).dropna()
+        if len(joined) > window:
+            roll_beta_series = _rolling_beta_impl(joined, window)
+
+    return {
+        "window": window,
+        "sharpe": _series_to_points(roll_sharpe.dropna()),
+        "volatility": _series_to_points(roll_vol.dropna()),
+        "beta": _series_to_points(roll_beta_series.dropna()) if roll_beta_series is not None else [],
+    }
+
+
+def kelly_criterion(holdings: list[dict], frame: pd.DataFrame) -> list[dict]:
+    """Kelly fraction f* = μ / σ² for each holding (fractional, capped 0–1)."""
+    result = []
+    for h in holdings:
+        ticker = h["ticker"]
+        if ticker not in frame.columns:
+            continue
+        px = frame[ticker].dropna().ffill()
+        if len(px) < 20:
+            result.append({"ticker": ticker, "kellyFraction": None,
+                           "annReturn": None, "annVolatility": None})
+            continue
+
+        log_ret = np.log(px / px.shift(1)).dropna()
+        mu = float(log_ret.mean()) * TRADING_DAYS
+        sigma2 = float(log_ret.var(ddof=1)) * TRADING_DAYS
+
+        kelly = max(0.0, min(1.0, mu / sigma2)) if sigma2 > 0 else 0.0
+        ann_vol = math.sqrt(sigma2) if sigma2 > 0 else None
+
+        result.append({
+            "ticker": ticker,
+            "kellyFraction": _clean(kelly),
+            "annReturn": _clean(mu),
+            "annVolatility": _clean(ann_vol),
+        })
+    return result
+
+
+def ff_attribution_portfolio(
+    holdings: list[dict],
+    frame: pd.DataFrame,
+    model: str,
+    rf: float,
+) -> dict:
+    """Fama-French attribution for the portfolio (weighted log returns)."""
+    present = [h for h in holdings if h["ticker"] in frame.columns]
+    if not present:
+        return {"error": "no holdings found in price data"}
+
+    total_w = sum(max(h["weight"], 0.0) for h in present) or 1.0
+    weights = {h["ticker"]: max(h["weight"], 0.0) / total_w for h in present}
+    cols = list(weights.keys())
+
+    px = frame[cols].dropna(how="all").ffill()
+    log_ret_df = np.log(px / px.shift(1)).dropna(how="all")
+
+    w_vec = np.array([weights[c] for c in cols])
+    port_ret_vals = log_ret_df[cols].to_numpy() @ w_vec
+    port_ret = pd.Series(port_ret_vals, index=log_ret_df.index)
+
+    factors = load_ff_factors(model)
+    if factors is None or factors.empty:
+        return {"error": "factor data unavailable"}
+
+    from .fama_french import _FF3_COLS, _FF5_COLS
+    factor_cols_all = _FF5_COLS if model == "5" else _FF3_COLS
+    factor_cols = [c for c in factor_cols_all if c != "RF"]
+    if not all(c in factors.columns for c in factor_cols + ["RF"]):
+        return {"error": "factor data missing expected columns"}
+
+    port_ret.index = pd.to_datetime(port_ret.index).tz_localize(None)
+    factors.index = pd.to_datetime(factors.index).tz_localize(None)
+
+    merged = pd.concat(
+        [port_ret.rename("ret"), factors[factor_cols + ["RF"]]],
+        axis=1, join="inner"
+    ).dropna()
+
+    if len(merged) < 20:
+        return {"error": "insufficient aligned observations"}
+
+    excess_ret = (merged["ret"] - merged["RF"]).values
+    factor_matrix = merged[factor_cols].values
+
+    ols = _ols(excess_ret, factor_matrix)
+
+    alpha_daily = ols["alpha"]
+    ann_alpha = alpha_daily * TRADING_DAYS
+
+    factor_names = [c.replace("-", "") for c in factor_cols]
+    factors_out = [
+        {
+            "name": name,
+            "loading": _clean(ols["betas"][i]) if i < len(ols["betas"]) else None,
+            "tStat": _clean(ols["t_stats"][i + 1]) if i + 1 < len(ols["t_stats"]) else None,
+        }
+        for i, name in enumerate(factor_names)
+    ]
+
+    return {
+        "model": model,
+        "alpha": _clean(alpha_daily),
+        "annAlpha": _clean(ann_alpha),
+        "factors": factors_out,
+        "rSquared": _clean(ols["r_squared"]),
+        "nObs": int(len(merged)),
+    }
+
+
+def efficient_frontier(
+    holdings: list[dict],
+    frame: pd.DataFrame,
+    n_points: int = 50,
+) -> dict:
+    """Trace the mean-variance efficient frontier (long-only, SLSQP)."""
+    present = [h for h in holdings if h["ticker"] in frame.columns]
+    if len(present) < 2:
+        return {"error": "need at least 2 holdings with price data", "frontier": []}
+
+    total_w = sum(max(h["weight"], 0.0) for h in present) or 1.0
+    current_weights = np.array([max(h["weight"], 0.0) / total_w for h in present])
+    tickers = [h["ticker"] for h in present]
+
+    px = frame[tickers].dropna(how="all").ffill()
+    log_ret = np.log(px / px.shift(1)).dropna(how="all")
+    if len(log_ret) < 30:
+        return {"error": "insufficient price history", "frontier": []}
+
+    mu = log_ret.mean().values * TRADING_DAYS
+    cov = log_ret.cov().values * TRADING_DAYS
+    n = len(tickers)
+
+    warning = None
+    if n > 20:
+        warning = "Efficient frontier computation may be slow for >20 holdings"
+
+    constraints = [
+        {"type": "eq", "fun": lambda w: np.sum(w) - 1.0},
+    ]
+    bounds = [(0.0, 1.0)] * n
+    w0 = np.full(n, 1.0 / n)
+
+    def port_vol(w):
+        return math.sqrt(max(float(w @ cov @ w), 0.0))
+
+    def port_ret_fn(w):
+        return float(mu @ w)
+
+    # Current portfolio stats
+    cur_vol = port_vol(current_weights)
+    cur_ret = port_ret_fn(current_weights)
+    rf = risk_free_rate()
+    cur_sharpe = (cur_ret - rf) / cur_vol if cur_vol > 0 else None
+
+    # Sweep target returns
+    min_ret_result = minimize(
+        lambda w: float(mu @ w),
+        w0, method="SLSQP", bounds=bounds, constraints=constraints,
+        options={"ftol": 1e-9, "maxiter": 500},
+    )
+    max_ret_result = minimize(
+        lambda w: -float(mu @ w),
+        w0, method="SLSQP", bounds=bounds, constraints=constraints,
+        options={"ftol": 1e-9, "maxiter": 500},
+    )
+
+    if not min_ret_result.success or not max_ret_result.success:
+        return {"warning": warning, "frontier": [], "error": "optimisation failed"}
+
+    ret_min = float(mu @ min_ret_result.x)
+    ret_max = float(mu @ max_ret_result.x)
+
+    target_rets = np.linspace(ret_min, ret_max, n_points)
+    frontier_points = []
+
+    for target in target_rets:
+        cons = constraints + [
+            {"type": "eq", "fun": lambda w, t=target: float(mu @ w) - t},
+        ]
+        res = minimize(
+            lambda w: float(w @ cov @ w),
+            w0, method="SLSQP", bounds=bounds, constraints=cons,
+            options={"ftol": 1e-9, "maxiter": 500},
+        )
+        if res.success:
+            vol = port_vol(res.x)
+            ret = float(mu @ res.x)
+            sh = (ret - rf) / vol if vol > 0 else None
+            frontier_points.append({
+                "vol": _clean(vol),
+                "ret": _clean(ret),
+                "sharpe": _clean(sh),
+            })
+
+    # Max Sharpe portfolio
+    def neg_sharpe(w):
+        v = math.sqrt(max(float(w @ cov @ w), 1e-12))
+        return -(float(mu @ w) - rf) / v
+
+    ms_res = minimize(
+        neg_sharpe, w0, method="SLSQP", bounds=bounds, constraints=constraints,
+        options={"ftol": 1e-9, "maxiter": 500},
+    )
+    max_sharpe = {}
+    if ms_res.success:
+        ms_w = ms_res.x
+        ms_vol = port_vol(ms_w)
+        ms_ret = float(mu @ ms_w)
+        ms_sh = (ms_ret - rf) / ms_vol if ms_vol > 0 else None
+        max_sharpe = {
+            "vol": _clean(ms_vol),
+            "ret": _clean(ms_ret),
+            "sharpe": _clean(ms_sh),
+            "weights": [{"ticker": tickers[i], "weight": _clean(float(ms_w[i]))} for i in range(n)],
+        }
+
+    result = {
+        "frontier": frontier_points,
+        "maxSharpe": max_sharpe,
+        "currentPortfolio": {
+            "vol": _clean(cur_vol),
+            "ret": _clean(cur_ret),
+            "sharpe": _clean(cur_sharpe),
+        },
+    }
+    if warning:
+        result["warning"] = warning
+    return result
+
+
+def monte_carlo_weights(
+    holdings: list[dict],
+    frame: pd.DataFrame,
+    n_sim: int = 10_000,
+) -> dict:
+    """Random Dirichlet weight vectors mapped to (return, vol, Sharpe) space."""
+    present = [h for h in holdings if h["ticker"] in frame.columns]
+    if len(present) < 2:
+        return {"error": "need at least 2 holdings", "points": [], "maxSharpe": {}}
+
+    tickers = [h["ticker"] for h in present]
+    px = frame[tickers].dropna(how="all").ffill()
+    log_ret = np.log(px / px.shift(1)).dropna(how="all")
+    if len(log_ret) < 20:
+        return {"error": "insufficient price history", "points": [], "maxSharpe": {}}
+
+    mu = log_ret.mean().values * TRADING_DAYS
+    cov = log_ret.cov().values * TRADING_DAYS
+    n = len(tickers)
+    rf = risk_free_rate()
+
+    rng = np.random.default_rng(seed=42)
+    # Dirichlet(1, …, 1) = uniform on the simplex
+    weights_matrix = rng.dirichlet(np.ones(n), size=n_sim)
+
+    rets = weights_matrix @ mu
+    vols = np.sqrt(np.einsum("ij,jk,ik->i", weights_matrix, cov, weights_matrix))
+    sharpes = np.where(vols > 0, (rets - rf) / vols, np.nan)
+
+    best_idx = int(np.nanargmax(sharpes))
+    best_weights = weights_matrix[best_idx]
+
+    # Sample to max 5000 points for response size
+    MAX_POINTS = 5000
+    if n_sim > MAX_POINTS:
+        idx = rng.choice(n_sim, size=MAX_POINTS, replace=False)
+    else:
+        idx = np.arange(n_sim)
+
+    points = [
+        {
+            "vol": _clean(float(vols[i])),
+            "ret": _clean(float(rets[i])),
+            "sharpe": _clean(float(sharpes[i])),
+        }
+        for i in idx
+    ]
+
+    return {
+        "points": points,
+        "maxSharpe": {
+            "vol": _clean(float(vols[best_idx])),
+            "ret": _clean(float(rets[best_idx])),
+            "sharpe": _clean(float(sharpes[best_idx])),
+            "weights": [
+                {"ticker": tickers[i], "weight": _clean(float(best_weights[i]))}
+                for i in range(n)
+            ],
+        },
+    }
+
+
+def black_litterman(
+    holdings: list[dict],
+    frame: pd.DataFrame,
+    views: list[dict],
+    rf: float,
+) -> dict:
+    """Black-Litterman posterior returns + optimal weights.
+
+    views = [{"ticker": ..., "expectedReturn": ...}] — absolute return views.
+    """
+    present = [h for h in holdings if h["ticker"] in frame.columns]
+    if len(present) < 2:
+        return {"error": "need at least 2 holdings for Black-Litterman"}
+
+    total_w = sum(max(h["weight"], 0.0) for h in present) or 1.0
+    w_mkt = np.array([max(h["weight"], 0.0) / total_w for h in present])
+    tickers = [h["ticker"] for h in present]
+    n = len(tickers)
+
+    px = frame[tickers].dropna(how="all").ffill()
+    log_ret = np.log(px / px.shift(1)).dropna(how="all")
+    if len(log_ret) < 20:
+        return {"error": "insufficient price history"}
+
+    cov = log_ret.cov().values * TRADING_DAYS
+
+    # Reverse optimisation: equilibrium returns π = δ Σ w_mkt
+    delta = 2.5
+    pi = delta * cov @ w_mkt
+
+    tau = 0.05
+
+    # Build view matrices P, q, Ω
+    valid_views = [v for v in views if v.get("ticker") in tickers]
+    if not valid_views:
+        # No views: return equilibrium weights
+        eq_returns = [
+            {"ticker": tickers[i], "equilibriumReturn": _clean(float(pi[i])),
+             "blReturn": _clean(float(pi[i]))}
+            for i in range(n)
+        ]
+        return {
+            "blReturns": eq_returns,
+            "optimalWeights": [{"ticker": tickers[i], "weight": _clean(float(w_mkt[i]))} for i in range(n)],
+            "currentWeights": [{"ticker": tickers[i], "weight": _clean(float(w_mkt[i]))} for i in range(n)],
+        }
+
+    k = len(valid_views)
+    P = np.zeros((k, n))
+    q = np.zeros(k)
+    for i, v in enumerate(valid_views):
+        j = tickers.index(v["ticker"])
+        P[i, j] = 1.0
+        q[i] = float(v["expectedReturn"])
+
+    # Ω = τ * P Σ P'  (proportional uncertainty)
+    omega = tau * P @ cov @ P.T
+
+    # BL posterior mean:
+    # μ_BL = [(τΣ)⁻¹ + P'Ω⁻¹P]⁻¹ [(τΣ)⁻¹π + P'Ω⁻¹q]
+    tau_cov = tau * cov
+    try:
+        tau_cov_inv = np.linalg.inv(tau_cov)
+    except np.linalg.LinAlgError:
+        tau_cov_inv = np.linalg.pinv(tau_cov)
+
+    try:
+        omega_inv = np.linalg.inv(omega)
+    except np.linalg.LinAlgError:
+        omega_inv = np.linalg.pinv(omega)
+
+    M_inv = tau_cov_inv + P.T @ omega_inv @ P
+    try:
+        M = np.linalg.inv(M_inv)
+    except np.linalg.LinAlgError:
+        M = np.linalg.pinv(M_inv)
+
+    mu_bl = M @ (tau_cov_inv @ pi + P.T @ omega_inv @ q)
+
+    # Optimal weights via unconstrained MV: w* = (δΣ)⁻¹ μ_BL, then normalise
+    try:
+        cov_inv = np.linalg.inv(cov)
+    except np.linalg.LinAlgError:
+        cov_inv = np.linalg.pinv(cov)
+
+    w_opt_raw = cov_inv @ (mu_bl - rf) / delta
+    # Long-only: floor at 0 and renormalise
+    w_opt = np.maximum(w_opt_raw, 0.0)
+    w_sum = w_opt.sum()
+    if w_sum > 0:
+        w_opt = w_opt / w_sum
+    else:
+        w_opt = w_mkt.copy()
+
+    bl_returns = [
+        {
+            "ticker": tickers[i],
+            "equilibriumReturn": _clean(float(pi[i])),
+            "blReturn": _clean(float(mu_bl[i])),
+        }
+        for i in range(n)
+    ]
+
+    return {
+        "blReturns": bl_returns,
+        "optimalWeights": [
+            {"ticker": tickers[i], "weight": _clean(float(w_opt[i]))}
+            for i in range(n)
+        ],
+        "currentWeights": [
+            {"ticker": tickers[i], "weight": _clean(float(w_mkt[i]))}
+            for i in range(n)
+        ],
+    }
+
+
+def stress_test_portfolio(
+    holdings: list[dict],
+    frame: pd.DataFrame,
+    bench_col: str,
+) -> list[dict]:
+    """Replay historical stress scenarios on the portfolio."""
+    present = [h for h in holdings if h["ticker"] in frame.columns]
+    if not present:
+        return []
+
+    total_w = sum(max(h["weight"], 0.0) for h in present) or 1.0
+    weights = {h["ticker"]: max(h["weight"], 0.0) / total_w for h in present}
+    cols = list(weights.keys())
+    w_vec = np.array([weights[c] for c in cols])
+
+    px = frame[cols].dropna(how="all").ffill()
+    px.index = pd.to_datetime(px.index)
+
+    bench_px = frame[bench_col].dropna().ffill() if bench_col in frame.columns else None
+    if bench_px is not None:
+        bench_px.index = pd.to_datetime(bench_px.index)
+
+    results = []
+    for key, (start, end, label) in _STRESS_SCENARIOS.items():
+        scenario_px = px.loc[start:end]
+        if len(scenario_px) < 5:
+            results.append({
+                "scenario": key,
+                "label": label,
+                "start": start,
+                "end": end,
+                "error": "insufficient historical data for this scenario period",
+                "totalReturn": None,
+                "maxDrawdown": None,
+                "returnsTimeSeries": [],
+                "benchmark": [],
+            })
+            continue
+
+        log_ret = np.log(scenario_px / scenario_px.shift(1)).dropna(how="all").fillna(0.0)
+        port_log_ret_vals = log_ret[cols].to_numpy() @ w_vec
+        port_log_ret = pd.Series(port_log_ret_vals, index=log_ret.index)
+
+        cum_ret = np.exp(port_log_ret.cumsum()) - 1.0
+        total_return = float(cum_ret.iloc[-1]) if len(cum_ret) else None
+
+        # Max drawdown within scenario
+        cum_value = np.exp(port_log_ret.cumsum())
+        cum_max = cum_value.cummax()
+        dd = (cum_value / cum_max) - 1.0
+        max_dd = float(dd.min()) if len(dd) else None
+
+        bench_series_out: list[dict] = []
+        if bench_px is not None:
+            bench_scenario = bench_px.loc[start:end]
+            if len(bench_scenario) >= 5:
+                bench_log_ret = np.log(bench_scenario / bench_scenario.shift(1)).dropna()
+                bench_cum = np.exp(bench_log_ret.cumsum()) - 1.0
+                bench_series_out = _series_to_points(bench_cum)
+
+        results.append({
+            "scenario": key,
+            "label": label,
+            "start": start,
+            "end": end,
+            "totalReturn": _clean(total_return),
+            "maxDrawdown": _clean(max_dd),
+            "returnsTimeSeries": _series_to_points(cum_ret),
+            "benchmark": bench_series_out,
+        })
+
+    return results
