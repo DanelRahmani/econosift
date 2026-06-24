@@ -102,16 +102,21 @@ the repo).
   `/api/risk/rolling?tickers=AAPL&period=1y&window=252` returns real data,
   `/api/risk/extended?tickers=AAPL&period=3y` returns full extended metrics.
 
-### ⏭️ Next: Phase 7 — Options & IV Module (`claude_plan.md` line ~182)
+- ✅ **Phase 7** (`4c7f01a`) — Options & IV Module. Standalone `/options` page with
+  full IV analytics: IV30 (linear interpolation between expiries bracketing 30 DTE),
+  IV Rank/Percentile, Put/Call OI Ratio, Max Pain, Implied Earnings Move. Black-Scholes
+  pricing + 5 Greeks (Δ/Γ/Θ/V/ρ), IV backsolve via `brentq`, CRR American binomial tree
+  (100-step). Charts: IV Term Structure, IV Smile (moneyness 0.70–1.30), OI Profile
+  (horizontal bar with Max Pain line). Chain table (Calls | Strikes | Puts, ITM tinted,
+  OTM-only toggle, BS price + delta columns). 🔴 Monte Carlo Options Pricing (10k GBM
+  paths, distribution histogram). New files: `services/options_engine.py`,
+  `routers/options.py` (7 endpoints under `/api/options`), 6 React components in
+  `frontend/components/options/`. "Options" added to desktop + mobile nav.
+  **368 pytest pass. Verified live in Docker:** `/options` HTTP 200,
+  `/api/options/expiries?ticker=AAPL` returns 23 expiries,
+  `/api/options/ivmetrics?ticker=AAPL` returns real IV30/Rank/MaxPain data.
 
-Options chain with IV analytics, Greeks, and pricing models per stock.
-Key deliverables: IV30 KPI (linear interpolation between expiries bracketing 30 DTE),
-IV Rank/Percentile, Put/Call OI Ratio, Max Pain, Implied Earnings Move. Black-Scholes
-(closed-form via `scipy.stats.norm`, Greeks Δ/Γ/Θ/V/ρ, IV backsolve via
-`scipy.optimize.brentq`). Charts: IV Term Structure, IV Smile, OI Profile. Options chain
-table (Calls | Strikes | Puts, ITM tinted, OTM-only toggle, synced expiry selector).
-🔴 Monte Carlo Options Pricing (10,000 GBM paths per option). Note: yfinance options data
-labelled "delayed ~15min"; IV decimal → multiply ×100 for display.
+### ⏭️ Next: Phase 8 — Macro Expansion (`claude_plan.md` line ~196)
 
 ### Working agreements (carry these forward)
 
@@ -147,16 +152,18 @@ labelled "delayed ~15min"; IV decimal → multiply ×100 for display.
 `discount_rates`, `fundamentals`, `analyst_service`, `fama_french`,
 `constituents`, `breadth_service`, `indices_service`, `feargreed_service`,
 `movers_service`, `treemap_service`, `finnhub_service`, `calendar_service`,
-`screener_service`, `screener_cache`, `advanced_risk`.
+`screener_service`, `screener_cache`, `advanced_risk`, `options_engine`.
 Routers: `valuation` (`/full`, `/dcf`, `/factors`), `dashboard` (`/breadth`,
 `/indices`, `/fear-greed`, `/movers`, `/constituents`),
 `treemap` (`/api/treemap?index=&period=`),
 `calendar` (`/api/calendar?index=&start=&end=`),
 `screener` (`/api/screener/universe`, `/presets`, `/status`, `/refresh`),
 `risk` (`/api/risk/rolling`, `/extended`, `/correlation`, `/garch`, `/hurst`,
-`/ou`, `/cointegration`, `/montecarlo`, `/stress`).
+`/ou`, `/cointegration`, `/montecarlo`, `/stress`),
+`options` (`/api/options/expiries`, `/ivmetrics`, `/chain`, `/termstructure`,
+`/smile`, `/oiprofile`, `/montecarlo`).
 All external calls cached via `@cached` / `@async_cached` in `cache.py`.
-🟡/🔴 endpoints in `risk.py` are intentionally uncached (compute-on-demand).
+🟡/🔴 endpoints in `risk.py` and `options.py` are intentionally uncached (compute-on-demand).
 
 ---
 
