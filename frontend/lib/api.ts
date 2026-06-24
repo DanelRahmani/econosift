@@ -19,6 +19,7 @@ import type {
   FxHeatmapData, FxPppData, LeadingData, FinancialConditionsData, CotData,
   Holders13FResponse, Form4Response,
   SnowflakeResponse, SnowflakeBatchResponse,
+  SectorReturnsResponse, SectorFundamentalsResponse, SectorRotationResponse, SectorDrillResponse,
 } from "./types";
 
 async function get<T>(path: string): Promise<T> {
@@ -291,4 +292,11 @@ export const api = {
 
   snowflakeBatch: (tickers: string[]) =>
     get<SnowflakeBatchResponse>(`/snowflake/batch?tickers=${tickers.map(encodeURIComponent).join(",")}`),
+
+  // --- Phase 10: Sector Performance ---
+  sectorReturns: (): Promise<SectorReturnsResponse> => get("/sector/returns"),
+  sectorFundamentals: (): Promise<SectorFundamentalsResponse> => get("/sector/fundamentals"),
+  sectorRotation: (): Promise<SectorRotationResponse> => get("/sector/rotation"),
+  sectorDrill: (sector: string): Promise<SectorDrillResponse> =>
+    get(`/sector/drill?sector=${encodeURIComponent(sector)}`),
 };

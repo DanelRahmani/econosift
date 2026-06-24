@@ -1099,6 +1099,61 @@ export interface SnowflakeBatchResponse {
   };
 }
 
+// --- Phase 10: Sector Performance ---
+export interface SectorReturn {
+  ticker: string;
+  sector: string;
+  changePercent: number | null;
+  vsSpy: number | null;
+}
+export interface SectorReturnsResponse {
+  periods: {
+    "1d": SectorReturn[];
+    "1w": SectorReturn[];
+    "1m": SectorReturn[];
+    "3m": SectorReturn[];
+    "ytd": SectorReturn[];
+    "1y": SectorReturn[];
+  };
+}
+export interface SectorFundamentals {
+  ticker: string;
+  sector: string;
+  price: number | null;
+  aum: number | null;
+  trailingPE: number | null;
+  priceToBook: number | null;
+  dividendYield: number | null;
+  beta: number | null;
+  vol30d: number | null;
+  maxDrawdown: number | null;
+  return1m: number | null;
+  return3m: number | null;
+  return6m: number | null;
+  return1y: number | null;
+}
+export type SectorFundamentalsResponse = SectorFundamentals[];
+export interface SectorBubble {
+  ticker: string;
+  sector: string;
+  return3m: number | null;
+  vsSpy: number | null;
+  aum: number | null;
+  phaseRank: number | null;
+}
+export interface SectorRotationResponse {
+  phase: "Early" | "Mid" | "Late" | "Recession";
+  confidence: number;
+  regimePhase: string | null;
+  regimeQuadrant: string | null;
+  sectors: SectorBubble[];
+}
+export interface IndustryGroup {
+  industry: string;
+  stocks: Array<{ symbol: string; name: string; change1d: number | null }>;
+}
+export type SectorDrillResponse = IndustryGroup[];
+
 // --- Admin health ---
 export interface CacheStat {
   hits: number;

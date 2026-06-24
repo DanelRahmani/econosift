@@ -9,6 +9,7 @@ const tabs = [
   { href: "/treemap", label: "Treemap" },
   { href: "/calendar", label: "Calendar" },
   { href: "/screener", label: "Screener" },
+  { href: "/sectors", label: "Sectors" },
   { href: "/markets", label: "Markets" },
   { href: "/risk", label: "Risk" },
   { href: "/options", label: "Options" },

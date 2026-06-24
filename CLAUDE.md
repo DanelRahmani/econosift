@@ -143,33 +143,21 @@ the repo).
   with axis-click tab navigation; `SnowflakeMini` (compact 100×100) in Screener Charts view.
   **368 pytest pass. Verified live:** AAPL → 7.11 Strong; batch and pages HTTP 200.
 
-### ⏭️ Next: Phase 10 — Sector Performance Charts
-
-**Goal**: Sector-level return comparison, rotation analysis, and industry drill-down.
-Full spec in `claude_plan.md` Phase 10. Summary:
-
-- **Data**: 11 SPDR ETFs via yfinance — XLF, XLK, XLE, XLV, XLI, XLY, XLP, XLB,
-  XLRE, XLC, XLU. All prices via `yf.download()` (not loop). Cached 15 min (market
-  hours) / 60 min (off-hours).
-- **Top KPIs** 🟢: 1D return bar chart for all 11 sectors (colour-coded red/green).
-- **Full charts** 🟢: 6 horizontal bar charts (1D / 1W / 1M / 3M / YTD / 1Y),
-  each sorted by return. Period tabs.
-- **Fundamentals table** 🟢: sector ETF rows with 4 sub-tabs —
-  Overview (price, 1D%, YTD%, AUM), Valuation (P/E, P/B, dividend yield),
-  Performance (1M/3M/6M/1Y), Volatility (beta, realised vol, max drawdown).
-- **Industry drill-down**: click a sector bar → show top-3 stocks per GICS industry
-  within that sector (from screener cache) → link to `/screener?preset=sector_X`.
-- **Sector Rotation Clock** 🟢: Sam Stovall 4-quadrant (Early / Mid / Late /
-  Recession). Sectors plotted as bubbles (size = AUM, colour = 3M return vs S&P 500).
-  Implied current phase derived from 3M ETF returns vs benchmark. Cross-validate
-  with the existing Phase 0.3 Regime Clock (`regime_service`).
-- **Placement**: new `/sectors` page + "Sectors" tab already exists in Markets page
-  (`SectorHeatmap` component at `frontend/components/markets/SectorHeatmap.tsx` —
-  read it first to see what's already built before adding new components).
-- **New backend**: `services/sector_service.py` + `routers/sector.py`
-  (`/api/sector/returns`, `/api/sector/fundamentals`, `/api/sector/rotation`).
-  Register in `main.py`. All 🟢 tier (run on load).
-- **Docker gate**: `pytest` + Docker rebuild + recreate + curl new endpoints before done.
+- ✅ **Phase 10** — Sector Performance Charts. New `/sectors` page + "Sectors" nav tab.
+  **KPI strip**: 11 SPDR ETF cards (1D return, red/green, clickable to trigger drill-down).
+  **Returns charts**: period tabs (1D/1W/1M/3M/YTD/1Y) each rendering a sorted horizontal bar
+  chart (green/red per sign). **Fundamentals table**: 4 sub-tabs (Overview/Valuation/Performance/
+  Volatility) with AUM, P/E, P/B, div yield, beta, vol30d, max drawdown.
+  **Sector Rotation Clock**: Recharts ScatterChart bubble plot — X=vs SPY 3M, Y=3M return,
+  bubble size=AUM; Sam Stovall 4-phase (Early/Mid/Late/Recession) implied from outperformance
+  ranking; regime cross-validation via `regime_service.regime_series("US")`.
+  **Industry drill-down**: click any sector bar or bubble → queries screener SQLite cache for
+  top-3 stocks per GICS industry within that sector; chips link to `/markets?ticker=`; "See all"
+  links to `/screener?sector=`.
+  New backend: `services/sector_service.py` (4 functions, all `@cached` 60 min) +
+  `routers/sector.py` (`/api/sector/returns`, `/fundamentals`, `/rotation`, `/drill`).
+  **368 pytest pass. Docker rebuild clean. Verified live:** all 4 endpoints return real data;
+  `/sectors` HTTP 200.
 
 ### Working agreements (carry these forward)
 
@@ -206,7 +194,8 @@ Full spec in `claude_plan.md` Phase 10. Summary:
 `constituents`, `breadth_service`, `indices_service`, `feargreed_service`,
 `movers_service`, `treemap_service`, `finnhub_service`, `calendar_service`,
 `screener_service`, `screener_cache`, `advanced_risk`, `options_engine`,
-`macro_expansion_service`, `rates_service`, `cot_service`, `edgar_service`.
+`macro_expansion_service`, `rates_service`, `cot_service`, `edgar_service`,
+`sector_service` (Phase 10 — SPDR ETF returns/fundamentals/rotation/industry drill).
 Routers: `valuation` (`/full`, `/dcf`, `/factors`), `dashboard` (`/breadth`,
 `/indices`, `/fear-greed`, `/movers`, `/constituents`),
 `treemap` (`/api/treemap?index=&period=`),
@@ -218,6 +207,7 @@ Routers: `valuation` (`/full`, `/dcf`, `/factors`), `dashboard` (`/breadth`,
 `/smile`, `/oiprofile`, `/montecarlo`),
 `market_data` (`/api/market/13f`, `/api/market/form4`),
 `snowflake` (`/api/snowflake`, `/api/snowflake/batch`),
+`sector` (`/api/sector/returns`, `/api/sector/fundamentals`, `/api/sector/rotation`, `/api/sector/drill`),
 `macro` — Phase 8 routes added: `/api/macro/rates`, `/inflation`, `/employment`,
 `/housing`, `/commodities`, `/fx/heatmap`, `/fx/ppp`, `/leading`,
 `/financial-conditions`, `/positioning`.
