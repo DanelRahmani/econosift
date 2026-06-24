@@ -59,7 +59,15 @@ export function MacroChart({ data, forecast = [] }: { data: MacroResponse; forec
             <XAxis dataKey="year" tick={{ fill: pal.axis, fontSize: 12 }} />
             <YAxis tick={{ fill: pal.axis, fontSize: 12 }}
               tickFormatter={(v) => `${v}${data.unit === "%" ? "%" : ""}`} />
-            <Tooltip {...chartTooltipStyle(theme)} />
+            <Tooltip
+              {...chartTooltipStyle(theme)}
+              formatter={(value: number | string, name: string) => {
+                const n = typeof value === "number" ? value : Number(value);
+                if (!Number.isFinite(n)) return ["—", name];
+                const unit = data.unit === "%" ? "%" : "";
+                return [`${n.toFixed(2)}${unit}`, name];
+              }}
+            />
             <Legend wrapperStyle={{ fontSize: 12 }} />
             {forecast.length > 0 && boundaryYear && (
               <ReferenceLine x={boundaryYear} stroke={pal.axis} strokeDasharray="4 4" strokeOpacity={0.5}

@@ -5,6 +5,9 @@ import { api } from "@/lib/api";
 import type { RatiosResponse, RatioGroup } from "@/lib/types";
 import { Card, Skeleton, ZScoreBadge } from "@/components/ui";
 import { fmtNum, fmtPctFromFraction } from "@/lib/format";
+import {
+  RATIO_GUIDE, ratioTone, ratioRanges, TONE_TEXT, TONE_DOT,
+} from "@/lib/ratioGuide";
 
 const PCT_KEYS = new Set([
   "grossMargin", "operatingMargin", "netMargin", "ebitdaMargin",
@@ -58,6 +61,67 @@ function fmt(key: string, v: number | null): string {
   return PCT_KEYS.has(key) ? fmtPctFromFraction(v) : fmtNum(v);
 }
 
+function RatioRow({ k, v }: { k: string; v: number | null }) {
+  const [open, setOpen] = useState(false);
+  const tone = ratioTone(k, v);
+  const ranges = ratioRanges(k);
+  const guide = RATIO_GUIDE[k];
+  const meaning = guide?.meaning ?? DESCRIPTIONS[k];
+  const hasGuide = Boolean(ranges && guide);
+
+  return (
+    <div className="border-b border-border/40">
+      <button
+        onClick={() => hasGuide && setOpen((o) => !o)}
+        className={`w-full flex items-center gap-3 py-2.5 text-left ${hasGuide ? "hover:bg-surface-alt/50" : "cursor-default"}`}
+      >
+        <span className={`h-2 w-2 rounded-full shrink-0 ${tone ? TONE_DOT[tone] : "bg-text-muted/40"}`} />
+        <div className="flex flex-col min-w-0 flex-1">
+          <span className="text-text-secondary">{LABELS[k] ?? k}</span>
+          {meaning && (
+            <span className="text-text-muted text-xs leading-snug truncate">{meaning}</span>
+          )}
+        </div>
+        <span className={`font-mono shrink-0 tabular-nums ${tone ? TONE_TEXT[tone] : "text-text-primary"}`}>
+          {fmt(k, v)}
+        </span>
+        {hasGuide && (
+          <span className="text-text-muted text-xs w-4 text-center shrink-0" data-hide-print>
+            {open ? "−" : "ⓘ"}
+          </span>
+        )}
+      </button>
+
+      {open && hasGuide && ranges && (
+        <div className="pb-3 pl-5 pr-1 text-xs space-y-2">
+          {meaning && <p className="text-text-secondary leading-relaxed">{meaning}</p>}
+          <div className="grid grid-cols-3 gap-2">
+            <RangePill tone="good" label="Favorable" value={ranges.good} />
+            <RangePill tone="normal" label="Average" value={ranges.normal} />
+            <RangePill tone="bad" label="Caution" value={ranges.bad} />
+          </div>
+          {guide.exception && (
+            <p className="text-text-muted leading-relaxed">
+              <span className="font-semibold text-text-secondary">Exception: </span>
+              {guide.exception}
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RangePill({ tone, label, value }: { tone: "good" | "normal" | "bad"; label: string; value: string }) {
+  const bg = tone === "good" ? "bg-success/10" : tone === "normal" ? "bg-warning/10" : "bg-danger/10";
+  return (
+    <div className={`rounded-md px-2 py-1.5 ${bg}`}>
+      <div className={`font-semibold ${TONE_TEXT[tone]}`}>{label}</div>
+      <div className="text-text-secondary font-mono mt-0.5 leading-tight">{value}</div>
+    </div>
+  );
+}
+
 function Group({ title, group }: { title: string; group: RatioGroup }) {
   const [open, setOpen] = useState(true);
   return (
@@ -71,17 +135,9 @@ function Group({ title, group }: { title: string; group: RatioGroup }) {
         <span className="text-text-muted">{open ? "−" : "+"}</span>
       </button>
       {open && (
-        <div className="px-6 pb-4 grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
+        <div className="px-6 pb-4 grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-0 text-sm">
           {Object.entries(group).map(([k, v]) => (
-            <div key={k} className="flex justify-between items-start border-b border-border/40 py-1.5 gap-2">
-              <div className="flex flex-col min-w-0">
-                <span className="text-text-secondary">{LABELS[k] ?? k}</span>
-                {DESCRIPTIONS[k] && (
-                  <span className="text-text-muted text-xs leading-snug">{DESCRIPTIONS[k]}</span>
-                )}
-              </div>
-              <span className="font-mono shrink-0">{fmt(k, v)}</span>
-            </div>
+            <RatioRow key={k} k={k} v={v} />
           ))}
         </div>
       )}
@@ -169,6 +225,12 @@ export function RatiosTab({ tickers }: { tickers: string[] }) {
               </div>
             </div>
           </Card>
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-xs text-text-muted px-1">
+            <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-success" /> Favorable</span>
+            <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-warning" /> Average</span>
+            <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-danger" /> Caution</span>
+            <span className="ml-auto">Tap a metric (ⓘ) for its ranges &amp; exceptions. Valuation multiples: green = cheaper, red = richer.</span>
+          </div>
           <Group title="Liquidity" group={data.liquidity} />
           <Group title="Leverage" group={data.leverage} />
           <Group title="Efficiency" group={data.efficiency} />
