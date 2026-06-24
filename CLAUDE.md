@@ -116,7 +116,24 @@ the repo).
   `/api/options/expiries?ticker=AAPL` returns 23 expiries,
   `/api/options/ivmetrics?ticker=AAPL` returns real IV30/Rank/MaxPain data.
 
-### ⏭️ Next: Phase 8 — Macro Expansion (`claude_plan.md` line ~196)
+- ✅ **Phase 8** (`1815c9e`, `783dc81`) — Macro Expansion. `/macro` page replaced with a
+  10-sub-tab macro intelligence hub: **Overview** (migrated FxWidget, YieldCurve, RegimeClock,
+  InflationHeatmap, CountryComparison), **Rates & Yields** (full yield curve 3M–30Y, TIPS
+  breakevens, real yields, credit spreads, Taylor Rule overlay, ACM term-premium), **Inflation**
+  (CPI/PCE/PPI/M2/breakevens, Quantity Theory dual-axis), **Growth & Employment** (Sahm Rule
+  with recession shading, JOLTS, industrial production), **Housing** (Case-Shiller, starts,
+  mortgage, home sales), **Commodities** (~25 futures table + Bitcoin), **FX** (currency
+  heatmap + PPP valuation for G10), **Leading Indicators** (LEI/CLI/CFNAI/PMI + IS-LM-PC
+  3-panel + GSCPI), **Financial Conditions** (NFCI/STLFSI4/Fed balance sheet/EPU),
+  **Positioning** (COT Report — 6 key contracts, net speculator position, COT Index). Markets
+  page gains **Institutional Holders (13F)** and **Insider Activity (Form 4)** panels.
+  New services: `macro_expansion_service`, `rates_service`, `cot_service`, `edgar_service`;
+  new router `market_data` (`/api/market/13f`, `/api/market/form4`); 10 new routes on `macro`
+  router. **368 pytest pass. Verified live in Docker:** all 7 new endpoints return HTTP 200
+  with real data (`/api/macro/rates`, `/inflation`, `/commodities`, `/positioning`,
+  `/api/market/13f?ticker=AAPL`, `/api/market/form4?ticker=AAPL`).
+
+### ⏭️ Next: Phase 9 (`claude_plan.md`)
 
 ### Working agreements (carry these forward)
 
@@ -152,7 +169,8 @@ the repo).
 `discount_rates`, `fundamentals`, `analyst_service`, `fama_french`,
 `constituents`, `breadth_service`, `indices_service`, `feargreed_service`,
 `movers_service`, `treemap_service`, `finnhub_service`, `calendar_service`,
-`screener_service`, `screener_cache`, `advanced_risk`, `options_engine`.
+`screener_service`, `screener_cache`, `advanced_risk`, `options_engine`,
+`macro_expansion_service`, `rates_service`, `cot_service`, `edgar_service`.
 Routers: `valuation` (`/full`, `/dcf`, `/factors`), `dashboard` (`/breadth`,
 `/indices`, `/fear-greed`, `/movers`, `/constituents`),
 `treemap` (`/api/treemap?index=&period=`),
@@ -161,7 +179,11 @@ Routers: `valuation` (`/full`, `/dcf`, `/factors`), `dashboard` (`/breadth`,
 `risk` (`/api/risk/rolling`, `/extended`, `/correlation`, `/garch`, `/hurst`,
 `/ou`, `/cointegration`, `/montecarlo`, `/stress`),
 `options` (`/api/options/expiries`, `/ivmetrics`, `/chain`, `/termstructure`,
-`/smile`, `/oiprofile`, `/montecarlo`).
+`/smile`, `/oiprofile`, `/montecarlo`),
+`market_data` (`/api/market/13f`, `/api/market/form4`),
+`macro` — Phase 8 routes added: `/api/macro/rates`, `/inflation`, `/employment`,
+`/housing`, `/commodities`, `/fx/heatmap`, `/fx/ppp`, `/leading`,
+`/financial-conditions`, `/positioning`.
 All external calls cached via `@cached` / `@async_cached` in `cache.py`.
 🟡/🔴 endpoints in `risk.py` and `options.py` are intentionally uncached (compute-on-demand).
 
