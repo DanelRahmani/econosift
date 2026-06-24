@@ -91,6 +91,60 @@ def get_volume_frame(symbols: tuple[str, ...], period: str) -> pd.DataFrame:
     return vol.dropna(how="all")
 
 
+@cached("yf_mcap")
+def get_market_caps(symbols: tuple[str, ...]) -> dict[str, float]:
+    """Fetch market cap for each symbol via ``fast_info``, in parallel threads.
+
+    This is the first threaded-batch fetch in the service — uses
+    ``ThreadPoolExecutor`` (max 10 workers) so the full constituent universe
+    (~500 tickers) completes in a few seconds rather than serially.  Any symbol
+    that fails or has no positive finite cap is silently omitted.  Never raises.
+
+    Returns ``{symbol: market_cap_float}`` for symbols with a valid cap only.
+    """
+    import math
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    if not symbols:
+        return {}
+
+    def _fetch_one(sym: str) -> tuple[str, float] | None:
+        try:
+            fi = yf.Ticker(sym).fast_info
+            mcap = None
+            try:
+                mcap = fi["market_cap"]
+            except Exception:
+                pass
+            if mcap is None:
+                try:
+                    mcap = fi["marketCap"]
+                except Exception:
+                    pass
+            if mcap is None:
+                try:
+                    mcap = getattr(fi, "market_cap", None)
+                except Exception:
+                    pass
+            if mcap is not None and not math.isnan(float(mcap)) and float(mcap) > 0:
+                return (sym, float(mcap))
+        except Exception:
+            pass
+        return None
+
+    result: dict[str, float] = {}
+    with ThreadPoolExecutor(max_workers=10) as ex:
+        futures = {ex.submit(_fetch_one, s): s for s in symbols}
+        for fut in as_completed(futures):
+            try:
+                pair = fut.result()
+                if pair is not None:
+                    result[pair[0]] = pair[1]
+            except Exception:
+                pass
+    return result
+
+
 @cached("yf_quote")
 def get_quote(ticker: str) -> dict:
     t = yf.Ticker(ticker)

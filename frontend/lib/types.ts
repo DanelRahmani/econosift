@@ -494,6 +494,25 @@ export interface ForecastResponse {
   series: MacroSeries[];
 }
 
+// --- Phase 3: S&P 500 Treemap ---
+export interface TreemapStock {
+  symbol: string;
+  name: string;
+  sector: string;
+  industry: string | null;
+  price: number;
+  changePercent: number;
+  marketCap: number;
+  high52: number;
+  low52: number;
+}
+export interface TreemapResponse {
+  index: string;
+  period: string;
+  asOf: string | null;
+  stocks: TreemapStock[];
+}
+
 // --- Admin health ---
 export interface CacheStat {
   hits: number;

@@ -6,7 +6,9 @@ cached for a week because membership changes only a few times a year.
 
 This module is foundational: Phase 2 breadth / movers and Phase 3 treemap /
 Phase 5 screener all draw their universes from here. Keep the return shape
-stable: ``[{"symbol", "name", "sector"}]`` with yfinance-ready symbols.
+stable: ``[{"symbol", "name", "sector", "industry"}]`` with yfinance-ready
+symbols. ``industry`` is the GICS Sub-Industry (or ``None`` for indices whose
+Wikipedia table lacks that column, e.g. Nasdaq-100 / Dow 30).
 """
 from __future__ import annotations
 
@@ -92,8 +94,41 @@ def _cell(v) -> str:
     return wtp.parse(str(v)).plain_text().strip()
 
 
+def _sector_header_index(rows: list[list[str]]) -> int | None:
+    """Find the GICS *Sector* column, explicitly excluding sub-industry columns.
+
+    We can't reuse :func:`_header_index` with "sector" because the header
+    "GICS Sub-Industry" also contains the word "sector" via sibling matches —
+    this helper only returns the index when "sector" appears in the cell but
+    "sub" does not, so it resolves to the pure sector column.
+    """
+    if not rows:
+        return None
+    header = [(_cell(h) or "").strip().lower() for h in rows[0]]
+    for i, h in enumerate(header):
+        if "sector" in h and "sub" not in h:
+            return i
+    # Fallback: accept "industry" only if no sector column at all (Dow table
+    # uses "Sector" but some tables only have "Industry").
+    for i, h in enumerate(header):
+        if "industry" in h and "sub" not in h:
+            return i
+    return None
+
+
+def _subindustry_header_index(rows: list[list[str]]) -> int | None:
+    """Find the GICS Sub-Industry column (contains both 'sub' and 'industry')."""
+    if not rows:
+        return None
+    header = [(_cell(h) or "").strip().lower() for h in rows[0]]
+    for i, h in enumerate(header):
+        if "sub" in h and "industry" in h:
+            return i
+    return None
+
+
 def _parse_constituents(wikitext: str, index: str) -> list[dict]:
-    """Find the membership table and pull symbol / name / sector columns."""
+    """Find the membership table and pull symbol / name / sector / industry columns."""
     parsed = wtp.parse(wikitext)
     out: list[dict] = []
     seen: set[str] = set()
@@ -109,7 +144,8 @@ def _parse_constituents(wikitext: str, index: str) -> list[dict]:
         if sym_i is None:
             continue
         name_i = _header_index(rows, "company", "security", "name")
-        sector_i = _header_index(rows, "sector", "industry")
+        sector_i = _sector_header_index(rows)
+        subind_i = _subindustry_header_index(rows)
 
         for row in rows[1:]:
             if sym_i >= len(row):
@@ -126,6 +162,8 @@ def _parse_constituents(wikitext: str, index: str) -> list[dict]:
                 "name": _cell(row[name_i]) if name_i is not None and name_i < len(row) else symbol,
                 "sector": (_cell(row[sector_i])
                            if sector_i is not None and sector_i < len(row) else None) or None,
+                "industry": (_cell(row[subind_i])
+                             if subind_i is not None and subind_i < len(row) else None) or None,
             })
         if out:
             break  # first table with a Symbol header is the membership table
@@ -134,8 +172,9 @@ def _parse_constituents(wikitext: str, index: str) -> list[dict]:
 
 
 def get_constituents(index: str) -> list[dict]:
-    """Return ``[{"symbol", "name", "sector"}]`` for an index, cached weekly.
+    """Return ``[{"symbol", "name", "sector", "industry"}]`` for an index, cached weekly.
 
+    ``industry`` is the GICS Sub-Industry where available (S&P 500), else ``None``.
     On any fetch/parse failure we serve the last good cached value (even if
     stale) and otherwise return an empty list — we never fabricate members.
     """

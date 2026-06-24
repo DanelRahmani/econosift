@@ -43,15 +43,30 @@ the repo).
   showing 10-decimal floats). **Frontend-only — needs a `frontend` rebuild to
   view; not yet visually verified in Docker.**
 
-### ⏭️ Next: Phase 3 — S&P 500 Treemap (`claude_plan.md` line ~121)
+- ✅ **Phase 3** — S&P 500 Treemap. Interactive `d3-hierarchy` squarified
+  treemap (area = log(market cap), colour = return% −5% red→0 white→+5% green),
+  sector→industry→stock drill-down + breadcrumb, lazy-P/E hover card, controls
+  (period, index S&P/NDX/Dow, group-by, colour-by). New `/treemap` page + nav
+  tab (desktop + mobile). Backend: `constituents.py` now parses GICS
+  Sub-Industry (`industry` field); new `treemap_service.py` + threaded
+  `yfinance_service.get_market_caps`; new `routers/treemap.py`. **284 pytest
+  pass, tsc clean. Verified live in Docker:** `/treemap` HTTP 200,
+  `/api/treemap?index=dow` returns 30/30 real tiles.
+  - ⚠️ **KNOWN ISSUE (deferred):** market caps come from `fast_info` →
+    `get_shares_full()`, which Yahoo **rate-limits past ~30 tickers**. So **dow
+    works** but **ndx/sp500 return 0 caps / 504** on cold load (stocks w/o mcap
+    are dropped → empty treemap). Fix later: compute `mcap = last_close ×
+    sharesOutstanding` (last_close is free from `get_close_frame`) with a
+    long-TTL background-warmed shares cache (Phase 5 cron pattern), or batch
+    `v7/finance/quote`. See `claude_plan.md` Phase 3.
 
-Interactive treemap: area = log(market cap), colour = return% (−5% red → 0%
-white → +5% green), `d3-hierarchy` squarified layout, sector/industry/stock
-drill-down, hover card (name/price/1D%/mcap/P/E/52W range), controls
-(period, index S&P/NDX/Dow, group-by, colour-by). **Reuse
-`services/constituents.py`** for the universe; batch quotes via
-`yfinance_service.get_close_frame`. `d3-hierarchy/scale/shape` already in
-`frontend/package.json`. Then Phases 4–12.
+### ⏭️ Next: Phase 4 — Economic Calendar (`claude_plan.md` line ~129)
+
+Unified `/calendar`: macro events (Finnhub `/calendar/economic` + FRED release
+calendar + `backend/data/cb_meetings.json`), earnings (`yf.Ticker.calendar` +
+Finnhub, overnight `ThreadPoolExecutor(max_workers=10)` cron), dividends
+(`exDividendDate`), IPOs (Finnhub). Weekly grid, today highlighted, filters
+(impact/country/tz), beat/miss colouring, <24h countdowns. Then Phases 5–12.
 
 ### Working agreements (carry these forward)
 
@@ -77,8 +92,9 @@ drill-down, hover card (name/price/1D%/mcap/P/E/52W range), controls
 `services/`: `dcf_engine`, `fx_service`, `regime_service`, `valuation_engine`,
 `discount_rates`, `fundamentals`, `analyst_service`, `fama_french`,
 `constituents`, `breadth_service`, `indices_service`, `feargreed_service`,
-`movers_service`. Routers: `valuation` (`/full`, `/dcf`, `/factors`),
-`dashboard` (`/breadth`, `/indices`, `/fear-greed`, `/movers`, `/constituents`).
+`movers_service`, `treemap_service`. Routers: `valuation` (`/full`, `/dcf`,
+`/factors`), `dashboard` (`/breadth`, `/indices`, `/fear-greed`, `/movers`,
+`/constituents`), `treemap` (`/api/treemap?index=&period=`).
 All external calls cached via `@cached` / `@async_cached` in `cache.py`.
 
 ---

@@ -8,6 +8,7 @@ import type {
   ValuationFullResponse, FactorResponse,
   BreadthResponse, IndicesResponse, FearGreedResponse, MoversResponse,
   ConstituentsResponse,
+  TreemapResponse,
 } from "./types";
 
 async function get<T>(path: string): Promise<T> {
@@ -140,4 +141,8 @@ export const api = {
 
   constituents: (index = "sp500") =>
     get<ConstituentsResponse>(`/dashboard/constituents?index=${index}`),
+
+  // --- Phase 3: Treemap ---
+  treemap: (index = "sp500", period = "1d") =>
+    get<TreemapResponse>(`/treemap?index=${encodeURIComponent(index)}&period=${encodeURIComponent(period)}`),
 };

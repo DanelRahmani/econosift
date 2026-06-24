@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .routers import (
     market, valuation, ratios, search, macro,
-    portfolio, screener, admin, dashboard,
+    portfolio, screener, admin, dashboard, treemap,
 )
 
 app = FastAPI(title="Axiom Finance API", version="1.0.0")
@@ -35,3 +35,4 @@ app.include_router(portfolio.router)
 app.include_router(screener.router)
 app.include_router(admin.router)
 app.include_router(dashboard.router)
+app.include_router(treemap.router)
