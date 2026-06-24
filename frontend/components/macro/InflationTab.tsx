@@ -13,9 +13,6 @@ import {
   Legend,
   ResponsiveContainer,
   ReferenceLine,
-  ComposedChart,
-  Bar,
-  YAxis as YAxisRight,
 } from "recharts";
 
 const GRID = "rgba(255,255,255,0.08)";
