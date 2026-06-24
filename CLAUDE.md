@@ -34,8 +34,24 @@ the repo).
 - ✅ **Phase 2** (`7937e9c`) — market breadth, ~25 global indices, 7-signal Fear &
   Greed, top movers, `/dashboard` landing page. Foundational
   `services/constituents.py` (S&P 500 / Nasdaq-100 / Dow via Wikipedia MediaWiki
-  API, weekly cache) is reused by Phases 3 & 5.
-- ⏭️ **Phase 3 — S&P 500 Treemap** is next. Then Phases 4–12.
+  API, weekly cache) is reused by Phases 3 & 5. **Verified live in Docker** (all 5
+  dashboard endpoints return real data; `/dashboard` HTTP 200). 267 pytest pass.
+- ✅ **UI polish** (`374a49a`) — Ratios tab now colour-codes every metric
+  (Favorable/Average/Caution) with an expandable per-ratio guide (meaning +
+  Good/Average/Caution ranges + exceptions) via new `frontend/lib/ratioGuide.ts`
+  (covers all 23 `/api/ratios` keys); macro chart tooltips rounded to 2 dp (were
+  showing 10-decimal floats). **Frontend-only — needs a `frontend` rebuild to
+  view; not yet visually verified in Docker.**
+
+### ⏭️ Next: Phase 3 — S&P 500 Treemap (`claude_plan.md` line ~121)
+
+Interactive treemap: area = log(market cap), colour = return% (−5% red → 0%
+white → +5% green), `d3-hierarchy` squarified layout, sector/industry/stock
+drill-down, hover card (name/price/1D%/mcap/P/E/52W range), controls
+(period, index S&P/NDX/Dow, group-by, colour-by). **Reuse
+`services/constituents.py`** for the universe; batch quotes via
+`yfinance_service.get_close_frame`. `d3-hierarchy/scale/shape` already in
+`frontend/package.json`. Then Phases 4–12.
 
 ### Working agreements (carry these forward)
 
