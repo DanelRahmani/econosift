@@ -159,6 +159,26 @@ the repo).
   **368 pytest pass. Docker rebuild clean. Verified live:** all 4 endpoints return real data;
   `/sectors` HTTP 200.
 
+- ✅ **Phase 11** (`aee9c35`, `7aa2e5f`) — Portfolio Analytics. New `/portfolio` page + "Portfolio" nav tab.
+  Holdings stored in localStorage; default portfolio AAPL 40%/MSFT 30%/GOOGL 20%/BRK-B 10%.
+  **4-tab layout**: Overview | Risk | Attribution | Optimize.
+  **Overview 🟢**: performance chart vs ^GSPC + AGG (base-100 cumulative), drawdown underwater curve,
+  holdings table (weight/return/contribution).
+  **Risk 🟢**: NxN correlation heatmap, variance risk-contribution horizontal bars, rolling
+  Sharpe/Vol/Beta with window selector (20/60/120/252D).
+  **Attribution 🟢/🟡**: CAPM decomposition (annualised alpha, beta, R², systematic vs idiosyncratic
+  variance); 🟡 Kelly criterion position sizing (`f* = μ/σ²`); 🟡 Fama-French FF3/FF5 factor loadings
+  via Ken French daily CSVs.
+  **Optimize 🔴**: Efficient Frontier (SLSQP, long-only, 50-point sweep + max-Sharpe star);
+  Monte Carlo random-weight cloud (10k Dirichlet, 5k points returned, coloured by Sharpe);
+  Black-Litterman (τ=0.05, δ=2.5 risk aversion, user views form → posterior returns + optimal weights);
+  Stress Testing (GFC/COVID/rates/dotcom replay on weighted portfolio).
+  Backend: extended `services/portfolio.py` (12 new functions) + `routers/portfolio.py`
+  (13 endpoints under `/api/portfolio/`; 🟢 cached 60 min, 🟡/🔴 uncached).
+  Frontend: 15 new components in `components/portfolio/`.
+  **368 pytest pass. tsc clean (Next.js build). Verified live in Docker:** all 12 endpoints return
+  HTTP 200 with real data including Black-Litterman posterior returns; `/portfolio` HTTP 200.
+
 ### Working agreements (carry these forward)
 
 - **Per-phase Docker gate:** after coding a phase, run `pytest` + `tsc`, then do a
@@ -208,6 +228,8 @@ Routers: `valuation` (`/full`, `/dcf`, `/factors`), `dashboard` (`/breadth`,
 `market_data` (`/api/market/13f`, `/api/market/form4`),
 `snowflake` (`/api/snowflake`, `/api/snowflake/batch`),
 `sector` (`/api/sector/returns`, `/api/sector/fundamentals`, `/api/sector/rotation`, `/api/sector/drill`),
+`portfolio` (`/api/portfolio/analyze`, `/correlation`, `/risk-contribution`, `/capm`, `/rolling`,
+`/kelly`, `/ff`, `/frontier`, `/montecarlo`, `/blacklitterman`, `/stress`),
 `macro` — Phase 8 routes added: `/api/macro/rates`, `/inflation`, `/employment`,
 `/housing`, `/commodities`, `/fx/heatmap`, `/fx/ppp`, `/leading`,
 `/financial-conditions`, `/positioning`.
