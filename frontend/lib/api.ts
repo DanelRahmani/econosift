@@ -10,6 +10,7 @@ import type {
   ConstituentsResponse,
   TreemapResponse,
   CalendarResponse,
+  ScreenerUniverseResponse, PresetDef, ScreenerStatus,
 } from "./types";
 
 async function get<T>(path: string): Promise<T> {
@@ -151,4 +152,26 @@ export const api = {
   calendar: (index = "dow", start: string, end: string) =>
     get<CalendarResponse>(
       `/calendar?index=${encodeURIComponent(index)}&start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`),
+
+  // --- Phase 5: Screener Overhaul ---
+  screenerUniverse: (
+    index: string,
+    presets: string,
+    filters: string,
+    sort: string,
+    dir: "asc" | "desc",
+    limit: number,
+  ) =>
+    get<ScreenerUniverseResponse>(
+      `/screener/universe?index=${index}&presets=${encodeURIComponent(presets)}&filters=${encodeURIComponent(filters)}&sort=${sort}&dir=${dir}&limit=${limit}`
+    ),
+
+  screenerPresets: () =>
+    get<{ presets: PresetDef[] }>(`/screener/presets`),
+
+  screenerStatus: (index: string) =>
+    get<ScreenerStatus>(`/screener/status?index=${index}`),
+
+  screenerRefresh: (index: string) =>
+    post<{ index: string; started: boolean }>(`/screener/refresh?index=${index}`, {}),
 };

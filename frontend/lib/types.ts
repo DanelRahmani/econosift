@@ -541,6 +541,79 @@ export interface CalendarResponse {
   sources: { finnhub: boolean; fred: boolean; cbMeetings: boolean };
 }
 
+// --- Phase 5: Screener Overhaul ---
+export interface ScreenerCacheRow {
+  symbol: string;
+  name: string;
+  sector: string | null;
+  industry: string | null;
+  price: number | null;
+  changePercent: number | null;
+  marketCap: number | null;
+  volume: number | null;
+  avgVolume20d: number | null;
+  volumeRatio: number | null;
+  pe: number | null;
+  forwardPE: number | null;
+  eps: number | null;
+  dividendYield: number | null;
+  beta: number | null;
+  pb: number | null;
+  evEbitda: number | null;
+  evFcf: number | null;
+  fcfYield: number | null;
+  roic: number | null;
+  psRatio: number | null;
+  shortFloat: number | null;
+  shortRatio: number | null;
+  grossMargin: number | null;
+  operatingMargin: number | null;
+  netMargin: number | null;
+  roe: number | null;
+  roa: number | null;
+  debtToEquity: number | null;
+  currentRatio: number | null;
+  revenueGrowth: number | null;
+  epsGrowth: number | null;
+  sma50: number | null;
+  sma200: number | null;
+  aboveSma200: boolean | null;
+  goldenCross: boolean | null;
+  rsi14: number | null;
+  high52: number | null;
+  low52: number | null;
+  pctFromHigh: number | null;
+  piotroski: number | null;
+  altmanZ: number | null;
+  esg: number | null;
+  earningsRev30d: number | null;
+  spark: number[];
+}
+
+export interface ScreenerUniverseResponse {
+  index: string;
+  asOf: string | null;
+  count: number;
+  screened: number;
+  stale: boolean;
+  presets: string[];
+  results: ScreenerCacheRow[];
+}
+
+export interface PresetDef {
+  id: string;
+  label: string;
+  description: string;
+  category: string;
+}
+
+export interface ScreenerStatus {
+  index: string;
+  rowCount: number;
+  lastRefresh: string | null;
+  stale: boolean;
+}
+
 // --- Admin health ---
 export interface CacheStat {
   hits: number;
