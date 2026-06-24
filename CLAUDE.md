@@ -60,13 +60,32 @@ the repo).
     long-TTL background-warmed shares cache (Phase 5 cron pattern), or batch
     `v7/finance/quote`. See `claude_plan.md` Phase 3.
 
-### ⏭️ Next: Phase 4 — Economic Calendar (`claude_plan.md` line ~129)
+- ✅ **Phase 4** — Economic Calendar. Unified `/calendar`: four event streams in
+  one common schema — macro (`backend/data/cb_meetings.json` 2026 Fed/ECB/BoE/BoJ
+  dates + FRED release calendar + Finnhub economic), earnings & dividends
+  (threaded `yf.Ticker.earnings_dates`/`exDividendDate` fan-out,
+  `ThreadPoolExecutor(max_workers=10)`, selectable index, default Dow 30), IPOs
+  (Finnhub). New `finnhub_service.py` (thin, reusable Phases 5/7), `calendar_service.py`,
+  `routers/calendar.py`. Frontend: `/calendar` page + `components/calendar/*`
+  (weekly Mon–Sun grid, today highlighted, category filters + impact/country/tz,
+  beat/miss colouring, <24h countdowns) + nav tabs. **On-demand + 60-min cache**
+  (no scheduler infra — matches Phases 0–3). **316 pytest pass (+32), tsc clean.
+  Verified live in Docker:** `/calendar` HTTP 200; `/api/calendar?index=dow`
+  returns real macro (75 from FRED+CB) + 19 Dow earnings in the Jul Q2 window with
+  EPS estimates.
+  - ℹ️ **Graceful degradation:** IPOs need a Finnhub key (empty without, UI says so);
+    FRED releases need `FRED_API_KEY` (present on this machine). CB meetings always
+    work (shipped JSON). Large universes (sp500) may be slow/throttled on cold load —
+    same Yahoo caveat as the treemap mcaps.
 
-Unified `/calendar`: macro events (Finnhub `/calendar/economic` + FRED release
-calendar + `backend/data/cb_meetings.json`), earnings (`yf.Ticker.calendar` +
-Finnhub, overnight `ThreadPoolExecutor(max_workers=10)` cron), dividends
-(`exDividendDate`), IPOs (Finnhub). Weekly grid, today highlighted, filters
-(impact/country/tz), beat/miss colouring, <24h countdowns. Then Phases 5–12.
+### ⏭️ Next: Phase 5 — Screener Overhaul (`claude_plan.md` line ~142)
+
+High-performance screener: universes (S&P 500 / Nasdaq 100 / Dow 30 + ~3–5k
+small-cap via FinanceDatabase + custom), overnight cron → yfinance batch
+fundamentals → Parquet/SQLite cache, default + extended columns, preset signal
+pills, result tabs (Overview/Performance/Technicals/…), canvas sparkline gallery.
+Note: this is where the deferred treemap mcap fix (background-warmed shares cache)
+should land. Then Phases 6–12.
 
 ### Working agreements (carry these forward)
 
@@ -92,9 +111,11 @@ Finnhub, overnight `ThreadPoolExecutor(max_workers=10)` cron), dividends
 `services/`: `dcf_engine`, `fx_service`, `regime_service`, `valuation_engine`,
 `discount_rates`, `fundamentals`, `analyst_service`, `fama_french`,
 `constituents`, `breadth_service`, `indices_service`, `feargreed_service`,
-`movers_service`, `treemap_service`. Routers: `valuation` (`/full`, `/dcf`,
-`/factors`), `dashboard` (`/breadth`, `/indices`, `/fear-greed`, `/movers`,
-`/constituents`), `treemap` (`/api/treemap?index=&period=`).
+`movers_service`, `treemap_service`, `finnhub_service`, `calendar_service`.
+Routers: `valuation` (`/full`, `/dcf`, `/factors`), `dashboard` (`/breadth`,
+`/indices`, `/fear-greed`, `/movers`, `/constituents`),
+`treemap` (`/api/treemap?index=&period=`),
+`calendar` (`/api/calendar?index=&start=&end=`).
 All external calls cached via `@cached` / `@async_cached` in `cache.py`.
 
 ---

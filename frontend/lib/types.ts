@@ -513,6 +513,34 @@ export interface TreemapResponse {
   stocks: TreemapStock[];
 }
 
+// --- Phase 4: Economic Calendar ---
+export interface CalendarEvent {
+  date: string;                 // YYYY-MM-DD
+  category: "macro" | "earnings" | "dividend" | "ipo";
+  title: string;
+  ticker: string | null;
+  country: string | null;
+  impact: number | null;        // 1..3
+  time: "bmo" | "amc" | null;
+  epsEstimate: number | null;
+  epsActual: number | null;
+  revenueEstimate: number | null;
+  surprisePct: number | null;
+  beatMiss: "beat" | "miss" | "inline" | null;
+  amount: number | null;
+  exchange: string | null;
+}
+export interface CalendarResponse {
+  index: string;
+  start: string;
+  end: string;
+  macro: CalendarEvent[];
+  earnings: CalendarEvent[];
+  dividends: CalendarEvent[];
+  ipos: CalendarEvent[];
+  sources: { finnhub: boolean; fred: boolean; cbMeetings: boolean };
+}
+
 // --- Admin health ---
 export interface CacheStat {
   hits: number;

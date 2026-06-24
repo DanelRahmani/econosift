@@ -9,6 +9,7 @@ import type {
   BreadthResponse, IndicesResponse, FearGreedResponse, MoversResponse,
   ConstituentsResponse,
   TreemapResponse,
+  CalendarResponse,
 } from "./types";
 
 async function get<T>(path: string): Promise<T> {
@@ -145,4 +146,9 @@ export const api = {
   // --- Phase 3: Treemap ---
   treemap: (index = "sp500", period = "1d") =>
     get<TreemapResponse>(`/treemap?index=${encodeURIComponent(index)}&period=${encodeURIComponent(period)}`),
+
+  // --- Phase 4: Economic Calendar ---
+  calendar: (index = "dow", start: string, end: string) =>
+    get<CalendarResponse>(
+      `/calendar?index=${encodeURIComponent(index)}&start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`),
 };
