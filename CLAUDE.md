@@ -89,11 +89,20 @@ should land. Then Phases 6–12.
 
 ### Working agreements (carry these forward)
 
-- **Per-phase Docker gate:** after coding a phase, run `pytest` + `tsc`, then the
-  user does a **full no-cache rebuild** (`docker compose build --no-cache backend
-  frontend && docker compose up -d --force-recreate`) — cached builds silently
-  keep stale source. The user runs the rebuild and says when it's "live"; then
-  run live checks (curl the new endpoints + page HTTP 200) before moving on.
+- **Per-phase Docker gate:** after coding a phase, run `pytest` + `tsc`, then do a
+  **Docker rebuild + recreate** (`docker compose build backend frontend &&
+  docker compose up -d --force-recreate`) and run live checks (curl the new
+  endpoints + page HTTP 200) before moving on. As of Phase 4 **Claude runs the
+  rebuilds itself** (user authorised). **Prefer a cached `build`** — it's much
+  faster and the Dockerfile `COPY` layer still invalidates on any changed source,
+  so it does *not* keep stale code (the old "no-cache only" note was overcautious).
+  Fall back to `--no-cache` only if a build behaves as if source is stale. If
+  Docker errors, sound an **audible alert** (`[console]::beep(880,600)`) so the
+  user can fix the environment.
+- **Env keys on this machine:** `FRED_API_KEY` **is set** (FRED release calendar +
+  US FRED macro data work live). `FINNHUB_API_KEY` is **not** set → Finnhub-only
+  features (IPO calendar, economic calendar) degrade gracefully to empty with an
+  honest UI notice; never fabricate to fill them.
 - **Compute tiers:** 🟢 runs on page load · 🟡 "Calculate" button · 🔴 "Run
   Analysis" button. Never auto-trigger 🟡/🔴.
 - **UI rule:** every section = 3–6 KPIs on top + full extended list below.
