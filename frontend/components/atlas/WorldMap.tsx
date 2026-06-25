@@ -8,10 +8,6 @@ import {
   ZoomableGroup,
 } from "react-simple-maps";
 import { feature } from "topojson-client";
-import {
-  interpolateRdYlGn,
-  interpolateRdBu,
-} from "d3-scale-chromatic";
 import type { AtlasCountry } from "@/lib/types";
 import { fmtNum } from "@/lib/format";
 
@@ -19,7 +15,7 @@ interface Props {
   countries: AtlasCountry[];
   year: number;
   unit: string;
-  goodDirection: "high" | "low" | "neutral";
+  colorFor: (v: number | null | undefined) => string;
   region: string;
   members: Set<string>; // ISO3 set for region filter
   iso3ById: Map<string, string>; // numeric id -> iso3
@@ -34,23 +30,7 @@ const REGION_VIEW: Record<string, { center: [number, number]; zoom: number }> = 
   EM: { center: [30, 15], zoom: 1.2 },
 };
 
-function getColor(
-  value: number | null | undefined,
-  min: number,
-  max: number,
-  goodDirection: "high" | "low" | "neutral",
-): string {
-  const NO_DATA = "#3a3a4a";
-  if (value === null || value === undefined) return NO_DATA;
-  if (max === min) return "#888";
-  const t = (value - min) / (max - min);
-  if (goodDirection === "high") return interpolateRdYlGn(t);
-  if (goodDirection === "low") return interpolateRdYlGn(1 - t);
-  // neutral: diverging around midpoint
-  return interpolateRdBu(1 - t);
-}
-
-export function WorldMap({ countries, year, unit, goodDirection, region, members, iso3ById }: Props) {
+export function WorldMap({ countries, year, unit, colorFor, region, members, iso3ById }: Props) {
   // Use `object` as a safe escape hatch for the parsed topojson/geojson data
   const [geojson, setGeojson] = useState<object | null>(null);
   const [tooltip, setTooltip] = useState<{
@@ -82,18 +62,6 @@ export function WorldMap({ countries, year, unit, goodDirection, region, members
     return m;
   }, [countries, year]);
 
-  // Compute min/max for color scale (only over visible region)
-  const { min, max } = useMemo(() => {
-    const vals: number[] = [];
-    for (const c of countries) {
-      const inRegion = region === "World" || members.has(c.iso3);
-      const v = c.values[String(year)];
-      if (inRegion && v !== null && v !== undefined) vals.push(v);
-    }
-    if (!vals.length) return { min: 0, max: 1 };
-    return { min: Math.min(...vals), max: Math.max(...vals) };
-  }, [countries, year, region, members]);
-
   const view = REGION_VIEW[region] ?? REGION_VIEW.World;
 
   if (!geojson) {
@@ -122,9 +90,7 @@ export function WorldMap({ countries, year, unit, goodDirection, region, members
                 const iso3 = iso3ById.get(numericId);
                 const value = iso3 ? (valueByIso3.get(iso3) ?? null) : null;
                 const inRegion = region === "World" || (iso3 ? members.has(iso3) : false);
-                const fill = inRegion
-                  ? getColor(value, min, max, goodDirection)
-                  : "#2a2a3a";
+                const fill = inRegion ? colorFor(value) : "#2a2a3a";
                 const opacity = inRegion ? 1 : 0.35;
                 const countryName = iso3
                   ? (countries.find((c) => c.iso3 === iso3)?.name ?? iso3)

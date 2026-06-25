@@ -10,6 +10,7 @@ import { YearSlider } from "@/components/atlas/YearSlider";
 import { ColorLegend } from "@/components/atlas/ColorLegend";
 import { AtlasKPIs } from "@/components/atlas/AtlasKPIs";
 import { RankingTable } from "@/components/atlas/RankingTable";
+import { buildAtlasScale } from "@/lib/atlasScale";
 import type { AtlasIndicator, AtlasRegion, AtlasTimelineResponse } from "@/lib/types";
 
 const DEFAULT_INDICATOR = "gdp_growth";
@@ -72,9 +73,10 @@ export default function AtlasPage() {
     return m;
   }, [timeline]);
 
-  // Compute min/max for the current year across region
-  const { minVal, maxVal } = useMemo(() => {
-    if (!timeline) return { minVal: 0, maxVal: 1 };
+  // Build the quantile color scale over the visible (region-filtered) values for
+  // the current year. Shared by the map and the legend so they always match.
+  const atlasScale = useMemo(() => {
+    if (!timeline) return buildAtlasScale([], "neutral");
     const yearStr = String(year);
     const vals: number[] = [];
     for (const c of timeline.countries) {
@@ -82,8 +84,7 @@ export default function AtlasPage() {
       const v = c.values[yearStr];
       if (inRegion && v !== null && v !== undefined) vals.push(v);
     }
-    if (!vals.length) return { minVal: 0, maxVal: 1 };
-    return { minVal: Math.min(...vals), maxVal: Math.max(...vals) };
+    return buildAtlasScale(vals, timeline.goodDirection);
   }, [timeline, year, region, members]);
 
   const activeIndicator = indicators.find((i) => i.id === indicator);
@@ -158,7 +159,7 @@ export default function AtlasPage() {
               countries={timeline.countries}
               year={year}
               unit={timeline.unit}
-              goodDirection={timeline.goodDirection}
+              colorFor={atlasScale.colorFor}
               region={region}
               members={members}
               iso3ById={iso3ById}
@@ -173,12 +174,7 @@ export default function AtlasPage() {
           <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">
             Color Scale — {activeIndicator?.label ?? indicator}
           </h2>
-          <ColorLegend
-            min={minVal}
-            max={maxVal}
-            unit={timeline.unit}
-            goodDirection={timeline.goodDirection}
-          />
+          <ColorLegend bins={atlasScale.bins} unit={timeline.unit} />
         </Card>
       )}
 

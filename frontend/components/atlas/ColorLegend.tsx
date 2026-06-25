@@ -1,47 +1,59 @@
 "use client";
 
-import {
-  interpolateRdYlGn,
-  interpolateRdBu,
-} from "d3-scale-chromatic";
 import { fmtNum } from "@/lib/format";
+import { NO_DATA_COLOR, type AtlasBin } from "@/lib/atlasScale";
 
 interface Props {
-  min: number;
-  max: number;
+  bins: AtlasBin[];
   unit: string;
-  goodDirection: "high" | "low" | "neutral";
 }
 
-function buildGradient(goodDirection: "high" | "low" | "neutral"): string {
-  const steps = 10;
-  const stops = Array.from({ length: steps + 1 }, (_, i) => {
-    const t = i / steps;
-    let color: string;
-    if (goodDirection === "high") color = interpolateRdYlGn(t);
-    else if (goodDirection === "low") color = interpolateRdYlGn(1 - t);
-    else color = interpolateRdBu(1 - t);
-    return `${color} ${(t * 100).toFixed(0)}%`;
-  });
-  return `linear-gradient(to right, ${stops.join(", ")})`;
-}
-
-export function ColorLegend({ min, max, unit, goodDirection }: Props) {
-  const gradient = buildGradient(goodDirection);
+export function ColorLegend({ bins, unit }: Props) {
+  // Quantile bins: each segment holds ~the same number of countries, so the
+  // boundary values are unevenly spaced — that's expected and is what makes the
+  // map readable when a few outliers would otherwise dominate a linear scale.
+  const edges = bins.length
+    ? [bins[0].lo, ...bins.map((b) => b.hi)]
+    : [];
 
   return (
-    <div className="flex items-center gap-3">
-      <span className="text-xs text-text-muted">{fmtNum(min)} {unit}</span>
-      <div className="flex-1 relative h-4 rounded overflow-hidden" style={{ background: gradient }}>
-        {/* no-data swatch */}
-      </div>
-      <span className="text-xs text-text-muted">{fmtNum(max)} {unit}</span>
+    <div className="space-y-2">
+      <div className="flex items-center gap-4">
+        <div className="flex-1">
+          {bins.length ? (
+            <>
+              <div className="flex h-4 rounded overflow-hidden">
+                {bins.map((b, i) => (
+                  <div
+                    key={i}
+                    className="flex-1"
+                    style={{ backgroundColor: b.color }}
+                    title={`${fmtNum(b.lo)} – ${fmtNum(b.hi)} ${unit}`}
+                  />
+                ))}
+              </div>
+              <div className="mt-1 flex justify-between">
+                {edges.map((e, i) => (
+                  <span key={i} className="text-[10px] tabular-nums text-text-muted">
+                    {fmtNum(e)}
+                  </span>
+                ))}
+              </div>
+            </>
+          ) : (
+            <div className="h-4 rounded bg-surface-alt" />
+          )}
+        </div>
 
-      {/* No data swatch */}
-      <div className="flex items-center gap-1.5 ml-2">
-        <div className="w-4 h-4 rounded" style={{ backgroundColor: "#3a3a4a" }} />
-        <span className="text-xs text-text-muted">No data</span>
+        {/* No data swatch */}
+        <div className="flex items-center gap-1.5">
+          <div className="w-4 h-4 rounded" style={{ backgroundColor: NO_DATA_COLOR }} />
+          <span className="text-xs text-text-muted">No data</span>
+        </div>
       </div>
+      <p className="text-[11px] text-text-muted">
+        Equal-count bins ({bins.length || 0} quantiles{unit ? `, ${unit}` : ""}) — outlier-robust.
+      </p>
     </div>
   );
 }
