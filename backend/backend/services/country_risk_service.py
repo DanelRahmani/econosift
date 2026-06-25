@@ -146,7 +146,7 @@ async def get_country_risk(countries: tuple[str, ...] | None = None) -> dict:
             "signals":    signals,
         })
 
-    result.sort(key=lambda row: sum(1 for v in row["signals"].values() if v == "red"), reverse=True)
+    result.sort(key=lambda row: row["name"])
 
     return {
         "countries":  result,

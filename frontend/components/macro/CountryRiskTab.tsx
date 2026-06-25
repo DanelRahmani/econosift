@@ -14,10 +14,10 @@ const KPI_LABELS: Record<string, string> = {
 const KPI_KEYS = Object.keys(KPI_LABELS);
 
 function trafficBg(sig: TrafficLight): string {
-  if (sig === "green")  return "bg-green-900/40 text-green-300";
-  if (sig === "yellow") return "bg-yellow-900/40 text-yellow-300";
-  if (sig === "red")    return "bg-red-900/40 text-red-300";
-  return "bg-white/5 text-white/40";
+  if (sig === "green")  return "bg-success/20 text-success";
+  if (sig === "yellow") return "bg-warning/20 text-warning";
+  if (sig === "red")    return "bg-danger/20 text-danger";
+  return "bg-surface-alt text-text-muted";
 }
 
 function fmt(v: number | null | undefined, key: string): string {
@@ -39,14 +39,26 @@ export function CountryRiskTab() {
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return (
-    <div className="flex items-center justify-center h-64 text-white/40">Loading country risk data…</div>
-  );
-  if (error || !data) return (
-    <div className="flex items-center justify-center h-64 text-red-400">Failed to load country risk data.</div>
-  );
+  if (loading) {
+    return (
+      <div className="space-y-4">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div key={i} className="h-16 animate-pulse bg-surface-alt rounded" />
+        ))}
+      </div>
+    );
+  }
+  if (error || !data) {
+    return (
+      <div className="text-text-secondary text-sm py-8 text-center">
+        Country risk data unavailable.
+      </div>
+    );
+  }
 
-  const filtered = data.countries.filter(c =>
+  const sorted = [...data.countries].sort((a, b) => a.name.localeCompare(b.name));
+
+  const filtered = sorted.filter(c =>
     c.name.toLowerCase().includes(search.toLowerCase()) ||
     c.iso3.toLowerCase().includes(search.toLowerCase())
   );
@@ -61,36 +73,39 @@ export function CountryRiskTab() {
 
   return (
     <div className="space-y-6">
+      {/* KPI summary strip */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {KPI_KEYS.map(key => (
-          <div key={key} className="bg-white/5 rounded-lg p-3 border border-white/10">
-            <div className="text-xs text-white/50 mb-1">{KPI_LABELS[key]}</div>
-            <div className="text-lg font-semibold text-white">{fmt(averages[key], key)}</div>
-            <div className="text-[10px] text-white/30 mt-1">
-              {data.thresholds[key]?.green} = <span className="text-green-400">good</span>
+          <div key={key} className="card p-3">
+            <div className="text-xs text-text-secondary mb-1">{KPI_LABELS[key]}</div>
+            <div className="text-lg font-semibold text-text-primary">{fmt(averages[key], key)}</div>
+            <div className="text-[10px] text-text-muted mt-1">
+              {data.thresholds[key]?.green} = <span className="text-success">good</span>
             </div>
           </div>
         ))}
       </div>
 
+      {/* Search */}
       <div className="flex items-center gap-3">
         <input
           type="text"
           placeholder="Search country…"
           value={search}
           onChange={e => setSearch(e.target.value)}
-          className="w-full max-w-xs bg-white/10 border border-white/20 rounded px-3 py-1.5 text-sm text-white placeholder:text-white/30 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          className="input w-full max-w-xs text-sm"
         />
-        <span className="text-xs text-white/40">{filtered.length} countries</span>
+        <span className="text-xs text-text-muted">{filtered.length} countries</span>
       </div>
 
-      <div className="overflow-x-auto rounded-lg border border-white/10">
+      {/* Traffic-light table */}
+      <div className="overflow-x-auto rounded-lg border border-border">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-white/10 bg-white/5">
-              <th className="text-left px-3 py-2 text-white/60 font-medium sticky left-0 bg-zinc-900 min-w-[140px]">Country</th>
+            <tr className="border-b border-border bg-surface-alt">
+              <th className="text-left px-3 py-2 text-text-secondary font-medium sticky left-0 bg-surface-alt min-w-[140px]">Country</th>
               {KPI_KEYS.map(key => (
-                <th key={key} className="text-center px-2 py-2 text-white/60 font-medium min-w-[90px]">
+                <th key={key} className="text-center px-2 py-2 text-text-secondary font-medium min-w-[90px]">
                   {KPI_LABELS[key]}
                 </th>
               ))}
@@ -98,10 +113,10 @@ export function CountryRiskTab() {
           </thead>
           <tbody>
             {filtered.map((c, i) => (
-              <tr key={c.iso3} className={`border-b border-white/5 ${i % 2 === 0 ? "" : "bg-white/[0.02]"}`}>
-                <td className="px-3 py-1.5 sticky left-0 bg-zinc-900 font-medium">
-                  <span className="text-white/90">{c.name}</span>
-                  <span className="ml-1.5 text-[10px] text-white/30">{c.iso3}</span>
+              <tr key={c.iso3} className={`border-b border-border ${i % 2 === 0 ? "" : "bg-surface-alt/40"}`}>
+                <td className="px-3 py-1.5 sticky left-0 bg-surface font-medium">
+                  <span className="text-text-primary">{c.name}</span>
+                  <span className="ml-1.5 text-[10px] text-text-muted">{c.iso3}</span>
                 </td>
                 {KPI_KEYS.map(key => {
                   const val = (c.indicators as unknown as Record<string, number | null>)[key];
