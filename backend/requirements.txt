@@ -25,6 +25,8 @@ openpyxl
 pyarrow
 pandas-ta
 pycountry
+# Phase 17 — persistence layer
+sqlalchemy>=2.0
 # Testing
 pytest
 pytest-asyncio

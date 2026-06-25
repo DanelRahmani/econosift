@@ -17,6 +17,8 @@ from .services import screener_service
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    from .database import init_db
+    init_db()
     threading.Thread(target=screener_service.warm_all, daemon=True).start()
     yield
 

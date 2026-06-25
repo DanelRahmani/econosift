@@ -4,6 +4,8 @@ services:
     env_file: .env
     expose:
       - "8000"
+    volumes:
+      - sqlite_data:/app/data
     restart: unless-stopped
 
   frontend:
@@ -22,3 +24,6 @@ services:
       - backend
       - frontend
     restart: unless-stopped
+
+volumes:
+  sqlite_data:
