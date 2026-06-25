@@ -23,16 +23,20 @@ log = logging.getLogger(__name__)
 # G10 currency config
 # ---------------------------------------------------------------------------
 
-# CCY → list of FRED series ids to try in order (first with recent data wins)
+# CCY → list of FRED series ids to try in order (first with recent data wins).
+# Primary: OECD "Immediate Rates (<24h): Central Bank Rates" (IRSTCI01*) — current
+# policy-rate proxies. Fallback: OECD 3-month interbank (IR3TIB01*) for currencies
+# whose immediate-rate series has been discontinued. The legacy INTDSR* discount-rate
+# series were dropped — they ended ~2021 and fail the staleness guard.
 _POLICY_RATE_SERIES: dict[str, list[str]] = {
     "USD": ["FEDFUNDS"],
-    "EUR": ["ECBMRRFR", "ECBDFR"],
-    "GBP": ["BOERUKM", "INTDSRGBM193N"],
-    "CAD": ["INTDSRCAM193N"],
-    "AUD": ["INTDSRAUAM193N"],
-    "NZD": ["INTDSRNZM193N"],
-    "CHF": ["INTDSRCHM193N"],
-    "JPY": ["INTDSRJPM193N"],
+    "EUR": ["ECBMRRFR", "ECBDFR", "IRSTCI01EZM156N"],
+    "GBP": ["IRSTCI01GBM156N", "IR3TIB01GBM156N"],
+    "CAD": ["IRSTCI01CAM156N", "IR3TIB01CAM156N"],
+    "AUD": ["IRSTCI01AUM156N", "IR3TIB01AUM156N"],
+    "NZD": ["IRSTCI01NZM156N", "IR3TIB01NZM156N"],
+    "CHF": ["IRSTCI01CHM156N", "IR3TIB01CHM156N"],
+    "JPY": ["IRSTCI01JPM156N", "IR3TIB01JPM156N"],
 }
 
 # Non-USD G10 currencies (NOK/SEK omitted — no reliable FRED policy rate series)

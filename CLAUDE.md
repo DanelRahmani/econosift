@@ -50,11 +50,12 @@ This section is the source of truth for cross-machine continuation.
 - ✅ **Phase 11** (`aee9c35`, `7aa2e5f`): Portfolio analytics page with overview, risk, attribution, optimization, Black-Litterman, and stress testing.
 - ✅ **Phase 12**: Advanced technicals on Markets plus screener technical indicators and presets.
 - ✅ **Phase 13**: Atlas page with world choropleth, 6 macro indicators, year slider, regional blocs, and WB/IMF data.
+- ✅ **Phase 14**: Research Hub (`/research`) — 3 tabs: Risk Parity (inverse-vol + ERC via SLSQP, monthly-rebalanced backtest vs 60/40 SPY+AGG), FX Carry (G10 carry table + long-top3/short-bottom3 backtest vs DXY), Cross-Sectional Momentum (1M/3M/6M/12M-1M deciles, Dow default + Nasdaq/S&P opt-in). Backtests + large-universe momentum gated behind 🔴 buttons. **Carry data note:** the plan's legacy `INTDSR*` discount-rate series ended ~2021 and fail the 120-day staleness guard — replaced with OECD immediate central-bank rates (`IRSTCI01*`) + 3-month interbank fallback (`IR3TIB01*`); USD=FEDFUNDS, EUR=ECBMRRFR. NOK/SEK omitted (no reliable G10 series). Live-verified: AUD top / JPY·CHF bottom carry, ERC weights sum to 1, top decile > bottom decile.
 
 ### Backend module map (added by this build)
 
-`services/`: `dcf_engine`, `fx_service`, `regime_service`, `valuation_engine`, `snowflake_service`, `discount_rates`, `fundamentals`, `analyst_service`, `fama_french`, `constituents`, `breadth_service`, `indices_service`, `feargreed_service`, `movers_service`, `treemap_service`, `finnhub_service`, `calendar_service`, `screener_service`, `screener_cache`, `advanced_risk`, `options_engine`, `macro_expansion_service`, `rates_service`, `cot_service`, `edgar_service`, `sector_service`, `technicals_service`, `atlas_service`.
-Routers: `valuation`, `dashboard`, `treemap`, `calendar`, `screener`, `risk`, `options`, `market_data`, `snowflake`, `sector`, `technicals`, `atlas`, `portfolio`, `macro`.
+`services/`: `dcf_engine`, `fx_service`, `regime_service`, `valuation_engine`, `snowflake_service`, `discount_rates`, `fundamentals`, `analyst_service`, `fama_french`, `constituents`, `breadth_service`, `indices_service`, `feargreed_service`, `movers_service`, `treemap_service`, `finnhub_service`, `calendar_service`, `screener_service`, `screener_cache`, `advanced_risk`, `options_engine`, `macro_expansion_service`, `rates_service`, `cot_service`, `edgar_service`, `sector_service`, `technicals_service`, `atlas_service`, `risk_parity_service`, `carry_service`, `momentum_service`.
+Routers: `valuation`, `dashboard`, `treemap`, `calendar`, `screener`, `risk`, `options`, `market_data`, `snowflake`, `sector`, `technicals`, `atlas`, `portfolio`, `macro`, `research`.
 All external calls cached via `@cached` / `@async_cached` in `cache.py`.
 🟡/🔴 endpoints in `risk.py` and `options.py` are intentionally uncached (compute-on-demand).
 
@@ -93,7 +94,9 @@ All external calls cached via `@cached` / `@async_cached` in `cache.py`.
 
 New pages extending the platform into quantitative research. All data infrastructure already exists; gaps are frontend visualization and new signal logic only. No new API keys required.
 
-- ✅ **Phase 13 — Global Macro Atlas** (`/atlas`) — **DONE** (see Phase 13 entry above for the full shipped feature set + live verification). **Next: Phase 14.**
+- ✅ **Phase 13 — Global Macro Atlas** (`/atlas`) — **DONE** (see Phase 13 entry above for the full shipped feature set + live verification).
+
+- ✅ **Phase 14 — Research Hub** (`/research`) — **DONE** (see Phase 14 entry above). **Next: Phase 15.** Note for Phase 16 Central Bank Tracker: do **not** use the plan's `INTDSR*` series — they're discontinued; reuse Phase 14's `IRSTCI01*`/`IR3TIB01*` series from `carry_service.py`.
 
 - 🔲 **Phase 14 — Research Hub: Risk Parity + FX Carry + Momentum** (`/research`)
   Three-tab page covering quantitative research strategies.

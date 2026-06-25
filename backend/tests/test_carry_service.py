@@ -28,12 +28,12 @@ def _make_fred_data() -> dict[str, pd.Series]:
     return {
         "FEDFUNDS":          _series(3.00),   # USD
         "ECBMRRFR":          _series(2.50),   # EUR  carry = -0.50
-        "BOERUKM":           _series(3.50),   # GBP  carry = +0.50
-        "INTDSRAUAM193N":    _series(4.35),   # AUD  carry = +1.35
-        "INTDSRNZM193N":     _series(5.50),   # NZD  carry = +2.50  ← highest
-        "INTDSRCAM193N":     _series(3.25),   # CAD  carry = +0.25
-        "INTDSRCHM193N":     _series(1.50),   # CHF  carry = -1.50
-        "INTDSRJPM193N":     _series(0.10),   # JPY  carry = -2.90  ← lowest
+        "IRSTCI01GBM156N":   _series(3.50),   # GBP  carry = +0.50
+        "IRSTCI01AUM156N":   _series(4.35),   # AUD  carry = +1.35
+        "IRSTCI01NZM156N":   _series(5.50),   # NZD  carry = +2.50  ← highest
+        "IRSTCI01CAM156N":   _series(3.25),   # CAD  carry = +0.25
+        "IRSTCI01CHM156N":   _series(1.50),   # CHF  carry = -1.50
+        "IRSTCI01JPM156N":   _series(0.10),   # JPY  carry = -2.90  ← lowest
     }
 
 
