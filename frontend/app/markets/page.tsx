@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, Suspense, lazy } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
@@ -11,17 +11,35 @@ import { PriceChart } from "@/components/markets/PriceChart";
 import { QuoteCards } from "@/components/markets/QuoteCards";
 import { RiskMetricsTable } from "@/components/markets/RiskMetricsTable";
 import { CorrelationMatrix } from "@/components/markets/CorrelationMatrix";
-import { ValuationTab } from "@/components/markets/ValuationTab";
-import { RatiosTab } from "@/components/markets/RatiosTab";
-import { PortfolioTab } from "@/components/markets/PortfolioTab";
-import { RankingsTab } from "@/components/markets/RankingsTab";
-import { SectorHeatmap } from "@/components/markets/SectorHeatmap";
-import { ScreenerTab } from "@/components/markets/ScreenerTab";
-import { FxRatesPanel } from "@/components/markets/FxRatesPanel";
 import { NewsFeed } from "@/components/markets/NewsFeed";
 import { Watchlist } from "@/components/Watchlist";
 import { SnowflakeChart } from "@/components/markets/SnowflakeChart";
-import { TechnicalsTab } from "@/components/markets/TechnicalsTab";
+import { TabSkeleton } from "@/components/markets/TabSkeleton";
+
+const ValuationTab = lazy(() =>
+  import("@/components/markets/ValuationTab").then((m) => ({ default: m.ValuationTab }))
+);
+const TechnicalsTab = lazy(() =>
+  import("@/components/markets/TechnicalsTab").then((m) => ({ default: m.TechnicalsTab }))
+);
+const RatiosTab = lazy(() =>
+  import("@/components/markets/RatiosTab").then((m) => ({ default: m.RatiosTab }))
+);
+const PortfolioTab = lazy(() =>
+  import("@/components/markets/PortfolioTab").then((m) => ({ default: m.PortfolioTab }))
+);
+const RankingsTab = lazy(() =>
+  import("@/components/markets/RankingsTab").then((m) => ({ default: m.RankingsTab }))
+);
+const SectorHeatmap = lazy(() =>
+  import("@/components/markets/SectorHeatmap").then((m) => ({ default: m.SectorHeatmap }))
+);
+const ScreenerTab = lazy(() =>
+  import("@/components/markets/ScreenerTab").then((m) => ({ default: m.ScreenerTab }))
+);
+const FxRatesPanel = lazy(() =>
+  import("@/components/markets/FxRatesPanel").then((m) => ({ default: m.FxRatesPanel }))
+);
 
 const PERIODS = ["1mo", "3mo", "6mo", "1y", "2y", "5y"];
 const BENCHMARKS = [
@@ -220,7 +238,9 @@ function MarketsPageInner() {
       )}
 
       {tab === "Technicals" && tickers.length > 0 && (
-        <TechnicalsTab ticker={tickers[0]} />
+        <Suspense fallback={<TabSkeleton />}>
+          <TechnicalsTab ticker={tickers[0]} />
+        </Suspense>
       )}
 
       {!tickers.length && tab === "Technicals" && (
@@ -228,31 +248,45 @@ function MarketsPageInner() {
       )}
 
       {tab === "Valuation" && tickers.length > 0 && (
-        <ValuationTab tickers={tickers} period={period} onNavigateTab={(t) => setTab(t as Tab)} />
+        <Suspense fallback={<TabSkeleton />}>
+          <ValuationTab tickers={tickers} period={period} onNavigateTab={(t) => setTab(t as Tab)} />
+        </Suspense>
       )}
 
       {tab === "Ratios" && tickers.length > 0 && (
-        <RatiosTab tickers={tickers} />
+        <Suspense fallback={<TabSkeleton />}>
+          <RatiosTab tickers={tickers} />
+        </Suspense>
       )}
 
       {tab === "Portfolio" && (
-        <PortfolioTab tickers={tickers} period={period} />
+        <Suspense fallback={<TabSkeleton />}>
+          <PortfolioTab tickers={tickers} period={period} />
+        </Suspense>
       )}
 
       {tab === "Rankings" && (
-        <RankingsTab tickers={tickers} />
+        <Suspense fallback={<TabSkeleton />}>
+          <RankingsTab tickers={tickers} />
+        </Suspense>
       )}
 
       {tab === "Sectors" && (
-        <SectorHeatmap />
+        <Suspense fallback={<TabSkeleton />}>
+          <SectorHeatmap />
+        </Suspense>
       )}
 
       {tab === "Screener" && (
-        <ScreenerTab />
+        <Suspense fallback={<TabSkeleton />}>
+          <ScreenerTab />
+        </Suspense>
       )}
 
       {tab === "FX" && (
-        <FxRatesPanel />
+        <Suspense fallback={<TabSkeleton />}>
+          <FxRatesPanel />
+        </Suspense>
       )}
     </div>
   );
