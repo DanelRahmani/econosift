@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from .middleware import DeduplicationMiddleware
 from .routers import (
     market, valuation, ratios, search, macro,
     portfolio, screener, admin, dashboard, treemap, calendar, risk, options,
@@ -18,9 +19,13 @@ from .services import screener_service
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     from .database import init_db
+    from .services.jobs import start_scheduler
     init_db()
     threading.Thread(target=screener_service.warm_all, daemon=True).start()
+    scheduler = start_scheduler()
     yield
+    if scheduler:
+        scheduler.shutdown(wait=False)
 
 
 app = FastAPI(title="Axiom Finance API", version="1.0.0", lifespan=lifespan)
@@ -32,6 +37,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(DeduplicationMiddleware)
 
 
 @app.get("/health")
