@@ -1526,3 +1526,83 @@ export interface MomentumResponse {
   missing: string[];
   error?: string;
 }
+
+// --- Phase 15: Realized Moments ---
+export interface MomentSeriesPoint {
+  date: string;
+  rvol21: number | null;
+  rvol63: number | null;
+  rvol252: number | null;
+  skew21: number | null;
+  skew63: number | null;
+  skew252: number | null;
+  kurt21: number | null;
+  kurt63: number | null;
+  kurt252: number | null;
+}
+export interface MomentsLatest {
+  rvol21: number | null;
+  skew21: number | null;
+  kurt21: number | null;
+}
+export interface MomentsResponse {
+  ticker: string;
+  period: string;
+  asOf: string;
+  series: MomentSeriesPoint[];
+  latest: MomentsLatest | null;
+  error?: string;
+}
+export interface MomentsCrossDecile {
+  decile: number;
+  avgSkew: number | null;
+  avgFwdReturn: number | null;
+  count: number;
+}
+export interface MomentsNameRow {
+  ticker: string;
+  priorSkew: number | null;
+  fwdReturn: number | null;
+}
+export interface MomentsCrossSection {
+  universe: string;
+  window: number;
+  asOf: string;
+  deciles: MomentsCrossDecile[];
+  names: MomentsNameRow[];
+  missing: string[];
+  error?: string;
+}
+
+// --- Phase 15: Econometric Lab ---
+export interface RegressCoefficient {
+  name: string;
+  coef: number | null;
+  stdErr: number | null;
+  tStat: number | null;
+  pValue: number | null;
+  stars: string;
+}
+export interface RegressResidual {
+  country: string;
+  year: number;
+  fitted: number | null;
+  residual: number | null;
+}
+export interface RegressResponse {
+  dep: string;
+  indep: string[];
+  countries: string[];
+  start: number;
+  end: number;
+  asOf?: string;
+  nObs: number;
+  rSquared?: number | null;
+  adjRSquared?: number | null;
+  aic?: number | null;
+  bic?: number | null;
+  coefficients: RegressCoefficient[];
+  residuals: RegressResidual[];
+  warning?: string | null;
+  error?: string;
+}

@@ -346,3 +346,49 @@ def _safe(d, key):
             return getattr(d, key)
         except Exception:
             return None
+
+
+@cached("yf_ohlc")
+def get_ohlc_frame(symbols: tuple[str, ...], period: str) -> dict[str, pd.DataFrame]:
+    """Return {symbol: DataFrame[Open,High,Low,Close]} for the requested symbols.
+
+    auto_adjust scales Open/High/Low/Close by the same split/dividend factor so
+    Garman-Klass high/low/open/close ratios remain valid after adjustment.
+    """
+    if not symbols:
+        return {}
+    raw = yf.download(
+        list(symbols),
+        period=period,
+        interval="1d",
+        auto_adjust=True,
+        progress=False,
+        threads=True,
+    )
+    if raw is None or len(raw) == 0:
+        return {}
+
+    _OHLC_FIELDS = {"Open", "High", "Low", "Close"}
+
+    if isinstance(raw.columns, pd.MultiIndex):
+        # Detect which level holds the OHLC field names (auto_adjust can flip order).
+        field_level = 0 if _OHLC_FIELDS & set(raw.columns.get_level_values(0)) else 1
+        tick_level = 1 - field_level
+        result: dict[str, pd.DataFrame] = {}
+        for sym in symbols:
+            try:
+                df = raw.xs(sym, axis=1, level=tick_level)[["Open", "High", "Low", "Close"]].dropna(how="any")
+                if len(df) > 0:
+                    result[sym] = df
+            except (KeyError, Exception):
+                pass
+        return result
+    else:
+        # Single-ticker: flat frame with OHLC columns.
+        try:
+            df = raw[["Open", "High", "Low", "Close"]].dropna(how="any")
+            if len(df) > 0:
+                return {symbols[0]: df}
+        except (KeyError, Exception):
+            pass
+        return {}

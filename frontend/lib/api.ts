@@ -26,6 +26,8 @@ import type {
   TechnicalsResponse,
   AtlasIndicator, AtlasRegion, AtlasTimelineResponse, AtlasSnapshotResponse,
   RiskParityWeights, RiskParityBacktest, CarryTable, CarryBacktest, MomentumResponse,
+  MomentsResponse, MomentsCrossSection,
+  RegressResponse,
 } from "./types";
 
 async function get<T>(path: string): Promise<T> {
@@ -371,4 +373,15 @@ export const api = {
 
   momentum: (universe = "dow", signal = "12m1m"): Promise<MomentumResponse> =>
     get(`/research/momentum?universe=${encodeURIComponent(universe)}&signal=${encodeURIComponent(signal)}`),
+
+  // --- Phase 15: Realized Moments ---
+  moments: (ticker: string, period = "3y"): Promise<MomentsResponse> =>
+    get(`/research/moments?ticker=${encodeURIComponent(ticker)}&period=${encodeURIComponent(period)}`),
+
+  momentsCrosssection: (universe = "dow", window = 21): Promise<MomentsCrossSection> =>
+    get(`/research/moments/crosssection?universe=${encodeURIComponent(universe)}&window=${window}`),
+
+  // --- Phase 15: Econometric Lab ---
+  macroRegress: (dep: string, indep: string[], countries: string[], start: number, end: number): Promise<RegressResponse> =>
+    post("/macro/regress", { dep, indep, countries, start, end }),
 };

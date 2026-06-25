@@ -9,7 +9,8 @@ from typing import Any
 
 import pandas as pd
 import requests
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, HTTPException, Query
+from pydantic import BaseModel, Field
 
 from ..config import COUNTRIES, INDICATORS
 from ..services import macro_service
@@ -737,3 +738,39 @@ async def positioning():
     """CFTC Commitments of Traders: net speculator positioning for 6 key futures."""
     from ..services import cot_service
     return await cot_service.get_cot_data()
+
+
+# ---------------------------------------------------------------------------
+# Econometric Lab (Phase 15)
+# ---------------------------------------------------------------------------
+
+class RegressRequest(BaseModel):
+    dep: str
+    indep: list[str] = Field(min_length=1, max_length=5)
+    countries: list[str]
+    start: int = 2000
+    end: int = Field(default_factory=lambda: date.today().year)
+
+
+@router.post("/regress")
+async def regress(req: RegressRequest):
+    """Pooled OLS regression of a World Bank indicator on 1–5 other indicators."""
+    from ..services import econ_lab_service
+    countries = [c.strip().upper() for c in req.countries if c.strip()]
+    indep = [i.strip() for i in req.indep if i.strip()]
+    if not countries:
+        return {
+            "dep": req.dep,
+            "indep": indep,
+            "countries": [],
+            "start": req.start,
+            "end": req.end,
+            "error": "at least one country required",
+            "coefficients": [],
+            "residuals": [],
+            "nObs": 0,
+        }
+    try:
+        return await econ_lab_service.regress(req.dep, indep, countries, req.start, req.end)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc

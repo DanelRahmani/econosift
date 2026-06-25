@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 from ..services import risk_parity_service as rp
 from ..services import carry_service
 from ..services import momentum_service
+from ..services import realized_moments_service
 
 router = APIRouter(prefix="/api/research", tags=["research"])
 
@@ -68,5 +69,27 @@ async def get_momentum(
 ):
     try:
         return momentum_service.get_momentum(universe, signal)
+    except Exception as exc:  # pragma: no cover - defensive
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@router.get("/moments")
+async def get_moments(
+    ticker: str = Query(..., min_length=1, max_length=12),
+    period: str = Query("3y", pattern=r"^(1y|2y|3y|5y|10y|max)$"),
+):
+    try:
+        return realized_moments_service.get_moments(ticker.strip().upper(), period)
+    except Exception as exc:  # pragma: no cover - defensive
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@router.get("/moments/crosssection")
+async def get_moments_crosssection(
+    universe: str = Query("dow", pattern="^(dow|ndx|sp500)$"),
+    window: int = Query(21, ge=5, le=126),
+):
+    try:
+        return realized_moments_service.get_crosssection(universe, window)
     except Exception as exc:  # pragma: no cover - defensive
         raise HTTPException(status_code=500, detail=str(exc)) from exc

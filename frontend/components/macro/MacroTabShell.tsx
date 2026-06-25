@@ -14,6 +14,7 @@ const TABS = [
   { id: "leading", label: "Leading Indicators" },
   { id: "financial", label: "Financial Conditions" },
   { id: "positioning", label: "Positioning" },
+  { id: "lab", label: "Econometric Lab" },
 ];
 
 const MacroOverviewLazy = dynamic(() =>
@@ -46,6 +47,9 @@ const FinancialConditionsLazy = dynamic(() =>
 const PositioningTabLazy = dynamic(() =>
   import("./PositioningTab").then((m) => ({ default: m.PositioningTab }))
 );
+const EconLabLazy = dynamic(() =>
+  import("./EconLabTab").then((m) => ({ default: m.EconLabTab }))
+);
 
 function TabContent({ activeTab }: { activeTab: string }) {
   switch (activeTab) {
@@ -59,6 +63,7 @@ function TabContent({ activeTab }: { activeTab: string }) {
     case "leading":     return <LeadingIndicatorsLazy />;
     case "financial":   return <FinancialConditionsLazy />;
     case "positioning": return <PositioningTabLazy />;
+    case "lab":         return <EconLabLazy />;
     default:            return <MacroOverviewLazy />;
   }
 }

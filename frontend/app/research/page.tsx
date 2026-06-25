@@ -4,11 +4,13 @@ import { useState } from "react";
 import { RiskParityTab } from "@/components/research/RiskParityTab";
 import { FxCarryTab } from "@/components/research/FxCarryTab";
 import { MomentumTab } from "@/components/research/MomentumTab";
+import { RealizedMomentsTab } from "@/components/research/RealizedMomentsTab";
 
 const TABS = [
   { key: "riskparity", label: "Risk Parity" },
   { key: "carry", label: "FX Carry" },
   { key: "momentum", label: "Momentum" },
+  { key: "moments", label: "Realized Moments" },
 ] as const;
 type TabKey = (typeof TABS)[number]["key"];
 
@@ -43,6 +45,7 @@ export default function ResearchPage() {
       {tab === "riskparity" && <RiskParityTab />}
       {tab === "carry" && <FxCarryTab />}
       {tab === "momentum" && <MomentumTab />}
+      {tab === "moments" && <RealizedMomentsTab />}
     </main>
   );
 }
