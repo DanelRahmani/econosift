@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
+import { useState, useEffect, Suspense } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
-import type { PricesResponse, RiskResponse, EventsResponse } from "@/lib/types";
+import type { EventsResponse } from "@/lib/types";
 import { SearchBar } from "@/components/SearchBar";
 import { Card, Skeleton } from "@/components/ui";
 import { PriceChart } from "@/components/markets/PriceChart";
@@ -49,11 +50,6 @@ function MarketsPageInner() {
   const [showWatchlist, setShowWatchlist] = useState(false);
   const [benchmark, setBenchmark] = useState<string>(() => searchParams.get("b") ?? "");
 
-  const [prices, setPrices] = useState<PricesResponse | null>(null);
-  const [risk, setRisk] = useState<RiskResponse | null>(null);
-  const [events, setEvents] = useState<EventsResponse[]>([]);
-  const [loading, setLoading] = useState(false);
-
   const tickersKey = tickers.join(",");
 
   // Keep URL in sync with current state so it can be bookmarked / shared
@@ -67,39 +63,33 @@ function MarketsPageInner() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tickersKey, period, tab, benchmark]);
 
-  useEffect(() => {
-    if (!tickers.length) {
-      setPrices(null);
-      setRisk(null);
-      return;
-    }
-    let active = true;
-    setLoading(true);
-    Promise.all([
-      api.prices(tickersKey, period, benchmark || undefined),
-      api.risk(tickersKey, period, 0.04, benchmark || undefined),
-    ])
-      .then(([p, r]) => {
-        if (!active) return;
-        setPrices(p);
-        setRisk(r);
-      })
-      .catch(() => active && (setPrices(null), setRisk(null)))
-      .finally(() => active && setLoading(false));
-    return () => {
-      active = false;
-    };
-  }, [tickersKey, period, benchmark]);
+  const { data: prices, isLoading: pricesLoading } = useQuery({
+    queryKey: ["market-prices", tickersKey, period, benchmark ?? ""],
+    queryFn: () => api.prices(tickersKey, period, benchmark || undefined),
+    staleTime: 5 * 60 * 1000,
+    enabled: tickers.length > 0,
+  });
 
-  // Earnings / dividend / split events for chart overlays.
-  useEffect(() => {
-    if (!tickers.length) { setEvents([]); return; }
-    let active = true;
-    Promise.all(tickers.slice(0, 6).map((t) => api.events(t).catch(() => null)))
-      .then((res) => active && setEvents(res.filter((e): e is EventsResponse => e !== null)))
-      .catch(() => active && setEvents([]));
-    return () => { active = false; };
-  }, [tickersKey]);
+  const { data: risk, isLoading: riskLoading } = useQuery({
+    queryKey: ["market-risk", tickersKey, period, benchmark ?? ""],
+    queryFn: () => api.risk(tickersKey, period, 0.04, benchmark || undefined),
+    staleTime: 5 * 60 * 1000,
+    enabled: tickers.length > 0,
+  });
+
+  const { data: eventsData } = useQuery({
+    queryKey: ["market-events", tickersKey],
+    queryFn: async () => {
+      const results = await Promise.all(
+        tickers.slice(0, 6).map((t) => api.events(t).catch(() => null))
+      );
+      return results.filter((e): e is EventsResponse => e !== null);
+    },
+    staleTime: 30 * 60 * 1000,
+    enabled: tickers.length > 0,
+  });
+
+  const events = eventsData ?? [];
 
   function addTicker(sym: string) {
     setTickers((prev) => (prev.includes(sym) ? prev : [...prev, sym]));
@@ -192,7 +182,9 @@ function MarketsPageInner() {
           <QuoteCards tickers={tickers} />
           <Card>
             <h2 className="text-sm font-semibold mb-4 text-text-secondary">Normalised Price (base 100)</h2>
-            {loading && !prices ? <Skeleton className="h-96" /> : prices && <PriceChart data={prices} events={events} />}
+            {pricesLoading
+              ? <Skeleton className="h-96" />
+              : prices && <PriceChart data={prices} events={events} />}
           </Card>
           <SnowflakeChart
             ticker={tickers[0]}
@@ -218,7 +210,7 @@ function MarketsPageInner() {
           </div>
           <Card>
             <h2 className="text-sm font-semibold mb-4 text-text-secondary">Risk Metrics</h2>
-            {loading && !risk ? <Skeleton className="h-40" /> : risk && <RiskMetricsTable metrics={risk.metrics} />}
+            {riskLoading ? <Skeleton className="h-40" /> : risk && <RiskMetricsTable metrics={risk.metrics} />}
           </Card>
           <Card>
             <h2 className="text-sm font-semibold mb-4 text-text-secondary">Return Correlation</h2>

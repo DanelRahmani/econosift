@@ -37,12 +37,16 @@ function rollingAvg(values: (number | null)[], window: number): (number | null)[
   });
 }
 
-export function PriceChart({ data, events = [] }: { data: PricesResponse; events?: EventsResponse[] }) {
+export function PriceChart({ data, events = [], isLoading }: { data: PricesResponse; events?: EventsResponse[]; isLoading?: boolean }) {
   const { theme } = useTheme();
   const pal = chartPalette(theme);
   const { prices, benchmarks } = data;
   const [activeSmas, setActiveSmas] = useState<number[]>([]);
   const [showEvents, setShowEvents] = useState(true);
+
+  if (isLoading) {
+    return <div className="h-96 bg-gray-100 dark:bg-gray-800 rounded animate-pulse" />;
+  }
 
   if (!prices.length) {
     return <div className="text-text-muted text-sm">No price data.</div>;
