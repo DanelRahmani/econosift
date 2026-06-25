@@ -55,9 +55,11 @@ This section is the source of truth for cross-machine continuation.
 
 ### Backend module map (added by this build)
 
-`services/`: `dcf_engine`, `fx_service`, `regime_service`, `valuation_engine`, `snowflake_service`, `discount_rates`, `fundamentals`, `analyst_service`, `fama_french`, `constituents`, `breadth_service`, `indices_service`, `feargreed_service`, `movers_service`, `treemap_service`, `finnhub_service`, `calendar_service`, `screener_service`, `screener_cache`, `advanced_risk`, `options_engine`, `macro_expansion_service`, `rates_service`, `cot_service`, `edgar_service`, `sector_service`, `technicals_service`, `atlas_service`, `risk_parity_service`, `carry_service`, `momentum_service`, `realized_moments_service`, `econ_lab_service`, `country_risk_service`, `centralbanks_service`.
-Routers: `valuation`, `dashboard`, `treemap`, `calendar`, `screener`, `risk`, `options`, `market_data`, `snowflake`, `sector`, `technicals`, `atlas`, `portfolio`, `macro`, `research`.
-All external calls cached via `@cached` / `@async_cached` in `cache.py`.
+`services/`: `dcf_engine`, `fx_service`, `regime_service`, `valuation_engine`, `snowflake_service`, `discount_rates`, `fundamentals`, `analyst_service`, `fama_french`, `constituents`, `breadth_service`, `indices_service`, `feargreed_service`, `movers_service`, `treemap_service`, `finnhub_service`, `calendar_service`, `screener_service`, `screener_cache`, `advanced_risk`, `options_engine`, `macro_expansion_service`, `rates_service`, `cot_service`, `edgar_service`, `sector_service`, `technicals_service`, `atlas_service`, `risk_parity_service`, `carry_service`, `momentum_service`, `realized_moments_service`, `econ_lab_service`, `country_risk_service`, `centralbanks_service`, `jobs`.
+Routers: `valuation`, `dashboard`, `treemap`, `calendar`, `screener`, `risk`, `options`, `market_data` (+ `/composite`), `snowflake`, `sector`, `technicals`, `atlas`, `portfolio`, `macro`, `research`, `admin` (+ `/performance`).
+Database: `database.py` (SQLAlchemy engine, SessionLocal), `db_models.py` (DailyPrice, DailyQuote, DailyMacro, DailyFX, JobExecution, CacheEntry).
+Middleware: `middleware.py` (DeduplicationMiddleware stub).
+All external calls cached via `@cached` / `@async_cached` in `cache.py`. `HybridCache` class available for two-tier memory+SQLite caching.
 🟡/🔴 endpoints in `risk.py` and `options.py` are intentionally uncached (compute-on-demand).
 
 ---
@@ -114,6 +116,20 @@ New pages extending the platform into quantitative research. All data infrastruc
   - **CB meetings**: `backend/data/cb_meetings.json` extended from 32→52 entries with BoC (8), RBA (8), SNB (4) 2026 dates. ecocal library was investigated but not added (adds a scraping dep); hardcoded dates follow the established project pattern.
   - **Hashability fix**: `country_risk` endpoint passes countries as `tuple` (not list) to the `@async_cached` decorator.
   - Live-verified: both endpoints HTTP 200, traffic-light table and policy rate chart render in browser, 11 new unit tests passing.
+
+- ✅ **Phase 17 — Performance & Persistence Layer** — **DONE**. SQLite persistence + APScheduler background jobs + React Query frontend caching.
+  - **Database** (`database.py`, `db_models.py`): SQLite (WAL mode) with 6 ORM tables: `DailyPrice`, `DailyQuote`, `DailyMacro`, `DailyFX`, `JobExecution`, `CacheEntry`. Volume-mounted at `/app/data` for persistence across restarts. `init_db()` called on startup (idempotent).
+  - **Job Infrastructure** (`services/jobs.py`): APScheduler `BackgroundScheduler` with 3 cron jobs: `refresh_daily_prices` (16:00 UTC), `refresh_daily_quotes` (17:00 UTC), `refresh_fx_rates` (09/15/21 UTC). Job execution logged to `JobExecution` table. Controlled via `SCHEDULER_ENABLED` env var.
+  - **HybridCache** (added to `cache.py`): Two-tier cache — in-memory `TTLCache` → SQLite `CacheEntry` fallback. Existing `@cached`/`@async_cached` decorators unchanged. Stats track `hits_mem`, `hits_db`, `misses`. `get_stale_while_revalidate()` for SWR pattern.
+  - **Composite endpoint** (`GET /api/market/composite`): Single OHLCV fetch returns `{prices, risk, quotes}` — eliminates 3-request waterfall. Registered in `market_data.py`. `DeduplicationMiddleware` stub in `middleware.py`.
+  - **Admin endpoint** (`GET /api/admin/performance`): Returns cache stats + last-24h job execution log + DB connection info.
+  - **Nginx**: gzip enabled for JSON/JS/CSS, `proxy_read_timeout` reduced 120s → 60s.
+  - **React Query v5** (`@tanstack/react-query@5.101.1`): `queryClient.ts` with staleTime 5min / gcTime 30min. `Providers` wrapper in `frontend/components/providers.tsx`, wired into `layout.tsx`.
+  - **Markets page refactor**: 4 `useState` vars + 2 manual `useEffect` blocks replaced with 3 `useQuery` hooks. `PriceChart` gains `isLoading` skeleton prop.
+  - **Progressive tab loading**: 8 heavy tabs (`ValuationTab`, `TechnicalsTab`, `RatiosTab`, `PortfolioTab`, `RankingsTab`, `SectorHeatmap`, `ScreenerTab`, `FxRatesPanel`) converted to `lazy()` + `<Suspense fallback={<TabSkeleton />}>`. Overview and Risk tabs remain eager.
+  - **Backfill scripts**: `backend/scripts/backfill_ohlcv.py` (5Y OHLCV for S&P 500 + NDX + Dow in batches of 50) and `backend/scripts/backfill_macro.py` (12 FRED series from 2000–present). Run once post-deployment inside Docker.
+  - **Docker**: `sqlite_data` named volume added. No new containers.
+  - Live-verified: 557 tests passing (38 new), all Phase 0–16 endpoints HTTP 200, composite endpoint returns prices+quotes in <500ms, DB persists across `docker compose down/up`.
 
 ---
 
