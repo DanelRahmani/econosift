@@ -20,6 +20,7 @@ import { FxRatesPanel } from "@/components/markets/FxRatesPanel";
 import { NewsFeed } from "@/components/markets/NewsFeed";
 import { Watchlist } from "@/components/Watchlist";
 import { SnowflakeChart } from "@/components/markets/SnowflakeChart";
+import { TechnicalsTab } from "@/components/markets/TechnicalsTab";
 
 const PERIODS = ["1mo", "3mo", "6mo", "1y", "2y", "5y"];
 const BENCHMARKS = [
@@ -29,7 +30,7 @@ const BENCHMARKS = [
   { value: "^DJI", label: "Dow Jones" },
   { value: "^RUT", label: "Russell 2000" },
 ];
-const TABS = ["Overview", "Risk", "Valuation", "Ratios", "Portfolio", "Rankings", "Sectors", "Screener", "FX"] as const;
+const TABS = ["Overview", "Risk", "Technicals", "Valuation", "Ratios", "Portfolio", "Rankings", "Sectors", "Screener", "FX"] as const;
 type Tab = (typeof TABS)[number];
 
 function MarketsPageInner() {
@@ -182,7 +183,7 @@ function MarketsPageInner() {
         )}
       </div>
 
-      {!tickers.length && tab !== "Sectors" && tab !== "Screener" && tab !== "FX" && (
+      {!tickers.length && tab !== "Sectors" && tab !== "Screener" && tab !== "FX" && tab !== "Technicals" && (
         <Card><div className="text-text-muted">Search and add a ticker to begin.</div></Card>
       )}
 
@@ -224,6 +225,14 @@ function MarketsPageInner() {
             {risk && <CorrelationMatrix metrics={risk.metrics} />}
           </Card>
         </div>
+      )}
+
+      {tab === "Technicals" && tickers.length > 0 && (
+        <TechnicalsTab ticker={tickers[0]} />
+      )}
+
+      {!tickers.length && tab === "Technicals" && (
+        <Card><div className="text-text-muted">Search and add a ticker to begin.</div></Card>
       )}
 
       {tab === "Valuation" && tickers.length > 0 && (

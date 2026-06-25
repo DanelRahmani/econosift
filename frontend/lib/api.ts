@@ -23,6 +23,7 @@ import type {
   Holding,
   PortfolioAnalysis, CorrelationData, RiskContribData, CAPMData, RollingData,
   KellyData, FFData, FrontierData, MCData, BLData, StressScenario,
+  TechnicalsResponse,
 } from "./types";
 
 async function get<T>(path: string): Promise<T> {
@@ -336,4 +337,7 @@ export const api = {
 
   portfolioStress: (holdings: Holding[], period: string): Promise<StressScenario[]> =>
     post("/portfolio/stress", { holdings, period }),
+
+  fetchTechnicals: (ticker: string, period = "1y"): Promise<TechnicalsResponse> =>
+    get(`/technicals?ticker=${encodeURIComponent(ticker)}&period=${period}`),
 };

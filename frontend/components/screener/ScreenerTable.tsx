@@ -91,6 +91,19 @@ const ALL_COLS: ColDef[] = [
   { key: "altmanZ",        label: "Altman Z",        render: (r) => fmtNum(r.altmanZ) },
   { key: "esg",            label: "ESG",             render: (r) => fmtNum(r.esg, 1) },
   { key: "earningsRev30d", label: "Earn Rev 30d",    render: (r) => pct(r.earningsRev30d) },
+  // Phase 12 columns
+  { key: "macd",           label: "MACD",            render: (r) => fmtNum(r.macd, 4) },
+  { key: "macdSignal",     label: "MACD Signal",     render: (r) => fmtNum(r.macdSignal, 4) },
+  { key: "bbPctB",         label: "BB %B",           render: (r) => fmtNum(r.bbPctB, 3) },
+  { key: "bbSqueeze",      label: "BB Squeeze",      render: (r) => boolFmt(r.bbSqueeze),
+    tone: (r) => r.bbSqueeze === true ? "text-warning" : undefined },
+  { key: "obv",            label: "OBV",             render: (r) => fmtLarge(r.obv) },
+  { key: "cmf20",          label: "CMF 20",          render: (r) => fmtNum(r.cmf20, 3),
+    tone: (r) => r.cmf20 != null ? (r.cmf20 > 0 ? "text-success" : "text-danger") : undefined },
+  { key: "ichimokuBullish",label: "Ichi Bullish",    render: (r) => boolFmt(r.ichimokuBullish),
+    tone: (r) => r.ichimokuBullish === true ? "text-success" : r.ichimokuBullish === false ? "text-danger" : undefined },
+  { key: "obvDivergence",  label: "OBV Divergence",  render: (r) => boolFmt(r.obvDivergence),
+    tone: (r) => r.obvDivergence === true ? "text-warning" : undefined },
 ];
 
 const COL_MAP = new Map(ALL_COLS.map((c) => [c.key, c]));
@@ -102,7 +115,7 @@ function cols(keys: (keyof ScreenerCacheRow)[]): ColDef[] {
 export const TAB_COLS: Record<ResultTab, ColDef[]> = {
   Overview:     cols(["symbol", "name", "sector", "price", "changePercent", "marketCap", "pe", "dividendYield", "beta"]),
   Performance:  cols(["symbol", "price", "changePercent", "high52", "low52", "pctFromHigh", "rsi14"]),
-  Technicals:   cols(["symbol", "price", "sma50", "sma200", "aboveSma200", "goldenCross", "rsi14", "volumeRatio"]),
+  Technicals:   cols(["symbol", "price", "sma50", "sma200", "aboveSma200", "goldenCross", "rsi14", "volumeRatio", "macd", "bbPctB", "bbSqueeze", "cmf20", "ichimokuBullish", "obvDivergence"]),
   Valuation:    cols(["symbol", "pe", "forwardPE", "pb", "psRatio", "evEbitda", "evFcf", "fcfYield", "eps"]),
   Profitability:cols(["symbol", "grossMargin", "operatingMargin", "netMargin", "roe", "roa", "roic", "debtToEquity", "currentRatio"]),
   Dividends:    cols(["symbol", "dividendYield", "eps", "shortFloat", "shortRatio"]),

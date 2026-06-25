@@ -179,6 +179,17 @@ the repo).
   **368 pytest pass. tsc clean (Next.js build). Verified live in Docker:** all 12 endpoints return
   HTTP 200 with real data including Black-Litterman posterior returns; `/portfolio` HTTP 200.
 
+- ✅ **Phase 12** — Advanced Technicals. New "Technicals" tab on the Markets page between "Risk" and "Valuation".
+  **KPI strip**: Trend (SMA50 vs SMA200), RSI-14, MACD signal (Bullish/Bearish), Volume vs 20D avg, 52-week position %.
+  **Price chart overlays**: toggle pills for Bollinger Bands (upper/mid/lower), Ichimoku Cloud (Tenkan/Kijun/Senkou A+B/Chikou), Fibonacci Retracement (7 levels from 6M swing H/L), Classic Pivot Points (daily/weekly/monthly P/R1/R2/S1/S2).
+  **Sub-charts** (7 panels): MACD (line + signal + histogram), RSI-14, Stochastic RSI (K/D), Williams %R, OBV, CMF-20, ATR-14.
+  **Fibonacci table** and **Pivot Points table** below charts.
+  **5 new screener presets** (category: "technical"): `bb_squeeze` (Bollinger Squeeze), `ichimoku_bull` (Ichimoku Bullish), `ichimoku_bear` (Ichimoku Bearish), `obv_divergence` (OBV Divergence), `cmf_rsi` (CMF+ & RSI<50).
+  **Screener cache**: 8 new columns added (`macd`, `macd_signal`, `bb_pct_b`, `bb_squeeze`, `obv`, `cmf20`, `ichimoku_bullish`, `obv_divergence`) with idempotent `ALTER TABLE` migration.
+  **Screener Technicals tab** now shows new columns (MACD, BB %B, BB Squeeze, CMF 20, Ichimoku Bullish, OBV Divergence).
+  New backend: `services/technicals_service.py` (full pandas_ta computation, `@cached` 60 min) + `routers/technicals.py` (`GET /api/technicals?ticker=&period=`). Dockerfile upgraded to run `pip install --upgrade pip setuptools wheel` before requirements to fix `pkg_resources` build error.
+  **368 pytest pass. tsc clean. Verified live in Docker:** `/api/technicals?ticker=AAPL&period=1y` returns real data for all 9 indicator arrays (macd:319, bollinger:325, ichimoku:344, rsi:343, stochRsi:328, williamsR:331, obv:343, cmf:325, atr:331, fibLevels:7, pivotPoints with daily/weekly/monthly); 5 new presets visible in `/api/screener/presets`; `/markets` HTTP 200.
+
 ### Working agreements (carry these forward)
 
 - **Per-phase Docker gate:** after coding a phase, run `pytest` + `tsc`, then do a
@@ -215,7 +226,8 @@ the repo).
 `movers_service`, `treemap_service`, `finnhub_service`, `calendar_service`,
 `screener_service`, `screener_cache`, `advanced_risk`, `options_engine`,
 `macro_expansion_service`, `rates_service`, `cot_service`, `edgar_service`,
-`sector_service` (Phase 10 — SPDR ETF returns/fundamentals/rotation/industry drill).
+`sector_service` (Phase 10 — SPDR ETF returns/fundamentals/rotation/industry drill),
+`technicals_service` (Phase 12 — full pandas_ta indicator suite: MACD/BB/Ichimoku/Fibonacci/Pivots/RSI/StochRSI/WilliamsR/OBV/CMF/ATR).
 Routers: `valuation` (`/full`, `/dcf`, `/factors`), `dashboard` (`/breadth`,
 `/indices`, `/fear-greed`, `/movers`, `/constituents`),
 `treemap` (`/api/treemap?index=&period=`),
@@ -228,6 +240,7 @@ Routers: `valuation` (`/full`, `/dcf`, `/factors`), `dashboard` (`/breadth`,
 `market_data` (`/api/market/13f`, `/api/market/form4`),
 `snowflake` (`/api/snowflake`, `/api/snowflake/batch`),
 `sector` (`/api/sector/returns`, `/api/sector/fundamentals`, `/api/sector/rotation`, `/api/sector/drill`),
+`technicals` (`/api/technicals?ticker=&period=`),
 `portfolio` (`/api/portfolio/analyze`, `/correlation`, `/risk-contribution`, `/capm`, `/rolling`,
 `/kelly`, `/ff`, `/frontier`, `/montecarlo`, `/blacklitterman`, `/stress`),
 `macro` — Phase 8 routes added: `/api/macro/rates`, `/inflation`, `/employment`,

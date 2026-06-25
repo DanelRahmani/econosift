@@ -588,6 +588,15 @@ export interface ScreenerCacheRow {
   esg: number | null;
   earningsRev30d: number | null;
   spark: number[];
+  // Phase 12 fields
+  macd: number | null;
+  macdSignal: number | null;
+  bbPctB: number | null;
+  bbSqueeze: boolean | null;
+  obv: number | null;
+  cmf20: number | null;
+  ichimokuBullish: boolean | null;
+  obvDivergence: boolean | null;
 }
 
 export interface ScreenerUniverseResponse {
@@ -1297,6 +1306,96 @@ export interface StressScenario {
   error?: string;
 }
 export type StressData = StressScenario[];
+
+// --- Phase 12 Technicals ---
+export interface TechnicalSummary {
+  trend: 'Bullish' | 'Bearish' | 'Neutral' | 'N/A';
+  rsi: number | null;
+  macdSignal: 'Bullish' | 'Bearish' | 'Neutral' | 'N/A';
+  volumeVs20d: number | null;
+  week52Position: number | null;
+  week52High: number | null;
+  week52Low: number | null;
+  bbSqueeze: boolean;
+}
+
+export interface BollingerPoint {
+  date: string;
+  upper: number;
+  mid: number;
+  lower: number;
+  pctB: number | null;
+  bandwidth: number | null;
+}
+
+export interface IchimokuPoint {
+  date: string;
+  tenkan: number | null;
+  kijun: number | null;
+  senkouA: number | null;
+  senkouB: number | null;
+  chikou: number | null;
+}
+
+export interface FibLevel {
+  level: number;
+  label: string;
+  price: number;
+}
+
+export interface PivotSet {
+  p: number;
+  r1: number;
+  r2: number;
+  s1: number;
+  s2: number;
+}
+
+export interface MACDPoint {
+  date: string;
+  macd: number | null;
+  signal: number | null;
+  hist: number | null;
+}
+
+export interface SubChartPoint {
+  date: string;
+  value: number | null;
+}
+
+export interface StochRsiPoint {
+  date: string;
+  k: number | null;
+  d: number | null;
+}
+
+export interface PriceOHLCV {
+  date: string;
+  open: number | null;
+  high: number | null;
+  low: number | null;
+  close: number | null;
+  volume: number | null;
+}
+
+export interface TechnicalsResponse {
+  ticker: string;
+  period: string;
+  asOf: string | null;
+  summary: TechnicalSummary;
+  prices: PriceOHLCV[];
+  bollinger: BollingerPoint[];
+  ichimoku: IchimokuPoint[];
+  macd: MACDPoint[];
+  rsi: SubChartPoint[];
+  stochRsi: StochRsiPoint[];
+  williamsR: SubChartPoint[];
+  obv: SubChartPoint[];
+  cmf: SubChartPoint[];
+  atr: SubChartPoint[];
+  fibLevels: FibLevel[];
+  pivotPoints: Record<'daily' | 'weekly' | 'monthly', PivotSet>;
+}
 
 // --- Admin health ---
 export interface CacheStat {

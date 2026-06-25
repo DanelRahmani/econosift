@@ -29,6 +29,12 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+try:
+    import pandas_ta as _ta  # type: ignore
+    _HAS_TA = True
+except ImportError:
+    _HAS_TA = False
+
 from . import constituents as _constituents
 from . import yfinance_service as yfs
 from . import screener_cache
@@ -68,6 +74,12 @@ PRESETS: list[dict] = [
     {"id": "quality_growth",       "label": "Quality Growth",      "description": "ROE>15%, revenue growth>10%, net margin>10%", "category": "quality"},
     {"id": "deep_value",           "label": "Deep Value",          "description": "P/B < 1 and P/E < 10",                        "category": "value"},
     {"id": "high_short_interest",  "label": "High Short Interest", "description": "Short float > 20%",                           "category": "sentiment"},
+    # Phase 12 — advanced technical presets
+    {"id": "bb_squeeze",       "label": "Bollinger Squeeze",      "description": "Bandwidth compression — breakout may be imminent",  "category": "technical"},
+    {"id": "ichimoku_bull",    "label": "Ichimoku Bullish",       "description": "Price above cloud, Tenkan > Kijun",                 "category": "technical"},
+    {"id": "ichimoku_bear",    "label": "Ichimoku Bearish",       "description": "Price below cloud, Tenkan < Kijun",                 "category": "technical"},
+    {"id": "obv_divergence",   "label": "OBV Divergence",         "description": "Price at 20D high but OBV not confirming",          "category": "technical"},
+    {"id": "cmf_rsi",          "label": "CMF+ & RSI<50",          "description": "Positive money flow with RSI below 50 (accumulation zone)", "category": "technical"},
 ]
 
 _PRESET_IDS = {p["id"] for p in PRESETS}
@@ -128,6 +140,19 @@ def _passes_preset(row: dict, preset_id: str) -> bool:
         return pb is not None and pe is not None and pb < 1.0 and pe < 10.0
     if p == "high_short_interest":
         v = _v("shortFloat"); return v is not None and v > 0.20
+    # Phase 12 presets
+    if p == "bb_squeeze":
+        v = _v("bbSqueeze"); return v is True
+    if p == "ichimoku_bull":
+        v = _v("ichimokuBullish"); return v is True
+    if p == "ichimoku_bear":
+        v = _v("ichimokuBullish"); return v is False
+    if p == "obv_divergence":
+        # price at 20D high but OBV not at 20D high — approximated via stored flag
+        v = _v("obvDivergence"); return v is True
+    if p == "cmf_rsi":
+        cmf = _v("cmf20"); rsi = _v("rsi14")
+        return cmf is not None and rsi is not None and cmf > 0.0 and rsi < 50.0
 
     return False
 
@@ -376,6 +401,11 @@ def _compute_technicals(
         "goldenCross": None, "rsi14": None,
         "high52": None, "low52": None, "pctFromHigh": None,
         "spark": [],
+        # Phase 12 fields
+        "macd": None, "macdSignal": None,
+        "bbPctB": None, "bbSqueeze": None,
+        "obv": None, "cmf20": None,
+        "ichimokuBullish": None, "obvDivergence": None,
     }
 
     if close_frame is None or close_frame.empty or sym not in close_frame.columns:
@@ -440,6 +470,85 @@ def _compute_technicals(
     # Spark: ~63 most-recent daily closes (3 months ≈ 63 trading days)
     spark_col = col.tail(63)
     out["spark"] = [_clean(v) for v in spark_col.tolist() if _clean(v) is not None]
+
+    # Phase 12 — advanced indicators via pandas_ta (requires close_frame + vol_frame)
+    if _HAS_TA and len(col) >= 30:
+        try:
+            _df = pd.DataFrame({"Close": col})
+            # MACD
+            _df.ta.macd(append=True)
+            macd_col_name = next((c for c in _df.columns if c.startswith("MACD_")), None)
+            macds_col_name = next((c for c in _df.columns if c.startswith("MACDs_")), None)
+            if macd_col_name:
+                out["macd"] = _clean(_df[macd_col_name].iloc[-1])
+            if macds_col_name:
+                out["macdSignal"] = _clean(_df[macds_col_name].iloc[-1])
+
+            # Bollinger Bands %B and Squeeze
+            _df.ta.bbands(length=20, std=2, append=True)
+            bbp_col = next((c for c in _df.columns if c.startswith("BBP_")), None)
+            bbb_col = next((c for c in _df.columns if c.startswith("BBB_")), None)
+            if bbp_col:
+                out["bbPctB"] = _clean(_df[bbp_col].iloc[-1])
+            if bbb_col:
+                last_bw = _clean(_df[bbb_col].dropna().iloc[-1]) if not _df[bbb_col].dropna().empty else None
+                out["bbSqueeze"] = bool(last_bw is not None and last_bw < 5.0)
+
+            # CMF (needs high, low, volume — skip if not in close_frame)
+            if (vol_frame is not None and not vol_frame.empty and sym in vol_frame.columns
+                    and sym in close_frame.columns
+                    and hasattr(close_frame, "columns")):
+                _vcol = vol_frame[sym].dropna()
+                # Try to rebuild OHLCV — approximate H=L=C for screener (volume-weighted)
+                _cmf_df = pd.DataFrame({
+                    "High": col, "Low": col, "Close": col, "Volume": _vcol,
+                }).dropna()
+                if len(_cmf_df) >= 20:
+                    _cmf_df.ta.cmf(length=20, append=True)
+                    cmf_col_name = next((c for c in _cmf_df.columns if c.startswith("CMF_")), None)
+                    if cmf_col_name:
+                        out["cmf20"] = _clean(_cmf_df[cmf_col_name].iloc[-1])
+
+            # OBV (needs volume)
+            if vol_frame is not None and not vol_frame.empty and sym in vol_frame.columns:
+                _vcol = vol_frame[sym].dropna()
+                _obv_df = pd.DataFrame({"Close": col, "Volume": _vcol}).dropna()
+                if len(_obv_df) >= 5:
+                    _obv_df.ta.obv(append=True)
+                    obv_col_name = next((c for c in _obv_df.columns if c.startswith("OBV")), None)
+                    if obv_col_name:
+                        out["obv"] = _clean(_obv_df[obv_col_name].iloc[-1])
+                        # OBV Divergence: price at 20D high but OBV not at 20D high
+                        if len(_obv_df) >= 20 and price is not None:
+                            obv_s = _obv_df[obv_col_name].dropna()
+                            price_s = _obv_df["Close"].dropna()
+                            if len(obv_s) >= 20 and len(price_s) >= 20:
+                                price_at_20d_high = float(price_s.iloc[-1]) >= float(price_s.tail(20).max()) * 0.99
+                                obv_at_20d_high = float(obv_s.iloc[-1]) >= float(obv_s.tail(20).max()) * 0.99
+                                out["obvDivergence"] = bool(price_at_20d_high and not obv_at_20d_high)
+
+            # Ichimoku Bullish signal: price > Senkou A and B, Tenkan > Kijun
+            if len(col) >= 52:
+                _df.ta.sma(length=9, append=True)  # reuse df
+                _ichi_df = pd.DataFrame({"High": col, "Low": col, "Close": col})
+                _ichi_df.ta.ichimoku(tenkan=9, kijun=26, senkou=52, append=True)
+                tenkan_c = next((c for c in _ichi_df.columns if c.startswith("ITS_")), None)
+                kijun_c = next((c for c in _ichi_df.columns if c.startswith("IKS_")), None)
+                sa_c = next((c for c in _ichi_df.columns if c.startswith("ISA_")), None)
+                sb_c = next((c for c in _ichi_df.columns if c.startswith("ISB_")), None)
+                if tenkan_c and kijun_c and sa_c and sb_c and price is not None:
+                    t = _clean(_ichi_df[tenkan_c].iloc[-1])
+                    k = _clean(_ichi_df[kijun_c].iloc[-1])
+                    sa = _clean(_ichi_df[sa_c].iloc[-1])
+                    sb = _clean(_ichi_df[sb_c].iloc[-1])
+                    if t and k and sa and sb:
+                        cloud_top = max(sa, sb)
+                        cloud_bot = min(sa, sb)
+                        out["ichimokuBullish"] = bool(
+                            price > cloud_top and t > k
+                        )
+        except Exception:
+            pass  # indicators are best-effort in the screener pipeline
 
     # Volume
     if vol_frame is not None and not vol_frame.empty and sym in vol_frame.columns:

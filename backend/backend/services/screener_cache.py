@@ -86,6 +86,14 @@ CREATE TABLE IF NOT EXISTS fundamentals (
     esg                 REAL,
     earnings_rev30d     REAL,
     spark_json          TEXT,      -- JSON array of floats
+    macd                REAL,
+    macd_signal         REAL,
+    bb_pct_b            REAL,
+    bb_squeeze          INTEGER,   -- 0/1/NULL (boolean)
+    obv                 REAL,
+    cmf20               REAL,
+    ichimoku_bullish    INTEGER,   -- 0/1/NULL (boolean)
+    obv_divergence      INTEGER,   -- 0/1/NULL (boolean)
     updated_at          TEXT       -- ISO-8601 UTC
 );
 
@@ -103,6 +111,29 @@ CREATE TABLE IF NOT EXISTS shares (
 _lock = threading.Lock()
 _conn: sqlite3.Connection | None = None
 
+_PHASE12_COLS = [
+    ("macd",             "REAL"),
+    ("macd_signal",      "REAL"),
+    ("bb_pct_b",         "REAL"),
+    ("bb_squeeze",       "INTEGER"),
+    ("obv",              "REAL"),
+    ("cmf20",            "REAL"),
+    ("ichimoku_bullish", "INTEGER"),
+    ("obv_divergence",   "INTEGER"),
+]
+
+
+def _migrate_phase12(conn: sqlite3.Connection) -> None:
+    """Add Phase 12 columns if they do not already exist (idempotent)."""
+    cur = conn.execute("PRAGMA table_info(fundamentals)")
+    existing = {row[1] for row in cur.fetchall()}
+    for col_name, col_type in _PHASE12_COLS:
+        if col_name not in existing:
+            try:
+                conn.execute(f"ALTER TABLE fundamentals ADD COLUMN {col_name} {col_type}")
+            except Exception:
+                pass
+
 
 def _get_conn() -> sqlite3.Connection:
     """Return (and lazily initialise) the module-level connection."""
@@ -117,6 +148,8 @@ def _get_conn() -> sqlite3.Connection:
         conn = sqlite3.connect(str(path), check_same_thread=False)
         conn.execute("PRAGMA journal_mode=WAL")
         conn.executescript(_DDL)
+        # Phase 12 migration: add new technical columns if they don't exist yet
+        _migrate_phase12(conn)
         conn.commit()
         _conn = conn
     return _conn
@@ -185,6 +218,14 @@ _COL: dict[str, str] = {
     "esg":              "esg",
     "earningsRev30d":   "earnings_rev30d",
     "spark":            "spark_json",  # stored as JSON text
+    "macd":             "macd",
+    "macdSignal":       "macd_signal",
+    "bbPctB":           "bb_pct_b",
+    "bbSqueeze":        "bb_squeeze",
+    "obv":              "obv",
+    "cmf20":            "cmf20",
+    "ichimokuBullish":  "ichimoku_bullish",
+    "obvDivergence":    "obv_divergence",
     "updated_at":       "updated_at",
 }
 
@@ -192,7 +233,7 @@ _COL: dict[str, str] = {
 _CAMEL: dict[str, str] = {v: k for k, v in _COL.items() if k != "spark"}
 # spark_json → spark handled specially
 
-_BOOL_COLS = {"above_sma200", "golden_cross"}
+_BOOL_COLS = {"above_sma200", "golden_cross", "bb_squeeze", "ichimoku_bullish", "obv_divergence"}
 
 
 def _clean_float(v: Any) -> float | None:
