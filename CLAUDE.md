@@ -2,10 +2,18 @@
 
 ## What This App Does
 
-Axiom Finance is a self-hosted financial analytics dashboard built on FastAPI + Next.js 14, containerized via Docker Compose. It has two main pillars:
+Axiom Finance is a self-hosted financial analytics platform built on FastAPI + Next.js 14, containerized via Docker Compose. It covers the full investment research stack across 9 pages:
 
-- **Markets**: Analyze stocks globally — price charts, risk metrics (VaR, Sharpe, Beta), CAPM/DCF valuation, financial ratios, correlation matrices
-- **Macro**: Compare macroeconomic indicators (GDP, CPI, unemployment, etc.) across 20+ countries via a 7-source data pipeline (FRED, World Bank, IMF, ECB, DB.nomics, etc.)
+- **Markets** (`/markets`): Price charts, technical indicators (MACD/BB/Ichimoku/Fibonacci/Pivots), risk metrics (VaR/Sharpe/Beta/GARCH), valuation (8-model engine + DCF + Snowflake score), ratios, options & IV, news feed, 13F/Form 4
+- **Dashboard** (`/dashboard`): Market breadth, global indices, Fear & Greed, top movers
+- **Screener** (`/screener`): S&P 500 / Nasdaq 100 / Dow 30 universe with 20+ preset signals, overnight-warmed cache, 9 result tabs
+- **Portfolio** (`/portfolio`): Efficient frontier, Black-Litterman, Monte Carlo, Fama-French attribution, stress testing
+- **Risk** (`/risk`): Rolling metrics, GARCH, Hurst, cointegration, historical stress scenarios
+- **Options** (`/options`): IV analytics, Greeks, term structure, OI profile, binomial pricing
+- **Sectors** (`/sectors`): SPDR ETF returns, rotation clock, industry drill-down
+- **Treemap** (`/treemap`): S&P 500 / Nasdaq / Dow squarified treemap with sector drill-down
+- **Calendar** (`/calendar`): Earnings, dividends, macro releases, IPOs, CB meetings
+- **Macro** (`/macro`): 10-tab macro hub — rates, inflation, growth, housing, commodities, FX, leading indicators, financial conditions, COT positioning
 
 No paid APIs required. Optional free FRED API key for richer US data.
 
@@ -17,14 +25,13 @@ No paid APIs required. Optional free FRED API key for richer US data.
 
 ---
 
-## Active Build: Phases 0–12 (see `claude_plan.md`)
+## Build History: Phases 0–12 ✅ COMPLETE
 
-We are executing the `claude_plan.md` roadmap **one phase at a time, verifying
-each in Docker before the next**. This section is the source of truth for
-cross-machine continuation (the `~/.claude` auto-memory does **not** travel with
-the repo).
+All 13 phases of the `claude_plan.md` roadmap are **fully shipped and verified in Docker**.
+The original build plan is done. Future work should start a new phase plan.
+This section is the source of truth for cross-machine continuation (the `~/.claude` auto-memory does **not** travel with the repo).
 
-### Progress
+### Completed Phases
 
 - ✅ **Setup** (`02f5028`) — Phase 0–12 deps, pytest + Playwright harness, Finnhub config.
 - ✅ **Phase 0** (`390438b`) — two-stage DCF engine, FX rates panel, regime clock.
