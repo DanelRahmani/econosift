@@ -15,6 +15,7 @@ const tabs = [
   { href: "/risk", label: "Risk" },
   { href: "/options", label: "Options" },
   { href: "/macro", label: "Macro" },
+  { href: "/atlas", label: "Atlas" },
 ];
 
 export function Navbar() {

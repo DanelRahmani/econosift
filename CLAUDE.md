@@ -2,7 +2,7 @@
 
 ## What This App Does
 
-Axiom Finance is a self-hosted financial analytics platform built on FastAPI + Next.js 14, containerized via Docker Compose. It covers the full investment research stack across 9 pages:
+Axiom Finance is a self-hosted financial analytics platform built on FastAPI + Next.js 14, containerized via Docker Compose. It covers the full investment research stack across 11 pages:
 
 - **Markets** (`/markets`): Price charts, technical indicators (MACD/BB/Ichimoku/Fibonacci/Pivots), risk metrics (VaR/Sharpe/Beta/GARCH), valuation (8-model engine + DCF + Snowflake score), ratios, options & IV, news feed, 13F/Form 4
 - **Dashboard** (`/dashboard`): Market breadth, global indices, Fear & Greed, top movers
@@ -14,6 +14,7 @@ Axiom Finance is a self-hosted financial analytics platform built on FastAPI + N
 - **Treemap** (`/treemap`): S&P 500 / Nasdaq / Dow squarified treemap with sector drill-down
 - **Calendar** (`/calendar`): Earnings, dividends, macro releases, IPOs, CB meetings
 - **Macro** (`/macro`): 10-tab macro hub — rates, inflation, growth, housing, commodities, FX, leading indicators, financial conditions, COT positioning
+- **Atlas** (`/atlas`): Choropleth world map of 6 macro indicators across ~200 countries (2000–2024) with year-slider animation, regional blocs (G7/G20/Eurozone/EM), color legend, KPI strip, and Top/Bottom-10 rankings
 
 No paid APIs required. Optional free FRED API key for richer US data.
 
@@ -25,9 +26,9 @@ No paid APIs required. Optional free FRED API key for richer US data.
 
 ---
 
-## Build History: Phases 0–12 ✅ COMPLETE
+## Build History: Phases 0–13 ✅ COMPLETE
 
-All 13 phases of the `claude_plan.md` roadmap are **fully shipped and verified in Docker**.
+All phases 0–13 of the `claude_plan.md` roadmap are **fully shipped and verified in Docker**.
 The original build plan is done. Future work should start a new phase plan.
 This section is the source of truth for cross-machine continuation (the `~/.claude` auto-memory does **not** travel with the repo).
 
@@ -197,6 +198,28 @@ This section is the source of truth for cross-machine continuation (the `~/.clau
   New backend: `services/technicals_service.py` (full pandas_ta computation, `@cached` 60 min) + `routers/technicals.py` (`GET /api/technicals?ticker=&period=`). Dockerfile upgraded to run `pip install --upgrade pip setuptools wheel` before requirements to fix `pkg_resources` build error.
   **368 pytest pass. tsc clean. Verified live in Docker:** `/api/technicals?ticker=AAPL&period=1y` returns real data for all 9 indicator arrays (macd:319, bollinger:325, ichimoku:344, rsi:343, stochRsi:328, williamsR:331, obv:343, cmf:325, atr:331, fibLevels:7, pivotPoints with daily/weekly/monthly); 5 new presets visible in `/api/screener/presets`; `/markets` HTTP 200.
 
+- ✅ **Phase 13** — Global Macro Atlas. New `/atlas` page + "Atlas" nav tab (desktop + mobile).
+  Interactive **choropleth world map** (`react-simple-maps` + bundled `world-atlas` countries-110m
+  TopoJSON in `frontend/public/world-110m.json`) of 6 macro indicators (GDP growth, CPI inflation,
+  unemployment, debt/GDP, current account, GDP per capita) across **~200 countries, 2000–2024**.
+  Indicator selector pills, **year slider with play/pause autoplay** (animates fully client-side —
+  the page fetches `/api/atlas/timeline` once per indicator and slices by year), **regional filters**
+  (G7/G20/Eurozone/EM) that both **dim non-members and zoom/pan** the map to the bloc, d3-scale-chromatic
+  color scale keyed by per-indicator `goodDirection` (high→RdYlGn, low→reversed, neutral→RdBu),
+  color legend, KPI strip (global mean / highest / lowest / # reporting), and **Top-10/Bottom-10
+  ranking table** with CSV export. Data: **World Bank primary** (`wbgapi` `economy='all'`, one call
+  per indicator) **+ IMF WEO gap-fill** (`imfp`, ISO3-keyed — avoids the `[:2]` truncation collision
+  in `source_imf.py`); genuinely missing cells render grey ("No data"), never fabricated. ISO3→ISO
+  3166-1 numeric mapping via `pycountry` so the response `id` joins the TopoJSON's numeric `geo.id`.
+  New backend: `services/atlas_service.py` + `routers/atlas.py` (4 endpoints under `/api/atlas`).
+  New frontend: `app/atlas/page.tsx` + 7 components in `components/atlas/`. Deps added:
+  `react-simple-maps`, `topojson-client`, `d3-scale-chromatic` (+ types); backend `pycountry`.
+  **394 pytest pass (+26 new). Next build (tsc) clean. Verified live in Docker:**
+  `/api/atlas/indicators` → 6 with goodDirection; `/regions` → G7/G20/Eurozone/EM with ISO3 members;
+  `/api/atlas/timeline?indicator=gdp_growth` → 217 countries (215 with joinable numeric id, USA=`840`),
+  real WB data; `/api/atlas/snapshot?indicator=inflation&year=2022` → 178 reporting, avg 12.66%,
+  top Lebanon 171%, bottom South Sudan −6.7%; `/atlas` HTTP 200.
+
 ### Working agreements (carry these forward)
 
 - **Per-phase Docker gate:** after coding a phase, run `pytest` + `tsc`, then do a
@@ -234,7 +257,8 @@ This section is the source of truth for cross-machine continuation (the `~/.clau
 `screener_service`, `screener_cache`, `advanced_risk`, `options_engine`,
 `macro_expansion_service`, `rates_service`, `cot_service`, `edgar_service`,
 `sector_service` (Phase 10 — SPDR ETF returns/fundamentals/rotation/industry drill),
-`technicals_service` (Phase 12 — full pandas_ta indicator suite: MACD/BB/Ichimoku/Fibonacci/Pivots/RSI/StochRSI/WilliamsR/OBV/CMF/ATR).
+`technicals_service` (Phase 12 — full pandas_ta indicator suite: MACD/BB/Ichimoku/Fibonacci/Pivots/RSI/StochRSI/WilliamsR/OBV/CMF/ATR),
+`atlas_service` (Phase 13 — ~200-country macro timelines via wbgapi `economy='all'` + IMF WEO gap-fill, ISO3→numeric via pycountry, region blocs G7/G20/Eurozone/EM).
 Routers: `valuation` (`/full`, `/dcf`, `/factors`), `dashboard` (`/breadth`,
 `/indices`, `/fear-greed`, `/movers`, `/constituents`),
 `treemap` (`/api/treemap?index=&period=`),
@@ -248,6 +272,7 @@ Routers: `valuation` (`/full`, `/dcf`, `/factors`), `dashboard` (`/breadth`,
 `snowflake` (`/api/snowflake`, `/api/snowflake/batch`),
 `sector` (`/api/sector/returns`, `/api/sector/fundamentals`, `/api/sector/rotation`, `/api/sector/drill`),
 `technicals` (`/api/technicals?ticker=&period=`),
+`atlas` (`/api/atlas/indicators`, `/regions`, `/timeline?indicator=&start=&end=`, `/snapshot?indicator=&year=`),
 `portfolio` (`/api/portfolio/analyze`, `/correlation`, `/risk-contribution`, `/capm`, `/rolling`,
 `/kelly`, `/ff`, `/frontier`, `/montecarlo`, `/blacklitterman`, `/stress`),
 `macro` — Phase 8 routes added: `/api/macro/rates`, `/inflation`, `/employment`,
@@ -255,6 +280,29 @@ Routers: `valuation` (`/full`, `/dcf`, `/factors`), `dashboard` (`/breadth`,
 `/financial-conditions`, `/positioning`.
 All external calls cached via `@cached` / `@async_cached` in `cache.py`.
 🟡/🔴 endpoints in `risk.py` and `options.py` are intentionally uncached (compute-on-demand).
+
+---
+
+## Upcoming Phases (14–16) — see `claude_plan.md` for full spec
+
+New pages extending the platform into quantitative research. All data infrastructure already exists; gaps are frontend visualization and new signal logic only. No new API keys required.
+
+- ✅ **Phase 13 — Global Macro Atlas** (`/atlas`) — **DONE** (see Phase 13 entry above for the full shipped feature set + live verification). **Next: Phase 14.**
+
+- 🔲 **Phase 14 — Research Hub: Risk Parity + FX Carry + Momentum** (`/research`)
+  Three-tab page covering quantitative research strategies.
+  - **Risk Parity**: Inverse-vol and ERC (Equal Risk Contribution) weighting via SLSQP extension of `portfolio.py`. Multi-asset (equities/bonds/commodities). Backtest vs 60/40. New: `risk_parity_service.py`.
+  - **FX Carry**: Long top-3 / short bottom-3 G10 pairs by interest differential. Policy rates from FRED `INTDSR*` series (BoE/BoC/RBA/SNB/BoJ/RBNZ — already have `fredapi`). Carry table + backtest chart. New: `carry_service.py`.
+  - **Cross-Sectional Momentum**: Sort S&P 500 by 1M/3M/6M/12M-1M prior return into deciles; compute forward returns. Uses `screener_cache.py` SQLite. New: `momentum_service.py`.
+  All in `routers/research.py`. `POST /api/research/riskparity`, `GET /api/research/carry`, `GET /api/research/momentum`.
+
+- 🔲 **Phase 15 — Realized Moments + Econometric Lab**
+  - **Realized Moments** (4th tab in `/research`): Garman-Klass realized variance + realized skewness/kurtosis from daily OHLC. Cross-sectional sort by skew → MAX/MIN effect. New: `realized_moments_service.py`.
+  - **Econometric Lab** (new "Lab" tab in `/macro`): User-selectable OLS regression across World Bank country data. `POST /api/macro/regress` with `{dep, indep[], countries[], start, end}`. Uses `numpy.linalg.lstsq` (already in env). Returns coefficients, t-stats, R², AIC/BIC.
+
+- 🔲 **Phase 16 — Country Risk + Central Bank Tracker** (extend `/macro`)
+  - **Country Risk tab**: 6-KPI sovereign panel (debt/GDP, current account, inflation, fiscal balance, reserves growth, unemployment) with traffic-light thresholds (green/yellow/red). `GET /api/macro/country-risk?countries=`. Data: World Bank + IMF, already integrated.
+  - **Central Banks tab**: Policy rate history for 7 major CBs (Fed/ECB/BoE/BoJ/BoC/RBA/SNB) via FRED `INTDSR*` + ECB series. Fed balance sheet (`WALCL`). Multi-line chart + meeting countdown. `GET /api/macro/centralbanks`.
 
 ---
 

@@ -1397,6 +1397,59 @@ export interface TechnicalsResponse {
   pivotPoints: Record<'daily' | 'weekly' | 'monthly', PivotSet>;
 }
 
+// --- Phase 13: Global Macro Atlas ---
+export interface AtlasIndicator {
+  id: string;
+  label: string;
+  unit: string;
+  goodDirection: "high" | "low" | "neutral";
+}
+
+export interface AtlasRegion {
+  id: string;
+  label: string;
+  members: string[]; // ISO3 codes
+}
+
+export interface AtlasCountry {
+  iso3: string;
+  id: string | null; // ISO numeric (matches TopoJSON geo.id)
+  name: string;
+  regions: string[];
+  values: Record<string, number | null>;
+}
+
+export interface AtlasTimelineResponse {
+  indicator: string;
+  label: string;
+  unit: string;
+  goodDirection: "high" | "low" | "neutral";
+  start: number;
+  end: number;
+  countries: AtlasCountry[];
+}
+
+export interface AtlasSnapshotCountry {
+  iso3: string;
+  id: string | null;
+  name: string;
+  regions: string[];
+  value: number | null;
+}
+
+export interface AtlasSnapshotResponse {
+  indicator: string;
+  unit: string;
+  year: number;
+  countries: AtlasSnapshotCountry[];
+  stats: {
+    avg: number | null;
+    count_reporting: number;
+    top: Array<{ iso3: string; name: string; value: number }>;
+    bottom: Array<{ iso3: string; name: string; value: number }>;
+  };
+}
+
 // --- Admin health ---
 export interface CacheStat {
   hits: number;

@@ -24,6 +24,7 @@ import type {
   PortfolioAnalysis, CorrelationData, RiskContribData, CAPMData, RollingData,
   KellyData, FFData, FrontierData, MCData, BLData, StressScenario,
   TechnicalsResponse,
+  AtlasIndicator, AtlasRegion, AtlasTimelineResponse, AtlasSnapshotResponse,
 } from "./types";
 
 async function get<T>(path: string): Promise<T> {
@@ -340,4 +341,17 @@ export const api = {
 
   fetchTechnicals: (ticker: string, period = "1y"): Promise<TechnicalsResponse> =>
     get(`/technicals?ticker=${encodeURIComponent(ticker)}&period=${period}`),
+
+  // --- Phase 13: Global Macro Atlas ---
+  atlasIndicators: (): Promise<{ indicators: AtlasIndicator[] }> =>
+    get("/atlas/indicators"),
+
+  atlasRegions: (): Promise<{ regions: AtlasRegion[] }> =>
+    get("/atlas/regions"),
+
+  atlasTimeline: (indicator: string, start = 2000, end = 2024): Promise<AtlasTimelineResponse> =>
+    get(`/atlas/timeline?indicator=${encodeURIComponent(indicator)}&start=${start}&end=${end}`),
+
+  atlasSnapshot: (indicator: string, year: number): Promise<AtlasSnapshotResponse> =>
+    get(`/atlas/snapshot?indicator=${encodeURIComponent(indicator)}&year=${year}`),
 };
