@@ -15,6 +15,8 @@ const TABS = [
   { id: "financial", label: "Financial Conditions" },
   { id: "positioning", label: "Positioning" },
   { id: "lab", label: "Econometric Lab" },
+  { id: "country-risk", label: "Country Risk" },
+  { id: "centralbanks", label: "Central Banks" },
 ];
 
 const MacroOverviewLazy = dynamic(() =>
@@ -50,6 +52,12 @@ const PositioningTabLazy = dynamic(() =>
 const EconLabLazy = dynamic(() =>
   import("./EconLabTab").then((m) => ({ default: m.EconLabTab }))
 );
+const CountryRiskTabLazy = dynamic(() =>
+  import("./CountryRiskTab").then((m) => ({ default: m.CountryRiskTab }))
+);
+const CentralBanksTabLazy = dynamic(() =>
+  import("./CentralBanksTab").then((m) => ({ default: m.CentralBanksTab }))
+);
 
 function TabContent({ activeTab }: { activeTab: string }) {
   switch (activeTab) {
@@ -64,6 +72,8 @@ function TabContent({ activeTab }: { activeTab: string }) {
     case "financial":   return <FinancialConditionsLazy />;
     case "positioning": return <PositioningTabLazy />;
     case "lab":         return <EconLabLazy />;
+    case "country-risk": return <CountryRiskTabLazy />;
+    case "centralbanks": return <CentralBanksTabLazy />;
     default:            return <MacroOverviewLazy />;
   }
 }

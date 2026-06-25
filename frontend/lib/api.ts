@@ -28,6 +28,7 @@ import type {
   RiskParityWeights, RiskParityBacktest, CarryTable, CarryBacktest, MomentumResponse,
   MomentsResponse, MomentsCrossSection,
   RegressResponse,
+  CountryRiskData, CentralBanksData,
 } from "./types";
 
 async function get<T>(path: string): Promise<T> {
@@ -384,4 +385,10 @@ export const api = {
   // --- Phase 15: Econometric Lab ---
   macroRegress: (dep: string, indep: string[], countries: string[], start: number, end: number): Promise<RegressResponse> =>
     post("/macro/regress", { dep, indep, countries, start, end }),
+
+  // --- Phase 16: Country Risk + Central Banks ---
+  macroCountryRisk: (countries?: string) =>
+    get<CountryRiskData>(`/macro/country-risk${countries ? `?countries=${countries}` : ""}`),
+  macroCentralBanks: () =>
+    get<CentralBanksData>(`/macro/centralbanks`),
 };

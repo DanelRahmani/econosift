@@ -1606,3 +1606,42 @@ export interface RegressResponse {
   warning?: string | null;
   error?: string;
 }
+
+// Phase 16 — Country Risk
+export interface CountryRiskIndicators {
+  debt_gdp: number | null;
+  current_account: number | null;
+  inflation: number | null;
+  fiscal_balance: number | null;
+  reserves_growth: number | null;
+  unemployment: number | null;
+}
+export type TrafficLight = "green" | "yellow" | "red" | null;
+export interface CountryRiskEntry {
+  iso3: string;
+  name: string;
+  year: number;
+  indicators: CountryRiskIndicators;
+  signals: Record<keyof CountryRiskIndicators, TrafficLight>;
+}
+export interface CountryRiskData {
+  countries: CountryRiskEntry[];
+  thresholds: Record<string, { green: string; yellow: string; red: string }>;
+}
+
+// Phase 16 — Central Banks
+export interface CbCurrent {
+  rate: number | null;
+  series: string;
+  next_meeting: string | null;
+  days_until: number | null;
+}
+export interface CentralBanksData {
+  history: Array<{
+    date: string;
+    Fed?: number; ECB?: number; BoE?: number; BoJ?: number;
+    BoC?: number; RBA?: number; SNB?: number;
+  }>;
+  current: Record<string, CbCurrent>;
+  balance_sheet: Array<{ date: string; value: number }>;
+}

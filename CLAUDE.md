@@ -13,7 +13,7 @@ Axiom Finance is a self-hosted financial analytics platform built on FastAPI + N
 - **Sectors** (`/sectors`): SPDR ETF returns, rotation clock, industry drill-down
 - **Treemap** (`/treemap`): S&P 500 / Nasdaq / Dow squarified treemap with sector drill-down
 - **Calendar** (`/calendar`): Earnings, dividends, macro releases, IPOs, CB meetings
-- **Macro** (`/macro`): 10-tab macro hub — rates, inflation, growth, housing, commodities, FX, leading indicators, financial conditions, COT positioning
+- **Macro** (`/macro`): 12-tab macro hub — rates, inflation, growth, housing, commodities, FX, leading indicators, financial conditions, COT positioning, Econometric Lab, Country Risk, Central Banks
 - **Atlas** (`/atlas`): Choropleth world map of 6 macro indicators across ~200 countries (2000–2024) with year-slider animation, regional blocs (G7/G20/Eurozone/EM), color legend, KPI strip, and Top/Bottom-10 rankings
 
 No paid APIs required. Optional free FRED API key for richer US data.
@@ -55,7 +55,7 @@ This section is the source of truth for cross-machine continuation.
 
 ### Backend module map (added by this build)
 
-`services/`: `dcf_engine`, `fx_service`, `regime_service`, `valuation_engine`, `snowflake_service`, `discount_rates`, `fundamentals`, `analyst_service`, `fama_french`, `constituents`, `breadth_service`, `indices_service`, `feargreed_service`, `movers_service`, `treemap_service`, `finnhub_service`, `calendar_service`, `screener_service`, `screener_cache`, `advanced_risk`, `options_engine`, `macro_expansion_service`, `rates_service`, `cot_service`, `edgar_service`, `sector_service`, `technicals_service`, `atlas_service`, `risk_parity_service`, `carry_service`, `momentum_service`, `realized_moments_service`, `econ_lab_service`.
+`services/`: `dcf_engine`, `fx_service`, `regime_service`, `valuation_engine`, `snowflake_service`, `discount_rates`, `fundamentals`, `analyst_service`, `fama_french`, `constituents`, `breadth_service`, `indices_service`, `feargreed_service`, `movers_service`, `treemap_service`, `finnhub_service`, `calendar_service`, `screener_service`, `screener_cache`, `advanced_risk`, `options_engine`, `macro_expansion_service`, `rates_service`, `cot_service`, `edgar_service`, `sector_service`, `technicals_service`, `atlas_service`, `risk_parity_service`, `carry_service`, `momentum_service`, `realized_moments_service`, `econ_lab_service`, `country_risk_service`, `centralbanks_service`.
 Routers: `valuation`, `dashboard`, `treemap`, `calendar`, `screener`, `risk`, `options`, `market_data`, `snowflake`, `sector`, `technicals`, `atlas`, `portfolio`, `macro`, `research`.
 All external calls cached via `@cached` / `@async_cached` in `cache.py`.
 🟡/🔴 endpoints in `risk.py` and `options.py` are intentionally uncached (compute-on-demand).
@@ -108,9 +108,12 @@ New pages extending the platform into quantitative research. All data infrastruc
 
 - ✅ **Phase 15 — Realized Moments + Econometric Lab** — **DONE** (see Phase 15 entry in build history above). **Next: Phase 16.** Built with numpy + scipy (no statsmodels, per working agreement); reused `fama_french._ols` math pattern. `GET /api/research/moments`, `GET /api/research/moments/crosssection`, `POST /api/macro/regress`.
 
-- 🔲 **Phase 16 — Country Risk + Central Bank Tracker** (extend `/macro`)
-  - **Country Risk tab**: 6-KPI sovereign panel (debt/GDP, current account, inflation, fiscal balance, reserves growth, unemployment) with traffic-light thresholds (green/yellow/red). `GET /api/macro/country-risk?countries=`. Data: World Bank + IMF, already integrated.
-  - **Central Banks tab**: Policy rate history for 7 major CBs (Fed/ECB/BoE/BoJ/BoC/RBA/SNB) via FRED `INTDSR*` + ECB series. Fed balance sheet (`WALCL`). Multi-line chart + meeting countdown. `GET /api/macro/centralbanks`.
+- ✅ **Phase 16 — Country Risk + Central Bank Tracker** (extend `/macro`) — **DONE**. Two new tabs added to the macro page.
+  - **Country Risk tab**: 6-KPI traffic-light sovereign panel (debt/GDP, current account, inflation, fiscal balance, reserves growth, unemployment) for ~200-country WB universe, sorted by risk (most-red first). WB codes: `GC.DOD.TOTL.GD.ZS`, `BN.CAB.XOKA.GD.ZS`, `FP.CPI.TOTL.ZG`, `SL.UEM.TOTL.ZS` (reused from atlas_service) + `GC.BAL.CASH.GD.ZS` (fiscal balance) + `FI.RES.TOTL.CD` (reserves, YoY%). `GET /api/macro/country-risk?countries=`. New: `country_risk_service.py`.
+  - **Central Banks tab**: Policy rate history 2005–present for 7 CBs (Fed/ECB/BoE/BoJ/BoC/RBA/SNB) using FRED `IRSTCI01*`/`IR3TIB01*` series (same as carry_service — **NOT** the discontinued `INTDSR*`). Fed balance sheet (`WALCL`). Multi-line Recharts chart + 7-CB KPI cards with next meeting countdown. `GET /api/macro/centralbanks`. New: `centralbanks_service.py`.
+  - **CB meetings**: `backend/data/cb_meetings.json` extended from 32→52 entries with BoC (8), RBA (8), SNB (4) 2026 dates. ecocal library was investigated but not added (adds a scraping dep); hardcoded dates follow the established project pattern.
+  - **Hashability fix**: `country_risk` endpoint passes countries as `tuple` (not list) to the `@async_cached` decorator.
+  - Live-verified: both endpoints HTTP 200, traffic-light table and policy rate chart render in browser, 11 new unit tests passing.
 
 ---
 

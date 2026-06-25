@@ -774,3 +774,22 @@ async def regress(req: RegressRequest):
         return await econ_lab_service.regress(req.dep, indep, countries, req.start, req.end)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+# ---------------------------------------------------------------------------
+# Phase 16 – Country Risk + Central Banks
+# ---------------------------------------------------------------------------
+
+from ..services import country_risk_service as _crs
+from ..services import centralbanks_service as _cbs
+
+
+@router.get("/country-risk")
+async def country_risk(countries: str | None = None):
+    c = tuple(x.strip() for x in countries.split(",") if x.strip()) if countries else None
+    return await _crs.get_country_risk(c)
+
+
+@router.get("/centralbanks")
+async def centralbanks():
+    return await _cbs.get_centralbanks()
