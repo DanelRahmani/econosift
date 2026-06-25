@@ -29,6 +29,7 @@ import type {
   MomentsResponse, MomentsCrossSection,
   RegressResponse,
   CountryRiskData, CentralBanksData,
+  PricePoint, RiskMetric,
 } from "./types";
 
 async function get<T>(path: string): Promise<T> {
@@ -391,4 +392,15 @@ export const api = {
     get<CountryRiskData>(`/macro/country-risk${countries ? `?countries=${countries}` : ""}`),
   macroCentralBanks: () =>
     get<CentralBanksData>(`/macro/centralbanks`),
+};
+
+// --- Phase 17.E: React Query ---
+export const marketComposite = (
+  tickers: string,
+  period: string,
+  benchmark?: string
+): Promise<{ prices: PricePoint[]; risk: RiskMetric[]; quotes: Quote[] }> => {
+  const params = new URLSearchParams({ tickers, period });
+  if (benchmark) params.set('benchmark', benchmark);
+  return get(`/api/market/composite?${params}`);
 };

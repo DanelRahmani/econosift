@@ -3,6 +3,7 @@ import "./globals.css";
 import { Navbar } from "@/components/Navbar";
 import { MobileNav } from "@/components/MobileNav";
 import { ThemeProvider, themeInitScript } from "@/components/ThemeProvider";
+import { Providers } from "@/components/providers";
 
 export const metadata: Metadata = {
   title: "Axiom Finance",
@@ -16,11 +17,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
       <body>
-        <ThemeProvider>
-          <Navbar />
-          <main className="max-w-7xl mx-auto px-4 py-6 pb-20 md:pb-6">{children}</main>
-          <MobileNav />
-        </ThemeProvider>
+        <Providers>
+          <ThemeProvider>
+            <Navbar />
+            <main className="max-w-7xl mx-auto px-4 py-6 pb-20 md:pb-6">{children}</main>
+            <MobileNav />
+          </ThemeProvider>
+        </Providers>
       </body>
     </html>
   );
