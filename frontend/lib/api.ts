@@ -25,6 +25,7 @@ import type {
   KellyData, FFData, FrontierData, MCData, BLData, StressScenario,
   TechnicalsResponse,
   AtlasIndicator, AtlasRegion, AtlasTimelineResponse, AtlasSnapshotResponse,
+  RiskParityWeights, RiskParityBacktest, CarryTable, CarryBacktest, MomentumResponse,
 } from "./types";
 
 async function get<T>(path: string): Promise<T> {
@@ -354,4 +355,20 @@ export const api = {
 
   atlasSnapshot: (indicator: string, year: number): Promise<AtlasSnapshotResponse> =>
     get(`/atlas/snapshot?indicator=${encodeURIComponent(indicator)}&year=${year}`),
+
+  // --- Phase 14: Research Hub ---
+  riskParity: (tickers: string[], period: string, mode: "erc" | "invvol"): Promise<RiskParityWeights> =>
+    post("/research/riskparity", { tickers, period, mode }),
+
+  riskParityBacktest: (tickers: string[], period: string, mode: "erc" | "invvol"): Promise<RiskParityBacktest> =>
+    post("/research/riskparity", { tickers, period, mode, backtest: true }),
+
+  carryTable: (period = "3y"): Promise<CarryTable> =>
+    get(`/research/carry?period=${encodeURIComponent(period)}`),
+
+  carryBacktest: (period = "3y"): Promise<CarryBacktest> =>
+    get(`/research/carry?period=${encodeURIComponent(period)}&backtest=true`),
+
+  momentum: (universe = "dow", signal = "12m1m"): Promise<MomentumResponse> =>
+    get(`/research/momentum?universe=${encodeURIComponent(universe)}&signal=${encodeURIComponent(signal)}`),
 };

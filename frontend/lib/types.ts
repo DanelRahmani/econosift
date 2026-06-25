@@ -1469,3 +1469,60 @@ export interface HealthResponse {
   };
   config: { fredApiKey: boolean };
 }
+
+// --- Phase 14: Research Hub ---
+export interface WeightRow { ticker: string; weight: number | null; }
+export interface RiskContribRow { ticker: string; weight: number | null; pctContrib: number | null; }
+export interface RiskParityWeights {
+  weights: WeightRow[];
+  riskContrib: RiskContribRow[];
+  missing: string[];
+  error?: string;
+}
+export interface BacktestPoint { date: string; strategy: number | null; benchmark: number | null; }
+export interface BacktestMetrics {
+  cagr: number | null; vol: number | null; sharpe: number | null; maxDrawdown: number | null;
+}
+export interface RiskParityBacktest {
+  series: BacktestPoint[];
+  finalWeights: WeightRow[];
+  metrics: { strategy: BacktestMetrics; benchmark: BacktestMetrics };
+  missing: string[];
+  error?: string;
+}
+
+export interface CarryRow {
+  ccy: string;
+  pair: string;
+  spot: number | null;
+  foreignRate: number | null;
+  carry: number | null;
+  fxVol: number | null;
+  volAdjCarry: number | null;
+  rateSource: string;
+}
+export interface CarryTable {
+  asOf: string;
+  usdRate: number | null;
+  rows: CarryRow[];
+  error?: string;
+}
+export interface CarryBacktest {
+  series: BacktestPoint[];
+  legs: { long: string[]; short: string[] };
+  metrics: BacktestMetrics;
+  error?: string;
+}
+
+export interface MomentumDecile { decile: number; avgReturn: number | null; count: number; }
+export interface MomentumRank { ticker: string; momentum: number | null; }
+export interface MomentumResponse {
+  universe: string;
+  signal: string;
+  asOf: string;
+  deciles: MomentumDecile[];
+  top: MomentumRank[];
+  bottom: MomentumRank[];
+  missing: string[];
+  error?: string;
+}

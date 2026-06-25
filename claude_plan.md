@@ -315,3 +315,199 @@ Route: `/portfolio`.
 | Ken French | Direct CSV download | Fama-French factor returns (3F + 5F) |
 | scipy | `pip install scipy` | Efficient frontier optimisation, Black-Scholes IV solve |
 | arch | `pip install arch` | GARCH(1,1) volatility modelling |
+| react-simple-maps | `npm install react-simple-maps` | Phase 13 choropleth world map |
+| d3-scale-chromatic | `npm install d3-scale-chromatic` | Phase 13 sequential color scales |
+| topojson-client | `npm install topojson-client` | Phase 13 GeoJSON topology processing |
+
+---
+
+## Phase 13 — Global Macro Atlas (`/atlas`)
+
+**Goal**: Interactive choropleth world map. Users select an indicator (GDP growth, inflation, unemployment, debt/GDP, current account balance) and see every country colored by its current value. Optional temporal slider animates changes year-over-year.
+
+**Data reuse**: `source_worldbank.py` (200+ countries, 8 indicators, already integrated via `wbgapi`), `source_imf.py` (IMF WEO forecasts for gap-filling), `source_dbnomics.py` (OECD MEI for OECD members). No new API keys required.
+
+### Backend
+
+**New file**: `backend/backend/services/atlas_service.py`
+- `get_snapshot(indicator, year)` — calls `source_worldbank.py` first, fills gaps with `source_imf.py`; returns `[{iso3, countryName, value, year, source}]`; `@async_cached("atlas_snapshot")`
+- `get_timeline(indicator)` — multi-year series 2000–present for animation; `@async_cached("atlas_timeline")`
+- `get_region_members()` — static mapping: G7, G20, Eurozone, EM Asia, LatAm, Africa
+
+**New file**: `backend/backend/routers/atlas.py`
+- `GET /api/atlas/snapshot?indicator=gdp_growth&year=2023`
+- `GET /api/atlas/timeline?indicator=inflation`
+- `GET /api/atlas/indicators` → list of 6 indicators with display names and units
+- `GET /api/atlas/regions` → region groupings with ISO3 member lists
+
+Register in `main.py`.
+
+**Indicator map** (World Bank codes):
+| Key | WB Code | Display |
+|-----|---------|---------|
+| `gdp_growth` | NY.GDP.MKTP.KD.ZG | GDP Growth (% YoY) |
+| `inflation` | FP.CPI.TOTL.ZG | CPI Inflation (% YoY) |
+| `unemployment` | SL.UEM.TOTL.ZS | Unemployment Rate (%) |
+| `debt_gdp` | GC.DOD.TOTL.GD.ZS | Govt Debt (% GDP) |
+| `current_account` | BN.CAB.XOKA.GD.ZS | Current Account (% GDP) |
+| `gdp_per_capita` | NY.GDP.PCAP.KD | GDP per Capita (constant USD) |
+
+### Frontend
+
+**New packages**: `react-simple-maps`, `d3-scale-chromatic`, `topojson-client`
+
+**New page**: `frontend/app/atlas/page.tsx`
+
+**New components** in `frontend/components/atlas/`:
+- `WorldMap.tsx` — `ComposableMap` + `Geographies` + `Geography`; color via D3 sequential scale (diverging for current account: negative red → positive blue; sequential for others); hover tooltip: country name, value, source, year
+- `IndicatorSelector.tsx` — pill buttons for 6 indicators (reuse pill pattern from screener presets)
+- `YearSlider.tsx` — range input 2000–2024; "Animate" button cycles years at 800ms interval
+- `RegionFilter.tsx` — G7 / G20 / Eurozone / EM chips that opacity-fade non-members
+- `AtlasLegend.tsx` — gradient bar with min/median/max labels and units
+- `CountryTooltip.tsx` — hover card showing value, rank in universe, 5-year trend sparkline
+
+**Types** (`frontend/lib/types.ts`):
+```ts
+AtlasCountry { iso3, countryName, value, year, source }
+AtlasSnapshot { indicator, year, countries: AtlasCountry[], min, max, median }
+AtlasTimeline { indicator, years: number[], series: { iso3, countryName, values: (number|null)[] }[] }
+AtlasIndicatorDef { key, label, unit, colorScheme }
+```
+
+**Nav**: Add "Atlas" to `Navbar.tsx` (desktop) + `MobileNav.tsx` (mobile icon).
+
+**API client** (`frontend/lib/api.ts`): add `atlasSnapshot`, `atlasTimeline`, `atlasIndicators`, `atlasRegions`.
+
+### Verification
+- `GET /api/atlas/snapshot?indicator=gdp_growth&year=2023` returns ≥ 150 countries
+- `/atlas` HTTP 200
+- Map renders with colored countries; hover tooltip shows real values
+- Year slider animates coloring changes 2000–2023
+- All 6 indicators return real data
+- pytest passes, tsc clean, Docker rebuild + recreate
+
+---
+
+## Phase 14 — Research Hub: Risk Parity + FX Carry + Momentum (`/research`)
+
+**Goal**: New page with 3 sub-tabs for academically grounded quantitative research tools using existing data infrastructure.
+
+### Tab 1: Risk Parity (extends `portfolio.py`)
+
+**New file**: `backend/backend/services/risk_parity_service.py`
+- `inverse_vol_weights(tickers, period)` — `w_i = (1/σ_i) / Σ(1/σ_j)`; uses `yfinance_service.get_close_frame()`
+- `erc_weights(tickers, period)` — Equal Risk Contribution via SLSQP: minimize `Σ_i Σ_j (RC_i − RC_j)²` subject to `Σw=1, w≥0`; extends existing optimizer pattern from `portfolio.py`
+- `risk_parity_backtest(tickers, period, mode)` — rebalance monthly; cumulative return vs 60/40 benchmark (SPY+AGG)
+- All functions `@cached`
+
+**Endpoints** in `backend/backend/routers/research.py`:
+- `POST /api/research/riskparity` — body: `{tickers, period, mode: "invvol"|"erc"}`
+
+**Frontend** (`components/research/RiskParityTab.tsx`):
+- Multi-ticker input (default: `["SPY","TLT","GLD","DJP"]` — equities/bonds/gold/commodities)
+- Mode toggle: Inverse Vol vs ERC vs 60/40
+- Weights horizontal bar chart, risk contribution bar chart (reuse pattern from `RiskContribution.tsx`)
+- Backtest cumulative return chart vs 60/40 (Recharts `LineChart`)
+
+### Tab 2: FX Carry (extends `fx_service.py`)
+
+**New file**: `backend/backend/services/carry_service.py`
+- Fetch G10 policy rates from FRED: `FEDFUNDS` (USD), `INTDSRGBM193N` (GBP), `INTDSRCAM193N` (CAD), `INTDSRAUAM193N` (AUD), `INTDSRNZM193N` (NZD), `INTDSRCHM193N` (CHF), `INTDSRJPM193N` (JPY) + ECB MRR for EUR — add series to `source_fred.py`
+- `get_carry_table()` — for each G10 pair: spot rate (fx_service), domestic rate (USD FEDFUNDS), foreign rate (above FRED series), carry = `(r_foreign − r_USD)` annualized, FX vol (30-day rolling std of daily returns ×√252), vol-adjusted carry = carry / fx_vol
+- `get_carry_backtest(period)` — long top-3 / short bottom-3 by carry; daily rebalanced; cumulative return series
+- `@cached("carry_table")` and `@cached("carry_backtest")`
+
+**Endpoints**: `GET /api/research/carry?period=3y`
+
+**Frontend** (`components/research/FxCarryTab.tsx`):
+- Sortable table: G10 pairs ranked by carry%, vol-adj carry%, 30d FX vol
+- Carry basket cumulative return chart vs DXY (Recharts)
+- Color coding: high carry green, low carry / funding currency grey
+
+### Tab 3: Cross-Sectional Momentum (uses `screener_cache.py`)
+
+**New file**: `backend/backend/services/momentum_service.py`
+- Load screener SQLite cache (`.db` file from Phase 5)
+- Compute 1M/3M/6M/12M-1M prior returns from price data via `yfinance_service.get_close_frame()`
+- Sort S&P 500 universe into deciles; compute decile-average forward 1M/3M returns
+- Top-20 / bottom-20 ranked stocks with momentum score
+- `@cached("momentum_decile")`, `@cached("momentum_ranked")`
+
+**Endpoints**: `GET /api/research/momentum?universe=sp500&signal=12m1m`
+
+**Frontend** (`components/research/MomentumTab.tsx`):
+- Decile bar chart (avg prior return per decile → bar color per sign)
+- Ranked top-20 / bottom-20 table with momentum scores, ticker links to `/markets?ticker=`
+- Signal selector pills: 12M-1M, 6M, 3M, 1M
+
+**Page**: `frontend/app/research/page.tsx` with 3 sub-tabs. Add "Research" to `Navbar.tsx` + `MobileNav.tsx`.
+
+### Verification
+- All 3 endpoints return real data; `/research` HTTP 200
+- Risk parity weights sum to 1, all ≥ 0
+- Carry table: AUD/NZD near top (high yield), JPY/CHF near bottom (funding currencies)
+- Momentum: top decile avg prior return > bottom decile avg prior return
+- pytest passes, tsc clean, Docker rebuild + recreate
+
+---
+
+## Phase 15 — Realized Moments + Econometric Lab
+
+### Realized Moments sub-tab (extend `/research`)
+
+**Goal**: Compute realized variance, skewness, kurtosis from daily OHLCV. Explore MAX/MIN tail-return effects cross-sectionally.
+
+**New file**: `backend/backend/services/realized_moments_service.py`
+- Garman-Klass realized variance: `σ²_GK = 0.5(ln H − ln L)² − (2ln2−1)(ln C − ln O)²` per day
+- Realized skewness and kurtosis from daily log returns over rolling 21d/63d/252d windows
+- Cross-sectional sort: rank S&P 500 by prior 1M realized skewness → compute forward 1M return by decile (MAX effect test)
+- Endpoint: `GET /api/research/moments?ticker=AAPL&period=3y`; `GET /api/research/moments/crosssection?window=21`
+
+**Frontend** (`components/research/RealizedMomentsTab.tsx`):
+- Time-series chart of realized vol/skew/kurt for user-selected ticker
+- Cross-sectional decile bar (skew decile → avg forward return)
+
+### Econometric Lab (new sub-tab in `/macro` → "Lab")
+
+**Goal**: User-selectable OLS regression across World Bank country data.
+
+**Endpoint**: `POST /api/macro/regress`
+- Body: `{dep: "gdp_growth", indep: ["inflation", "debt_gdp"], countries: ["US","DE","JP"], start: 2000, end: 2023}`
+- Fetch series from `source_worldbank.py`, run `numpy.linalg.lstsq` (already in backend env), return: coefficients, t-stats (via `statsmodels.OLS`), R², adjusted R², AIC/BIC, residuals
+
+**Frontend** (`components/macro/EconLabTab.tsx`):
+- Dependent variable dropdown (6 World Bank indicators)
+- Multi-select for independent variables
+- Country multi-select (from existing country list endpoint)
+- Results: coefficient table with significance stars (p<0.05 *, p<0.01 **, p<0.001 ***), R² badge, residual scatter (Recharts)
+
+---
+
+## Phase 16 — Country Risk + Central Bank Tracker (extend `/macro`)
+
+### Country Risk Dashboard (new sub-tab in `/macro`)
+
+**Goal**: 6-KPI sovereign risk panel for any country with traffic-light thresholds.
+
+**Endpoint**: `GET /api/macro/country-risk?countries=US,DE,BR,IN`
+- KPIs: debt/GDP (WB `GC.DOD.TOTL.GD.ZS`), current account (WB `BN.CAB.XOKA.GD.ZS`), CPI inflation (WB `FP.CPI.TOTL.ZG`), fiscal balance proxy (IMF `GGX_NGDP`), external reserves growth (WB `FI.RES.TOTL.CD` YoY), unemployment (WB `SL.UEM.TOTL.ZS`)
+- Thresholds: debt/GDP >90% = red, 60–90% = yellow; current account < −5% = red; etc.
+- All data already available via `source_worldbank.py` + `source_imf.py`
+
+**Frontend** (`components/macro/CountryRiskTab.tsx`):
+- Multi-country comparison table with traffic-light cell coloring (green/yellow/red)
+- 5-year sparkline per KPI per country
+
+### Central Bank Tracker (new sub-tab in `/macro`)
+
+**Goal**: Policy rate history for 7 major central banks + Fed balance sheet.
+
+**Endpoint**: `GET /api/macro/centralbanks`
+- Policy rates: Fed (`FEDFUNDS`), ECB (`FM.B.U2.EUR.4F.KR.MRR_FR.LEV` via `source_ecb.py`), BoE (`INTDSRGBM193N`), BoJ (`INTDSRJPM193N`), BoC (`INTDSRCAM193N`), RBA (`INTDSRAUAM193N`), SNB (`INTDSRCHM193N`) — all via existing FRED + ECB integrations
+- Fed balance sheet: `WALCL` (FRED, total assets)
+- Meeting calendar: reuse `calendar_service.py` CB meetings JSON
+
+**Frontend** (`components/macro/CentralBanksTab.tsx`):
+- Multi-line rate chart (7 CB policy rates, Recharts `LineChart`, 10Y history)
+- Fed balance sheet area chart (right Y axis)
+- Next meeting countdown cards per CB (reuse calendar styling)

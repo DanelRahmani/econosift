@@ -11,6 +11,7 @@ const tabs = [
   { href: "/screener", label: "Screener" },
   { href: "/sectors", label: "Sectors" },
   { href: "/portfolio", label: "Portfolio" },
+  { href: "/research", label: "Research" },
   { href: "/markets", label: "Markets" },
   { href: "/risk", label: "Risk" },
   { href: "/options", label: "Options" },
