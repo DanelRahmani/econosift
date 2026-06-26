@@ -290,6 +290,13 @@ def _hydrate_chain_rows(
             iv_pct = None
         mid = (bid + ask) / 2.0 if (bid or ask) else (last or 0.0)
 
+        # Fix 2: When yfinance IV is bogus (~0.001%), backsolve from mid-price
+        if (iv_raw is None or iv_raw <= 0.001) and mid > 0 and T > 0:
+            backsolved = iv_backsolve(mid, S, float(strike), T, r, opt_type)
+            if backsolved is not None:
+                iv_raw = backsolved
+                iv_pct = backsolved * 100.0
+
         # Black-Scholes delta and theoretical price using IV from chain
         delta = None
         bs_p = None
@@ -373,8 +380,20 @@ def _atm_iv_for_expiry(t: yf.Ticker, spot: float, expiry: str) -> float | None:
         idx = (calls_df["strike"] - spot).abs().idxmin()
         iv_raw = calls_df.loc[idx, "impliedVolatility"]
         iv_clean = _clean(iv_raw)
-        if iv_clean and iv_clean > 0:
+        if iv_clean and iv_clean > 0.001:
             return iv_clean * 100.0
+
+        # Fix 2: When yfinance IV is bogus (~0.001%), backsolve from ATM mid-price
+        atm_strike = float(calls_df.loc[idx, "strike"])
+        bid = _clean(calls_df.loc[idx, "bid"]) or 0.0
+        ask = _clean(calls_df.loc[idx, "ask"]) or 0.0
+        mid = (bid + ask) / 2.0 if (bid or ask) else 0.0
+        dte = _dte(expiry)
+        T_val = max(dte, 1) / 365.0
+        if mid > 0 and T_val > 0:
+            bs_iv = iv_backsolve(mid, spot, atm_strike, T_val, _risk_free_rate(), "call")
+            if bs_iv is not None:
+                return bs_iv * 100.0
     except Exception:
         pass
     return None
@@ -619,13 +638,20 @@ def get_term_structure(ticker: str) -> list[dict]:
             atm_idx = (calls_df["strike"] - spot).abs().idxmin()
             atm_strike = calls_df.loc[atm_idx, "strike"]
             iv_raw = _clean(calls_df.loc[atm_idx, "impliedVolatility"])
-            atm_iv = iv_raw * 100.0 if iv_raw and iv_raw > 0 else None
+            atm_iv = iv_raw * 100.0 if iv_raw and iv_raw > 0.001 else None
             if atm_iv and atm_iv > 500:
                 atm_iv = None
 
             call_bid = calls_df.loc[atm_idx, "bid"] or 0.0
             call_ask = calls_df.loc[atm_idx, "ask"] or 0.0
             call_mid = (call_bid + call_ask) / 2.0
+
+            # Fix 2: Backsolve IV when yfinance returns bogus near-zero value
+            if atm_iv is None and call_mid > 0 and dte > 0:
+                T_term = max(dte, 1) / 365.0
+                bs_iv = iv_backsolve(call_mid, spot, float(atm_strike), T_term, _risk_free_rate(), "call")
+                if bs_iv is not None:
+                    atm_iv = bs_iv * 100.0
 
             put_mid = 0.0
             if puts_df is not None and not puts_df.empty:
@@ -678,15 +704,29 @@ def get_iv_smile(ticker: str, expiry: str) -> list[dict]:
             return []
 
         # Build puts lookup keyed by strike
+        r = _risk_free_rate()
+        dte_smile = _dte(expiry)
+        T_smile = max(dte_smile, 1) / 365.0
+
         puts_iv: dict[float, float | None] = {}
         if puts_df is not None and not puts_df.empty:
             for _, row in puts_df.iterrows():
                 strike = _clean(row.get("strike"))
                 iv_raw = _clean(row.get("impliedVolatility"))
                 if strike is not None:
-                    puts_iv[float(strike)] = iv_raw * 100.0 if iv_raw and iv_raw > 0 else None
-                    if puts_iv[float(strike)] and puts_iv[float(strike)] > 500:
-                        puts_iv[float(strike)] = None
+                    pct = iv_raw * 100.0 if iv_raw and iv_raw > 0.001 else None
+                    if pct and pct > 500:
+                        pct = None
+                    # Fix 2: Backsolve put IV from mid-price
+                    if pct is None and T_smile > 0:
+                        pb = _clean(row.get("bid")) or 0.0
+                        pa = _clean(row.get("ask")) or 0.0
+                        pm = (pb + pa) / 2.0 if (pb or pa) else 0.0
+                        if pm > 0:
+                            bs_iv = iv_backsolve(pm, spot, float(strike), T_smile, r, "put")
+                            if bs_iv is not None:
+                                pct = bs_iv * 100.0
+                    puts_iv[float(strike)] = pct
 
         results = []
         for _, row in calls_df.iterrows():
@@ -699,9 +739,18 @@ def get_iv_smile(ticker: str, expiry: str) -> list[dict]:
                 continue
 
             iv_raw = _clean(row.get("impliedVolatility"))
-            call_iv = iv_raw * 100.0 if iv_raw and iv_raw > 0 else None
+            call_iv = iv_raw * 100.0 if iv_raw and iv_raw > 0.001 else None
             if call_iv and call_iv > 500:
                 call_iv = None
+            # Fix 2: Backsolve call IV from mid-price
+            if call_iv is None and T_smile > 0:
+                cb = _clean(row.get("bid")) or 0.0
+                ca = _clean(row.get("ask")) or 0.0
+                cm = (cb + ca) / 2.0 if (cb or ca) else 0.0
+                if cm > 0:
+                    bs_iv = iv_backsolve(cm, spot, strike, T_smile, r, "call")
+                    if bs_iv is not None:
+                        call_iv = bs_iv * 100.0
             put_iv = puts_iv.get(strike)
 
             if call_iv is None and put_iv is None:

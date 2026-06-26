@@ -196,6 +196,48 @@ def dupont(bundle: dict) -> dict:
 # 3. Piotroski F-Score
 # ---------------------------------------------------------------------------
 
+def _build_prior_year(bundle: dict) -> dict | None:
+    """Extract t-1 (prior-year) financial statements from DataFrames in bundle.
+
+    yfinance DataFrames have date columns sorted latest-first, so column index 1
+    is the prior year.  Returns a dict with ``financials``, ``balance_sheet``,
+    ``cashflow``, ``info`` keys or None if DataFrames lack a second column.
+    """
+    fin_df = bundle.get("financials_df")
+    bs_df = bundle.get("balance_sheet_df")
+    cf_df = bundle.get("cashflow_df")
+
+    # Need at least one DataFrame with ≥2 columns to build prior year
+    has_prior = False
+    for df in (fin_df, bs_df, cf_df):
+        if df is not None and hasattr(df, "columns") and len(df.columns) >= 2:
+            has_prior = True
+            break
+    if not has_prior:
+        return None
+
+    def _col_to_dict(df, col_idx: int) -> dict:
+        if df is None or not hasattr(df, "columns") or col_idx >= len(df.columns):
+            return {}
+        col = df.columns[col_idx]
+        out: dict = {}
+        for idx, val in df[col].items():
+            try:
+                out[str(idx)] = None if (val is None or (hasattr(val, "__float__") and
+                    (float(val) != float(val)))) else float(val)
+            except Exception:
+                continue
+        return out
+
+    prior_info = bundle.get("info", {}) or {}
+    return {
+        "financials": _col_to_dict(fin_df, 1),
+        "balance_sheet": _col_to_dict(bs_df, 1),
+        "cashflow": _col_to_dict(cf_df, 1),
+        "info": prior_info,
+    }
+
+
 def piotroski_f(bundle: dict, prior_year: dict | None = None) -> dict:
     """Piotroski F-Score (0–9).
 
@@ -245,6 +287,11 @@ def piotroski_f(bundle: dict, prior_year: dict | None = None) -> dict:
     # --- Operating Efficiency (require prior year) ---
     f8: bool | None = None
     f9: bool | None = None
+
+    # Fix 5: Auto-build prior_year from DataFrames (second column = t-1) when not
+    # explicitly passed.  yfinance DataFrames have date columns, latest first.
+    if prior_year is None:
+        prior_year = _build_prior_year(bundle)
 
     if prior_year is not None:
         _, py_fin, py_bs, _ = _unpack(prior_year)

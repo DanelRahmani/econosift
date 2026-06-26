@@ -4,9 +4,10 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import type { RatiosResponse, RatioGroup } from "@/lib/types";
 import { Card, Skeleton, ZScoreBadge } from "@/components/ui";
-import { fmtNum, fmtPct, fmtPctFromFraction } from "@/lib/format";
+import { fmtNum, fmtPctFlex } from "@/lib/format";
 import {
   RATIO_GUIDE, ratioTone, ratioRanges, TONE_TEXT, TONE_DOT,
+  RISK_METRIC_GUIDES, type RiskMetricGuide,
 } from "@/lib/ratioGuide";
 
 const PCT_KEYS = new Set([
@@ -61,30 +62,117 @@ const DESCRIPTIONS: Record<string, string> = {
 };
 
 function fmt(key: string, v: number | null): string {
-  if (PCT_KEYS.has(key)) return fmtPctFromFraction(v);
-  if (PCT_DIRECT_KEYS.has(key)) return fmtPct(v);
+  if (PCT_KEYS.has(key)) return fmtPctFlex(v, "fraction");
+  if (PCT_DIRECT_KEYS.has(key)) return fmtPctFlex(v, "direct");
   return fmtNum(v);
 }
+
+// ──────────────────────────────────────────────────────────────────────────
+// Risk metric info row — expandable like RatioRow
+// ──────────────────────────────────────────────────────────────────────────
+
+function riskTone(g: RiskMetricGuide, v: number | null): "good" | "normal" | "bad" | null {
+  if (v === null || Number.isNaN(v)) return null;
+  if (g.dir === "high") {
+    if (v >= 1.0) return "good";
+    if (v >= 0.5) return "normal";
+    return "bad";
+  }
+  if (g.dir === "low") {
+    if (v <= 0.5) return "good";
+    if (v <= 1.0) return "normal";
+    return "bad";
+  }
+  // band — for beta
+  if (v >= 0.7 && v <= 1.3) return "good";
+  if ((v >= 0.4 && v < 0.7) || (v > 1.3 && v <= 2.0)) return "normal";
+  return "bad";
+}
+
+function MetricInfoRow({
+  guide,
+  value,
+  special,
+}: {
+  guide: RiskMetricGuide;
+  value: number | null;
+  special?: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  const tone = riskTone(guide, value);
+  const formatted = value !== null && !Number.isNaN(value) ? fmtNum(value) : "—";
+
+  return (
+    <div className="border-b border-border/40 last:border-b-0">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="w-full flex items-center gap-3 py-2.5 text-left hover:bg-surface-alt/50 transition-colors"
+      >
+        <span className={`h-2 w-2 rounded-full shrink-0 ${tone ? TONE_DOT[tone] : "bg-text-muted/40"}`} />
+        <div className="flex flex-col min-w-0 flex-1">
+          <span className="text-text-secondary text-sm">{guide.label}</span>
+          <span className="text-text-muted text-xs leading-snug truncate">{guide.blurb}</span>
+        </div>
+        <span className={`font-mono shrink-0 tabular-nums text-sm ${tone ? TONE_TEXT[tone] : "text-text-primary"}`}>
+          {special ?? formatted}
+        </span>
+        <span className="text-text-muted text-xs w-4 text-center shrink-0" data-hide-print>
+          {open ? "−" : "ⓘ"}
+        </span>
+      </button>
+
+      {open && (
+        <div className="pb-3 pl-5 pr-1 text-xs space-y-2">
+          <p className="text-text-secondary leading-relaxed">{guide.meaning}</p>
+          <div className="grid grid-cols-3 gap-2">
+            <div className="rounded-md px-2 py-1.5 bg-success/10">
+              <div className="font-semibold text-success">Favorable</div>
+              <div className="text-text-secondary font-mono mt-0.5 leading-tight">{guide.good}</div>
+            </div>
+            <div className="rounded-md px-2 py-1.5 bg-warning/10">
+              <div className="font-semibold text-warning">Average</div>
+              <div className="text-text-secondary font-mono mt-0.5 leading-tight">{guide.normal}</div>
+            </div>
+            <div className="rounded-md px-2 py-1.5 bg-danger/10">
+              <div className="font-semibold text-danger">Caution</div>
+              <div className="text-text-secondary font-mono mt-0.5 leading-tight">{guide.bad}</div>
+            </div>
+          </div>
+          {guide.exception && (
+            <p className="text-text-muted leading-relaxed">
+              <span className="font-semibold text-text-secondary">Note: </span>
+              {guide.exception}
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Ratio row (unchanged logic, minor UI polish)
+// ──────────────────────────────────────────────────────────────────────────
 
 function RatioRow({ k, v }: { k: string; v: number | null }) {
   const [open, setOpen] = useState(false);
   const tone = ratioTone(k, v);
   const ranges = ratioRanges(k);
   const guide = RATIO_GUIDE[k];
-  const meaning = guide?.meaning ?? DESCRIPTIONS[k];
+  const shortDesc = DESCRIPTIONS[k];
   const hasGuide = Boolean(ranges && guide);
 
   return (
     <div className="border-b border-border/40">
       <button
         onClick={() => hasGuide && setOpen((o) => !o)}
-        className={`w-full flex items-center gap-3 py-2.5 text-left ${hasGuide ? "hover:bg-surface-alt/50" : "cursor-default"}`}
+        className={`w-full flex items-center gap-3 py-2.5 text-left ${hasGuide ? "hover:bg-surface-alt/50 transition-colors" : "cursor-default"}`}
       >
         <span className={`h-2 w-2 rounded-full shrink-0 ${tone ? TONE_DOT[tone] : "bg-text-muted/40"}`} />
         <div className="flex flex-col min-w-0 flex-1">
           <span className="text-text-secondary">{LABELS[k] ?? k}</span>
-          {meaning && (
-            <span className="text-text-muted text-xs leading-snug truncate">{meaning}</span>
+          {shortDesc && (
+            <span className="text-text-muted text-xs leading-snug truncate">{shortDesc}</span>
           )}
         </div>
         <span className={`font-mono shrink-0 tabular-nums ${tone ? TONE_TEXT[tone] : "text-text-primary"}`}>
@@ -99,7 +187,7 @@ function RatioRow({ k, v }: { k: string; v: number | null }) {
 
       {open && hasGuide && ranges && (
         <div className="pb-3 pl-5 pr-1 text-xs space-y-2">
-          {meaning && <p className="text-text-secondary leading-relaxed">{meaning}</p>}
+          {guide.meaning && <p className="text-text-secondary leading-relaxed">{guide.meaning}</p>}
           <div className="grid grid-cols-3 gap-2">
             <RangePill tone="good" label="Favorable" value={ranges.good} />
             <RangePill tone="normal" label="Average" value={ranges.normal} />
@@ -107,7 +195,7 @@ function RatioRow({ k, v }: { k: string; v: number | null }) {
           </div>
           {guide.exception && (
             <p className="text-text-muted leading-relaxed">
-              <span className="font-semibold text-text-secondary">Exception: </span>
+              <span className="font-semibold text-text-secondary">Note: </span>
               {guide.exception}
             </p>
           )}
@@ -133,7 +221,7 @@ function Group({ title, group }: { title: string; group: RatioGroup }) {
     <Card className="p-0 overflow-hidden">
       <button
         onClick={() => setOpen((o) => !o)}
-        className="w-full flex justify-between items-center px-6 py-4 hover:bg-surface-alt"
+        className="w-full flex justify-between items-center px-6 py-4 hover:bg-surface-alt transition-colors"
         data-hide-print
       >
         <span className="font-semibold">{title}</span>
@@ -156,12 +244,53 @@ function exportPDF() {
   document.body.classList.remove("print-mode");
 }
 
+// ──────────────────────────────────────────────────────────────────────────
+// Legend card — explains the colour-coding system at a glance
+// ──────────────────────────────────────────────────────────────────────────
+
+function LegendCard() {
+  return (
+    <Card className="p-4">
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs">
+        <span className="font-semibold text-text-primary mr-1">How to read this page:</span>
+        <span className="flex items-center gap-1.5">
+          <span className="h-2.5 w-2.5 rounded-full bg-success inline-block" />
+          <span className="text-success font-medium">Favorable</span>
+          <span className="text-text-muted">— metric is in a healthy range</span>
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="h-2.5 w-2.5 rounded-full bg-warning inline-block" />
+          <span className="text-warning font-medium">Average</span>
+          <span className="text-text-muted">— acceptable but not standout</span>
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="h-2.5 w-2.5 rounded-full bg-danger inline-block" />
+          <span className="text-danger font-medium">Caution</span>
+          <span className="text-text-muted">— warrants attention</span>
+        </span>
+        <span className="flex items-center gap-1.5 text-text-muted">
+          <span className="h-2.5 w-2.5 rounded-full bg-text-muted/40 inline-block" />
+          <span>No guide available</span>
+        </span>
+      </div>
+      <p className="text-text-muted text-xs mt-2 border-t border-border/40 pt-2">
+        Click any <span className="font-semibold text-text-secondary">ⓘ</span> icon to see the metric's definition, Favorable / Average / Caution thresholds, and any known exceptions. Valuation multiples (P/E, P/B, EV/EBITDA, etc.) use{" "}
+        <span className="text-success font-medium">green = cheaper</span>,{" "}
+        <span className="text-danger font-medium">red = richer</span>.
+      </p>
+    </Card>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Main component
+// ──────────────────────────────────────────────────────────────────────────
+
 export function RatiosTab({ tickers }: { tickers: string[] }) {
   const [selectedTicker, setSelectedTicker] = useState(tickers[0] ?? "");
   const [data, setData] = useState<RatiosResponse | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // If tickers list changes and selected is no longer in it, reset
   useEffect(() => {
     if (!tickers.includes(selectedTicker) && tickers.length > 0) {
       setSelectedTicker(tickers[0]);
@@ -218,24 +347,86 @@ export function RatiosTab({ tickers }: { tickers: string[] }) {
       )}
       {data && (
         <>
-          <Card>
-            <div className="flex flex-wrap gap-6 items-center text-sm">
-              <span className="font-mono text-lg">{data.ticker}</span>
-              <Stat label="Beta" value={fmtNum(data.beta)} />
-              <Stat label="Sharpe" value={fmtNum(data.sharpe)} />
-              <Stat label="Sortino" value={fmtNum(data.sortino)} />
-              <div className="flex items-center gap-2">
-                <span className="text-text-secondary">Altman Z</span>
+          {/* Legend */}
+          <LegendCard />
+
+          {/* Risk & Performance metrics card */}
+          <Card className="p-0 overflow-hidden">
+            <div className="px-6 py-3 border-b border-border/40">
+              <span className="font-semibold text-sm">Risk &amp; Performance</span>
+            </div>
+            <div className="px-6 pb-2">
+              <MetricInfoRow
+                guide={RISK_METRIC_GUIDES.beta}
+                value={data.beta}
+              />
+              <MetricInfoRow
+                guide={RISK_METRIC_GUIDES.sharpe}
+                value={data.sharpe}
+              />
+              <MetricInfoRow
+                guide={RISK_METRIC_GUIDES.sortino}
+                value={data.sortino}
+              />
+              <div className="flex items-center py-2.5 gap-3 border-b border-border/40 last:border-b-0">
+                <span className="h-2 w-2 rounded-full shrink-0">
+                  {data.zScore === null
+                    ? <span className="block h-2 w-2 rounded-full bg-text-muted/40" />
+                    : data.zScore > 2.99
+                    ? <span className="block h-2 w-2 rounded-full bg-success" />
+                    : data.zScore >= 1.81
+                    ? <span className="block h-2 w-2 rounded-full bg-warning" />
+                    : <span className="block h-2 w-2 rounded-full bg-danger" />
+                  }
+                </span>
+                <div className="flex flex-col min-w-0 flex-1">
+                  <span className="text-text-secondary text-sm">Altman Z-Score</span>
+                  <span className="text-text-muted text-xs leading-snug truncate">Bankruptcy risk model (5 financial ratios)…</span>
+                </div>
                 <ZScoreBadge z={data.zScore} />
+                <button
+                  onClick={() => {
+                    const el = document.getElementById("altman-z-info");
+                    if (el) {
+                      const hidden = el.classList.toggle("hidden");
+                      el.classList.toggle("block", hidden);
+                    }
+                  }}
+                  className="text-text-muted text-xs w-4 text-center shrink-0 hover:text-text-primary transition-colors"
+                  data-hide-print
+                  aria-label="Altman Z-Score info"
+                >
+                  ⓘ
+                </button>
+              </div>
+              {/* Altman Z info panel (toggled by ⓘ) */}
+              <div id="altman-z-info" className="hidden pb-3 pl-5 pr-1 text-xs space-y-2">
+                <p className="text-text-secondary leading-relaxed">{RISK_METRIC_GUIDES.altmanZ.meaning}</p>
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="rounded-md px-2 py-1.5 bg-success/10">
+                    <div className="font-semibold text-success">Safe Zone</div>
+                    <div className="text-text-secondary font-mono mt-0.5 leading-tight">{"> 2.99"}</div>
+                  </div>
+                  <div className="rounded-md px-2 py-1.5 bg-warning/10">
+                    <div className="font-semibold text-warning">Grey Zone</div>
+                    <div className="text-text-secondary font-mono mt-0.5 leading-tight">1.81 – 2.99</div>
+                  </div>
+                  <div className="rounded-md px-2 py-1.5 bg-danger/10">
+                    <div className="font-semibold text-danger">Distress Zone</div>
+                    <div className="text-text-secondary font-mono mt-0.5 leading-tight">{"< 1.81"}</div>
+                  </div>
+                </div>
+                {RISK_METRIC_GUIDES.altmanZ.exception && (
+                  <p className="text-text-muted leading-relaxed">
+                    <span className="font-semibold text-text-secondary">Note: </span>
+                    {RISK_METRIC_GUIDES.altmanZ.exception}
+                  </p>
+                )}
               </div>
             </div>
           </Card>
-          <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-xs text-text-muted px-1">
-            <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-success" /> Favorable</span>
-            <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-warning" /> Average</span>
-            <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-danger" /> Caution</span>
-            <span className="ml-auto">Tap a metric (ⓘ) for its ranges &amp; exceptions. Valuation multiples: green = cheaper, red = richer.</span>
-          </div>
+
+          {/* Ratio groups */}
           <Group title="Liquidity" group={data.liquidity} />
           <Group title="Leverage" group={data.leverage} />
           <Group title="Efficiency" group={data.efficiency} />
@@ -243,15 +434,6 @@ export function RatiosTab({ tickers }: { tickers: string[] }) {
           <Group title="Valuation Multiples" group={data.valuation} />
         </>
       )}
-    </div>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center gap-2">
-      <span className="text-text-secondary">{label}</span>
-      <span className="font-mono">{value}</span>
     </div>
   );
 }

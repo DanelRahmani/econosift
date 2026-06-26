@@ -16,6 +16,20 @@ export function fmtPctFromFraction(v: number | null | undefined, digits = 2): st
   return `${(v * 100).toFixed(digits)}%`;
 }
 
+/**
+ * Flexible percentage formatter — callers specify whether the value is
+ * already a percentage ("direct", e.g. 0.39 → "0.39%") or a fraction
+ * ("fraction", e.g. 0.0039 → "0.39%").
+ */
+export function fmtPctFlex(
+  v: number | null | undefined,
+  fmt: "direct" | "fraction",
+  digits = 2,
+): string {
+  if (fmt === "direct") return fmtPct(v, digits);
+  return fmtPctFromFraction(v, digits);
+}
+
 export function fmtPrice(v: number | null | undefined, currency = "$"): string {
   if (v === null || v === undefined || Number.isNaN(v)) return DASH;
   return `${currency}${v.toFixed(2)}`;

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import time
+import numpy as np
 import pandas as pd
 import yfinance as yf
 
@@ -212,9 +213,114 @@ def get_info(ticker: str) -> dict:
         out["info"] = t.get_info() or {}
     except Exception:
         out["info"] = {}
-    out["financials"] = _df_to_dict(_safe_stmt(t, "financials"))
-    out["balance_sheet"] = _df_to_dict(_safe_stmt(t, "balance_sheet"))
-    out["cashflow"] = _df_to_dict(_safe_stmt(t, "cashflow"))
+    info = out["info"]
+
+    # ── Store raw DataFrames for multi-period consumers (Piotroski, Beneish) ──
+    fin_df = _safe_stmt(t, "financials")
+    bs_df = _safe_stmt(t, "balance_sheet")
+    cf_df = _safe_stmt(t, "cashflow")
+    out["financials"] = _df_to_dict(fin_df)
+    out["balance_sheet"] = _df_to_dict(bs_df)
+    out["cashflow"] = _df_to_dict(cf_df)
+    out["financials_df"] = fin_df if fin_df is not None and not fin_df.empty else None
+    out["balance_sheet_df"] = bs_df if bs_df is not None and not bs_df.empty else None
+    out["cashflow_df"] = cf_df if cf_df is not None and not cf_df.empty else None
+
+    # ── Fix 1: Inject missing keys from alternative yfinance accessors ──
+    price = info.get("currentPrice") or info.get("regularMarketPrice")
+
+    # trailingEps: compute from trailingPE and price
+    if "trailingEps" not in info or info["trailingEps"] is None:
+        pe = info.get("trailingPE")
+        if pe and price and pe > 0:
+            info["trailingEps"] = price / pe
+
+    # forwardEps: try earnings_estimate DataFrame, fallback to price/forwardPE
+    if "forwardEps" not in info or info["forwardEps"] is None:
+        try:
+            ee = t.earnings_estimate
+            if ee is not None and not ee.empty and "0y" in ee.index:
+                row = ee.loc["0y"]
+                if "avg" in ee.columns:
+                    info["forwardEps"] = float(row["avg"])
+        except Exception:
+            pass
+        if "forwardEps" not in info or info["forwardEps"] is None:
+            fpe = info.get("forwardPE")
+            if fpe and price and fpe > 0:
+                info["forwardEps"] = price / fpe
+
+    # freeCashflow: from cashflow statement dict
+    cf_dict = out.get("cashflow", {})
+    if "freeCashflow" not in info or info["freeCashflow"] is None:
+        fcf = cf_dict.get("Free Cash Flow")
+        if fcf is not None:
+            info["freeCashflow"] = fcf
+
+    # operatingCashflow: from cashflow statement dict
+    if "operatingCashflow" not in info or info["operatingCashflow"] is None:
+        ocf = cf_dict.get("Operating Cash Flow") or cf_dict.get("Total Cash From Operating Activities")
+        if ocf is not None:
+            info["operatingCashflow"] = ocf
+
+    # sector / industry: yfinance populates sectorKey/industryKey alternate keys
+    if "sector" not in info or info["sector"] is None:
+        sector = info.get("sectorKey") or info.get("sectorDisp")
+        if sector:
+            info["sector"] = sector
+    if "industry" not in info or info["industry"] is None:
+        industry = info.get("industryKey") or info.get("industryDisp")
+        if industry:
+            info["industry"] = industry
+
+    # beta: try fast_info first, fallback to 2Y daily returns vs benchmark
+    if "beta" not in info or info["beta"] is None:
+        try:
+            fi_beta = t.fast_info.get("beta") if hasattr(t, "fast_info") else None
+            if fi_beta:
+                info["beta"] = float(fi_beta)
+        except Exception:
+            pass
+        if "beta" not in info or info["beta"] is None:
+            try:
+                bench = benchmark_for(ticker)
+                frame = yf.download(
+                    [ticker, bench], period="2y", auto_adjust=True,
+                    progress=False, threads=False,
+                )
+                if frame is not None and not frame.empty:
+                    if isinstance(frame.columns, pd.MultiIndex):
+                        close = frame["Close"]
+                    else:
+                        close = frame
+                    if ticker in close.columns and bench in close.columns:
+                        r = np.log(close[ticker] / close[ticker].shift(1)).dropna()
+                        br = np.log(close[bench] / close[bench].shift(1)).dropna()
+                        joined = pd.concat([r, br], axis=1, join="inner").dropna()
+                        if len(joined) > 2:
+                            var_b = joined.iloc[:, 1].var(ddof=1)
+                            if var_b and var_b > 0:
+                                info["beta"] = joined.iloc[:, 0].cov(joined.iloc[:, 1]) / var_b
+            except Exception:
+                pass
+
+    # ── Fix 6: Shares precision guard for large-cap tickers ──
+    shares_raw = info.get("sharesOutstanding")
+    if shares_raw is not None:
+        try:
+            shares_val = float(shares_raw)
+        except (TypeError, ValueError):
+            shares_val = None
+        mcap = info.get("marketCap")
+        if shares_val is not None and mcap is not None and shares_val < 1_000_000_000 and mcap > 100_000_000_000:
+            # Shares look too low for a large-cap — try fast_info fallback
+            try:
+                fi_shares = t.fast_info.get("shares_outstanding")
+                if fi_shares and float(fi_shares) > 1_000_000_000:
+                    info["sharesOutstanding"] = float(fi_shares)
+            except Exception:
+                pass
+
     return out
 
 

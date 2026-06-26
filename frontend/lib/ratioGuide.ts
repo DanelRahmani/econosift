@@ -216,3 +216,75 @@ export const TONE_DOT: Record<Tone, string> = {
   normal: "bg-warning",
   bad: "bg-danger",
 };
+
+// ──────────────────────────────────────────────────────────────────────────
+// Risk / Performance metric guides (Beta, Sharpe, Sortino, Altman Z)
+// ──────────────────────────────────────────────────────────────────────────
+
+export interface RiskMetricGuide {
+  label: string;
+  meaning: string;
+  blurb: string;
+  format: "num" | "pct";
+  /** "high" = higher better, "low" = lower better, "band" = sweet spot. */
+  dir: "high" | "low" | "band";
+  good: string;
+  normal: string;
+  bad: string;
+  exception?: string;
+}
+
+export const RISK_METRIC_GUIDES: Record<string, RiskMetricGuide> = {
+  beta: {
+    label: "Beta",
+    blurb: "Sensitivity to the S&P 500 — 1.0 = moves with market, < 1 = defensive, > 1 = aggressive",
+    meaning:
+      "Measures a stock's sensitivity to the benchmark (S&P 500). Computed from 2 years of daily log returns. A beta of 1 means the stock moves with the market; below 1 is defensive, above 1 is aggressive.",
+    format: "num",
+    dir: "band",
+    good: "0.7 – 1.3 (market-like)",
+    normal: "0.4 – 0.7 or 1.3 – 2.0",
+    bad: "< 0.4 (uncorrelated) or > 2.0 (very volatile)",
+    exception:
+      "Low-beta utilities and high-beta tech/biotech are normal for their sectors. A negative beta (rare) means the stock tends to move opposite the market.",
+  },
+  sharpe: {
+    label: "Sharpe Ratio",
+    blurb: "Return per unit of risk — > 1.0 is good, higher means better risk-adjusted performance",
+    meaning:
+      "Risk-adjusted return — excess return per unit of total volatility. (Return − RiskFree) ÷ StdDev. Annualised from daily log returns. Higher is better; > 1.0 is considered good.",
+    format: "num",
+    dir: "high",
+    good: "≥ 1.0 (strong risk-adjusted return)",
+    normal: "0.5 – 1.0 (adequate)",
+    bad: "< 0.5 (poor compensation for risk)",
+    exception:
+      "Sharpe penalises upside volatility as much as downside. Use Sortino for a downside-only view. Short lookback periods can give misleadingly high/low values.",
+  },
+  sortino: {
+    label: "Sortino Ratio",
+    blurb: "Like Sharpe but only penalises downside — higher means better downside-adjusted return",
+    meaning:
+      "Like Sharpe but only penalises downside deviation (returns below zero). Better for assessing strategies where upside volatility is welcome. Annualised from daily log returns.",
+    format: "num",
+    dir: "high",
+    good: "≥ 1.0 (strong downside-adjusted return)",
+    normal: "0.5 – 1.0 (adequate)",
+    bad: "< 0.5 (poor downside compensation)",
+    exception:
+      "A very high Sortino with a low Sharpe suggests the stock had large upside swings — not necessarily sustainable.",
+  },
+  altmanZ: {
+    label: "Altman Z-Score",
+    blurb: "Bankruptcy risk model — > 2.99 is safe, < 1.81 signals distress risk",
+    meaning:
+      "Bankruptcy-prediction model combining five financial ratios: working capital, retained earnings, EBIT, market cap, and sales — all scaled to total assets. Originally calibrated for public manufacturers.",
+    format: "num",
+    dir: "high",
+    good: "> 2.99 (Safe Zone — low bankruptcy risk)",
+    normal: "1.81 – 2.99 (Grey Zone — warrants monitoring)",
+    bad: "< 1.81 (Distress Zone — elevated bankruptcy risk)",
+    exception:
+      "Best suited for manufacturing firms. Tech, financial, and service companies may score deceptively low due to asset-light balance sheets. Use as one signal among many.",
+  },
+};

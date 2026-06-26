@@ -151,9 +151,13 @@ async def full(ticker: str):
     valuation = await asyncio.to_thread(valuation_models, bundle, beta)
     fundamentals = await asyncio.to_thread(extended_fundamentals, bundle)
     analyst = await asyncio.to_thread(analyst_data, sym)
+    kpis = _kpis(bundle.get("info", {}) or {})
+    # Fix 7: Inject computed beta when yfinance info.beta is null
+    if kpis.get("beta") is None and beta is not None:
+        kpis["beta"] = beta
     return {
         "ticker": sym,
-        "kpis": _kpis(bundle.get("info", {}) or {}),
+        "kpis": kpis,
         "valuation": valuation,
         "fundamentals": fundamentals,
         "analyst": analyst,
