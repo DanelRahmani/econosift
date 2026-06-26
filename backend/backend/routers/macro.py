@@ -806,3 +806,25 @@ from ..services.macro_regime_service import get_macro_regime
 async def macro_regime():
     """4-quadrant macro regime classifier: growth × inflation with asset allocation signals."""
     return await get_macro_regime()
+
+# ---------------------------------------------------------------------------
+# Phase 18B – Funding, Sentiment, Taylor Rule
+# ---------------------------------------------------------------------------
+
+@router.get("/funding")
+async def funding_liquidity():
+    """Funding and Liquidity gauge."""
+    from ..services.funding_service import get_funding_liquidity
+    return await asyncio.to_thread(get_funding_liquidity)
+
+@router.get("/taylor-rule")
+async def taylor_rule():
+    """US Taylor Rule and Output Gap."""
+    from ..services.econ_lab_service import calculate_taylor_rule
+    return await calculate_taylor_rule()
+
+@router.get("/sentiment")
+async def macro_sentiment():
+    """Macro Sentiment Signals via Finnhub news."""
+    from ..services.sentiment_service import get_macro_sentiment
+    return await asyncio.to_thread(get_macro_sentiment)

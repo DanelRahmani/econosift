@@ -13,6 +13,7 @@ import {
   ResponsiveContainer,
   ReferenceLine,
 } from "recharts";
+import { TaylorRuleWidget } from "./TaylorRuleWidget";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -139,6 +140,8 @@ export function EconLabTab() {
 
   return (
     <div className="space-y-6">
+      <TaylorRuleWidget />
+
       {/* Controls */}
       <Card className="p-5 space-y-5">
         <h2 className="text-base font-semibold text-text-primary">Econometric Lab — Pooled OLS</h2>

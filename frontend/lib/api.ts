@@ -400,6 +400,14 @@ export const api = {
   policyTracker: () => get<PolicyTrackerData>("/policy/tracker"),
   sovereignRisk: () => get<SovereignRiskData>("/sovereign/risk"),
   macroRegime: () => get<MacroRegimeData>("/macro/regime"),
+  macroTaylorRule: () => get<any>("/macro/taylor-rule"),
+  macroSentiment: () => get<any>("/macro/sentiment"),
+  // --- Phase 18B: Scenario Lab ---
+  macroFunding: () => get<any>("/macro/funding"),
+  scenarioHistorical: () => get<any>("/scenario/historical"),
+  scenarioStress: (holdings: Holding[]) => post<any>("/scenario/historical/stress", { holdings }),
+  scenarioCustom: (holdings: Holding[], shocks: Record<string, number>) =>
+    post<any>("/scenario/custom", { holdings, shocks }),
 };
 
 // --- Phase 17.E: React Query ---

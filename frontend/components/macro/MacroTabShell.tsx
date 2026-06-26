@@ -2,6 +2,7 @@
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { Suspense } from "react";
 import dynamic from "next/dynamic";
+import { RegimeOverlay } from "./RegimeOverlay";
 
 const TABS = [
   { id: "overview", label: "Overview" },
@@ -17,6 +18,8 @@ const TABS = [
   { id: "lab", label: "Econometric Lab" },
   { id: "country-risk", label: "Country Risk" },
   { id: "centralbanks", label: "Central Banks" },
+  { id: "funding", label: "Funding & Liquidity" },
+  { id: "sentiment", label: "Sentiment Signals" },
 ];
 
 const MacroOverviewLazy = dynamic(() =>
@@ -58,6 +61,12 @@ const CountryRiskTabLazy = dynamic(() =>
 const CentralBanksTabLazy = dynamic(() =>
   import("./CentralBanksTab").then((m) => ({ default: m.CentralBanksTab }))
 );
+const FundingLiquidityTabLazy = dynamic(() =>
+  import("./FundingLiquidityTab").then((m) => ({ default: m.FundingLiquidityTab }))
+);
+const SentimentTabLazy = dynamic(() =>
+  import("./SentimentTab").then((m) => ({ default: m.SentimentTab }))
+);
 
 function TabContent({ activeTab }: { activeTab: string }) {
   switch (activeTab) {
@@ -74,6 +83,8 @@ function TabContent({ activeTab }: { activeTab: string }) {
     case "lab":         return <EconLabLazy />;
     case "country-risk": return <CountryRiskTabLazy />;
     case "centralbanks": return <CentralBanksTabLazy />;
+    case "funding":     return <FundingLiquidityTabLazy />;
+    case "sentiment":   return <SentimentTabLazy />;
     default:            return <MacroOverviewLazy />;
   }
 }
@@ -92,6 +103,7 @@ function MacroTabShellInner() {
 
   return (
     <div>
+      <RegimeOverlay />
       {/* Tab bar */}
       <div className="flex overflow-x-auto border-b border-border mb-6 gap-0 no-scrollbar">
         {TABS.map((tab) => (
