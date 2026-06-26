@@ -1,8 +1,31 @@
 # FIXES_Phase19.md — Axiom Finance UI & Data Quality Fix Plan
 
-**Date:** 2026-06-26
-**Based on:** `UI_report.md` (2026-06-25 exhaustive pass) + `EVALUATION.md` (2026-06-26 automated pass)
-**Working agreements:** Per `CLAUDE.md` — per-step verification, Docker rebuild gate after each phase, pytest + tsc, live checks, commit+push.
+**Date:** 2026-06-26  |  **Branch:** `beta`  |  **Last commit:** `75247f2`
+**Based on:** `UI_report.md` (2026-06-25) + `EVALUATION.md` (2026-06-26)
+
+---
+
+## ═══════ PROGRESS LOG (2026-06-26 Session 1) ═══════
+
+### ✅ DEPLOYED & VERIFIED — 11 fixes, 3 commits on `beta`
+**P0:** Div Yield 0.39%, Dark chart $166-$330, Calendar clean, Calendar spinner, KPI no truncation
+**P1:** Nav overflow scroll, Mobile +Treemap/Calendar/Sectors/Theme, Treemap spinner, Dashboard null-safety, Options IV clamp ≤500%
+
+### 📝 CODED ON DISK — needs `docker compose build && commit`
+- `formatAsOf()` in `format.ts` + used in `treemap/page.tsx`
+- Portfolio `"AAPL"` → `"Ticker"` in `PortfolioInput.tsx`
+- `_retry_yf()` in `yfinance_service.py` (2 retries for 401/crumb)
+- DNS `8.8.8.8`/`8.8.4.4` in `docker-compose.yml`
+
+### ❌ NOT STARTED — 11 steps
+Steps 9, 12, 13, 15, 16, 17, 19, 21, 22, 23, 27
+
+### 🔧 MANUAL DEPLOY
+```
+cd C:\Users\danel\Coding\axiomfinance
+git add -A && git commit -m "Phase 19C/D" && git push origin beta
+docker compose build --no-cache frontend backend && docker compose up -d --force-recreate
+```
 
 ---
 
