@@ -1645,3 +1645,79 @@ export interface CentralBanksData {
   current: Record<string, CbCurrent>;
   balance_sheet: Array<{ date: string; value: number }>;
 }
+
+// ── Phase 18A ──────────────────────────────────────────────────
+
+export interface CreditPulseData {
+  current: {
+    ig_oas: number | null;
+    hy_oas: number | null;
+    bbb_spread: number | null;
+    funding_spread: number | null;
+    hy_ig_ratio: number | null;
+  };
+  history: {
+    ig_oas: MacroTimeSeries[];
+    hy_oas: MacroTimeSeries[];
+    bbb_spread: MacroTimeSeries[];
+    funding_spread: MacroTimeSeries[];
+  };
+  signals: { ig_oas: string; hy_oas: string; stress: boolean };
+}
+
+export interface YieldCurvePoint { tenor: string; years: number; yield: number | null; }
+export interface YieldCurvesData {
+  us_curve: {
+    points: YieldCurvePoint[];
+    spread_2y10y: number | null;
+    spread_3m10y: number | null;
+    inverted: boolean;
+  };
+  real_yields: YieldCurvePoint[];
+  breakevens: Record<string, number | null>;
+  term_premium: { current: number | null; history: MacroTimeSeries[] };
+  foreign_10y: Record<string, { yield_10y: number | null; spread_vs_us: number | null }>;
+}
+
+export interface PolicyDivergenceEntry {
+  cb: string;
+  current_rate: number | null;
+  change_3m: number | null;
+  change_12m: number | null;
+  stance: "tightening" | "easing" | "on_hold" | "unknown";
+  divergence_rank: number;
+}
+export interface PolicyTrackerData {
+  divergence: PolicyDivergenceEntry[];
+  carry_differentials: Record<string, number | null>;
+}
+
+export interface SovereignCountry {
+  iso3: string;
+  name: string;
+  yield_10y: number | null;
+  spread_vs_us: number | null;
+  composite_score: number;
+  signal: "green" | "yellow" | "red";
+  wb_indicators: Record<string, number | null>;
+  wb_signals: Record<string, string>;
+}
+export interface SovereignRiskData {
+  countries: SovereignCountry[];
+  top_risk: SovereignCountry[];
+  bottom_risk: SovereignCountry[];
+}
+
+export interface MacroRegimeData {
+  regime: "Goldilocks" | "Reflationary" | "Stagflation" | "Deflationary";
+  growth_signal: "rising" | "falling";
+  inflation_signal: "above" | "below";
+  metrics: {
+    lei_current: number | null;
+    lei_change_3m: number | null;
+    cpi_yoy: number | null;
+    fed_funds: number | null;
+    yield_spread_2y10y: number | null;
+  };
+  asset_signals: Record<string, "overweight" | "underweight" | "neutral">;
+}

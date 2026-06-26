@@ -30,6 +30,7 @@ import type {
   RegressResponse,
   CountryRiskData, CentralBanksData,
   PricePoint, RiskMetric,
+  CreditPulseData, YieldCurvesData, PolicyTrackerData, SovereignRiskData, MacroRegimeData,
 } from "./types";
 
 async function get<T>(path: string): Promise<T> {
@@ -392,6 +393,13 @@ export const api = {
     get<CountryRiskData>(`/macro/country-risk${countries ? `?countries=${countries}` : ""}`),
   macroCentralBanks: () =>
     get<CentralBanksData>(`/macro/centralbanks`),
+
+  // --- Phase 18A: Credit, Yield, Policy, Sovereign, Regime ---
+  creditPulse: () => get<CreditPulseData>("/credit/pulse"),
+  yieldCurves: () => get<YieldCurvesData>("/yield/curves"),
+  policyTracker: () => get<PolicyTrackerData>("/policy/tracker"),
+  sovereignRisk: () => get<SovereignRiskData>("/sovereign/risk"),
+  macroRegime: () => get<MacroRegimeData>("/macro/regime"),
 };
 
 // --- Phase 17.E: React Query ---
