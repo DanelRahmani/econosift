@@ -82,33 +82,11 @@ def macro_events(start: str, end: str) -> list[dict]:
                 impact=3,
             ))
 
-    # (b) FRED release calendar (requires API key)
-    if FRED_API_KEY:
-        try:
-            resp = requests.get(
-                "https://api.stlouisfed.org/fred/releases/dates",
-                params={
-                    "api_key": FRED_API_KEY,
-                    "file_type": "json",
-                    "include_release_dates_with_no_data": "false",
-                    "realtime_start": start,
-                    "realtime_end": end,
-                },
-                timeout=20,
-            )
-            resp.raise_for_status()
-            data = resp.json()
-            for rel in data.get("release_dates", []):
-                d = rel.get("date", "")
-                if start <= d <= end:
-                    events.append(_event(
-                        date=d,
-                        category="macro",
-                        title=rel.get("release_name", "FRED Release"),
-                        country="US",
-                    ))
-        except Exception:
-            pass
+    # (b) FRED release calendar — dropped (Phase 19): raw FRED release dates
+    # are not actionable economic calendar events (e.g. "Coinbase Cryptocurrencies"
+    # "Tri-Party General Collateral Rate Data").  Finnhub economic calendar (below)
+    # and central-bank meetings provide the curated macro event feed.
+    # See: UI_report.md C-01
 
     # (c) Finnhub economic calendar
     for item in finnhub_service.economic_calendar(start, end):

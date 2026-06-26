@@ -157,7 +157,7 @@ export const RATIO_GUIDE: Record<string, RatioGuide> = {
   },
   dividendYield: {
     meaning: "Annual dividend ÷ share price.",
-    dir: "band", t1: 0.005, t2: 0.08, lo: 0.02, hi: 0.06, isPct: true,
+    dir: "band", t1: 0.5, t2: 8, lo: 2, hi: 6, isPct: false, suffix: "%",
     exception: "A yield above ~8% often signals the market expects a dividend cut.",
   },
   eps: {

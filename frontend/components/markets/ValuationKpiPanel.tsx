@@ -180,7 +180,7 @@ export function ValuationKpiPanel({ kpis, wacc, fundamentals }: Props) {
     { label: "Forward P/E", value: fmtNum(kpis.forwardPE) },
     { label: "EPS (TTM)", value: nil(kpis.trailingEps) ? DASH : `${sym}${fmtNum(kpis.trailingEps)}` },
     { label: "Fwd EPS", value: nil(kpis.forwardEps) ? DASH : `${sym}${fmtNum(kpis.forwardEps)}` },
-    { label: "Div. Yield", value: nil(kpis.dividendYield) ? DASH : fmtDecPct(kpis.dividendYield) },
+    { label: "Div. Yield", value: nil(kpis.dividendYield) ? DASH : fmtPct(kpis.dividendYield) },
     { label: "52W Range", value: rangeStr },
     { label: "Beta", value: fmtNum(kpis.beta) },
   ];
@@ -206,7 +206,7 @@ export function ValuationKpiPanel({ kpis, wacc, fundamentals }: Props) {
     <div className="space-y-4">
 
       {/* ── KPI Strip ─────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-9 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
         {kpiTiles.map((t) => (
           <KpiTile key={t.label} label={t.label} value={t.value} />
         ))}

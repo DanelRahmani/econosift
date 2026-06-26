@@ -4,19 +4,21 @@ import { useState } from "react";
 import { api } from "@/lib/api";
 import type { ScreenerResponse, ScreenerRow } from "@/lib/types";
 import { Card, Skeleton } from "@/components/ui";
-import { fmtNum, fmtPctFromFraction, exportToCsv } from "@/lib/format";
+import { fmtNum, fmtPct, fmtPctFromFraction, exportToCsv } from "@/lib/format";
 
 // Screener fields with how to read & render them.
-const FIELDS: { key: string; label: string; group: keyof ScreenerRow | null; pct?: boolean }[] = [
+// pct: "fraction" = yfinance returns decimal fraction (e.g. 0.45 = 45%)
+// pct: "direct"  = yfinance returns percentage directly (e.g. 0.39 = 0.39%)
+const FIELDS: { key: string; label: string; group: keyof ScreenerRow | null; pct?: "fraction" | "direct" }[] = [
   { key: "peRatio", label: "P/E", group: "valuation" },
   { key: "forwardPE", label: "Fwd P/E", group: "valuation" },
   { key: "pbRatio", label: "P/B", group: "valuation" },
-  { key: "dividendYield", label: "Div Yield", group: "valuation", pct: true },
+  { key: "dividendYield", label: "Div Yield", group: "valuation", pct: "direct" },
   { key: "debtToEquity", label: "D/E", group: "leverage" },
   { key: "currentRatio", label: "Current", group: "liquidity" },
-  { key: "roe", label: "ROE", group: "profitability", pct: true },
-  { key: "netMargin", label: "Net Margin", group: "profitability", pct: true },
-  { key: "grossMargin", label: "Gross Margin", group: "profitability", pct: true },
+  { key: "roe", label: "ROE", group: "profitability", pct: "fraction" },
+  { key: "netMargin", label: "Net Margin", group: "profitability", pct: "fraction" },
+  { key: "grossMargin", label: "Gross Margin", group: "profitability", pct: "fraction" },
   { key: "sharpe", label: "Sharpe", group: null },
   { key: "beta", label: "Beta", group: null },
   { key: "zScore", label: "Z-Score", group: null },
@@ -34,7 +36,9 @@ function readValue(row: ScreenerRow, key: string): number | null {
 function renderValue(row: ScreenerRow, key: string): string {
   const f = FIELDS.find((x) => x.key === key);
   const v = readValue(row, key);
-  return f?.pct ? fmtPctFromFraction(v) : fmtNum(v);
+  if (f?.pct === "fraction") return fmtPctFromFraction(v);
+  if (f?.pct === "direct") return fmtPct(v);
+  return fmtNum(v);
 }
 
 const DEFAULT_UNIVERSE = "AAPL, MSFT, NVDA, GOOGL, AMZN, META, KO, PG, JPM, XOM, JNJ, WMT";

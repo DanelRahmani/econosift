@@ -48,7 +48,7 @@ const ALL_COLS: ColDef[] = [
     tone: (r) => { const t = ratioTone("peRatio", r.pe); return t ? TONE_TEXT[t] : undefined; } },
   { key: "forwardPE",      label: "Fwd P/E",         render: (r) => fmtNum(r.forwardPE) },
   { key: "eps",            label: "EPS",             render: (r) => fmtNum(r.eps) },
-  { key: "dividendYield",  label: "Div Yield",       render: (r) => pct(r.dividendYield),
+  { key: "dividendYield",  label: "Div Yield",       render: (r) => fmtPct(r.dividendYield),
     tone: (r) => { const t = ratioTone("dividendYield", r.dividendYield); return t ? TONE_TEXT[t] : undefined; } },
   { key: "beta",           label: "Beta",            render: (r) => fmtNum(r.beta) },
   { key: "pb",             label: "P/B",             render: (r) => fmtNum(r.pb),

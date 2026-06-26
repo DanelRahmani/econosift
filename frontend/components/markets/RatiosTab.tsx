@@ -4,15 +4,18 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import type { RatiosResponse, RatioGroup } from "@/lib/types";
 import { Card, Skeleton, ZScoreBadge } from "@/components/ui";
-import { fmtNum, fmtPctFromFraction } from "@/lib/format";
+import { fmtNum, fmtPct, fmtPctFromFraction } from "@/lib/format";
 import {
   RATIO_GUIDE, ratioTone, ratioRanges, TONE_TEXT, TONE_DOT,
 } from "@/lib/ratioGuide";
 
 const PCT_KEYS = new Set([
   "grossMargin", "operatingMargin", "netMargin", "ebitdaMargin",
-  "roa", "roe", "fcfMargin", "dividendYield",
+  "roa", "roe", "fcfMargin",
 ]);
+
+// yfinance returns dividendYield as a percentage (e.g. 0.39 = 0.39%), not a fraction
+const PCT_DIRECT_KEYS = new Set(["dividendYield"]);
 
 const LABELS: Record<string, string> = {
   currentRatio: "Current Ratio", quickRatio: "Quick Ratio", cashRatio: "Cash Ratio",
@@ -58,7 +61,9 @@ const DESCRIPTIONS: Record<string, string> = {
 };
 
 function fmt(key: string, v: number | null): string {
-  return PCT_KEYS.has(key) ? fmtPctFromFraction(v) : fmtNum(v);
+  if (PCT_KEYS.has(key)) return fmtPctFromFraction(v);
+  if (PCT_DIRECT_KEYS.has(key)) return fmtPct(v);
+  return fmtNum(v);
 }
 
 function RatioRow({ k, v }: { k: string; v: number | null }) {

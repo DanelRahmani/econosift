@@ -199,8 +199,8 @@ export function TechnicalsTab({ ticker }: { ticker: string }) {
     );
     return vals;
   });
-  const yMin = allPriceVals.length ? Math.min(...allPriceVals) * 0.98 : "auto";
-  const yMax = allPriceVals.length ? Math.max(...allPriceVals) * 1.02 : "auto";
+  const yMin = allPriceVals.length ? Math.floor(Math.min(...allPriceVals) * 0.97) : "auto";
+  const yMax = allPriceVals.length ? Math.ceil(Math.max(...allPriceVals) * 1.03) : "auto";
 
   // Pivot reference lines for selected timeframe
   const pivotSet: PivotSet | undefined = pivotPoints?.daily;
@@ -310,6 +310,7 @@ export function TechnicalsTab({ ticker }: { ticker: string }) {
                 <XAxis dataKey="date" tick={{ fill: pal.axis, fontSize: 11 }} minTickGap={40} />
                 <YAxis
                   tick={{ fill: pal.axis, fontSize: 11 }}
+                  tickFormatter={(v: number) => `$${v.toFixed(0)}`}
                   domain={[yMin, yMax]}
                   width={60}
                 />

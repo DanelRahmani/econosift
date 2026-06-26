@@ -305,7 +305,12 @@ export default function CalendarPage() {
 
       {/* Body */}
       {loading && !data ? (
-        <Skeleton className="h-[640px]" />
+        <Card>
+          <div className="flex flex-col items-center justify-center h-[640px] gap-3">
+            <div className="animate-spin h-8 w-8 border-2 border-accent border-t-transparent rounded-full" />
+            <p className="text-text-muted text-sm">Loading calendar…</p>
+          </div>
+        </Card>
       ) : error || !data ? (
         <Card>
           <div className="text-text-muted text-sm py-10 text-center">
