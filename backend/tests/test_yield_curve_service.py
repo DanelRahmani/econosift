@@ -37,7 +37,7 @@ async def test_yield_curves_structure():
     assert "foreign_10y" in result
     assert "breakevens" in result
     assert "term_premium" in result
-    assert result["us_curve"]["spread_2y10y"] == pytest.approx(4.80 - 4.20)
+    assert result["us_curve"]["spread_2y10y"] == pytest.approx(4.20 - 4.80)
     assert result["us_curve"]["inverted"] is True  # 2Y > 10Y
     assert "Germany" in result["foreign_10y"]
 

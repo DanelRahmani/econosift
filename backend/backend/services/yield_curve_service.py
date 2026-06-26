@@ -80,8 +80,8 @@ async def get_yield_curves() -> dict:
     dgs10 = _latest(data.get("DGS10",  []))
     dgs3m = _latest(data.get("DGS3MO", []))
 
-    spread_2y10y  = round(dgs2  - dgs10, 4) if dgs2  is not None and dgs10 is not None else None
-    spread_3m10y  = round(dgs3m - dgs10, 4) if dgs3m is not None and dgs10 is not None else None
+    spread_2y10y  = round(dgs10 - dgs2,  4) if dgs10 is not None and dgs2  is not None else None
+    spread_3m10y  = round(dgs10 - dgs3m, 4) if dgs10 is not None and dgs3m is not None else None
 
     # Real yields (TIPS)
     real_points = [
@@ -120,7 +120,7 @@ async def get_yield_curves() -> dict:
             "points":       curve_points,
             "spread_2y10y": spread_2y10y,
             "spread_3m10y": spread_3m10y,
-            "inverted":     bool(spread_2y10y is not None and spread_2y10y > 0),
+            "inverted":     bool(spread_2y10y is not None and spread_2y10y < 0),
         },
         "real_yields":  real_points,
         "breakevens":   breakevens,
