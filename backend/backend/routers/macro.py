@@ -793,3 +793,16 @@ async def country_risk(countries: str | None = None):
 @router.get("/centralbanks")
 async def centralbanks():
     return await _cbs.get_centralbanks()
+
+
+# ---------------------------------------------------------------------------
+# Phase 18A – Macro Regime Classifier
+# ---------------------------------------------------------------------------
+
+from ..services.macro_regime_service import get_macro_regime
+
+
+@router.get("/regime")
+async def macro_regime():
+    """4-quadrant macro regime classifier: growth × inflation with asset allocation signals."""
+    return await get_macro_regime()
