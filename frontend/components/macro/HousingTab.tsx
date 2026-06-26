@@ -106,7 +106,7 @@ export function HousingTab() {
 
   const salesData = (history.existingHomeSales ?? []).map((pt) => ({
     date: pt.date.slice(0, 7),
-    "Existing Home Sales (M)": pt.value != null ? pt.value / 1000 : null,
+    "Existing Home Sales (M)": pt.value != null ? pt.value / 1_000_000 : null,
   }));
 
   return (
@@ -130,7 +130,7 @@ export function HousingTab() {
         />
         <KpiCard
           label="Existing Home Sales (M)"
-          value={kpis.existingHomeSales != null ? kpis.existingHomeSales / 1000 : null}
+          value={kpis.existingHomeSales != null ? kpis.existingHomeSales / 1_000_000 : null}
           unit="M"
         />
       </div>
@@ -216,7 +216,7 @@ export function HousingTab() {
             <LineChart data={salesData}>
               <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
               <XAxis dataKey="date" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
-              <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `${v}M`} />
+              <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `${v}M`} domain={[3, 5]} />
               <Tooltip formatter={(v: number) => [`${v?.toFixed(2)}M`]} />
               <RecessionAreas />
               <Line

@@ -6,6 +6,7 @@ import io
 import logging
 import zipfile
 from datetime import date
+from io import StringIO
 
 import pandas as pd
 import requests
@@ -14,7 +15,11 @@ from ..cache import async_cached
 
 log = logging.getLogger(__name__)
 
-COT_URL = "https://www.cftc.gov/dcom/files/dcotnoc.zip"
+COT_URLS = [
+    "https://www.cftc.gov/dea/newcot/deafut.txt",  # live weekly futures-only
+    "https://www.cftc.gov/files/dea/history/fut_fin_xls_2026.zip",
+    "https://www.cftc.gov/dcom/files/dcotnoc.zip",  # legacy format
+]
 
 COT_CONTRACTS = [
     {"name": "S&P 500 E-mini", "code": "13874+"},
@@ -25,12 +30,18 @@ COT_CONTRACTS = [
     {"name": "10Y T-Note", "code": "043602"},
 ]
 
-# Column name candidates for each field (CFTC changes column names across file versions)
-DATE_COLS = ["Report_Date_as_YYYY_MM_DD", "As_of_Date_In_Form_YYMMDD", "As_of_Date_In_Form_YYYY-MM-DD"]
-CODE_COLS = ["CFTC_Contract_Market_Code", "Contract_Market_Code", "CFTC Market Code in Initials"]
-LONG_COLS = ["NonComm_Positions_Long_All", "Noncommercial Long", "Non-Commercial Long"]
-SHORT_COLS = ["NonComm_Positions_Short_All", "Noncommercial Short", "Non-Commercial Short"]
-OI_COLS = ["Open_Interest_All", "Open Interest", "Open_Interest"]
+# Column name candidates (CFTC changes names across file versions)
+DATE_COLS = ["Report_Date_as_YYYY_MM_DD", "As_of_Date_In_Form_YYMMDD",
+             "As_of_Date_In_Form_YYYY-MM-DD", "Date", "Report Date",
+             "Report_Date", "As_of_Date"]
+CODE_COLS = ["CFTC_Contract_Market_Code", "Contract_Market_Code",
+             "CFTC Market Code in Initials", "Market_and_Exchange_Names",
+             "Market and Exchange Name", "Market_And_Exchange_Name"]
+LONG_COLS = ["NonComm_Positions_Long_All", "Noncommercial Long", "Non-Commercial Long",
+             "NonComm_Long", "Noncommercial_Positions_Long", "NonComm_Pos_Long"]
+SHORT_COLS = ["NonComm_Positions_Short_All", "Noncommercial Short", "Non-Commercial Short",
+              "NonComm_Short", "Noncommercial_Positions_Short", "NonComm_Pos_Short"]
+OI_COLS = ["Open_Interest_All", "Open Interest", "Open_Interest", "Tot_Open_Interest"]
 
 
 def _pick_col(df: pd.DataFrame, candidates: list[str]) -> str | None:
@@ -47,24 +58,37 @@ def _pick_col(df: pd.DataFrame, candidates: list[str]) -> str | None:
 
 
 def _download_cot_sync() -> pd.DataFrame:
-    resp = requests.get(COT_URL, timeout=60)
-    resp.raise_for_status()
-    zf = zipfile.ZipFile(io.BytesIO(resp.content))
-    # Find the CSV/TXT file inside the ZIP
-    csv_name = next(
-        (n for n in zf.namelist() if n.lower().endswith(".txt") or n.lower().endswith(".csv")),
-        None,
-    )
-    if csv_name is None:
-        raise ValueError(f"No CSV/TXT found in COT ZIP. Contents: {zf.namelist()}")
-    df = pd.read_csv(zf.open(csv_name), skipinitialspace=True, low_memory=False)
-    # Strip string columns
-    for col in df.select_dtypes(include="object").columns:
+    """Try multiple URLs for COT data, returning the first successful parse."""
+    last_err = None
+    for url in COT_URLS:
         try:
-            df[col] = df[col].str.strip()
-        except Exception:
-            pass
-    return df
+            resp = requests.get(url, timeout=60)
+            resp.raise_for_status()
+            if url.endswith(".zip"):
+                zf = zipfile.ZipFile(io.BytesIO(resp.content))
+                csv_name = next(
+                    (n for n in zf.namelist() if n.lower().endswith((".txt", ".csv"))),
+                    None,
+                )
+                if csv_name is None:
+                    raise ValueError(f"No CSV/TXT in ZIP: {zf.namelist()}")
+                df = pd.read_csv(zf.open(csv_name), skipinitialspace=True, low_memory=False)
+            else:
+                # Plain text file
+                df = pd.read_csv(io.StringIO(resp.text), skipinitialspace=True, low_memory=False)
+            # Strip string columns
+            for col in df.select_dtypes(include="object").columns:
+                try:
+                    df[col] = df[col].str.strip()
+                except Exception:
+                    pass
+            if not df.empty:
+                return df
+        except Exception as exc:
+            last_err = exc
+            log.debug("COT URL %s failed: %s", url, exc)
+            continue
+    raise ValueError(f"All COT URLs failed. Last error: {last_err}")
 
 
 def _parse_cot(df: pd.DataFrame) -> list[dict]:

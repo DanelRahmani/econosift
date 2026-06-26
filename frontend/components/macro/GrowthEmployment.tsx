@@ -51,6 +51,7 @@ export function GrowthEmployment() {
   const [data, setData] = useState<EmploymentData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [nfpRange, setNfpRange] = useState<"5Y" | "All">("5Y");
 
   useEffect(() => {
     api
@@ -152,7 +153,7 @@ export function GrowthEmployment() {
         />
         <KpiCard
           label="Initial Claims"
-          value={kpis.joblessClaims}
+          value={kpis.joblessClaims != null ? kpis.joblessClaims / 1_000 : null}
           unit="K"
         />
         <KpiCard label="Labor Participation" value={kpis.laborParticipation} />
@@ -217,29 +218,37 @@ export function GrowthEmployment() {
       )}
 
       {/* NFP bar chart */}
-      {nfpData.length > 0 && (
+      {nfpData.length > 0 && (() => {
+        const cutoff = nfpRange === "5Y" ? new Date(new Date().setFullYear(new Date().getFullYear() - 5)).toISOString().slice(0, 7) : null;
+        const filtered = cutoff ? nfpData.filter((d: any) => d.date >= cutoff) : nfpData;
+        return (
         <Card className="p-4">
-          <h3 className="font-semibold mb-3">Non-Farm Payrolls (Monthly Change, thousands)</h3>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-semibold">Non-Farm Payrolls (Monthly Change, thousands)</h3>
+            <div className="flex gap-1">
+              <button onClick={() => setNfpRange("5Y")}
+                className={`px-2 py-1 text-xs rounded border transition-colors ${nfpRange === "5Y" ? "border-accent bg-accent/10 text-accent" : "border-border text-text-muted hover:text-text-primary"}`}>5Y</button>
+              <button onClick={() => setNfpRange("All")}
+                className={`px-2 py-1 text-xs rounded border transition-colors ${nfpRange === "All" ? "border-accent bg-accent/10 text-accent" : "border-border text-text-muted hover:text-text-primary"}`}>All</button>
+            </div>
+          </div>
+          <p className="text-xs text-text-secondary mb-2">{nfpRange === "5Y" ? "Last 5 years — pandemic extremes excluded." : "Full history including pandemic."}</p>
           <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={nfpData}>
+            <BarChart data={filtered}>
               <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
               <XAxis dataKey="date" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
-              <YAxis tick={{ fontSize: 11 }} />
+              <YAxis tick={{ fontSize: 11 }} domain={["auto", "auto"]} />
               <Tooltip formatter={(v: number) => [`${v?.toFixed(0)}K`, "NFP"]} />
               <Bar dataKey="NFP" radius={[2, 2, 0, 0]}>
-                {nfpData.map((entry, i) => (
-                  <Cell
-                    key={i}
-                    fill={
-                      entry.NFP != null && entry.NFP >= 0 ? "#10b981" : "#ef4444"
-                    }
-                  />
+                {filtered.map((entry: any, i: number) => (
+                  <Cell key={i} fill={entry.NFP != null && entry.NFP >= 0 ? "#10b981" : "#ef4444"} />
                 ))}
               </Bar>
             </BarChart>
           </ResponsiveContainer>
         </Card>
-      )}
+        );
+      })()}
 
       {/* JOLTS */}
       {joltsData.length > 0 && (

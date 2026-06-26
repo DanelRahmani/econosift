@@ -9,7 +9,7 @@ from ..cache import cached
 POSITIVE_WORDS = {"surge", "growth", "rebound", "soar", "jump", "rally", "easing", "stimulus", "cut", "upbeat", "strong", "gains", "bull"}
 NEGATIVE_WORDS = {"crash", "plunge", "recession", "slump", "fear", "panic", "tightening", "hike", "downbeat", "weak", "losses", "bear", "crisis", "inflation"}
 
-@cached(ttl_seconds=3600)
+@cached("macro_sentiment")
 def get_macro_sentiment() -> dict:
     """Fetch general news from Finnhub and compute a simple macro sentiment score."""
     # Finnhub general news: category=general

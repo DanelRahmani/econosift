@@ -109,11 +109,11 @@ export function InflationTab() {
     "CPI YoY": history.cpiYoY?.[i]?.value ?? null,
   }));
 
-  // Chart 5: Quantity Theory — M2 growth vs Nominal GDP growth
+  // Chart 5: Quantity Theory — M2 growth vs Nominal GDP growth (dual axis)
   const qtData = (data.quantityTheory?.nominalGdp ?? []).map((pt, i) => ({
     date: pt.date.slice(0, 7),
-    "Nominal GDP YoY": pt.value,
-    "M2 YoY": data.quantityTheory?.m2?.[i]?.value ?? null,
+    "Nominal GDP YoY %": pt.value,
+    "M2 YoY %": data.quantityTheory?.m2?.[i]?.value ?? null,
   }));
 
   return (
@@ -235,17 +235,18 @@ export function InflationTab() {
         <Card className="p-4">
           <h3 className="font-semibold mb-1">Quantity Theory of Money (MV = PQ)</h3>
           <p className="text-xs text-text-secondary mb-3">
-            M2 growth drives nominal GDP: if velocity (V) is stable, money growth → price level growth
+            M2 growth (right axis) vs Nominal GDP growth (left axis). If velocity is stable, money growth drives nominal GDP.
           </p>
           <ResponsiveContainer width="100%" height={220}>
             <LineChart data={qtData}>
               <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
               <XAxis dataKey="date" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
-              <YAxis tickFormatter={(v) => `${v}%`} tick={{ fontSize: 11 }} />
+              <YAxis yAxisId="left" tickFormatter={(v) => `${v}%`} tick={{ fontSize: 11 }} domain={[-10, 30]} />
+              <YAxis yAxisId="right" orientation="right" tickFormatter={(v) => `${v}%`} tick={{ fontSize: 11 }} domain={[-10, 30]} />
               <Tooltip formatter={(v: number) => [`${v?.toFixed(2)}%`]} />
               <Legend />
-              <Line type="monotone" dataKey="Nominal GDP YoY" stroke="#3b82f6" dot={false} strokeWidth={2} />
-              <Line type="monotone" dataKey="M2 YoY" stroke="#8b5cf6" dot={false} strokeWidth={1.5} strokeDasharray="5 5" />
+              <Line yAxisId="left" type="monotone" dataKey="Nominal GDP YoY %" stroke="#3b82f6" dot={false} strokeWidth={2} />
+              <Line yAxisId="right" type="monotone" dataKey="M2 YoY %" stroke="#8b5cf6" dot={false} strokeWidth={1.5} strokeDasharray="5 5" />
             </LineChart>
           </ResponsiveContainer>
         </Card>

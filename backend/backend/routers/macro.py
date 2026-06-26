@@ -189,6 +189,7 @@ async def inflation():
     core_pce_yoy = _yoy(data.get("PCEPILFE", []))
     ppi_yoy = _yoy(data.get("PPIFIS", []))
     m2_yoy = _yoy(data.get("M2SL", []))
+    gdp_yoy = _yoy(data.get("GDP", []))
 
     return {
         "asOf": cpi_yoy[-1]["date"] if cpi_yoy else None,
@@ -212,8 +213,8 @@ async def inflation():
             "m2Yoy": m2_yoy,
         },
         "quantityTheory": {
-            "nominalGdp": data.get("GDP", []),
-            "m2": data.get("M2SL", []),
+            "nominalGdpYoY": gdp_yoy,
+            "m2YoY": m2_yoy,
         },
     }
 
@@ -318,144 +319,134 @@ async def housing():
     }
 
 
-# Commodity futures tickers and display names
-_COMMODITY_TICKERS = [
-    ("CL=F", "WTI Crude Oil", "Energy"),
-    ("BZ=F", "Brent Crude", "Energy"),
-    ("RB=F", "RBOB Gasoline", "Energy"),
-    ("HO=F", "Heating Oil", "Energy"),
-    ("NG=F", "Natural Gas", "Energy"),
-    ("GC=F", "Gold", "Metals"),
-    ("SI=F", "Silver", "Metals"),
-    ("HG=F", "Copper", "Metals"),
-    ("PA=F", "Palladium", "Metals"),
-    ("PL=F", "Platinum", "Metals"),
-    ("ZW=F", "Wheat", "Agriculture"),
-    ("ZC=F", "Corn", "Agriculture"),
-    ("ZS=F", "Soybeans", "Agriculture"),
-    ("LE=F", "Live Cattle", "Agriculture"),
-    ("LBS=F", "Lumber", "Agriculture"),
+# Commodity config: (display name, sector, FRED series for spot price)
+_COMMODITY_CONFIG = [
+    ("WTI Crude Oil", "Energy", "DCOILWTICO"),
+    ("Brent Crude", "Energy", "DCOILBRENTEU"),
+    ("Natural Gas", "Energy", "DHHNGSP"),
+    ("Gold", "Metals", "GOLDAMGBD228NLBR"),
+    ("Silver", "Metals", "DSLVUSDM"),
+    ("Copper", "Metals", "PCOPPUSDM"),
+    ("Wheat", "Agriculture", "PWHEAMTUSDM"),
+    ("Corn", "Agriculture", "PMAIZEUSDM"),
+    ("Soybeans", "Agriculture", "PSOYBUSDM"),
 ]
 
-_AXIOM_BASKET = ["CL=F", "GC=F", "NG=F", "HG=F", "ZW=F"]
+_YF_FALLBACK = {
+    "WTI Crude Oil": "CL=F", "Brent Crude": "BZ=F", "Natural Gas": "NG=F",
+    "Gold": "GC=F", "Silver": "SI=F", "Copper": "HG=F",
+    "Wheat": "ZW=F", "Corn": "ZC=F", "Soybeans": "ZS=F",
+}
+
+_AXIOM_BASKET_FRED = ["DCOILWTICO", "GOLDAMGBD228NLBR", "DHHNGSP", "PCOPPUSDM", "PWHEAMTUSDM"]
 
 
 def _get_commodities_sync() -> dict:
+    """Fetch commodity prices primarily from FRED, with yfinance for 1D/1W changes."""
     import yfinance as yf
-    from datetime import datetime
-
-    tickers = [t[0] for t in _COMMODITY_TICKERS]
-    try:
-        raw = yf.download(
-            tickers,
-            period="1y",
-            auto_adjust=True,
-            progress=False,
-            group_by="ticker",
-        )
-    except Exception as exc:
-        log.warning("yfinance commodities download failed: %s", exc)
-        return {"kpis": {}, "table": [], "ratios": {"goldOilRatio": []}, "axiomIndex": [], "asOf": str(date.today())}
 
     today = str(date.today())
+    from ..services.macro_expansion_service import _fetch_fred_series_sync
+
+    fred_ids = [c[2] for c in _COMMODITY_CONFIG]
+    fred_data = _fetch_fred_series_sync(fred_ids, start=(date.today() - timedelta(days=365)).isoformat())
+
     table_rows = []
+    for name, sector, fred_id in _COMMODITY_CONFIG:
+        series = fred_data.get(fred_id, [])
+        price = round(series[-1]["value"], 4) if series else None
+        change1m = None
+        if len(series) >= 22:
+            prev = series[-22]["value"]
+            if prev and price:
+                change1m = round((price / prev - 1) * 100, 2)
+        table_rows.append({
+            "ticker": fred_id, "name": name, "sector": sector,
+            "price": price, "change1d": None, "change1w": None,
+            "change1m": change1m, "changeYtd": None,
+        })
 
-    for ticker, name, sector in _COMMODITY_TICKERS:
-        try:
-            if len(tickers) == 1:
-                closes = raw["Close"]
-            else:
-                closes = raw["Close"][ticker] if ticker in raw["Close"].columns else raw[ticker]["Close"]
+    # yfinance fallback for 1D/1W changes only
+    try:
+        for name, yf_tick in _YF_FALLBACK.items():
+            try:
+                tk = yf.Ticker(yf_tick)
+                hist = tk.history(period="5d")
+                if hist is None or hist.empty:
+                    continue
+                closes = hist["Close"].dropna()
+                if len(closes) < 2:
+                    continue
+                ch1d = round((float(closes.iloc[-1]) / float(closes.iloc[-2]) - 1) * 100, 2) if len(closes) >= 2 else None
+                ch1w = round((float(closes.iloc[-1]) / float(closes.iloc[0]) - 1) * 100, 2) if len(closes) >= 5 else None
+                for row in table_rows:
+                    if row["name"] == name:
+                        row["change1d"] = ch1d
+                        row["change1w"] = ch1w
+                        if row["price"] is None:
+                            row["price"] = round(float(closes.iloc[-1]), 4)
+                        break
+            except Exception:
+                pass
+    except Exception as exc:
+        log.debug("yfinance commodity fallback failed: %s", exc)
 
-            closes = closes.dropna()
-            if closes.empty:
-                continue
-
-            price = round(float(closes.iloc[-1]), 4)
-
-            def pct(n: int) -> float | None:
-                if len(closes) > n:
-                    return round((float(closes.iloc[-1]) / float(closes.iloc[-n - 1]) - 1) * 100, 2)
-                return None
-
-            # YTD: from first trading day of current year
-            year_start = str(date.today().year) + "-01-01"
-            ytd_closes = closes[closes.index >= year_start]
-            ytd = None
-            if len(ytd_closes) > 1:
-                ytd = round((float(ytd_closes.iloc[-1]) / float(ytd_closes.iloc[0]) - 1) * 100, 2)
-
-            table_rows.append({
-                "ticker": ticker,
-                "name": name,
-                "sector": sector,
-                "price": price,
-                "change1d": pct(1),
-                "change1w": pct(5),
-                "change1m": pct(21),
-                "changeYtd": ytd,
-            })
-        except Exception as exc:
-            log.debug("Commodity %s parse error: %s", ticker, exc)
-            continue
-
-    # KPIs
-    def row_val(t: str, field: str = "price") -> float | None:
+    def row_val(nm: str, field: str = "price") -> float | None:
         for r in table_rows:
-            if r["ticker"] == t:
+            if r["name"] == nm:
                 return r.get(field)
         return None
 
     kpis = {
-        "wti": row_val("CL=F"),
-        "gold": row_val("GC=F"),
-        "natGas": row_val("NG=F"),
-        "copper": row_val("HG=F"),
-        "wheat": row_val("ZW=F"),
-        "wtiChange1d": row_val("CL=F", "change1d"),
-        "goldChange1d": row_val("GC=F", "change1d"),
+        "wti": row_val("WTI Crude Oil"), "gold": row_val("Gold"),
+        "natGas": row_val("Natural Gas"), "copper": row_val("Copper"),
+        "wheat": row_val("Wheat"),
+        "wtiChange1d": row_val("WTI Crude Oil", "change1d"),
+        "goldChange1d": row_val("Gold", "change1d"),
     }
 
-    # Gold/Oil ratio (5Y history)
+    # Gold/Oil ratio from FRED
     gold_oil_ratio: list[dict] = []
     try:
-        hist_tickers = ["GC=F", "CL=F"]
-        hist_raw = yf.download(
-            hist_tickers,
-            period="5y",
-            auto_adjust=True,
-            progress=False,
-            group_by="ticker",
+        gold_s = fred_data.get("GOLDAMGBD228NLBR", [])
+        oil_s = fred_data.get("DCOILWTICO", [])
+        oil_map = {p["date"]: p["value"] for p in oil_s if p.get("value", 0) > 0}
+        gold_oil_ratio = [
+            {"date": p["date"], "value": round(p["value"] / oil_map[p["date"]], 4)}
+            for p in gold_s if p["date"] in oil_map
+        ]
+        # Try 5Y history too
+        hist_fred = _fetch_fred_series_sync(
+            ["GOLDAMGBD228NLBR", "DCOILWTICO"],
+            start=(date.today() - timedelta(days=5 * 365)).isoformat(),
         )
-        gc = hist_raw["Close"]["GC=F"].dropna() if "GC=F" in hist_raw["Close"].columns else pd.Series(dtype=float)
-        cl = hist_raw["Close"]["CL=F"].dropna() if "CL=F" in hist_raw["Close"].columns else pd.Series(dtype=float)
-        if not gc.empty and not cl.empty:
-            ratio = (gc / cl).dropna()
-            gold_oil_ratio = [
-                {"date": str(d.date()), "value": round(float(v), 4)}
-                for d, v in ratio.items()
-            ]
+        if hist_fred:
+            g5 = hist_fred.get("GOLDAMGBD228NLBR", [])
+            o5 = hist_fred.get("DCOILWTICO", [])
+            om5 = {p["date"]: p["value"] for p in o5 if p.get("value", 0) > 0}
+            r5 = [{"date": p["date"], "value": round(p["value"] / om5[p["date"]], 4)}
+                  for p in g5 if p["date"] in om5]
+            if len(r5) > len(gold_oil_ratio):
+                gold_oil_ratio = r5
     except Exception as exc:
         log.debug("Gold/Oil ratio failed: %s", exc)
 
-    # Axiom Commodity Index: equal-weighted normalized from 2020-01-01
+    # Axiom Commodity Index (equal-weighted, normalized, from FRED)
     axiom_index: list[dict] = []
     try:
-        ax_raw = yf.download(
-            _AXIOM_BASKET,
-            start="2020-01-01",
-            auto_adjust=True,
-            progress=False,
-            group_by="ticker",
-        )
+        ax_data = _fetch_fred_series_sync(_AXIOM_BASKET_FRED, start="2020-01-01")
         closes_basket: dict[str, pd.Series] = {}
-        for t in _AXIOM_BASKET:
-            s = ax_raw["Close"][t].dropna() if t in ax_raw["Close"].columns else pd.Series(dtype=float)
-            if not s.empty:
-                closes_basket[t] = s / float(s.iloc[0])  # normalize to 1.0 at start
-
+        for fid in _AXIOM_BASKET_FRED:
+            pts = ax_data.get(fid, [])
+            if len(pts) >= 2:
+                s = pd.Series({p["date"]: p["value"] for p in pts})
+                s.index = pd.to_datetime(s.index)
+                s = s.sort_index()
+                ref = float(s.iloc[0])
+                if ref > 0:
+                    closes_basket[fid] = s / ref
         if closes_basket:
-            idx_df = pd.DataFrame(closes_basket).mean(axis=1) * 100  # scale to 100 at start
+            idx_df = pd.DataFrame(closes_basket).mean(axis=1) * 100
             axiom_index = [
                 {"date": str(d.date()), "value": round(float(v), 4)}
                 for d, v in idx_df.dropna().items()
@@ -464,9 +455,7 @@ def _get_commodities_sync() -> dict:
         log.debug("Axiom commodity index failed: %s", exc)
 
     return {
-        "asOf": today,
-        "kpis": kpis,
-        "table": table_rows,
+        "asOf": today, "kpis": kpis, "table": table_rows,
         "ratios": {"goldOilRatio": gold_oil_ratio},
         "axiomIndex": axiom_index,
     }
@@ -478,54 +467,49 @@ async def commodities():
     return await asyncio.to_thread(_get_commodities_sync)
 
 
-# FX pairs for heatmap
-_FX_PAIRS = [
-    ("EURUSD=X", "EUR/USD"),
-    ("GBPUSD=X", "GBP/USD"),
-    ("USDJPY=X", "USD/JPY"),
-    ("USDCNH=X", "USD/CNH"),
-    ("USDCHF=X", "USD/CHF"),
-    ("AUDUSD=X", "AUD/USD"),
-    ("NZDUSD=X", "NZD/USD"),
-    ("USDCAD=X", "USD/CAD"),
-    ("USDSEK=X", "USD/SEK"),
-    ("USDNOK=X", "USD/NOK"),
-    ("USDMXN=X", "USD/MXN"),
-    ("USDBRL=X", "USD/BRL"),
+# FX pairs for heatmap — use FRED DEX* series (daily, reliable)
+_FX_PAIRS_FRED = [
+    ("DEXUSEU", "EUR/USD", False),   ("DEXUSUK", "GBP/USD", False),
+    ("DEXJPUS", "USD/JPY", True),    ("DEXCHUS", "USD/CHF", True),
+    ("DEXCAUS", "USD/CAD", True),    ("DEXUSAL", "AUD/USD", False),
+    ("DEXUSNZ", "NZD/USD", False),   ("DEXSZUS", "USD/SEK", True),
+    ("DEXNOUS", "USD/NOK", True),    ("DEXMXUS", "USD/MXN", True),
+    ("DEXBZUS", "USD/BRL", True),    ("DEXKOUS", "USD/KRW", True),
 ]
 
 
 def _get_fx_heatmap_sync() -> dict:
-    import yfinance as yf
+    """FX heatmap using FRED daily exchange rates."""
+    from ..services.macro_expansion_service import _fetch_fred_series_sync
 
-    tickers = [t[0] for t in _FX_PAIRS]
-    try:
-        raw = yf.download(
-            tickers,
-            period="5d",
-            auto_adjust=True,
-            progress=False,
-            group_by="ticker",
-        )
-    except Exception as exc:
-        log.warning("FX heatmap download failed: %s", exc)
-        return {"crosses": [], "asOf": str(date.today())}
+    fred_ids = [p[0] for p in _FX_PAIRS_FRED]
+    start_date = (date.today() - timedelta(days=30)).isoformat()
+    fred_data = _fetch_fred_series_sync(fred_ids, start=start_date)
 
     crosses = []
-    for ticker, pair in _FX_PAIRS:
+    for fred_id, pair, is_inverted in _FX_PAIRS_FRED:
         try:
-            if len(tickers) == 1:
-                s = raw["Close"].dropna()
-            else:
-                s = raw["Close"][ticker].dropna() if ticker in raw["Close"].columns else pd.Series(dtype=float)
-            if len(s) >= 2:
-                change1d = round((float(s.iloc[-1]) / float(s.iloc[-2]) - 1) * 100, 4)
-            else:
+            series = fred_data.get(fred_id, [])
+            if len(series) >= 2:
+                latest = series[-1]["value"]
+                prev = series[-2]["value"]
+                if is_inverted and latest > 0 and prev > 0:
+                    change1d = round((prev / latest - 1) * 100, 4)
+                    price = round(1 / latest, 6)
+                elif not is_inverted:
+                    change1d = round((latest / prev - 1) * 100, 4)
+                    price = round(latest, 6)
+                else:
+                    price = None; change1d = None
+            elif len(series) == 1 and series[0]["value"] > 0:
+                v = series[0]["value"]
+                price = round(1 / v, 6) if is_inverted else round(v, 6)
                 change1d = None
-            price = round(float(s.iloc[-1]), 6) if not s.empty else None
-            crosses.append({"pair": pair, "ticker": ticker, "price": price, "change1d": change1d})
+            else:
+                price = None; change1d = None
+            crosses.append({"pair": pair, "ticker": fred_id, "price": price, "change1d": change1d})
         except Exception:
-            crosses.append({"pair": pair, "ticker": ticker, "price": None, "change1d": None})
+            crosses.append({"pair": pair, "ticker": fred_id, "price": None, "change1d": None})
 
     return {"crosses": crosses, "asOf": str(date.today())}
 
@@ -536,85 +520,92 @@ async def fx_heatmap():
     return await asyncio.to_thread(_get_fx_heatmap_sync)
 
 
-# G10 PPP pairs: (pair_label, yf_ticker, us_cpi_series, foreign_cpi_series)
+# G10 PPP pairs: (pair_label, dex_series, is_inverted, foreign_cpi_series)
 _PPP_PAIRS = [
-    ("EUR/USD", "EURUSD=X", "CPIAUCSL", "CP0000EZ19M086NEST"),
-    ("GBP/USD", "GBPUSD=X", "CPIAUCSL", "GBPCPIALLMINMEI"),
-    ("USD/JPY", "USDJPY=X", "CPIAUCSL", "JPNCPIALLMINMEI"),
-    ("USD/CHF", "USDCHF=X", "CPIAUCSL", "CHECPIALLMINMEI"),
-    ("AUD/USD", "AUDUSD=X", "CPIAUCSL", "AUSCPIALLMINMEI"),
-    ("NZD/USD", "NZDUSD=X", "CPIAUCSL", "NZLCPIALLMINMEI"),
-    ("USD/CAD", "USDCAD=X", "CPIAUCSL", "CANCPIALLMINMEI"),
-    ("USD/SEK", "USDSEK=X", "CPIAUCSL", "SWECPIALLMINMEI"),
-    ("USD/NOK", "USDNOK=X", "CPIAUCSL", "NORCPIALLMINMEI"),
+    ("EUR/USD", "DEXUSEU", False, "CP0000EZ19M086NEST"),
+    ("GBP/USD", "DEXUSUK", False, "GBPCPIALLMINMEI"),
+    ("USD/JPY", "DEXJPUS", True,  "JPNCPIALLMINMEI"),
+    ("USD/CHF", "DEXCHUS", True,  "CHECPIALLMINMEI"),
+    ("AUD/USD", "DEXUSAL", False, "AUSCPIALLMINMEI"),
+    ("USD/CAD", "DEXCAUS", True,  "CANCPIALLMINMEI"),
+    ("USD/SEK", "DEXSZUS", True,  "SWECPIALLMINMEI"),
+    ("USD/NOK", "DEXNOUS", True,  "NORCPIALLMINMEI"),
 ]
 
 
 def _get_fx_ppp_sync() -> dict:
-    """Compute PPP-implied exchange rates vs spot for G10 pairs."""
-    import yfinance as yf
-
+    """Compute PPP-implied exchange rates vs spot for G10 pairs using FRED CPI + DEX."""
     if not __import__("os").environ.get("FRED_API_KEY"):
         return {"pairs": [], "note": "FRED_API_KEY required for PPP calculation"}
 
     from fredapi import Fred
     from ..config import FRED_API_KEY
+    from ..services.macro_expansion_service import _fetch_fred_series_sync
+
     fred = Fred(api_key=FRED_API_KEY)
 
-    # Fetch US CPI once
+    # Fetch US CPI
     try:
-        us_cpi = fred.get_series("CPIAUCSL", observation_start="2000-01-01").dropna()
+        us_cpi_raw = _fetch_fred_series_sync(["CPIAUCSL"], start="2005-01-01").get("CPIAUCSL", [])
     except Exception as exc:
         log.warning("PPP: US CPI fetch failed: %s", exc)
         return {"pairs": [], "error": str(exc)}
 
-    # Base year: earliest common date = 2000-01-01; use Jan 2000 levels as base
-    base_date = pd.Timestamp("2000-01-01")
+    # Build CPI maps (date -> value)
+    us_cpi_map = {p["date"]: p["value"] for p in us_cpi_raw}
 
     pairs_out = []
-    for pair_label, yf_ticker, _, foreign_cpi_id in _PPP_PAIRS:
+    for pair_label, dex_id, is_inverted, fg_cpi_id in _PPP_PAIRS:
         try:
-            # Spot rate
-            spot_df = yf.download(yf_ticker, period="5d", auto_adjust=True, progress=False)
-            spot = None
-            if not spot_df.empty:
-                spot = round(float(spot_df["Close"].dropna().iloc[-1]), 6)
+            # Spot rate from FRED DEX
+            dex_raw = _fetch_fred_series_sync([dex_id], start=(date.today() - timedelta(days=60)).isoformat())
+            dex_series = dex_raw.get(dex_id, [])
+            if len(dex_series) < 2:
+                pairs_out.append({"pair": pair_label, "spot": None, "ppp": None, "overvaluation": None})
+                continue
 
-            # Foreign CPI from FRED
-            try:
-                foreign_cpi = fred.get_series(foreign_cpi_id, observation_start="2000-01-01").dropna()
-            except Exception:
+            spot_val = dex_series[-1]["value"]
+            spot = round(1 / spot_val, 6) if is_inverted and spot_val > 0 else round(spot_val, 6)
+
+            # Foreign CPI
+            fg_cpi_raw = _fetch_fred_series_sync([fg_cpi_id], start="2005-01-01").get(fg_cpi_id, [])
+            fg_cpi_map = {p["date"]: p["value"] for p in fg_cpi_raw}
+
+            # Find latest date where both US and foreign CPI are available
+            common_dates = sorted(set(us_cpi_map.keys()) & set(fg_cpi_map.keys()))
+            if len(common_dates) < 2:
                 pairs_out.append({"pair": pair_label, "spot": spot, "ppp": None, "overvaluation": None})
                 continue
 
-            # PPP = base_spot * (US_CPI_now / US_CPI_base) / (foreign_CPI_now / foreign_CPI_base)
-            # Use Jan 2000 as base; forward-fill to align
-            us_base = float(us_cpi.asof(base_date)) if not us_cpi.asof(base_date) is None else float(us_cpi.iloc[0])
-            us_now = float(us_cpi.iloc[-1])
-            f_base = float(foreign_cpi.asof(base_date)) if not foreign_cpi.asof(base_date) is None else float(foreign_cpi.iloc[0])
-            f_now = float(foreign_cpi.iloc[-1])
+            latest = common_dates[-1]
+            earliest = common_dates[0]
 
-            if f_base == 0 or f_now == 0 or us_base == 0:
+            us_now = us_cpi_map[latest]
+            us_base = us_cpi_map[earliest]
+            fg_now = fg_cpi_map[latest]
+            fg_base = fg_cpi_map[earliest]
+
+            if not all([us_now, us_base, fg_now, fg_base]) or us_base == 0 or fg_base == 0:
+                pairs_out.append({"pair": pair_label, "spot": spot, "ppp": None, "overvaluation": None})
                 continue
 
-            # We need a base spot rate; use yfinance historical for Jan 2000
-            hist = yf.download(yf_ticker, start="2000-01-01", end="2000-03-01", auto_adjust=True, progress=False)
-            if hist.empty:
+            # PPP implied rate: base_spot * (US CPI change) / (foreign CPI change)
+            # Use earliest common date spot as base
+            base_spot_raw = dex_series[0]["value"] if dex_series else None
+            if base_spot_raw is None or base_spot_raw == 0:
+                pairs_out.append({"pair": pair_label, "spot": spot, "ppp": None, "overvaluation": None})
                 continue
-            base_spot = float(hist["Close"].dropna().iloc[0])
 
-            ppp = round(base_spot * (us_now / us_base) / (f_now / f_base), 6)
+            base_spot = round(1 / base_spot_raw, 6) if is_inverted else round(base_spot_raw, 6)
+            ppp = round(base_spot * (us_now / us_base) / (fg_now / fg_base), 6)
             overvaluation = round((spot / ppp - 1) * 100, 2) if spot and ppp else None
 
             pairs_out.append({
-                "pair": pair_label,
-                "spot": spot,
-                "ppp": ppp,
-                "overvaluation": overvaluation,
+                "pair": pair_label, "spot": spot, "ppp": ppp, "overvaluation": overvaluation,
             })
         except Exception as exc:
             log.debug("PPP %s failed: %s", pair_label, exc)
-            continue
+            pairs_out.append({"pair": pair_label, "spot": None, "ppp": None, "overvaluation": None})
 
     return {"pairs": pairs_out, "asOf": str(date.today())}
 
@@ -653,25 +644,49 @@ def _download_gscpi_sync() -> list[dict]:
 
 
 @router.get("/leading")
-async def leading():
+async def leading(base_year: int = Query(2020, description="Base year for IS-LM-PC normalization")):
     """Leading Economic Indicators: LEI, CFNAI, ISM PMI, GSCPI, IS-LM-PC framework data."""
     from ..services.macro_expansion_service import fetch_fred_series
 
     series_ids = (
         "USSLIND",            # Conference Board LEI
         "CFNAI",              # Chicago Fed National Activity Index
-        "NAPM",               # ISM Manufacturing PMI (legacy; use MANEMP if unavailable)
+        "NAPM",               # ISM Manufacturing PMI
         "GDPC1",              # Real GDP (quarterly)
-        "GDPPOT",             # Potential GDP (quarterly)
         "FEDFUNDS",           # Federal Funds Rate
         "M2SL",               # M2 Money Supply
         "UNRATE",             # Unemployment rate
-        "CPIAUCSL",           # CPI
+        "CPIAUCSL",           # CPI level
     )
     data, gscpi = await asyncio.gather(
         fetch_fred_series(series_ids, start="2000-01-01"),
         asyncio.to_thread(_download_gscpi_sync),
     )
+
+    # --- IS-LM-PC: normalize series to given base year = 100 ---
+    def _normalize(series: list[dict], base_year: int) -> list[dict]:
+        """Normalize so the average value in base_year = 100."""
+        if not series:
+            return []
+        base_vals = [p["value"] for p in series if p["date"][:4] == str(base_year)]
+        if not base_vals:
+            # Fall back to all values
+            base_vals = [p["value"] for p in series]
+        if not base_vals:
+            return series
+        base = sum(base_vals) / len(base_vals)
+        if base == 0:
+            return series
+        return [{"date": p["date"], "value": round(p["value"] / base * 100, 2)} for p in series]
+
+    islmpc = {
+        "gdp": _normalize(data.get("GDPC1", []), base_year),
+        "fedFunds": _normalize(data.get("FEDFUNDS", []), base_year),
+        "m2": _normalize(data.get("M2SL", []), base_year),
+        "unrate": _normalize(data.get("UNRATE", []), base_year),
+        "cpi": _normalize(data.get("CPIAUCSL", []), base_year),
+        "baseYear": base_year,
+    }
 
     return {
         "asOf": str(date.today()),
@@ -687,14 +702,8 @@ async def leading():
             "ismPmi": data.get("NAPM", []),
             "gscpi": gscpi,
         },
-        "islmpc": {
-            "gdp": data.get("GDPC1", []),
-            "gdpPot": data.get("GDPPOT", []),
-            "fedFunds": data.get("FEDFUNDS", []),
-            "m2": data.get("M2SL", []),
-            "unrate": data.get("UNRATE", []),
-            "cpi": data.get("CPIAUCSL", []),
-        },
+        "islmpc": islmpc,
+        "baseYear": base_year,
     }
 
 
@@ -706,14 +715,25 @@ async def financial_conditions():
     series_ids = (
         "NFCI",           # Chicago Fed National Financial Conditions Index
         "STLFSI4",        # St. Louis Fed Financial Stress Index
-        "WALCL",          # Fed balance sheet (total assets)
+        "WALCL",          # US Federal Reserve balance sheet (total assets, millions)
         "DRCCLACBS",      # Credit card delinquency rate
-        "TOTCI",          # Total C&I loans
+        "BUSLOANS",       # Commercial & Industrial Loans (billions)
         "USEPUINDXD",     # Economic Policy Uncertainty Index (daily → monthly available)
     )
     data = await fetch_fred_series(series_ids, start="2000-01-01")
 
-    fed_bs = data.get("WALCL", [])
+    # WALCL is in millions USD → convert to trillions
+    fed_bs_raw = data.get("WALCL", [])
+    fed_bs = [
+        {"date": p["date"], "value": round(p["value"] / 1_000_000, 4)}
+        for p in fed_bs_raw if p.get("value") is not None
+    ]
+    # BUSLOANS is in billions USD → convert to trillions
+    ci_raw = data.get("BUSLOANS", data.get("TOTCI", []))
+    ci_loans = [
+        {"date": p["date"], "value": round(p["value"] / 1_000, 4)}
+        for p in ci_raw if p.get("value") is not None
+    ]
 
     return {
         "asOf": str(date.today()),
@@ -721,13 +741,14 @@ async def financial_conditions():
             "nfci": _latest(data.get("NFCI", [])),
             "stlfsi": _latest(data.get("STLFSI4", [])),
             "fedBalanceSheet": _latest(fed_bs),
+            "ciLoans": _latest(ci_loans),
         },
         "history": {
             "nfci": data.get("NFCI", []),
             "stlfsi": data.get("STLFSI4", []),
             "fedBalanceSheet": fed_bs,
             "creditCardDelinquency": data.get("DRCCLACBS", []),
-            "ciLoans": data.get("TOTCI", []),
+            "ciLoans": ci_loans,
             "economicPolicyUncertainty": data.get("USEPUINDXD", []),
         },
     }
@@ -815,7 +836,7 @@ async def macro_regime():
 async def funding_liquidity():
     """Funding and Liquidity gauge."""
     from ..services.funding_service import get_funding_liquidity
-    return await asyncio.to_thread(get_funding_liquidity)
+    return await get_funding_liquidity()
 
 @router.get("/taylor-rule")
 async def taylor_rule():

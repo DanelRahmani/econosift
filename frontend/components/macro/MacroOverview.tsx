@@ -28,6 +28,7 @@ export function MacroOverview() {
   const [countries, setCountries] = useState<Country[]>([]);
   const [indicators, setIndicators] = useState<Indicator[]>([]);
   const [selected, setSelected] = useState<string[]>(["US", "DE", "JP"]);
+  const [regimeCountry, setRegimeCountry] = useState("US");
   const [indicator, setIndicator] = useState("gdp_growth");
   const [start, setStart] = useState(2000);
   const [end, setEnd] = useState(CURRENT_YEAR);
@@ -41,6 +42,13 @@ export function MacroOverview() {
     api.countries().then((r) => setCountries(r.countries)).catch(() => {});
     api.indicators().then((r) => setIndicators(r.indicators)).catch(() => {});
   }, []);
+
+  // Keep regime country in sync with selected countries
+  useEffect(() => {
+    if (!selected.includes(regimeCountry) && selected.length > 0) {
+      setRegimeCountry(selected[0]);
+    }
+  }, [selected, regimeCountry]);
 
   const canForecast = FORECASTABLE.has(indicator);
   const selKey = selected.join(",");
@@ -164,14 +172,24 @@ export function MacroOverview() {
 
       {selected.length > 0 && (
         <Card>
-          <h2 className="text-sm font-semibold mb-3 text-text-secondary">
-            Regime Clock ·{" "}
-            {countries.find((c) => c.iso2 === selected[0])?.name ?? selected[0]}
-          </h2>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-semibold text-text-secondary">
+              Regime Clock
+            </h2>
+            <select
+              value={regimeCountry}
+              onChange={(e) => setRegimeCountry(e.target.value)}
+              className="input max-w-[180px] text-xs"
+            >
+              {countries.filter(c => selected.includes(c.iso2)).map(c => (
+                <option key={c.iso2} value={c.iso2}>{c.name}</option>
+              ))}
+            </select>
+          </div>
           <RegimeClock
-            country={selected[0]}
+            country={regimeCountry}
             countryName={
-              countries.find((c) => c.iso2 === selected[0])?.name ?? selected[0]
+              countries.find((c) => c.iso2 === regimeCountry)?.name ?? regimeCountry
             }
           />
         </Card>

@@ -48,14 +48,16 @@ export function LeadingIndicators() {
   const [data, setData] = useState<LeadingData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [baseYear, setBaseYear] = useState(2020);
 
   useEffect(() => {
+    setLoading(true);
     api
-      .macroLeading()
+      .macroLeading(baseYear)
       .then(setData)
       .catch(() => setError(true))
       .finally(() => setLoading(false));
-  }, []);
+  }, [baseYear]);
 
   if (loading) {
     return (
@@ -141,6 +143,21 @@ export function LeadingIndicators() {
 
   return (
     <div className="space-y-6">
+      {/* Base Year Selector */}
+      <div className="flex items-center gap-3">
+        <span className="text-xs text-text-secondary">IS-LM-PC Base Year:</span>
+        <select
+          value={baseYear}
+          onChange={(e) => setBaseYear(Number(e.target.value))}
+          className="text-xs bg-surface border border-border rounded px-2 py-1 text-text-primary"
+        >
+          {[2024, 2023, 2022, 2021, 2020, 2019, 2015, 2010, 2005, 2000].map(y => (
+            <option key={y} value={y}>{y}</option>
+          ))}
+        </select>
+        <span className="text-[10px] text-text-muted">Normalizes IS-LM-PC data to 100 at selected year</span>
+      </div>
+
       {/* KPI Row */}
       <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <KpiCard
@@ -271,25 +288,27 @@ export function LeadingIndicators() {
       {/* IS-LM-PC Panel */}
       <div>
         <h3 className="font-semibold mb-1">IS-LM-Phillips Curve Framework</h3>
-        <p className="text-xs text-text-secondary mb-4">
-          Scatter plots tracing macroeconomic relationships over time.
+        <p className="text-xs text-text-secondary mb-1">
+          Normalized to base year = 100. Dots show historical over time; <span className="text-red-400 font-semibold">● current</span>.
         </p>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* IS Curve */}
           <Card className="p-4">
             <h4 className="text-sm font-semibold mb-1">IS Curve</h4>
             <p className="text-xs text-text-secondary mb-3">
-              Fed Funds Rate vs Real GDP Growth
+              Fed Funds Rate vs GDP (index, {baseYear ?? "?"} = 100)
             </p>
             {isData.length > 0 ? (
               <ResponsiveContainer width="100%" height={200}>
                 <ScatterChart>
                   <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
-                  <XAxis dataKey="x" name="Fed Funds %" tickFormatter={(v) => `${v}%`} tick={{ fontSize: 10 }} label={{ value: "Fed Funds %", position: "insideBottom", offset: -5, fontSize: 10 }} />
-                  <YAxis dataKey="y" name="GDP YoY %" tickFormatter={(v) => `${v}%`} tick={{ fontSize: 10 }} />
-                  <ZAxis range={[20, 20]} />
-                  <Tooltip cursor={{ strokeDasharray: "3 3" }} formatter={(v: number) => [`${v?.toFixed(2)}%`]} />
-                  <Scatter data={isData} fill="#3b82f6" fillOpacity={0.6} />
+                  <XAxis dataKey="x" name="Fed Funds" tick={{ fontSize: 10 }} label={{ value: "Fed Funds (index)", position: "insideBottom", offset: -5, fontSize: 10 }} />
+                  <YAxis dataKey="y" name="GDP" tick={{ fontSize: 10 }} label={{ value: "GDP (index)", angle: -90, position: "insideLeft", fontSize: 10 }} />
+                  <Tooltip cursor={{ strokeDasharray: "3 3" }} formatter={(v: number) => [v?.toFixed(1)]} />
+                  <Scatter data={isData.slice(0, -1)} fill="#3b82f6" fillOpacity={0.4} name="Historical" />
+                  {isData.length > 0 && (
+                    <Scatter data={[isData[isData.length - 1]]} fill="#ef4444" fillOpacity={1} name="Current" />
+                  )}
                 </ScatterChart>
               </ResponsiveContainer>
             ) : (
@@ -301,17 +320,19 @@ export function LeadingIndicators() {
           <Card className="p-4">
             <h4 className="text-sm font-semibold mb-1">LM Curve</h4>
             <p className="text-xs text-text-secondary mb-3">
-              M2 Growth vs Nominal GDP Growth
+              M2 vs GDP (index, {baseYear ?? "?"} = 100)
             </p>
             {lmData.length > 0 ? (
               <ResponsiveContainer width="100%" height={200}>
                 <ScatterChart>
                   <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
-                  <XAxis dataKey="x" name="M2 YoY %" tickFormatter={(v) => `${v}%`} tick={{ fontSize: 10 }} label={{ value: "M2 Growth %", position: "insideBottom", offset: -5, fontSize: 10 }} />
-                  <YAxis dataKey="y" name="Nominal GDP %" tickFormatter={(v) => `${v}%`} tick={{ fontSize: 10 }} />
-                  <ZAxis range={[20, 20]} />
-                  <Tooltip cursor={{ strokeDasharray: "3 3" }} formatter={(v: number) => [`${v?.toFixed(2)}%`]} />
-                  <Scatter data={lmData} fill="#10b981" fillOpacity={0.6} />
+                  <XAxis dataKey="x" name="M2" tick={{ fontSize: 10 }} label={{ value: "M2 (index)", position: "insideBottom", offset: -5, fontSize: 10 }} />
+                  <YAxis dataKey="y" name="GDP" tick={{ fontSize: 10 }} label={{ value: "GDP (index)", angle: -90, position: "insideLeft", fontSize: 10 }} />
+                  <Tooltip cursor={{ strokeDasharray: "3 3" }} formatter={(v: number) => [v?.toFixed(1)]} />
+                  <Scatter data={lmData.slice(0, -1)} fill="#10b981" fillOpacity={0.4} name="Historical" />
+                  {lmData.length > 0 && (
+                    <Scatter data={[lmData[lmData.length - 1]]} fill="#ef4444" fillOpacity={1} name="Current" />
+                  )}
                 </ScatterChart>
               </ResponsiveContainer>
             ) : (
@@ -323,26 +344,16 @@ export function LeadingIndicators() {
           <Card className="p-4">
             <h4 className="text-sm font-semibold mb-1">Phillips Curve</h4>
             <p className="text-xs text-text-secondary mb-3">
-              Unemployment % vs CPI Inflation %
+              Unemployment vs CPI (index, {baseYear ?? "?"} = 100)
             </p>
             {phillipsPath.length > 0 ? (
               <ResponsiveContainer width="100%" height={200}>
                 <ScatterChart>
                   <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
-                  <XAxis dataKey="x" name="Unemployment %" tickFormatter={(v) => `${v}%`} tick={{ fontSize: 10 }} label={{ value: "Unemployment %", position: "insideBottom", offset: -5, fontSize: 10 }} />
-                  <YAxis dataKey="y" name="CPI YoY %" tickFormatter={(v) => `${v}%`} tick={{ fontSize: 10 }} />
-                  <ZAxis range={[20, 20]} />
-                  <Tooltip cursor={{ strokeDasharray: "3 3" }} formatter={(v: number) => [`${v?.toFixed(2)}%`]} />
-                  {/* Historical path */}
+                  <XAxis dataKey="x" name="Unemployment" tick={{ fontSize: 10 }} label={{ value: "Unemployment (index)", position: "insideBottom", offset: -5, fontSize: 10 }} />
+                  <YAxis dataKey="y" name="CPI" tick={{ fontSize: 10 }} label={{ value: "CPI (index)", angle: -90, position: "insideLeft", fontSize: 10 }} />
+                  <Tooltip cursor={{ strokeDasharray: "3 3" }} formatter={(v: number) => [v?.toFixed(1)]} />
                   <Scatter data={phillipsPath} fill="#8b5cf6" fillOpacity={0.4} name="Historical" />
-                  {/* Current point */}
-                  {phillipsCurrent && (
-                    <Scatter
-                      data={[phillipsCurrent]}
-                      fill="#ef4444"
-                      name="Current"
-                    />
-                  )}
                 </ScatterChart>
               </ResponsiveContainer>
             ) : (

@@ -31,6 +31,7 @@ import type {
   CountryRiskData, CentralBanksData,
   PricePoint, RiskMetric,
   CreditPulseData, YieldCurvesData, PolicyTrackerData, SovereignRiskData, MacroRegimeData,
+  WikiCategoriesResponse, WikiTermsResponse,
 } from "./types";
 
 async function get<T>(path: string): Promise<T> {
@@ -283,8 +284,8 @@ export const api = {
   macroFxPpp: () =>
     get<FxPppData>(`/macro/fx/ppp`),
 
-  macroLeading: () =>
-    get<LeadingData>(`/macro/leading`),
+  macroLeading: (baseYear = 2020) =>
+    get<LeadingData>(`/macro/leading?base_year=${baseYear}`),
 
   macroFinancialConditions: () =>
     get<FinancialConditionsData>(`/macro/financial-conditions`),
@@ -408,6 +409,15 @@ export const api = {
   scenarioStress: (holdings: Holding[]) => post<any>("/scenario/historical/stress", { holdings }),
   scenarioCustom: (holdings: Holding[], shocks: Record<string, number>) =>
     post<any>("/scenario/custom", { holdings, shocks }),
+
+  // --- Wiki ---
+  wikiCategories: () => get<WikiCategoriesResponse>("/wiki/categories"),
+  wikiTerms: (search?: string, category?: string) => {
+    const params = new URLSearchParams();
+    if (search) params.set("search", search);
+    if (category) params.set("category", category);
+    return get<WikiTermsResponse>(`/wiki/terms?${params}`);
+  },
 };
 
 // --- Phase 17.E: React Query ---

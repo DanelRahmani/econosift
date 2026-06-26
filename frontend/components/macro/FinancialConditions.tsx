@@ -54,6 +54,7 @@ export function FinancialConditions() {
   const [data, setData] = useState<FinancialConditionsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [epuLogScale, setEpuLogScale] = useState(false);
 
   useEffect(() => {
     api
@@ -90,9 +91,10 @@ export function FinancialConditions() {
     STLFSI: history.stlfsi?.[i]?.value ?? null,
   }));
 
+  // Backend now returns $T for Fed BS
   const balanceSheetData = (history.fedBalanceSheet ?? []).map((pt) => ({
     date: pt.date.slice(0, 7),
-    "Fed Balance Sheet ($T)": pt.value != null ? pt.value / 1e12 : null,
+    "US Fed Balance Sheet ($T)": pt.value,
   }));
 
   const delinquencyData = (history.creditCardDelinquency ?? []).map((pt) => ({
@@ -100,9 +102,10 @@ export function FinancialConditions() {
     "Credit Card Delinquency %": pt.value,
   }));
 
+  // Backend returns $T for C&I loans
   const loansData = (history.ciLoans ?? []).map((pt) => ({
     date: pt.date.slice(0, 7),
-    "C&I Loans ($B)": pt.value != null ? pt.value / 1e9 : null,
+    "C&I Loans ($T)": pt.value,
   }));
 
   const epuData = (history.economicPolicyUncertainty ?? []).map((pt) => ({
@@ -113,7 +116,7 @@ export function FinancialConditions() {
   return (
     <div className="space-y-6">
       {/* KPI Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
         <KpiCard
           label="NFCI"
           value={kpis.nfci}
@@ -129,10 +132,16 @@ export function FinancialConditions() {
           }
         />
         <KpiCard
-          label="Fed Balance Sheet"
-          value={kpis.fedBalanceSheet != null ? kpis.fedBalanceSheet / 1e12 : null}
-          unit="T"
-          sub="USD trillions"
+          label="US Fed Balance Sheet"
+          value={kpis.fedBalanceSheet}
+          unit="$T"
+          sub="Total assets"
+        />
+        <KpiCard
+          label="C&I Loans"
+          value={kpis.ciLoans}
+          unit="$T"
+          sub="Commercial & Industrial"
         />
       </div>
 
@@ -159,10 +168,10 @@ export function FinancialConditions() {
         </Card>
       )}
 
-      {/* Fed Balance Sheet */}
+      {/* US Federal Reserve Balance Sheet */}
       {balanceSheetData.length > 0 && (
         <Card className="p-4">
-          <h3 className="font-semibold mb-1">Federal Reserve Balance Sheet</h3>
+          <h3 className="font-semibold mb-1">US Federal Reserve Balance Sheet</h3>
           <p className="text-xs text-text-secondary mb-3">
             Total assets (USD trillions). QE = expansion; QT = contraction.
           </p>
@@ -174,7 +183,7 @@ export function FinancialConditions() {
               <Tooltip formatter={(v: number) => [`$${v?.toFixed(2)}T`]} />
               <Area
                 type="monotone"
-                dataKey="Fed Balance Sheet ($T)"
+                dataKey="US Fed Balance Sheet ($T)"
                 stroke="#3b82f6"
                 fill="#3b82f6"
                 fillOpacity={0.2}
@@ -214,7 +223,7 @@ export function FinancialConditions() {
       {/* C&I Loans */}
       {loansData.length > 0 && (
         <Card className="p-4">
-          <h3 className="font-semibold mb-1">Commercial & Industrial Loans ($B)</h3>
+          <h3 className="font-semibold mb-1">Commercial & Industrial Loans ($T)</h3>
           <p className="text-xs text-text-secondary mb-3">
             Bank lending to businesses — slowdown signals tighter credit.
           </p>
@@ -222,11 +231,11 @@ export function FinancialConditions() {
             <LineChart data={loansData}>
               <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
               <XAxis dataKey="date" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
-              <YAxis tickFormatter={(v) => `$${v}B`} tick={{ fontSize: 11 }} />
-              <Tooltip formatter={(v: number) => [`$${v?.toFixed(0)}B`]} />
+              <YAxis tickFormatter={(v) => `$${v}T`} tick={{ fontSize: 11 }} />
+              <Tooltip formatter={(v: number) => [`$${v?.toFixed(3)}T`]} />
               <Line
                 type="monotone"
-                dataKey="C&I Loans ($B)"
+                dataKey="C&I Loans ($T)"
                 stroke="#10b981"
                 dot={false}
                 strokeWidth={2}
@@ -239,16 +248,25 @@ export function FinancialConditions() {
       {/* Economic Policy Uncertainty */}
       {epuData.length > 0 && (
         <Card className="p-4">
-          <h3 className="font-semibold mb-1">Economic Policy Uncertainty Index</h3>
+          <div className="flex items-center justify-between mb-1">
+            <h3 className="font-semibold">Economic Policy Uncertainty Index</h3>
+            <button
+              onClick={() => setEpuLogScale(!epuLogScale)}
+              className={`px-2 py-1 text-xs rounded border transition-colors ${
+                epuLogScale ? "border-accent bg-accent/10 text-accent" : "border-border text-text-muted hover:text-text-primary"
+              }`}
+            >
+              {epuLogScale ? "Log Scale" : "Linear Scale"}
+            </button>
+          </div>
           <p className="text-xs text-text-secondary mb-3">
-            Baker, Bloom & Davis index. Higher = more uncertainty. Spikes around elections
-            and geopolitical events.
+            Baker, Bloom & Davis index. Higher = more uncertainty. {epuLogScale ? "Log scale reduces outlier skew." : ""}
           </p>
           <ResponsiveContainer width="100%" height={200}>
             <LineChart data={epuData}>
               <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
               <XAxis dataKey="date" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
-              <YAxis tick={{ fontSize: 11 }} />
+              <YAxis tick={{ fontSize: 11 }} scale={epuLogScale ? "log" : "linear"} domain={["auto", "auto"]} />
               <Tooltip formatter={(v: number) => [v?.toFixed(0), "EPU Index"]} />
               <Line
                 type="monotone"

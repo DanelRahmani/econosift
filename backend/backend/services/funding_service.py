@@ -1,48 +1,71 @@
 """Funding and Liquidity service using FRED data."""
 from __future__ import annotations
 
-import pandas as pd
-from datetime import datetime, timedelta
+import logging
 
-from .yfinance_service import _FRED_API_KEY
-from .macro_expansion_service import _fetch_fred_series
-from ..cache import cached
+from ..cache import async_cached
+from ..config import FRED_API_KEY
+from . import macro_expansion_service as mes
 
-@cached(ttl_seconds=3600)
-def get_funding_liquidity() -> dict:
-    """Fetch M2SL, SOFR, and CP spread composites from FRED."""
-    if not _FRED_API_KEY:
+log = logging.getLogger(__name__)
+
+_FUNDING_SERIES = ("M2SL", "SOFR", "CPF3M", "FEDFUNDS")
+_START = "2024-01-01"
+
+
+def _latest(pts: list[dict]) -> float | None:
+    for pt in reversed(pts):
+        v = pt.get("value")
+        if v is not None:
+            try:
+                return float(v)
+            except (TypeError, ValueError):
+                continue
+    return None
+
+
+@async_cached("funding_liquidity")
+async def get_funding_liquidity() -> dict:
+    """Fetch M2SL, SOFR, CP spread, and SOFR-FF spread from FRED."""
+    if not FRED_API_KEY:
         return {"error": "FRED API key required"}
 
-    end = datetime.now()
-    start = end - timedelta(days=365*2) # 2 years of data
+    data = await mes.fetch_fred_series(_FUNDING_SERIES, start=_START)
 
-    # M2SL = M2 Money Stock
-    m2 = _fetch_fred_series("M2SL", start, end)
-    
-    # SOFR = Secured Overnight Financing Rate
-    sofr = _fetch_fred_series("SOFR", start, end)
-    
-    # CP = 3-Month Commercial Paper Minus FEDFUNDS (CPF3M - FEDFUNDS)
-    # Using CPF3M (3-Month Commercial Paper Rate) and FEDFUNDS
-    cpf3m = _fetch_fred_series("CPF3M", start, end)
-    fedfunds = _fetch_fred_series("FEDFUNDS", start, end)
+    m2_pts = data.get("M2SL", [])
+    sofr_pts = data.get("SOFR", [])
+    cpf3m_pts = data.get("CPF3M", [])
+    ff_pts = data.get("FEDFUNDS", [])
 
-    def _to_points(series: pd.Series) -> list[dict]:
-        if series is None or series.empty:
-            return []
-        series = series.dropna()
-        return [{"date": str(idx)[:10], "value": float(v)} for idx, v in series.items()]
+    # CP spread = CPF3M - FEDFUNDS (align by date)
+    ff_map = {p["date"]: p["value"] for p in ff_pts if p.get("value") is not None}
+    cp_spread: list[dict] = []
+    for p in cpf3m_pts:
+        if p.get("value") is not None and p["date"] in ff_map:
+            cp_spread.append({
+                "date": p["date"],
+                "value": round(p["value"] - ff_map[p["date"]], 4),
+            })
 
-    # Calculate CP spread composite
-    cp_spread = pd.Series(dtype=float)
-    if cpf3m is not None and fedfunds is not None:
-        # Reindex to match and calculate spread
-        common_idx = cpf3m.index.intersection(fedfunds.index)
-        cp_spread = cpf3m.loc[common_idx] - fedfunds.loc[common_idx]
+    # SOFR-FF spread
+    sofr_map = {p["date"]: p["value"] for p in sofr_pts if p.get("value") is not None}
+    sofr_ff_spread: list[dict] = []
+    for p in ff_pts:
+        if p.get("value") is not None and p["date"] in sofr_map:
+            sofr_ff_spread.append({
+                "date": p["date"],
+                "value": round(sofr_map[p["date"]] - p["value"], 4),
+            })
 
     return {
-        "m2": _to_points(m2),
-        "sofr": _to_points(sofr),
-        "cp_spread": _to_points(cp_spread),
+        "m2": m2_pts,
+        "sofr": sofr_pts,
+        "cp_spread": cp_spread,
+        "sofr_ff_spread": sofr_ff_spread,
+        "kpis": {
+            "m2_latest": _latest(m2_pts),
+            "sofr_latest": _latest(sofr_pts),
+            "cp_spread_latest": _latest(cp_spread),
+            "sofr_ff_latest": _latest(sofr_ff_spread),
+        },
     }

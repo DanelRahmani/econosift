@@ -1005,6 +1005,7 @@ export interface FinancialConditionsData {
     nfci: number | null;
     stlfsi: number | null;
     fedBalanceSheet: number | null;
+    ciLoans: number | null;
   };
   history: {
     nfci: MacroTimeSeries[];
@@ -1706,6 +1707,31 @@ export interface SovereignRiskData {
   countries: SovereignCountry[];
   top_risk: SovereignCountry[];
   bottom_risk: SovereignCountry[];
+}
+
+// ─── Wiki ──────────────────────────────────────────────────────
+export interface WikiTerm {
+  slug: string;
+  term: string;
+  category: string;
+  definition: string;
+  related: string[];
+}
+export interface WikiCategory {
+  key: string;
+  label: string;
+  icon: string;
+  count: number;
+}
+export interface WikiCategoriesResponse {
+  categories: WikiCategory[];
+  total: number;
+}
+export interface WikiTermsResponse {
+  terms: WikiTerm[];
+  total: number;
+  query: string;
+  category: string;
 }
 
 export interface MacroRegimeData {

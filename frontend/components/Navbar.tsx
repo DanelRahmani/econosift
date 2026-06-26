@@ -20,6 +20,7 @@ const tabs = [
   { href: "/policy", label: "Policy" },
   { href: "/sovereign", label: "Sovereign" },
   { href: "/atlas", label: "Atlas" },
+  { href: "/wiki", label: "Wiki" },
 ];
 
 export function Navbar() {

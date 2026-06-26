@@ -365,49 +365,53 @@ export function RegimeClock({
                 strokeOpacity={0.5}
               />
 
-              {/* quadrant labels */}
+              {/* quadrant labels — centered in each quadrant */}
               <ReferenceLine
-                x={thresholds.gdp}
+                x={(thresholds.gdp + xDomain[1]) / 2}
+                y={(yDomain[0] + thresholds.cpi) / 2}
                 stroke="none"
                 label={{
                   value: "Goldilocks",
-                  position: "insideTopRight",
+                  position: "center",
                   fontSize: 9,
                   fill: QUADRANT_FILL.Goldilocks,
-                  opacity: 0.7,
+                  opacity: 0.8,
                 }}
               />
               <ReferenceLine
-                x={thresholds.gdp}
+                x={(thresholds.gdp + xDomain[1]) / 2}
+                y={(thresholds.cpi + yDomain[1]) / 2}
                 stroke="none"
                 label={{
                   value: "Overheating",
-                  position: "insideBottomRight",
+                  position: "center",
                   fontSize: 9,
                   fill: QUADRANT_FILL.Overheating,
-                  opacity: 0.7,
+                  opacity: 0.8,
                 }}
               />
               <ReferenceLine
-                x={thresholds.gdp}
+                x={(xDomain[0] + thresholds.gdp) / 2}
+                y={(yDomain[0] + thresholds.cpi) / 2}
                 stroke="none"
                 label={{
                   value: "Slowdown",
-                  position: "insideTopLeft",
+                  position: "center",
                   fontSize: 9,
                   fill: QUADRANT_FILL.Slowdown,
-                  opacity: 0.7,
+                  opacity: 0.8,
                 }}
               />
               <ReferenceLine
-                x={thresholds.gdp}
+                x={(xDomain[0] + thresholds.gdp) / 2}
+                y={(thresholds.cpi + yDomain[1]) / 2}
                 stroke="none"
                 label={{
                   value: "Stagflation",
-                  position: "insideBottomLeft",
+                  position: "center",
                   fontSize: 9,
                   fill: QUADRANT_FILL.Stagflation,
-                  opacity: 0.7,
+                  opacity: 0.8,
                 }}
               />
 

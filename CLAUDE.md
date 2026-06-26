@@ -2,7 +2,7 @@
 
 ## What This App Does
 
-Axiom Finance is a self-hosted financial analytics platform built on FastAPI + Next.js 14, containerized via Docker Compose. It covers the full investment research stack across 11 pages:
+Axiom Finance is a self-hosted financial analytics platform built on FastAPI + Next.js 14, containerized via Docker Compose. It covers the full investment research stack across 12 pages:
 
 - **Markets** (`/markets`): Price charts, technical indicators (MACD/BB/Ichimoku/Fibonacci/Pivots), risk metrics (VaR/Sharpe/Beta/GARCH), valuation (8-model engine + DCF + Snowflake score), ratios, options & IV, news feed, 13F/Form 4
 - **Dashboard** (`/dashboard`): Market breadth, global indices, Fear & Greed, top movers
@@ -15,6 +15,7 @@ Axiom Finance is a self-hosted financial analytics platform built on FastAPI + N
 - **Calendar** (`/calendar`): Earnings, dividends, macro releases, IPOs, CB meetings
 - **Macro** (`/macro`): 12-tab macro hub — rates, inflation, growth, housing, commodities, FX, leading indicators, financial conditions, COT positioning, Econometric Lab, Country Risk, Central Banks
 - **Atlas** (`/atlas`): Choropleth world map of 6 macro indicators across ~200 countries (2000–2024) with year-slider animation, regional blocs (G7/G20/Eurozone/EM), color legend, KPI strip, and Top/Bottom-10 rankings
+- **Wiki** (`/wiki`): Searchable financial dictionary of 410+ terms across 26 categories — each with a detailed 3-5 sentence explanation covering what it is, how it's used, and why it matters. Category sidebar, debounced search, expandable term cards, related-term cross-linking. Backed by `wiki_service.py` and `GET /api/wiki/terms?search=&category=` endpoint.
 
 No paid APIs required. Optional free FRED API key for richer US data.
 
@@ -56,11 +57,13 @@ This section is the source of truth for cross-machine continuation.
 - ✅ **Phase 17**: Performance & Persistence Layer. SQLite (WAL mode) with 6 ORM tables, APScheduler background jobs (daily price/quote/FX refresh), React Query v5 frontend caching, HybridCache (memory→SQLite two-tier), composite `/api/market/composite` endpoint, admin `/api/admin/performance`, Nginx gzip, progressive tab lazy-loading with Suspense. Backfill scripts for OHLCV and macro data.
 - ✅ **Phase 18A**: Macro-Financial Intelligence. 5 new backend services (credit_market, yield_curve, policy, sovereign_risk, macro_regime), 3 new frontend pages (`/yield`, `/policy`, `/sovereign`). US spot curve, TIPS real yields, breakevens, ACM term premium, CB divergence score, G10 carry differentials, sovereign risk rankings. 563 tests passing.
 - ✅ **Phase 19**: UI & Data Quality Fixes (`0d3a005`→`72477bd`). 5 sub-phases (A–E), 21 fixes. P0: dividend yield scaling, dark-mode chart Y-axis, calendar FRED filter, loading UX, KPI truncation. P1: nav overflow + mobile nav pages, treemap UX, dashboard null-safety, options IV clamp. P2: timestamp formatting, portfolio placeholders, calendar category colors, mobile theme toggle. Backend: yfinance 401 retry, DNS fix, dead Phase 18B code removal. Live-verified: all pages HTTP 200, builds green, pytest passing.
+- ✅ **Phase 20** (2026-06-26): Macro Policy Pages overhaul — 6 backend fixes, 8 frontend fixes. **Backend**: Fixed broken `funding_service.py` (wrong imports/wrong function signatures — M2, SOFR, CP spread now work). Commodities switched from yfinance `=F` tickers to FRED primary (DCOILWTICO, GOLDAMGBD228NLBR, etc.). FX heatmap switched from yfinance `=X` to FRED DEX* series (EUR/USD, GBP/USD, etc.). PPP endpoint rewritten to use FRED DEX spot rates + CPI (8 pairs). Financial Conditions: WALCL Fed BS scaled to $T, C&I loans fixed (BUSLOANS series), ciLoans added to KPIs. Leading Indicators: base year normalization added (`?base_year=2020`), ISLMPC data normalized to index=100. Inflation: Quantity Theory now computes YoY changes with dual-axis chart. COT service: multiple URL fallbacks, expanded column name candidates. **Frontend**: CentralBanksTab — time span selector (1Y/5Y/10Y/All) with proper tick formatting, full CB names (US Federal Reserve, etc.), correct Fed BS label. FinancialConditions — EPU log scale toggle. GrowthEmployment — NFP 5Y/All time buttons, fixed existing home sales Y-axis (3M–5M). Housing — existing home sales scaling (÷1M). LeadingIndicators — base year selector dropdown, ISLMPC current position dots, index labels. RegimeClock — quadrant labels centered, country selector in MacroOverview. CommoditiesTab — KPI cards and data table rendering from FRED. **Note**: COT/Positioning tab may still show empty data (CFTC source issue); Econ Lab API works but frontend needs investigation; Atlas map rendering unreliable.
+- ✅ **Phase 21** (2026-06-26): Wiki/Dictionary page. **Backend**: New `wiki_service.py` with 410 financial terms across 26 categories, each with detailed 3-5 sentence explanations. New `wiki.py` router with `GET /api/wiki/categories`, `GET /api/wiki/terms?search=&category=`, `GET /api/wiki/term/{slug}`. **Frontend**: New `/wiki` page with debounced search, category sidebar (desktop) / horizontal pills (mobile), expandable term cards with related-term cross-linking. New components: `WikiSearch.tsx`, `WikiTermCard.tsx`, `WikiCategoryNav.tsx`. Navbar/MobileNav updated with Wiki tab. Wiki types added to `types.ts`, API methods added to `api.ts`. **Bug fixes**: Fixed 3 `data.baseYear` → `baseYear` references in `LeadingIndicators.tsx`; fixed `nominalGdpYoY`/`m2YoY` → `nominalGdp`/`m2` in `InflationTab.tsx`. Live-verified: `/wiki` HTTP 200, search works, category filter works, expand/collapse works, related-term links navigate correctly.
 
 ### Backend module map (added by this build)
 
-`services/`: `dcf_engine`, `fx_service`, `regime_service`, `valuation_engine`, `snowflake_service`, `discount_rates`, `fundamentals`, `analyst_service`, `fama_french`, `constituents`, `breadth_service`, `indices_service`, `feargreed_service`, `movers_service`, `treemap_service`, `finnhub_service`, `calendar_service`, `screener_service`, `screener_cache`, `advanced_risk`, `options_engine`, `macro_expansion_service`, `rates_service`, `cot_service`, `edgar_service`, `sector_service`, `technicals_service`, `atlas_service`, `risk_parity_service`, `carry_service`, `momentum_service`, `realized_moments_service`, `econ_lab_service`, `country_risk_service`, `centralbanks_service`, `jobs`.
-Routers: `valuation`, `dashboard`, `treemap`, `calendar`, `screener`, `risk`, `options`, `market_data` (+ `/composite`), `snowflake`, `sector`, `technicals`, `atlas`, `portfolio`, `macro`, `research`, `admin` (+ `/performance`).
+`services/`: `dcf_engine`, `fx_service`, `regime_service`, `valuation_engine`, `snowflake_service`, `discount_rates`, `fundamentals`, `analyst_service`, `fama_french`, `constituents`, `breadth_service`, `indices_service`, `feargreed_service`, `movers_service`, `treemap_service`, `finnhub_service`, `calendar_service`, `screener_service`, `screener_cache`, `advanced_risk`, `options_engine`, `macro_expansion_service`, `rates_service`, `cot_service`, `edgar_service`, `sector_service`, `technicals_service`, `atlas_service`, `risk_parity_service`, `carry_service`, `momentum_service`, `realized_moments_service`, `econ_lab_service`, `country_risk_service`, `centralbanks_service`, `wiki_service`, `jobs`.
+Routers: `valuation`, `dashboard`, `treemap`, `calendar`, `screener`, `risk`, `options`, `market_data` (+ `/composite`), `snowflake`, `sector`, `technicals`, `atlas`, `portfolio`, `macro`, `research`, `admin` (+ `/performance`), `wiki`.
 Database: `database.py` (SQLAlchemy engine, SessionLocal), `db_models.py` (DailyPrice, DailyQuote, DailyMacro, DailyFX, JobExecution, CacheEntry).
 Middleware: `middleware.py` (DeduplicationMiddleware stub).
 All external calls cached via `@cached` / `@async_cached` in `cache.py`. `HybridCache` class available for two-tier memory+SQLite caching.
@@ -114,9 +117,37 @@ Items explicitly excluded from completed phases — tracked for future work.
 - **Econometric Lab enhancements** — additional regression diagnostics, deferred from Phase 18B
 - **EM sovereign risk watch** — extend sovereign risk panel to emerging markets
 - **Regime overlays on Atlas/Macro** — overlay macro regime quadrant on Atlas map and Macro charts
-- **Funding/liquidity panel** — repo, SOFR, swap spread dashboard
 - **`datetime.utcnow()` deprecation** — `policy_service.py` uses deprecated `datetime.utcnow()`, should switch to `datetime.now(datetime.UTC)`
 - **ACM term premium / 30Y breakeven N/A** — FRED series sometimes lag, graceful fallback works but data is occasionally missing
+
+### From Phase 19 (UI & Data Quality)
+- **Admin page navigation link** — no navbar link to `/admin`, only accessible via direct URL (minor)
+- **Markets sub-tab redundancy** — main nav items overlap with Markets page sub-tabs (cosmetic)
+- **Fear & Greed per-signal explanation** (D-05) — documentation/minor
+- **Atlas map rendering artifacts** (A-04) — likely a library limitation (react-simple-maps)
+- **Mobile bottom nav 9-item layout** — pages added but full redesign deferred (cramped on small screens)
+- **Dashboard McClellan signal explanation** (D-05) — minor documentation
+- **Options ~15min delay badge restyle** (O-04) — minor
+- **Compute-tier indicator consistency** (G-13) — minor
+- **Active tab styling inconsistency** (G-15) — minor
+
+### From Phase 20 (2026-06-26 — Macro Policy Pages)
+- **✅ Funding & Liquidity tab** — FIXED: `funding_service.py` had broken imports; rewritten to use correct `macro_expansion_service.fetch_fred_series()`
+- **✅ Commodities tab** — FIXED: switched from yfinance `=F` futures to FRED commodity series
+- **✅ FX Heatmap** — FIXED: switched from yfinance `=X` to FRED DEX* series
+- **✅ PPP Analysis** — FIXED: rewrote to use FRED DEX + CPI, 8 pairs
+- **✅ Financial Conditions scaling** — FIXED: WALCL in $T, C&I loans via BUSLOANS, ciLoans in KPIs
+- **✅ NFP chart** — FIXED: 5Y/All time buttons, removed broken log scale
+- **✅ Existing Home Sales Y-axis** — FIXED: domain [3M–5M]
+- **✅ ISLMPC framework** — FIXED: base year normalization, index labels, current position dots on IS/LM curves
+- **✅ Quantity Theory** — FIXED: YoY computation, dual-axis chart
+- **✅ Central Banks tab** — FIXED: time span selector, full CB names, Fed BS label
+- **✅ EPU log scale** — FIXED: toggle button on chart
+- **✅ RegimeClock quadrants** — FIXED: labels centered, country selector
+- **COT/Positioning** — multiple URL fallbacks added; may still show empty (CFTC source format changes frequently)
+- **Atlas map rendering** — unreliable, likely react-simple-maps limitation
+- **Econ Lab frontend** — API works (nObs=40, R²=0.078) but frontend component needs investigation
+- **Inflation/Rates/Overview country selectors** — not yet implemented (US-only)
 
 ### From Phase 19 (UI & Data Quality)
 - **Admin page navigation link** — no navbar link to `/admin`, only accessible via direct URL (minor)

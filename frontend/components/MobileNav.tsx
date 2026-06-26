@@ -16,6 +16,7 @@ const tabs = [
   { href: "/sectors", label: "Sectors", icon: "M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" },
   { href: "/macro", label: "Macro", icon: "M4 19V5m0 14h16M8 15l3-4 3 3 4-6" },
   { href: "/atlas", label: "Atlas", icon: "M12 2a10 10 0 100 20 10 10 0 000-20zM2 12h20M12 2c2.5 2.5 4 6 4 10s-1.5 7.5-4 10c-2.5-2.5-4-6-4-10s1.5-7.5 4-10z" },
+  { href: "/wiki", label: "Wiki", icon: "M4 19.5A2.5 2.5 0 016.5 17H20M4 19.5A2.5 2.5 0 006.5 22H20V2L16 6l-4-4-4 4-4-4v17.5z" },
 ];
 
 export function MobileNav() {
