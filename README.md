@@ -1,4 +1,4 @@
-# Axiom Finance
+# Axiom Finance Alpha 0.1
 
 A locally-hosted, Dockerised, multi-asset financial analytics dashboard.
 
