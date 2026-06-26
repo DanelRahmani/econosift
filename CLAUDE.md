@@ -118,6 +118,17 @@ New pages extending the platform into quantitative research. All data infrastruc
   - Live-verified: both endpoints HTTP 200, traffic-light table and policy rate chart render in browser, 11 new unit tests passing.
 
 - ✅ **Phase 17 — Performance & Persistence Layer** — **DONE**. SQLite persistence + APScheduler background jobs + React Query frontend caching.
+
+- ✅ **Phase 18A — Macro-Financial Intelligence (backend + core pages)** — **DONE** (`ebb59da`→`066decd`). Turns Axiom into a macro-financial intelligence system with 5 new backend services, 3 new frontend pages, and 4 new router families.
+  - **Credit Pulse** (`services/credit_market.py`, `GET /api/credit/pulse`): IG/HY OAS, BBB spread, SOFR/DTB3 funding spread splice with TEDRATE history. Stress signal when HY OAS >700bps or funding spread >50bps.
+  - **Yield Curves** (`services/yield_curve_service.py`, `GET /api/yield/curves`): US spot curve (11 tenors), TIPS real yields (4 tenors), breakeven inflation (5Y/10Y/30Y), ACM term premium, 8 foreign 10Y spreads vs US (Germany/UK/Japan/France/Italy/Canada/Australia/Spain). Spread convention: 10Y−2Y (long minus short).
+  - **Policy Intelligence** (`services/policy_service.py`, `GET /api/policy/tracker`): CB divergence score + stance classification (tightening/easing/on_hold) for Fed/ECB/BoE/BoJ/BoC/RBA/SNB using Phase 14's `IRSTCI01*`/`IR3TIB01*` series with freshness-ranked fallback. G10 carry differentials vs USD.
+  - **Sovereign Risk** (`services/sovereign_risk_service.py`, `GET /api/sovereign/risk`): 10Y spread vs US Treasury + WB composite macro score (debt/GDP, fiscal balance, CA balance, inflation, unemployment) for 8 countries. Traffic-light risk signal.
+  - **Macro Regime** (`services/macro_regime_service.py`, `GET /api/macro/regime`): 4-quadrant growth×inflation regime classifier with regime-adjusted asset allocation signals.
+  - **Frontend**: `/yield` (US curve/real yields/breakevens), `/policy` (CB divergence table/stance badges/carry), `/sovereign` (risk rankings/spread panels) — all 3 pages HTTP 200 and rendering live data. Navbar updated.
+  - **Live-verified**: all 5 endpoints HTTP 200, all 3 pages rendering data (US 10Y 4.41%, Fed easing 3.63%, UK sovereign risk score 46.1 vs Germany 13.6). 563 tests passing.
+  - **Known minor items for 18B cleanup**: `datetime.utcnow()` deprecation warning in `policy_service.py`; ACM term premium and 30Y breakeven show N/A when FRED series lags (graceful fallback working).
+  - **Deferred to Phase 18B**: `/scenario` lab, Econometric Lab enhancements, EM sovereign risk watch, regime overlays on Atlas/Macro, funding/liquidity panel.
   - **Database** (`database.py`, `db_models.py`): SQLite (WAL mode) with 6 ORM tables: `DailyPrice`, `DailyQuote`, `DailyMacro`, `DailyFX`, `JobExecution`, `CacheEntry`. Volume-mounted at `/app/data` for persistence across restarts. `init_db()` called on startup (idempotent).
   - **Job Infrastructure** (`services/jobs.py`): APScheduler `BackgroundScheduler` with 3 cron jobs: `refresh_daily_prices` (16:00 UTC), `refresh_daily_quotes` (17:00 UTC), `refresh_fx_rates` (09/15/21 UTC). Job execution logged to `JobExecution` table. Controlled via `SCHEDULER_ENABLED` env var.
   - **HybridCache** (added to `cache.py`): Two-tier cache — in-memory `TTLCache` → SQLite `CacheEntry` fallback. Existing `@cached`/`@async_cached` decorators unchanged. Stats track `hits_mem`, `hits_db`, `misses`. `get_stale_while_revalidate()` for SWR pattern.
