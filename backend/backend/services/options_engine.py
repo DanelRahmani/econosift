@@ -285,6 +285,9 @@ def _hydrate_chain_rows(
         itm = bool(row.get("inTheMoney", False))
 
         iv_pct = (iv_raw * 100.0) if iv_raw and iv_raw > 0 else None
+        # Clamp nonsensical IV from deep-ITM near-expiry options (e.g. 771%)
+        if iv_pct and iv_pct > 500:
+            iv_pct = None
         mid = (bid + ask) / 2.0 if (bid or ask) else (last or 0.0)
 
         # Black-Scholes delta and theoretical price using IV from chain
@@ -617,6 +620,8 @@ def get_term_structure(ticker: str) -> list[dict]:
             atm_strike = calls_df.loc[atm_idx, "strike"]
             iv_raw = _clean(calls_df.loc[atm_idx, "impliedVolatility"])
             atm_iv = iv_raw * 100.0 if iv_raw and iv_raw > 0 else None
+            if atm_iv and atm_iv > 500:
+                atm_iv = None
 
             call_bid = calls_df.loc[atm_idx, "bid"] or 0.0
             call_ask = calls_df.loc[atm_idx, "ask"] or 0.0
@@ -680,6 +685,8 @@ def get_iv_smile(ticker: str, expiry: str) -> list[dict]:
                 iv_raw = _clean(row.get("impliedVolatility"))
                 if strike is not None:
                     puts_iv[float(strike)] = iv_raw * 100.0 if iv_raw and iv_raw > 0 else None
+                    if puts_iv[float(strike)] and puts_iv[float(strike)] > 500:
+                        puts_iv[float(strike)] = None
 
         results = []
         for _, row in calls_df.iterrows():
@@ -693,6 +700,8 @@ def get_iv_smile(ticker: str, expiry: str) -> list[dict]:
 
             iv_raw = _clean(row.get("impliedVolatility"))
             call_iv = iv_raw * 100.0 if iv_raw and iv_raw > 0 else None
+            if call_iv and call_iv > 500:
+                call_iv = None
             put_iv = puts_iv.get(strike)
 
             if call_iv is None and put_iv is None:

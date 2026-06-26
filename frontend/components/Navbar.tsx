@@ -31,7 +31,7 @@ export function Navbar() {
           <span className="text-accent">Axiom</span>{" "}
           <span className="text-text-primary">Finance</span>
         </Link>
-        <div className="flex gap-1">
+        <div className="flex gap-1 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] hidden md:flex">
           {tabs.map((t) => {
             const active = pathname?.startsWith(t.href);
             return (

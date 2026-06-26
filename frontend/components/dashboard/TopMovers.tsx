@@ -34,7 +34,7 @@ export function TopMovers({ index = "sp500" }: { index?: string }) {
   if (loading && !data) return <Skeleton className="h-80" />;
   if (!data) return <Card><div className="text-text-muted text-sm">Movers unavailable.</div></Card>;
 
-  const rows = data[tab];
+  const rows = data?.[tab] ?? [];
 
   return (
     <Card>

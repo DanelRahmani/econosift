@@ -32,8 +32,8 @@ export function BreadthBar({ index = "sp500" }: { index?: string }) {
       <div className="card text-text-muted text-sm">Breadth data unavailable.</div>
     );
 
-  const adv = data.advancing;
-  const dec = data.declining;
+  const adv = data.advancing ?? 0;
+  const dec = data.declining ?? 0;
   const denom = adv + dec || 1;
   const advPct = (adv / denom) * 100;
 
