@@ -118,7 +118,7 @@ export function RiskParityTab() {
               <BarChart data={weightRows} layout="vertical" margin={{ left: 8, right: 24 }}>
                 <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="var(--color-border)" />
                 <XAxis type="number" tickFormatter={(v) => `${v.toFixed(0)}%`} tick={{ fontSize: 11, fill: "var(--color-text-muted)" }} />
-                <YAxis type="category" dataKey="ticker" width={56} tick={{ fontSize: 11, fill: "var(--color-text-muted)", fontFamily: "monospace" }} />
+                <YAxis type="category" dataKey="ticker" width={80} tick={{ fontSize: 11, fill: "var(--color-text-muted)", fontFamily: "monospace" }} />
                 <Tooltip formatter={(v: number) => [`${v.toFixed(1)}%`, "Weight"]} contentStyle={tooltipStyle} />
                 <Bar dataKey="value" radius={[0, 4, 4, 0]}>
                   {weightRows.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
@@ -137,7 +137,7 @@ export function RiskParityTab() {
               <BarChart data={rcRows} layout="vertical" margin={{ left: 8, right: 24 }}>
                 <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="var(--color-border)" />
                 <XAxis type="number" tickFormatter={(v) => `${v.toFixed(0)}%`} tick={{ fontSize: 11, fill: "var(--color-text-muted)" }} />
-                <YAxis type="category" dataKey="ticker" width={56} tick={{ fontSize: 11, fill: "var(--color-text-muted)", fontFamily: "monospace" }} />
+                <YAxis type="category" dataKey="ticker" width={80} tick={{ fontSize: 11, fill: "var(--color-text-muted)", fontFamily: "monospace" }} />
                 <Tooltip formatter={(v: number) => [`${v.toFixed(1)}%`, "Risk Contribution"]} contentStyle={tooltipStyle} />
                 <Bar dataKey="value" radius={[0, 4, 4, 0]}>
                   {rcRows.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}

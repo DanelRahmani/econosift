@@ -96,7 +96,7 @@ export function MacroOverview() {
                   type="number"
                   min={2000}
                   max={end}
-                  className="input w-full"
+                  className="input w-full min-w-[80px]"
                   value={start}
                   onChange={(e) => setStart(parseInt(e.target.value) || 2000)}
                 />

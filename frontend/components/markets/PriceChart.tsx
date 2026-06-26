@@ -169,6 +169,7 @@ export function PriceChart({ data, events = [], isLoading }: { data: PricesRespo
                 key={c}
                 type="monotone"
                 dataKey={c}
+                name={c}
                 stroke={CHART_COLORS[i % CHART_COLORS.length]}
                 strokeWidth={2}
                 strokeDasharray={benchmarks.includes(c) ? "5 4" : undefined}

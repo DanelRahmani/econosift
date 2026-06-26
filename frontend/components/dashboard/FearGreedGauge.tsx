@@ -104,12 +104,12 @@ function Gauge({ value, label }: { value: number; label: string }) {
       <path d={arcPath(120, 60)} fill="none" stroke="#ca8a04" strokeWidth={STROKE} />
       <path d={arcPath(60, 0)} fill="none" stroke="#16a34a" strokeWidth={STROKE} strokeLinecap="round" />
       {/* Needle */}
-      <line x1={CX} y1={CY} x2={nx} y2={ny} stroke="currentColor" strokeWidth={3} className="text-text-primary" />
+      <line x1={CX} y1={CY} x2={nx} y2={ny} stroke="currentColor" strokeWidth={2.5} className="text-text-primary" pointerEvents="none" />
       <circle cx={CX} cy={CY} r={5} className="fill-text-primary" />
-      <text x={CX} y={CY - 30} textAnchor="middle" className="fill-text-primary" fontSize="30" fontWeight="700">
+      <text x={CX} y={CY - 42} textAnchor="middle" className="fill-text-primary" fontSize="28" fontWeight="700">
         {value.toFixed(0)}
       </text>
-      <text x={CX} y={CY - 10} textAnchor="middle" fill={scoreColor(value)} fontSize="12" fontWeight="600">
+      <text x={CX} y={CY - 22} textAnchor="middle" fill={scoreColor(value)} fontSize="12" fontWeight="600">
         {label}
       </text>
     </svg>

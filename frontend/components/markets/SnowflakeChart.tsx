@@ -166,7 +166,7 @@ export function SnowflakeChart({ ticker, onAxisClick, compact = false }: Props) 
 
       {/* Rewards & Risks */}
       {!compact && (
-        <div className="grid grid-cols-2 gap-3 pt-1">
+        <div className="grid grid-cols-2 gap-3 pt-1 items-start">
           <div>
             <p className="text-xs font-semibold text-success mb-1">✓ Strengths</p>
             <ul className="space-y-0.5">

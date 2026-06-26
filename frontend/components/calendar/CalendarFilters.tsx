@@ -34,17 +34,19 @@ function ToggleBtn({
   active,
   onClick,
   children,
+  colorClass,
 }: {
   active: boolean;
   onClick: () => void;
   children: React.ReactNode;
+  colorClass?: string;
 }) {
   return (
     <button
       onClick={onClick}
       className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
         active
-          ? "bg-accent text-white"
+          ? (colorClass ?? "bg-accent text-white")
           : "text-text-muted hover:bg-surface-alt"
       }`}
     >
@@ -52,6 +54,13 @@ function ToggleBtn({
     </button>
   );
 }
+
+const CATEGORY_COLORS: Record<string, string> = {
+  macro: "bg-blue-600 text-white",
+  earnings: "bg-emerald-600 text-white",
+  dividend: "bg-amber-500 text-white",
+  ipo: "bg-purple-600 text-white",
+};
 
 const CATEGORIES: { key: CalendarEvent["category"]; label: string }[] = [
   { key: "macro", label: "Macro" },
@@ -62,9 +71,9 @@ const CATEGORIES: { key: CalendarEvent["category"]; label: string }[] = [
 
 const IMPACT_OPTS: { value: ImpactFilter; label: string }[] = [
   { value: 0, label: "All" },
-  { value: 1, label: "★" },
-  { value: 2, label: "★★" },
-  { value: 3, label: "★★★" },
+  { value: 1, label: "⭐" },
+  { value: 2, label: "⭐⭐" },
+  { value: 3, label: "⭐⭐⭐" },
 ];
 
 const TZ_OPTS: TzDisplay[] = ["ET", "Local"];
@@ -94,6 +103,7 @@ export function CalendarFilters({
               key={c.key}
               active={filters.categories.has(c.key)}
               onClick={() => onCategoryToggle(c.key)}
+              colorClass={CATEGORY_COLORS[c.key]}
             >
               {c.label}
             </ToggleBtn>
