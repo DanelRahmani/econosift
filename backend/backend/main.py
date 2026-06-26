@@ -12,6 +12,7 @@ from .routers import (
     market, valuation, ratios, search, macro,
     portfolio, screener, admin, dashboard, treemap, calendar, risk, options,
     market_data, snowflake, sector, technicals, atlas, research, credit,
+    yield_curve,
 )
 from .services import screener_service
 
@@ -66,3 +67,4 @@ app.include_router(technicals.router)
 app.include_router(atlas.router)
 app.include_router(research.router)
 app.include_router(credit.router)
+app.include_router(yield_curve.router)
