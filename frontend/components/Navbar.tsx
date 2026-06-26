@@ -16,6 +16,9 @@ const tabs = [
   { href: "/risk", label: "Risk" },
   { href: "/options", label: "Options" },
   { href: "/macro", label: "Macro" },
+  { href: "/yield", label: "Yield" },
+  { href: "/policy", label: "Policy" },
+  { href: "/sovereign", label: "Sovereign" },
   { href: "/atlas", label: "Atlas" },
 ];
 
