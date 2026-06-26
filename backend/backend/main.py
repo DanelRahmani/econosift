@@ -11,7 +11,7 @@ from .middleware import DeduplicationMiddleware
 from .routers import (
     market, valuation, ratios, search, macro,
     portfolio, screener, admin, dashboard, treemap, calendar, risk, options,
-    market_data, snowflake, sector, technicals, atlas, research,
+    market_data, snowflake, sector, technicals, atlas, research, credit,
 )
 from .services import screener_service
 
@@ -65,3 +65,4 @@ app.include_router(sector.router)
 app.include_router(technicals.router)
 app.include_router(atlas.router)
 app.include_router(research.router)
+app.include_router(credit.router)
