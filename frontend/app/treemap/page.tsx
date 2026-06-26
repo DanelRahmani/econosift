@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import type { TreemapResponse } from "@/lib/types";
 import { Card, Skeleton } from "@/components/ui";
+import { formatAsOf } from "@/lib/format";
 import { TreemapChart } from "@/components/markets/Treemap";
 
 // ---------------------------------------------------------------------------
@@ -153,7 +154,7 @@ export default function TreemapPage() {
           <h1 className="text-xl font-bold text-text-primary">Market Treemap</h1>
           <p className="text-sm text-text-muted mt-0.5">
             Area = log(market cap) · Colour = {period.toUpperCase()} return
-            {data?.asOf ? ` · as of ${data.asOf}` : ""}
+            {data?.asOf ? ` · as of ${formatAsOf(data.asOf)}` : ""}
           </p>
         </div>
         {/* Colour legend */}

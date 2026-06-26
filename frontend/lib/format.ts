@@ -47,6 +47,20 @@ export const CHART_COLORS = [
   "#0891b2", "#9333ea", "#ea580c", "#db2777",
 ];
 
+/** Format an ISO timestamp to a readable date-time string. */
+export function formatAsOf(iso: string | null | undefined): string {
+  if (!iso) return "";
+  try {
+    const d = new Date(iso);
+    return d.toLocaleDateString("en-US", {
+      month: "short", day: "numeric", year: "numeric",
+      hour: "numeric", minute: "2-digit", timeZoneName: "short",
+    });
+  } catch {
+    return iso.slice(0, 10);
+  }
+}
+
 export function exportToCsv(filename: string, rows: Record<string, unknown>[]) {
   if (!rows.length) return;
   const headers = Object.keys(rows[0]);

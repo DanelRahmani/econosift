@@ -1,6 +1,7 @@
 """Thin, cached wrapper around yfinance."""
 from __future__ import annotations
 
+import time
 import pandas as pd
 import yfinance as yf
 
@@ -145,12 +146,28 @@ def get_market_caps(symbols: tuple[str, ...]) -> dict[str, float]:
     return result
 
 
+def _retry_yf(fn, max_retries=2, delay=1.0):
+    """Call fn() with retries for transient yfinance errors (401, crumb, etc.)."""
+    for attempt in range(max_retries + 1):
+        try:
+            return fn()
+        except Exception as e:
+            msg = str(e).lower()
+            if attempt < max_retries and ("401" in msg or "crumb" in msg or "too many" in msg):
+                time.sleep(delay * (attempt + 1))
+                continue
+            if attempt == max_retries:
+                raise
+            return None  # non-retryable error, return None
+    return None
+
+
 @cached("yf_quote")
 def get_quote(ticker: str) -> dict:
     t = yf.Ticker(ticker)
     info = {}
     try:
-        info = t.fast_info or {}
+        info = _retry_yf(lambda: t.fast_info or {})
     except Exception:
         info = {}
     price = _safe(info, "last_price") or _safe(info, "lastPrice")
@@ -159,7 +176,7 @@ def get_quote(ticker: str) -> dict:
 
     name = ticker
     try:
-        meta = t.get_info()
+        meta = _retry_yf(lambda: t.get_info())
     except Exception:
         meta = {}
     if meta:

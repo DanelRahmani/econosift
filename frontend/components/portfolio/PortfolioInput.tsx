@@ -61,7 +61,7 @@ export function PortfolioInput({ holdings, onChange, onAnalyze, loading }: Props
               type="text"
               value={h.ticker}
               onChange={(e) => updateTicker(i, e.target.value)}
-              placeholder="AAPL"
+              placeholder="Ticker"
               className="w-28 px-2 py-1.5 rounded-md border border-border bg-surface-alt text-text-primary text-sm font-mono uppercase focus:outline-none focus:border-accent"
             />
             <input
