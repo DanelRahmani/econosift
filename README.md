@@ -2,7 +2,7 @@
 
 A self-hosted, Dockerised financial analytics platform covering the full investment research stack — from macroeconomics to options pricing, portfolio optimisation to financial term dictionary.
 
-**No paid APIs required.** Optional free [FRED API key](https://fred.stlouisfed.org/docs/api/api_key.html) for richer US data.
+**No paid APIs required.** Optional free [FRED API key](https://fred.stlouisfed.org/docs/api/api_key.html) for richer US macro data and [Finnhub API key](https://finnhub.io/) for earnings, calendar events, and insider transactions.
 
 ---
 
@@ -67,7 +67,7 @@ The maroon/crimson accent is the Axiom brand signature — it provides a distinc
 git clone https://github.com/your-username/axiomfinance.git
 cd axiomfinance
 
-cp .env.example .env   # optional: add a free FRED_API_KEY (https://fred.stlouisfed.org/docs/api/api_key.html)
+cp .env.example .env   # optional: add FRED_API_KEY + FINNHUB_API_KEY (both have free tiers)
 docker compose up -d    # builds and starts everything
 ```
 
@@ -78,7 +78,7 @@ docker compose logs -f  # tail all logs
 docker compose down     # stop everything
 ```
 
-**No paid API keys required.** FRED_API_KEY is optional and free; without it the macro pipeline falls back to World Bank / IMF / pandas-datareader.
+**No paid API keys required.** FRED_API_KEY and FINNHUB_API_KEY are optional and have free tiers. Without FRED, macro data falls back to World Bank / IMF / BIS. Without Finnhub, calendar earnings/news/insider data is unavailable.
 
 ---
 
@@ -262,7 +262,7 @@ axiomfinance/
 | `FRED_API_KEY` | No | US economic data from St. Louis Fed (free tier available) |
 | `FINNHUB_API_KEY` | No | Earnings, news, insider transactions (free tier available) |
 
-Without API keys, the platform gracefully degrades — using World Bank, IMF, and pandas-datareader fallbacks for macro data.
+Without API keys, the platform gracefully degrades — using World Bank, IMF, and BIS for macro data; calendar/news/insider data will be unavailable without Finnhub.
 
 ---
 
