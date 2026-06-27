@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import type { FinancialConditionsData } from "@/lib/types";
+import type { FinancialConditionsData, CotData, CotContract } from "@/lib/types";
 import { Card } from "@/components/ui";
 import {
   LineChart,
@@ -55,6 +55,8 @@ export function FinancialConditions() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [epuLogScale, setEpuLogScale] = useState(false);
+  const [fundingData, setFundingData] = useState<any>(null);
+  const [cotData, setCotData] = useState<CotData | null>(null);
 
   useEffect(() => {
     api
@@ -62,6 +64,8 @@ export function FinancialConditions() {
       .then(setData)
       .catch(() => setError(true))
       .finally(() => setLoading(false));
+    api.macroFunding().then(setFundingData).catch(() => {});
+    api.macroCot().then(setCotData).catch(() => {});
   }, []);
 
   if (loading) {
@@ -279,6 +283,109 @@ export function FinancialConditions() {
           </ResponsiveContainer>
         </Card>
       )}
+
+      {/* ── Merged: Funding & Liquidity ── */}
+      {fundingData && !fundingData.error && (
+        <div className="space-y-4">
+          <h2 className="font-semibold text-lg border-t border-border pt-6 mt-2">Funding & Liquidity</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {fundingData.m2?.length > 0 && (
+              <Card className="p-4">
+                <h3 className="font-semibold text-sm mb-2">M2 Money Supply</h3>
+                <ResponsiveContainer width="100%" height={180}>
+                  <LineChart data={fundingData.m2}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
+                    <XAxis dataKey="date" hide /><YAxis domain={['auto','auto']} width={40} fontSize={10} /><Tooltip />
+                    <Line type="monotone" dataKey="value" stroke="#3b82f6" dot={false} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </Card>
+            )}
+            {fundingData.sofr?.length > 0 && (
+              <Card className="p-4">
+                <h3 className="font-semibold text-sm mb-2">SOFR</h3>
+                <ResponsiveContainer width="100%" height={180}>
+                  <LineChart data={fundingData.sofr}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
+                    <XAxis dataKey="date" hide /><YAxis domain={['auto','auto']} width={40} fontSize={10} /><Tooltip />
+                    <Line type="monotone" dataKey="value" stroke="#f59e0b" dot={false} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </Card>
+            )}
+            {fundingData.cp_spread?.length > 0 && (
+              <Card className="p-4">
+                <h3 className="font-semibold text-sm mb-2">3M CP Spread vs Fed Funds</h3>
+                <ResponsiveContainer width="100%" height={180}>
+                  <LineChart data={fundingData.cp_spread}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
+                    <XAxis dataKey="date" hide /><YAxis domain={['auto','auto']} width={40} fontSize={10} /><Tooltip />
+                    <Line type="monotone" dataKey="value" stroke="#ef4444" dot={false} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </Card>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Merged: COT Positioning ── */}
+      {cotData && !cotData.error && cotData.contracts?.length > 0 && (
+        <div className="space-y-4">
+          <h2 className="font-semibold text-lg border-t border-border pt-6 mt-2">
+            Commitments of Traders (CFTC)
+            <span className="text-xs text-text-secondary font-normal ml-2">
+              Source: {cotData.source}{cotData.asOf ? ` · as of ${cotData.asOf}` : ""}
+            </span>
+          </h2>
+          <Card className="p-4">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-xs text-text-secondary border-b border-border">
+                    <th className="pb-2 pr-4">Contract</th>
+                    <th className="pb-2 pr-4 text-right">Net Speculator</th>
+                    <th className="pb-2 pr-4 text-right">Net Commercial</th>
+                    <th className="pb-2 pr-4 text-right">Open Interest</th>
+                    <th className="pb-2 min-w-[120px]">COT Index (0–100)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {cotData.contracts.map((c: CotContract) => (
+                    <tr key={c.code} className="border-b border-border/40 hover:bg-surface-alt/30 transition-colors">
+                      <td className="py-2 pr-4"><div className="font-medium">{c.name}</div><div className="text-xs text-text-secondary">{c.code}</div></td>
+                      <td className={`py-2 pr-4 text-right font-mono font-semibold ${c.net_speculator != null && c.net_speculator >= 0 ? "text-success" : "text-danger"}`}>
+                        {c.net_speculator != null ? `${c.net_speculator >= 0 ? "+" : ""}${fmtCot(c.net_speculator)}` : "—"}
+                      </td>
+                      <td className={`py-2 pr-4 text-right font-mono ${c.net_commercial != null && c.net_commercial >= 0 ? "text-success" : "text-danger"}`}>
+                        {c.net_commercial != null ? `${c.net_commercial >= 0 ? "+" : ""}${fmtCot(c.net_commercial)}` : "—"}
+                      </td>
+                      <td className="py-2 pr-4 text-right font-mono text-text-secondary">{fmtCot(c.open_interest)}</td>
+                      <td className="py-2">
+                        {c.cot_index != null && (
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1 bg-surface-alt rounded-full h-2 overflow-hidden">
+                              <div className="h-2 rounded-full" style={{ width: `${Math.max(0, Math.min(100, c.cot_index))}%`, backgroundColor: c.cot_index >= 70 ? "#10b981" : c.cot_index <= 30 ? "#ef4444" : "#f59e0b" }} />
+                            </div>
+                            <span className="text-xs w-8 text-right">{c.cot_index.toFixed(0)}</span>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        </div>
+      )}
     </div>
   );
+}
+
+function fmtCot(v: number | null): string {
+  if (v == null) return "—";
+  if (Math.abs(v) >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
+  if (Math.abs(v) >= 1_000) return `${(v / 1_000).toFixed(0)}K`;
+  return v.toFixed(0);
 }

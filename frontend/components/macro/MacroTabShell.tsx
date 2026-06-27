@@ -6,27 +6,18 @@ import { RegimeOverlay } from "./RegimeOverlay";
 
 const TABS = [
   { id: "overview", label: "Overview" },
-  { id: "rates", label: "Rates & Yields" },
   { id: "inflation", label: "Inflation" },
   { id: "employment", label: "Growth & Employment" },
   { id: "housing", label: "Housing" },
   { id: "commodities", label: "Commodities" },
   { id: "fx", label: "FX" },
   { id: "leading", label: "Leading Indicators" },
-  { id: "financial", label: "Financial Conditions" },
-  { id: "positioning", label: "Positioning" },
-  { id: "lab", label: "Econometric Lab" },
-  { id: "country-risk", label: "Country Risk" },
-  { id: "centralbanks", label: "Central Banks" },
-  { id: "funding", label: "Funding & Liquidity" },
+  { id: "financial", label: "Financial & Funding Conditions" },
   { id: "sentiment", label: "Sentiment Signals" },
 ];
 
 const MacroOverviewLazy = dynamic(() =>
   import("./MacroOverview").then((m) => ({ default: m.MacroOverview }))
-);
-const RatesYieldsLazy = dynamic(() =>
-  import("./RatesYields").then((m) => ({ default: m.RatesYields }))
 );
 const InflationTabLazy = dynamic(() =>
   import("./InflationTab").then((m) => ({ default: m.InflationTab }))
@@ -49,21 +40,6 @@ const LeadingIndicatorsLazy = dynamic(() =>
 const FinancialConditionsLazy = dynamic(() =>
   import("./FinancialConditions").then((m) => ({ default: m.FinancialConditions }))
 );
-const PositioningTabLazy = dynamic(() =>
-  import("./PositioningTab").then((m) => ({ default: m.PositioningTab }))
-);
-const EconLabLazy = dynamic(() =>
-  import("./EconLabTab").then((m) => ({ default: m.EconLabTab }))
-);
-const CountryRiskTabLazy = dynamic(() =>
-  import("./CountryRiskTab").then((m) => ({ default: m.CountryRiskTab }))
-);
-const CentralBanksTabLazy = dynamic(() =>
-  import("./CentralBanksTab").then((m) => ({ default: m.CentralBanksTab }))
-);
-const FundingLiquidityTabLazy = dynamic(() =>
-  import("./FundingLiquidityTab").then((m) => ({ default: m.FundingLiquidityTab }))
-);
 const SentimentTabLazy = dynamic(() =>
   import("./SentimentTab").then((m) => ({ default: m.SentimentTab }))
 );
@@ -71,7 +47,6 @@ const SentimentTabLazy = dynamic(() =>
 function TabContent({ activeTab }: { activeTab: string }) {
   switch (activeTab) {
     case "overview":    return <MacroOverviewLazy />;
-    case "rates":       return <RatesYieldsLazy />;
     case "inflation":   return <InflationTabLazy />;
     case "employment":  return <GrowthEmploymentLazy />;
     case "housing":     return <HousingTabLazy />;
@@ -79,11 +54,6 @@ function TabContent({ activeTab }: { activeTab: string }) {
     case "fx":          return <FxTabLazy />;
     case "leading":     return <LeadingIndicatorsLazy />;
     case "financial":   return <FinancialConditionsLazy />;
-    case "positioning": return <PositioningTabLazy />;
-    case "lab":         return <EconLabLazy />;
-    case "country-risk": return <CountryRiskTabLazy />;
-    case "centralbanks": return <CentralBanksTabLazy />;
-    case "funding":     return <FundingLiquidityTabLazy />;
     case "sentiment":   return <SentimentTabLazy />;
     default:            return <MacroOverviewLazy />;
   }
