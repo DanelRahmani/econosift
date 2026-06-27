@@ -47,7 +47,7 @@ async def prices(tickers: str = Query(...), period: str = "1y",
     all_syms = tuple(dict.fromkeys(syms + benchmarks))
 
     frame = await asyncio.to_thread(yfs.get_close_frame, all_syms, period)
-    if frame is None or frame.empty:
+    if frame is None or not hasattr(frame, "empty") or frame.empty:
         return {"prices": [], "benchmarks": benchmarks, "missing": syms}
 
     frame = frame.copy()

@@ -111,7 +111,7 @@ def get_market_caps(symbols: tuple[str, ...]) -> dict[str, float]:
         return {}
 
     def _fetch_one(sym: str) -> tuple[str, float] | None:
-        try:
+        def _call():
             fi = yf.Ticker(sym).fast_info
             mcap = None
             try:
@@ -129,21 +129,33 @@ def get_market_caps(symbols: tuple[str, ...]) -> dict[str, float]:
                 except Exception:
                     pass
             if mcap is not None and not math.isnan(float(mcap)) and float(mcap) > 0:
-                return (sym, float(mcap))
+                return float(mcap)
+            return None
+        try:
+            val = _retry_yf(_call, max_retries=1, delay=1.5)
+            if val is not None:
+                return (sym, val)
         except Exception:
             pass
         return None
 
+    import time as _time
     result: dict[str, float] = {}
-    with ThreadPoolExecutor(max_workers=10) as ex:
-        futures = {ex.submit(_fetch_one, s): s for s in symbols}
-        for fut in as_completed(futures):
-            try:
-                pair = fut.result()
-                if pair is not None:
-                    result[pair[0]] = pair[1]
-            except Exception:
-                pass
+    BATCH_SIZE = 5
+    syms_list = list(symbols)
+    with ThreadPoolExecutor(max_workers=5) as ex:
+        for i in range(0, len(syms_list), BATCH_SIZE):
+            batch = syms_list[i:i + BATCH_SIZE]
+            if i > 0:
+                _time.sleep(0.6)
+            futures = {ex.submit(_fetch_one, s): s for s in batch}
+            for fut in as_completed(futures):
+                try:
+                    pair = fut.result()
+                    if pair is not None:
+                        result[pair[0]] = pair[1]
+                except Exception:
+                    pass
     return result
 
 

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { api } from "@/lib/api";
+import { PageSkeleton } from "@/components/ui";
 import type { Holding, PortfolioAnalysis, CorrelationData, RiskContribData, CAPMData } from "@/lib/types";
 // RiskContribData is RiskContribItem[] (flat list), CorrelationData has matrix as number[][]
 
@@ -195,7 +196,7 @@ export default function PortfolioPage() {
       <PortfolioKPIs data={analyzeData} loading={analyzeLoading} />
 
       {/* Tabs */}
-      <div className="flex gap-1 border-b border-border overflow-x-auto pb-0.5">
+      <div className="flex gap-1 border-b border-border overflow-x-auto pb-0.5 sticky top-14 z-20 bg-background/95 backdrop-blur">
         {TABS.map((t) => (
           <button
             key={t}
@@ -216,11 +217,7 @@ export default function PortfolioPage() {
         {/* ── Overview ── */}
         {tab === "Overview" && (
           <>
-            {analyzeLoading && (
-              <div className="flex items-center justify-center h-64 text-text-muted text-sm animate-pulse">
-                Loading portfolio data…
-              </div>
-            )}
+            {analyzeLoading && <PageSkeleton text="Loading portfolio data…" />}
             {!analyzeLoading && analyzeData && (
               <>
                 <PerformanceChart data={analyzeData} />

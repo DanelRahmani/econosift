@@ -75,16 +75,94 @@ _EXCHANGE_NAME_HINTS: list[tuple[str, str]] = [
 # Data loaders
 # ---------------------------------------------------------------------------
 
+DAMODARAN_URL = (
+    "https://pages.stern.nyu.edu/~adamodar/pc/datasets/ctryprem.xlsx"
+)
+
 def _data_path(fname: str) -> Path:
     return Path(__file__).resolve().parents[1] / "data" / fname
 
 
 @cached("erp_json")
 def load_erp() -> dict:
-    """Load Damodaran ERP JSON (cached). Returns raw dict."""
+    """Load Damodaran ERP data — live Excel download with static JSON fallback."""
+    import pandas as pd
+    import tempfile
+    import urllib.request
+
+    try:
+        # Download the latest ctryprem.xlsx from Damodaran's site
+        with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as tmp:
+            urllib.request.urlretrieve(DAMODARAN_URL, tmp.name)
+            xl = pd.ExcelFile(tmp.name)
+
+        # Find the regional breakdown sheet
+        sheet_name = None
+        for s in xl.sheet_names:
+            if "regional" in s.lower() or "country" in s.lower():
+                sheet_name = s
+                break
+        if sheet_name is None:
+            sheet_name = xl.sheet_names[1] if len(xl.sheet_names) > 1 else xl.sheet_names[0]
+
+        df = xl.parse(sheet_name, header=0)
+        df.columns = [str(c).strip().lower() for c in df.columns]
+
+        # Detect column names (Damodaran uses different column names across years)
+        country_col = erp_col = crp_col = tax_col = None
+        for c in df.columns:
+            c_clean = c.lower().strip()
+            if c_clean in ("country", "region"):
+                country_col = c
+            elif "risk premium" in c_clean or "total erp" in c_clean or c_clean == "erp":
+                if erp_col is None:
+                    erp_col = c
+            elif "country risk" in c_clean or "crp" in c_clean or "premium" in c_clean:
+                if crp_col is None and erp_col is not None:
+                    crp_col = c
+            elif "tax" in c_clean:
+                tax_col = c
+
+        countries: dict[str, dict] = {}
+        mature_erp = None
+        for _, row in df.iterrows():
+            name = str(row.get(country_col, "")).strip()
+            if not name or name.lower() in ("nan", "none", "", "total"):
+                continue
+            erp_val = _clean(row.get(erp_col)) if erp_col else None
+            crp_val = _clean(row.get(crp_col)) if crp_col else None
+            tax_val = _clean(row.get(tax_col)) if tax_col else None
+
+            if erp_val is None:
+                continue
+
+            countries[name] = {
+                "erp": round(erp_val, 4),
+                "crp": round(crp_val, 4) if crp_val is not None else None,
+                "taxRate": round(tax_val, 4) if tax_val is not None else None,
+            }
+            if name == "United States" or mature_erp is None:
+                mature_erp = erp_val
+
+        if countries:
+            log.info("Loaded %d countries from live Damodaran Excel (%s sheet)", len(countries), sheet_name)
+            return {
+                "asOf": "live",
+                "source": "Aswath Damodaran — ctryprem.xlsx (live download)",
+                "sourceUrl": DAMODARAN_URL,
+                "matureMarketERP": round(mature_erp or 4.46, 2),
+                "countries": countries,
+            }
+    except Exception as exc:
+        log.warning("Failed to download/parse Damodaran Excel, falling back to JSON: %s", exc)
+
+    # Fall back to static JSON
     path = _data_path("damodaran_erp_2026.json")
-    with open(path, "r", encoding="utf-8") as f:
-        return json.load(f)
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {"matureMarketERP": 4.46, "countries": {}}
 
 
 @cached("sector_multiples_json")

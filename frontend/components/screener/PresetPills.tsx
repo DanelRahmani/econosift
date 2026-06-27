@@ -23,8 +23,9 @@ export function PresetPills({ presets, selected, onToggle }: PresetPillsProps) {
   return (
     <div className="space-y-3">
       {Object.entries(grouped).map(([category, items]) => (
-        <div key={category} className="flex flex-wrap items-center gap-1.5">
+        <div key={category} className="flex items-center gap-1.5">
           <span className="text-xs text-text-muted font-medium w-24 shrink-0 capitalize">{category}</span>
+          <div className="flex flex-wrap gap-1.5">
           {items.map((p) => {
             const deferred = DEFERRED_IDS.has(p.id);
             const active = selected.has(p.id);
@@ -47,6 +48,7 @@ export function PresetPills({ presets, selected, onToggle }: PresetPillsProps) {
               </button>
             );
           })}
+          </div>
         </div>
       ))}
     </div>

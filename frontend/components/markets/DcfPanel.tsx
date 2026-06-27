@@ -6,6 +6,29 @@ import type { DcfResponse, DcfSensitivity } from "@/lib/types";
 import { Card, Skeleton } from "@/components/ui";
 import { fmtNum, fmtPct, fmtPrice, fmtLarge, currencySymbol } from "@/lib/format";
 
+// ── Regional discount rates ─────────────────────────────────────────────────
+interface CountryRate {
+  name: string;
+  riskFreeRate: number;
+  erp: number;
+}
+
+const DEFAULT_COUNTRY_RATES: CountryRate[] = [
+  { name: "United States", riskFreeRate: 0.04, erp: 0.05 },
+  { name: "Germany", riskFreeRate: 0.025, erp: 0.05 },
+  { name: "Japan", riskFreeRate: 0.01, erp: 0.05 },
+  { name: "United Kingdom", riskFreeRate: 0.04, erp: 0.05 },
+  { name: "Netherlands", riskFreeRate: 0.0275, erp: 0.05 },
+  { name: "France", riskFreeRate: 0.03, erp: 0.05 },
+  { name: "Switzerland", riskFreeRate: 0.01, erp: 0.05 },
+  { name: "Canada", riskFreeRate: 0.035, erp: 0.05 },
+  { name: "Australia", riskFreeRate: 0.04, erp: 0.05 },
+  { name: "China", riskFreeRate: 0.025, erp: 0.05 },
+  { name: "India", riskFreeRate: 0.065, erp: 0.08 },
+  { name: "Brazil", riskFreeRate: 0.10, erp: 0.08 },
+  { name: "Russia", riskFreeRate: 0.16, erp: 0.10 },
+];
+
 // ── Slider config ──────────────────────────────────────────────────────────
 interface Params {
   wacc: number;
@@ -57,7 +80,7 @@ function isSensitivityFull(s: DcfResponse["sensitivity"]): s is DcfSensitivity {
 }
 
 // ── Main component ─────────────────────────────────────────────────────────
-export function DcfPanel({ tickers, period }: { tickers: string[]; period?: string }) {
+export function DcfPanel({ tickers, sharedWacc = null }: { tickers: string[]; period?: string; sharedWacc?: number | null }) {
   const [selectedTicker, setSelectedTicker] = useState<string>(tickers[0] ?? "");
   const [params, setParams] = useState<Params>({
     wacc: 0.09,
@@ -68,8 +91,34 @@ export function DcfPanel({ tickers, period }: { tickers: string[]; period?: stri
   const [data, setData] = useState<DcfResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
+  const [countryRates, setCountryRates] = useState<CountryRate[]>(DEFAULT_COUNTRY_RATES);
+  const [selectedCountry, setSelectedCountry] = useState<string>("");
 
-  // Keep selectedTicker in sync when tickers prop changes
+  // Load live risk-free rates from backend
+  useEffect(() => {
+    api.riskFreeRates().then((r) => {
+      if (r.rates?.length) setCountryRates(r.rates);
+    }).catch(() => {});
+  }, []);
+
+  // When country selection changes, update WACC
+  function handleCountryChange(name: string) {
+    setSelectedCountry(name);
+    if (name) {
+      const c = countryRates.find((r) => r.name === name);
+      if (c) {
+        // Typical WACC = risk-free + ERP (simplified)
+        setParams((prev) => ({ ...prev, wacc: Math.round((c.riskFreeRate + c.erp) * 10000) / 10000 }));
+      }
+    }
+  }
+
+  // When sharedWacc changes from parent, update our WACC
+  useEffect(() => {
+    if (sharedWacc !== null) {
+      setParams((prev) => ({ ...prev, wacc: sharedWacc }));
+    }
+  }, [sharedWacc]);
   useEffect(() => {
     if (tickers.length && !tickers.includes(selectedTicker)) {
       setSelectedTicker(tickers[0]);
@@ -130,6 +179,23 @@ export function DcfPanel({ tickers, period }: { tickers: string[]; period?: stri
             </select>
           </div>
         )}
+
+        {/* Country / discount rate selector */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-sm text-text-secondary">Discount Rate</span>
+          <select
+            value={selectedCountry}
+            onChange={(e) => handleCountryChange(e.target.value)}
+            className="rounded-md bg-surface-alt border border-border px-2 py-1 text-xs text-text-primary"
+          >
+            <option value="">Custom</option>
+            {countryRates.map((c) => (
+              <option key={c.name} value={c.name}>
+                {c.name} ({(c.riskFreeRate * 100).toFixed(2)}%)
+              </option>
+            ))}
+          </select>
+        </div>
 
         {/* Sliders */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

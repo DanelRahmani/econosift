@@ -1,8 +1,9 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import type { RegressResponse } from "@/lib/types";
+import type { Country, RegressResponse } from "@/lib/types";
 import { Card } from "@/components/ui";
+import { CountrySelector } from "./CountrySelector";
 import {
   ScatterChart,
   Scatter,
@@ -31,29 +32,6 @@ const LAB_INDICATORS: { id: string; label: string }[] = [
 ];
 
 const DEFAULT_COUNTRIES = ["US", "DE", "JP", "GB", "FR", "CN", "IN", "BR"];
-
-const COUNTRY_OPTIONS: { iso2: string; name: string }[] = [
-  { iso2: "US", name: "United States" },
-  { iso2: "DE", name: "Germany" },
-  { iso2: "JP", name: "Japan" },
-  { iso2: "GB", name: "United Kingdom" },
-  { iso2: "FR", name: "France" },
-  { iso2: "CN", name: "China" },
-  { iso2: "IN", name: "India" },
-  { iso2: "BR", name: "Brazil" },
-  { iso2: "CA", name: "Canada" },
-  { iso2: "AU", name: "Australia" },
-  { iso2: "KR", name: "South Korea" },
-  { iso2: "MX", name: "Mexico" },
-  { iso2: "ES", name: "Spain" },
-  { iso2: "IT", name: "Italy" },
-  { iso2: "SE", name: "Sweden" },
-  { iso2: "NO", name: "Norway" },
-  { iso2: "DK", name: "Denmark" },
-  { iso2: "PL", name: "Poland" },
-  { iso2: "CH", name: "Switzerland" },
-  { iso2: "NL", name: "Netherlands" },
-];
 
 const CURRENT_YEAR = new Date().getFullYear();
 
@@ -103,6 +81,11 @@ export function EconLabTab() {
   const [result, setResult]         = useState<RegressResponse | null>(null);
   const [loading, setLoading]       = useState(false);
 
+  const [allCountries, setAllCountries] = useState<Country[]>([]);
+
+  useEffect(() => {
+    api.countries().then((r) => setAllCountries(r.countries)).catch(() => {});
+  }, []);
   // Available indep = all indicators except the chosen dep
   const availableIndep = LAB_INDICATORS.filter((ind) => ind.id !== dep);
 
@@ -193,29 +176,12 @@ export function EconLabTab() {
         </div>
 
         {/* Countries */}
-        <div>
-          <label className="text-xs text-text-secondary block mb-2">
-            Countries ({countries.length} selected)
-          </label>
-          <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
-            {COUNTRY_OPTIONS.map((c) => {
-              const on = countries.includes(c.iso2);
-              return (
-                <button
-                  key={c.iso2}
-                  onClick={() => toggleCountry(c.iso2)}
-                  className={`px-2.5 py-1 rounded-lg text-xs transition-colors ${
-                    on
-                      ? "bg-accent text-white"
-                      : "bg-surface-alt text-text-secondary hover:text-text-primary"
-                  }`}
-                >
-                  {c.name}
-                </button>
-              );
-            })}
-          </div>
-        </div>
+        <CountrySelector
+          countries={allCountries}
+          selected={countries}
+          onChange={setCountries}
+          max={20}
+        />
 
         {/* Year range */}
         <div className="flex gap-4 items-end">

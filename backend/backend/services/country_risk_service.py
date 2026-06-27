@@ -80,14 +80,22 @@ def _fetch_wb_sync(wb_code: str, start: int, end: int) -> dict[str, dict[int, fl
         return {}
 
 
-def _latest(year_map: dict[int, float], min_year: int = 2018) -> tuple[float | None, int | None]:
+def _latest(year_map: dict, min_year: int = 2018) -> tuple[float | None, int | None]:
     if not year_map:
         return None, None
-    candidates = {y: v for y, v in year_map.items() if y >= min_year}
-    if not candidates:
+    # Cast keys to int — World Bank API sometimes returns string year keys
+    int_map: dict[int, float] = {}
+    for y, v in year_map.items():
+        try:
+            iy = int(y)
+            if iy >= min_year:
+                int_map[iy] = float(v) if v is not None else 0.0
+        except (ValueError, TypeError):
+            continue
+    if not int_map:
         return None, None
-    yr = max(candidates)
-    return candidates[yr], yr
+    yr = max(int_map)
+    return int_map[yr], yr
 
 
 @async_cached("country_risk")

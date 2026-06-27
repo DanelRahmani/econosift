@@ -57,11 +57,32 @@ async def fetch(indicator_key: str, countries: tuple[str, ...],
     indicator = INDICATOR_MAP.get(indicator_key)
     if not indicator:
         return []
+
+    # Try bulk data first
     try:
-        df = await asyncio.to_thread(_fetch_sync, indicator, list(countries), start, end)
-        parsed = _parse(df, countries)
+        from ..services.bulk_data_service import load_imf
+        bulk = await asyncio.to_thread(load_imf, indicator_key, list(countries), start, end)
+        if bulk is not None and not bulk.empty:
+            out: dict[str, list[tuple[int, float]]] = {}
+            for _, row in bulk.iterrows():
+                iso3 = str(row["iso3"])
+                # Convert ISO3 to ISO2
+                from ..config import ISO2_TO_ISO3
+                iso3_to_iso2 = {v: k for k, v in ISO2_TO_ISO3.items()}
+                iso2 = iso3_to_iso2.get(iso3, iso3[:2])
+                try:
+                    out.setdefault(iso2, []).append((int(row["year"]), float(row["value"])))
+                except (ValueError, TypeError):
+                    continue
+            parsed = {k: sorted(v) for k, v in out.items()}
+        else:
+            raise Exception("bulk data not available")
     except Exception:
-        return []
+        try:
+            df = await asyncio.to_thread(_fetch_sync, indicator, list(countries), start, end)
+            parsed = _parse(df, countries)
+        except Exception:
+            return []
 
     results: list[SeriesResult] = []
     for iso2, points in parsed.items():

@@ -1,13 +1,37 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import type { CotData, CotContract } from "@/lib/types";
 import { Card } from "@/components/ui";
+
+function CotIndexBar({ value }: { value: number | null }) {
+  if (value == null) return <span className="text-text-secondary">—</span>;
+  const pct = Math.max(0, Math.min(100, value));
+  const color = pct >= 70 ? "#10b981" : pct <= 30 ? "#ef4444" : "#f59e0b";
+  return (
+    <div className="flex items-center gap-2">
+      <div className="flex-1 bg-surface-alt rounded-full h-2 overflow-hidden">
+        <div className="h-2 rounded-full" style={{ width: `${pct}%`, backgroundColor: color }} />
+      </div>
+      <span className="text-xs w-8 text-right">{pct.toFixed(0)}</span>
+    </div>
+  );
+}
+
+function fmtCot(v: number | null): string {
+  if (v == null) return "—";
+  if (Math.abs(v) >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
+  if (Math.abs(v) >= 1_000) return `${(v / 1_000).toFixed(0)}K`;
+  return v.toFixed(0);
+}
 
 export function SentimentTab() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [cotData, setCotData] = useState<CotData | null>(null);
 
   useEffect(() => {
     api.macroSentiment().then(setData).catch(console.error).finally(() => setLoading(false));
+    api.macroCot().then(setCotData).catch(() => {});
   }, []);
 
   if (loading) return <div className="h-64 animate-pulse bg-surface rounded"></div>;
@@ -49,6 +73,60 @@ export function SentimentTab() {
           ))}
         </div>
       </div>
+
+      {/* ── COT Positioning ── */}
+      {cotData && !cotData.error && cotData.contracts?.length > 0 && (
+        <div className="space-y-4">
+          <h2 className="font-semibold text-lg border-t border-border pt-6 mt-2">
+            Commitments of Traders (CFTC)
+            <span className="text-xs text-text-secondary font-normal ml-2">
+              Source: {cotData.source}{cotData.asOf ? ` · as of ${cotData.asOf}` : ""}
+            </span>
+          </h2>
+          <Card className="p-4">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-xs text-text-secondary border-b border-border">
+                    <th className="pb-2 pr-4">Contract</th>
+                    <th className="pb-2 pr-4 text-right">Net Speculator</th>
+                    <th className="pb-2 pr-4 text-right">Net Commercial</th>
+                    <th className="pb-2 pr-4 text-right">Open Interest</th>
+                    <th className="pb-2 min-w-[120px]">COT Index (0–100)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {cotData.contracts.map((c: CotContract) => (
+                    <tr key={c.code} className="border-b border-border/40 hover:bg-surface-alt/30 transition-colors">
+                      <td className="py-2 pr-4"><div className="font-medium">{c.name}</div><div className="text-xs text-text-secondary">{c.code}</div></td>
+                      <td className={`py-2 pr-4 text-right font-mono font-semibold ${c.net_speculator != null && c.net_speculator >= 0 ? "text-success" : "text-danger"}`}>
+                        {c.net_speculator != null ? `${c.net_speculator >= 0 ? "+" : ""}${fmtCot(c.net_speculator)}` : "—"}
+                      </td>
+                      <td className={`py-2 pr-4 text-right font-mono ${c.net_commercial != null && c.net_commercial >= 0 ? "text-success" : "text-danger"}`}>
+                        {c.net_commercial != null ? `${c.net_commercial >= 0 ? "+" : ""}${fmtCot(c.net_commercial)}` : "—"}
+                      </td>
+                      <td className="py-2 pr-4 text-right font-mono text-text-secondary">{fmtCot(c.open_interest)}</td>
+                      <td className="py-2">
+                        {c.cot_index != null && <CotIndexBar value={c.cot_index} />}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* COT unavailable message */}
+      {cotData && (cotData.error || !cotData.contracts?.length) && (
+        <div className="border-t border-border pt-6 mt-2">
+          <h2 className="font-semibold text-lg mb-2">Commitments of Traders (CFTC)</h2>
+          <p className="text-text-secondary text-sm">
+            {cotData.error ?? "COT data unavailable — CFTC source may be delayed. Data published weekly on Fridays."}
+          </p>
+        </div>
+      )}
     </div>
   );
 }

@@ -80,8 +80,8 @@ export function FearGreedGauge() {
   );
 }
 
-// SVG gauge geometry (0°=right, CCW positive; bottom-open semicircle 180°→0°).
-const CX = 110, CY = 110, R = 88, STROKE = 16;
+// SVG gauge geometry — bottom-open semicircle.
+const CX = 110, CY = 105, R = 88, STROKE = 14;
 
 function polar(angleDeg: number, r = R): [number, number] {
   const rad = (angleDeg * Math.PI) / 180;
@@ -90,26 +90,45 @@ function polar(angleDeg: number, r = R): [number, number] {
 function arcPath(startDeg: number, endDeg: number): string {
   const [x1, y1] = polar(startDeg);
   const [x2, y2] = polar(endDeg);
-  return `M ${x1} ${y1} A ${R} ${R} 0 0 0 ${x2} ${y2}`; // sweep=0 (CCW)
+  return `M ${x1} ${y1} A ${R} ${R} 0 0 0 ${x2} ${y2}`;
 }
 
 function Gauge({ value, label }: { value: number; label: string }) {
-  // value 0 → 180° (left, fear); value 100 → 0° (right, greed).
   const angle = 180 - (value / 100) * 180;
-  const [nx, ny] = polar(angle, R - STROKE / 2 - 2);
+  const [nx, ny] = polar(angle, R - STROKE / 2);
+
   return (
     <svg viewBox="0 0 220 130" className="w-full max-w-xs">
-      {/* Coloured bands: fear → neutral → greed */}
-      <path d={arcPath(180, 120)} fill="none" stroke="#c4394a" strokeWidth={STROKE} strokeLinecap="round" />
+      {/* Coloured bands: red (fear) → amber (neutral) → green (greed) */}
+      <path d={arcPath(180, 120)} fill="none" stroke="#c4394a" strokeWidth={STROKE} strokeLinecap="butt" />
       <path d={arcPath(120, 60)} fill="none" stroke="#ca8a04" strokeWidth={STROKE} />
-      <path d={arcPath(60, 0)} fill="none" stroke="#16a34a" strokeWidth={STROKE} strokeLinecap="round" />
+      <path d={arcPath(60, 0)} fill="none" stroke="#16a34a" strokeWidth={STROKE} strokeLinecap="butt" />
+
+      {/* Tick marks: 0, 25, 50, 75, 100 */}
+      {[0, 25, 50, 75, 100].map((v) => {
+        const a = 180 - (v / 100) * 180;
+        const [tx, ty] = polar(a, R + 14);
+        const [ix, iy] = polar(a, R - STROKE / 2 - 4);
+        const [ox, oy] = polar(a, R + 4);
+        return (
+          <g key={v}>
+            <line x1={ix} y1={iy} x2={ox} y2={oy} stroke="currentColor" strokeWidth={1} className="text-text-muted" opacity={0.5} />
+            <text x={tx} y={ty} textAnchor="middle" dominantBaseline="middle" fill="currentColor" fontSize="9" className="text-text-muted" opacity={0.7}>
+              {v}
+            </text>
+          </g>
+        );
+      })}
+
       {/* Needle */}
-      <line x1={CX} y1={CY} x2={nx} y2={ny} stroke="currentColor" strokeWidth={2.5} className="text-text-primary" pointerEvents="none" />
+      <line x1={CX} y1={CY} x2={nx} y2={ny} stroke="currentColor" strokeWidth={2} className="text-text-primary" pointerEvents="none" strokeLinecap="round" />
       <circle cx={CX} cy={CY} r={5} className="fill-text-primary" />
-      <text x={CX} y={CY - 42} textAnchor="middle" className="fill-text-primary" fontSize="28" fontWeight="700">
+
+      {/* Value — below the needle pivot */}
+      <text x={CX} y={CY + 3} textAnchor="middle" className="fill-text-primary" fontSize="30" fontWeight="700">
         {value.toFixed(0)}
       </text>
-      <text x={CX} y={CY - 22} textAnchor="middle" fill={scoreColor(value)} fontSize="12" fontWeight="600">
+      <text x={CX} y={CY - 3} textAnchor="middle" fill={scoreColor(value)} fontSize="11" fontWeight="600">
         {label}
       </text>
     </svg>

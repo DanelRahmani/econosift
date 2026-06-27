@@ -131,9 +131,9 @@ async def yield_curve():
     }
 
 
-@router.get("/regime")
-async def regime(country: str = "US", start: int = 2000):
-    """2×2 Goldilocks regime classifier: quarterly GDP growth vs CPI inflation."""
+@router.get("/regime-series")
+async def regime_series(country: str = "US", start: int = 2000):
+    """2×2 Goldilocks regime classifier: quarterly GDP growth vs CPI inflation (historical series)."""
     return await asyncio.to_thread(regime_service.regime_series, country.upper(), start)
 
 
@@ -172,9 +172,40 @@ async def rates():
     return await rates_service.get_rates_data()
 
 
+@router.get("/taylor-rule")
+async def taylor_rule():
+    """US Taylor Rule implied rate vs actual Fed Funds + output gap."""
+    import asyncio
+    from ..services.rates_service import _compute_taylor_rule, _fetch_many_fred_sync
+
+    loop = asyncio.get_event_loop()
+    fred = await loop.run_in_executor(
+        None, _fetch_many_fred_sync,
+        ["CPIAUCSL", "GDPC1", "GDPPOT", "FEDFUNDS"], "2000-01-01",
+    )
+    tr = await loop.run_in_executor(None, _compute_taylor_rule, fred)
+    implied = tr.get("implied", [])
+    actual = tr.get("actual", [])
+    output_gap = tr.get("output_gap", [])
+
+    # Merge into a unified series keyed by date
+    by_date: dict[str, dict] = {}
+    for pt in implied:
+        by_date.setdefault(pt["date"], {})["taylorRate"] = pt["value"]
+    for pt in actual:
+        by_date.setdefault(pt["date"], {})["fedFunds"] = pt["value"]
+    for pt in output_gap:
+        by_date.setdefault(pt["date"], {})["outputGap"] = pt["value"]
+
+    merged = [{"date": d, **vals} for d, vals in sorted(by_date.items())]
+    return {"data": merged}
+
+
 @router.get("/inflation")
-async def inflation():
+async def inflation(country: str = Query("US", description="ISO2 country code (FRED data is US-only)")):
     """CPI, Core CPI, PCE, Core PCE, PPI, breakevens, M2, Quantity Theory."""
+    if country.upper() != "US":
+        return {"asOf": None, "kpis": {}, "history": {}, "note": "FRED data is US-only. For cross-country data use /macro/data or /macro/country-risk."}
     from ..services.macro_expansion_service import fetch_fred_series
 
     series_ids = (
@@ -220,8 +251,10 @@ async def inflation():
 
 
 @router.get("/employment")
-async def employment():
+async def employment(country: str = Query("US", description="ISO2 country code (FRED data is US-only)")):
     """GDP growth, unemployment, NFP, jobless claims, JOLTS, Sahm Rule, industrial production."""
+    if country.upper() != "US":
+        return {"asOf": None, "kpis": {}, "history": {}, "note": "FRED data is US-only. For cross-country data use /macro/data or /macro/country-risk."}
     from ..services.macro_expansion_service import fetch_fred_series
 
     series_ids = (
@@ -279,8 +312,10 @@ async def employment():
 
 
 @router.get("/housing")
-async def housing():
+async def housing(country: str = Query("US", description="ISO2 country code (FRED data is US-only)")):
     """Case-Shiller, housing starts, mortgage rate, existing home sales, recession periods."""
+    if country.upper() != "US":
+        return {"asOf": None, "kpis": {}, "history": {}, "note": "FRED data is US-only. For cross-country data use /macro/data or /macro/country-risk."}
     from ..services.macro_expansion_service import fetch_fred_series, fetch_recession_dates
 
     series_ids = (
@@ -644,8 +679,12 @@ def _download_gscpi_sync() -> list[dict]:
 
 
 @router.get("/leading")
-async def leading(base_year: int = Query(2020, description="Base year for IS-LM-PC normalization")):
+async def leading(base_year: int = Query(2020, description="Base year for IS-LM-PC normalization"),
+                   country: str = Query("US", description="ISO2 country code (FRED data is US-only)")):
     """Leading Economic Indicators: LEI, CFNAI, ISM PMI, GSCPI, IS-LM-PC framework data."""
+    if country.upper() != "US":
+        return {"asOf": None, "kpis": {}, "history": {}, "islmpc": {}, "baseYear": base_year,
+                "note": "FRED data is US-only. For cross-country data use /macro/data or /macro/country-risk."}
     from ..services.macro_expansion_service import fetch_fred_series
 
     series_ids = (
@@ -708,8 +747,10 @@ async def leading(base_year: int = Query(2020, description="Base year for IS-LM-
 
 
 @router.get("/financial-conditions")
-async def financial_conditions():
+async def financial_conditions(country: str = Query("US", description="ISO2 country code (FRED data is US-only)")):
     """NFCI, STLFSI, Fed balance sheet, credit card delinquency, C&I loans, EPU."""
+    if country.upper() != "US":
+        return {"asOf": None, "kpis": {}, "history": {}, "note": "FRED data is US-only. For cross-country data use /macro/data or /macro/country-risk."}
     from ..services.macro_expansion_service import fetch_fred_series
 
     series_ids = (
@@ -829,7 +870,8 @@ async def macro_regime():
     return await get_macro_regime()
 
 # ---------------------------------------------------------------------------
-# Phase 18B – Funding, Sentiment, Taylor Rule
+# Phase 18B – Funding & Sentiment
+# (Taylor Rule is handled by the /rates-service route above — @router.get("/taylor-rule") at line ~175)
 # ---------------------------------------------------------------------------
 
 @router.get("/funding")
@@ -837,12 +879,6 @@ async def funding_liquidity():
     """Funding and Liquidity gauge."""
     from ..services.funding_service import get_funding_liquidity
     return await get_funding_liquidity()
-
-@router.get("/taylor-rule")
-async def taylor_rule():
-    """US Taylor Rule and Output Gap."""
-    from ..services.econ_lab_service import calculate_taylor_rule
-    return await calculate_taylor_rule()
 
 @router.get("/sentiment")
 async def macro_sentiment():

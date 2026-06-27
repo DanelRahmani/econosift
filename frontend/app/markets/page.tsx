@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
 import type { EventsResponse } from "@/lib/types";
 import { SearchBar } from "@/components/SearchBar";
-import { Card, Skeleton } from "@/components/ui";
+import { Card, Skeleton, ChartSkeleton, ScrollableTabBar, ExportPdfButton } from "@/components/ui";
 import { PriceChart } from "@/components/markets/PriceChart";
 import { QuoteCards } from "@/components/markets/QuoteCards";
 import { NewsFeed } from "@/components/markets/NewsFeed";
@@ -211,6 +211,7 @@ function MarketsPageInner() {
         >
           Watchlist
         </button>
+        <ExportPdfButton />
       </div>
 
       {showWatchlist && (
@@ -218,7 +219,7 @@ function MarketsPageInner() {
       )}
 
       <div className="flex flex-wrap items-center justify-between gap-4" data-hide-print>
-        <div className="flex gap-1 overflow-x-auto no-scrollbar">
+        <ScrollableTabBar className="sticky top-14 z-20 bg-background/95 backdrop-blur py-1">
           {TABS.map((t) => (
             <button
               key={t}
@@ -230,7 +231,7 @@ function MarketsPageInner() {
               {t}
             </button>
           ))}
-        </div>
+        </ScrollableTabBar>
         {(tab === "Overview" || tab === "Technicals" || tab === "Valuation") && (
           <div className="flex items-center gap-3">
             {tab === "Overview" && (
@@ -388,7 +389,7 @@ function MarketsPageInner() {
                 ))}
               </div>
             </div>
-            {secLoading ? <div className="animate-pulse bg-surface-alt rounded-lg h-80" />
+            {secLoading ? <ChartSkeleton height="h-80" />
               : secReturns ? <SectorReturnsChart data={secReturns.periods[secPeriod as keyof typeof secReturns.periods] ?? []}
                   onSectorClick={(s) => setSelectedSector(s === selectedSector ? null : s)} /> : null}
           </Card>
@@ -396,7 +397,7 @@ function MarketsPageInner() {
           <Card>
             <h3 className="text-sm font-semibold text-text-secondary mb-4">Sector ETF Fundamentals</h3>
             {secLoading || !secFundamentals ? (
-              <div className="animate-pulse bg-surface-alt rounded-lg h-48" />
+              <ChartSkeleton height="h-48" />
             ) : <SectorFundamentalsTable data={secFundamentals} />}
           </Card>
           {/* Rotation clock */}
@@ -406,7 +407,7 @@ function MarketsPageInner() {
               Sam Stovall 4-phase model. Bubbles sized by AUM. Click a dot to explore an industry.
             </p>
             {secLoading || !secRotation ? (
-              <div className="animate-pulse bg-surface-alt rounded-lg h-96" />
+              <ChartSkeleton height="h-96" />
             ) : <SectorRotationClock data={secRotation} onSectorClick={(s) => setSelectedSector(s === selectedSector ? null : s)} />}
           </Card>
           {/* Industry drill-down */}

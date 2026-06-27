@@ -5,7 +5,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine,
 } from "recharts";
-import { Card } from "@/components/ui";
+import { Card, PageSkeleton } from "@/components/ui";
 import { chartTooltipStyle, chartPalette } from "@/components/ui";
 import { CHART_COLORS } from "@/lib/format";
 import type { RollingTickerMetrics, RollingPoint } from "@/lib/types";
@@ -109,13 +109,7 @@ export function RollingMetricsChart({ data, theme, loading }: Props) {
   const [view, setView] = useState<ViewMode>("overlay");
 
   if (loading) {
-    return (
-      <Card className="p-4">
-        <div className="h-64 flex items-center justify-center text-text-muted text-sm">
-          Loading rolling metrics…
-        </div>
-      </Card>
-    );
+    return <PageSkeleton text="Loading rolling metrics…" />;
   }
   if (!data.length) {
     return (

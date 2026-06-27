@@ -60,10 +60,27 @@ async def fetch(indicator_key: str, countries: tuple[str, ...],
         return []
     iso3_to_iso2 = {ISO2_TO_ISO3.get(c, c): c for c in countries}
     iso3_list = list(iso3_to_iso2.keys())
+
+    # Try bulk data first
     try:
-        parsed = await asyncio.to_thread(_fetch_sync, series_id, iso3_list, start, end)
+        from ..services.bulk_data_service import load_worldbank
+        bulk = await asyncio.to_thread(load_worldbank, indicator_key, iso3_list, start, end)
+        if bulk is not None and not bulk.empty:
+            out: dict[str, list[tuple[int, float]]] = {}
+            for _, row in bulk.iterrows():
+                iso3 = str(row["iso3"])
+                try:
+                    out.setdefault(iso3, []).append((int(row["year"]), float(row["value"])))
+                except (ValueError, TypeError):
+                    continue
+            parsed = {k: sorted(v) for k, v in out.items()}
+        else:
+            raise Exception("bulk data not available")
     except Exception:
-        return []
+        try:
+            parsed = await asyncio.to_thread(_fetch_sync, series_id, iso3_list, start, end)
+        except Exception:
+            return []
 
     results: list[SeriesResult] = []
     for iso3, points in parsed.items():

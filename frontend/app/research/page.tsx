@@ -1,37 +1,46 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { RiskParityTab } from "@/components/research/RiskParityTab";
 import { FxCarryTab } from "@/components/research/FxCarryTab";
 import { MomentumTab } from "@/components/research/MomentumTab";
 import { RealizedMomentsTab } from "@/components/research/RealizedMomentsTab";
+import { EconLabTab } from "@/components/macro/EconLabTab";
 
 const TABS = [
   { key: "riskparity", label: "Risk Parity" },
   { key: "carry", label: "FX Carry" },
   { key: "momentum", label: "Momentum" },
   { key: "moments", label: "Realized Moments" },
+  { key: "econlab", label: "Econometric Lab" },
 ] as const;
 type TabKey = (typeof TABS)[number]["key"];
 
-export default function ResearchPage() {
-  const [tab, setTab] = useState<TabKey>("riskparity");
+function resolveTab(param: string | null): TabKey {
+  if (param && TABS.some((t) => t.key === param)) return param as TabKey;
+  return "riskparity";
+}
+
+function ResearchPageInner() {
+  const searchParams = useSearchParams();
+  const [tab, setTab] = useState<TabKey>(resolveTab(searchParams.get("tab")));
 
   return (
     <main className="max-w-7xl mx-auto px-4 py-6 space-y-6">
       <div>
         <h1 className="text-2xl font-display font-bold text-text-primary">Research Hub</h1>
         <p className="text-sm text-text-muted mt-1">
-          Quantitative research strategies — risk parity, FX carry, and cross-sectional momentum.
+          Quantitative research strategies — risk parity, FX carry, cross-sectional momentum, and econometric modeling.
         </p>
       </div>
 
-      <div className="flex gap-1 border-b border-border">
+      <div className="flex gap-1 border-b border-border overflow-x-auto no-scrollbar sticky top-14 z-20 bg-background/95 backdrop-blur">
         {TABS.map((t) => (
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
-            className={`px-4 py-2 text-sm font-medium -mb-px border-b-2 transition-colors ${
+            className={`px-4 py-2 text-sm font-medium -mb-px border-b-2 transition-colors whitespace-nowrap ${
               tab === t.key
                 ? "border-accent text-text-primary"
                 : "border-transparent text-text-muted hover:text-text-primary"
@@ -46,6 +55,15 @@ export default function ResearchPage() {
       {tab === "carry" && <FxCarryTab />}
       {tab === "momentum" && <MomentumTab />}
       {tab === "moments" && <RealizedMomentsTab />}
+      {tab === "econlab" && <EconLabTab />}
     </main>
+  );
+}
+
+export default function ResearchPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-muted">Loading…</div>}>
+      <ResearchPageInner />
+    </Suspense>
   );
 }

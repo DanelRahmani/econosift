@@ -118,6 +118,13 @@ async def capm_dcf(
     return {"valuations": valuations}
 
 
+@router.get("/risk-free-rates")
+async def risk_free_rates():
+    """Live country risk-free rates from FRED (cached nightly)."""
+    from ..services.risk_free_service import get_risk_free_rates
+    return {"rates": await get_risk_free_rates()}
+
+
 @router.get("/dcf")
 async def dcf(
     ticker: str,

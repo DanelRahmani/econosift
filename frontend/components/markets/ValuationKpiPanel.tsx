@@ -47,9 +47,9 @@ function fmtWacc(v: number | null | undefined): string {
 /** A single KPI tile in the top strip. */
 function KpiTile({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex flex-col gap-0.5 rounded-lg bg-surface-alt px-3 py-2.5 min-w-0">
+    <div className="flex flex-col gap-0.5 rounded-lg bg-surface-alt px-3 py-2.5 min-w-[6rem]">
       <span className="text-xs text-text-muted truncate">{label}</span>
-      <span className="font-mono text-sm text-text-primary truncate">{value}</span>
+      <span className="font-mono text-xs lg:text-sm text-text-primary truncate" title={value}>{value}</span>
     </div>
   );
 }
@@ -206,7 +206,7 @@ export function ValuationKpiPanel({ kpis, wacc, fundamentals }: Props) {
     <div className="space-y-4">
 
       {/* ── KPI Strip ─────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
         {kpiTiles.map((t) => (
           <KpiTile key={t.label} label={t.label} value={t.value} />
         ))}

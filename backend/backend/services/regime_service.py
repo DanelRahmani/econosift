@@ -4,6 +4,11 @@ Classifies quarterly macro regime for a given country based on:
   - GDP growth (YoY %) vs threshold (default 2.0 %)
   - CPI inflation (YoY %) vs threshold (default 2.5 %)
 
+Primary data source: World Bank (wb_gdp_growth.parquet, wb_inflation.parquet)
+   — covers ~200 countries, annual, 1960–2024.
+Augmented: FRED for US quarterly, Eurostat for EZ quarterly, FRED for JP quarterly.
+   — these provide higher-frequency quarterly data when available.
+
 Quadrants:
   Goldilocks  — growth >= gdp_thr AND inflation <  cpi_thr
   Overheating — growth >= gdp_thr AND inflation >= cpi_thr
@@ -13,6 +18,7 @@ Quadrants:
 from __future__ import annotations
 
 import math
+import pathlib
 from datetime import date, datetime
 from typing import Any
 
@@ -208,8 +214,45 @@ def _fetch_eurozone(start_year: int) -> tuple[pd.Series, pd.Series, str]:
 
 
 # ---------------------------------------------------------------------------
-# Japan best-effort via pandas-datareader / OECD.
+# World Bank bulk-data fallback — covers ~200 countries (annual)
 # ---------------------------------------------------------------------------
+
+_WB_GDP_PATH = pathlib.Path("/app/data/bulk/wb_gdp_growth.parquet")
+_WB_CPI_PATH = pathlib.Path("/app/data/bulk/wb_inflation.parquet")
+
+
+def _fetch_wb_country(iso2: str, start_year: int) -> tuple[pd.Series, pd.Series, str]:
+    """Read annual GDP growth and CPI inflation from World Bank parquet files."""
+    gdp_s = pd.Series(dtype=float)
+    cpi_s = pd.Series(dtype=float)
+    source = "World Bank (bulk)"
+
+    # Convert iso2 → iso3 (World Bank uses 3-letter codes)
+    try:
+        import pycountry
+        c = pycountry.countries.get(alpha_2=iso2)
+        iso3 = c.alpha_3 if c else iso2
+    except Exception:
+        iso3 = iso2
+
+    try:
+        if _WB_GDP_PATH.exists():
+            wb_gdp = pd.read_parquet(_WB_GDP_PATH)
+            mask = (wb_gdp["iso3"] == iso3) & (wb_gdp["year"] >= start_year)
+            gdp_rows = wb_gdp[mask][["year", "value"]].dropna()
+            if not gdp_rows.empty:
+                gdp_s = pd.Series(gdp_rows["value"].values, index=gdp_rows["year"].values)
+                gdp_s.index = pd.to_datetime(gdp_s.index.astype(str) + "-12-31")
+        if _WB_CPI_PATH.exists():
+            wb_cpi = pd.read_parquet(_WB_CPI_PATH)
+            mask = (wb_cpi["iso3"] == iso3) & (wb_cpi["year"] >= start_year)
+            cpi_rows = wb_cpi[mask][["year", "value"]].dropna()
+            if not cpi_rows.empty:
+                cpi_s = pd.Series(cpi_rows["value"].values, index=cpi_rows["year"].values)
+                cpi_s.index = pd.to_datetime(cpi_s.index.astype(str) + "-12-31")
+    except Exception:
+        source = "World Bank (error reading parquet)"
+    return gdp_s, cpi_s, source
 
 def _fetch_japan(start_year: int) -> tuple[pd.Series, pd.Series, str]:
     """
@@ -276,8 +319,11 @@ def regime_series(
     Return a time series classifying quarterly macro regime for *country*
     from *start_year* to today.
 
-    Supported: US (FRED), EZ (Eurozone, Eurostat), JP (Japan, FRED/OECD).
-    All other codes return empty series with a note.
+    Data sources (best available per country):
+      US — FRED quarterly (GDPC1, CPIAUCSL)
+      EZ/EA — Eurostat quarterly (namq_10_gdp, prc_hicp_midx)
+      JP — FRED quarterly (JPNRGDPEXP, JPNCPIALLMINMEI)
+      ALL OTHERS — World Bank annual (wb_gdp_growth, wb_inflation parquet)
     """
     today_str = date.today().isoformat()
     note: str | None = None
@@ -299,15 +345,18 @@ def regime_series(
         if gdp_q.empty and cpi_q.empty:
             note = f"Japan data unavailable: {source_label}"
     else:
-        return {
-            "country": country,
-            "thresholds": {"gdp": gdp_thr, "cpi": cpi_thr},
-            "series": [],
-            "current": None,
-            "source": "N/A",
-            "asOf": today_str,
-            "note": f"Country '{country}' not supported. Supported: US, EZ, JP.",
-        }
+        # World Bank annual data — works for ~200 countries
+        gdp_q, cpi_q, source_label = _fetch_wb_country(country, start_year)
+        if gdp_q.empty and cpi_q.empty:
+            return {
+                "country": country,
+                "thresholds": {"gdp": gdp_thr, "cpi": cpi_thr},
+                "series": [],
+                "current": None,
+                "source": source_label,
+                "asOf": today_str,
+                "note": f"No World Bank data for {country}.",
+            }
 
     # --- Align to common quarterly index ------------------------------------
     if not gdp_q.empty:

@@ -12,16 +12,16 @@ const primaryTabs = [
   { href: "/portfolio", label: "Portfolio" },
   { href: "/research", label: "Research" },
   { href: "/macro", label: "Macro" },
-  { href: "/calendar", label: "Calendar" },
+  { href: "/atlas", label: "Atlas" },
 ];
 
 const moreTabs = [
-  { href: "/atlas", label: "Atlas" },
-  { href: "/wiki", label: "Wiki" },
+  { href: "/calendar", label: "Calendar" },
   { href: "/risk", label: "Risk" },
   { href: "/options", label: "Options" },
-  { href: "/yield", label: "Yield" },
-  { href: "/policy", label: "Policy & Sovereign" },
+  { href: "/yield", label: "Rates & Policy" },
+  { href: "/wiki", label: "Wiki" },
+  { href: "/admin", label: "Admin" },
 ];
 
 export function Navbar() {

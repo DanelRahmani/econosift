@@ -212,7 +212,7 @@ function RiskPageInner() {
       )}
 
       {/* Tabs */}
-      <div className="flex gap-1 border-b border-border overflow-x-auto pb-0.5">
+      <div className="flex gap-1 border-b border-border overflow-x-auto pb-0.5 sticky top-14 z-20 bg-background/95 backdrop-blur">
         {TABS.map((t) => (
           <button
             key={t}

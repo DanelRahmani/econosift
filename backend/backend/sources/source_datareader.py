@@ -69,6 +69,20 @@ async def fetch(indicator_key: str, countries: tuple[str, ...],
 @cached("famafrench")
 def fama_french() -> list[dict]:
     """Annual means of Fama-French research factors."""
+    # Try bulk data first
+    try:
+        from ..services.bulk_data_service import load_famafrench
+        df = load_famafrench(2000)
+        if df is not None and not df.empty:
+            # Build list of dicts matching the expected format
+            return [
+                {"date": r["date"], "mkt_rf": r["mkt_rf"],
+                 "smb": r["smb"], "hml": r["hml"], "rf": r["rf"]}
+                for _, r in df.iterrows()
+            ]
+    except Exception:
+        pass
+
     import pandas_datareader.data as web
     try:
         data = web.DataReader("F-F_Research_Data_Factors", "famafrench",

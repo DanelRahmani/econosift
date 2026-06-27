@@ -13,7 +13,7 @@ Axiom Finance is a self-hosted financial analytics platform built on FastAPI + N
 - **Sectors** (`/sectors`): SPDR ETF returns, rotation clock, industry drill-down
 - **Treemap** (`/treemap`): S&P 500 / Nasdaq / Dow squarified treemap with sector drill-down
 - **Calendar** (`/calendar`): Earnings, dividends, macro releases, IPOs, CB meetings
-- **Macro** (`/macro`): 12-tab macro hub — rates, inflation, growth, housing, commodities, FX, leading indicators, financial conditions, COT positioning, Econometric Lab, Country Risk, Central Banks
+- **Macro** (`/macro`): 9-tab macro hub — overview, inflation, growth & employment, housing, commodities, FX, leading indicators, financial & funding conditions, sentiment & positioning
 - **Atlas** (`/atlas`): Choropleth world map of 6 macro indicators across ~200 countries (2000–2024) with year-slider animation, regional blocs (G7/G20/Eurozone/EM), color legend, KPI strip, and Top/Bottom-10 rankings
 - **Wiki** (`/wiki`): Searchable financial dictionary of 410+ terms across 26 categories — each with a detailed 3-5 sentence explanation covering what it is, how it's used, and why it matters. Category sidebar, debounced search, expandable term cards, related-term cross-linking. Backed by `wiki_service.py` and `GET /api/wiki/terms?search=&category=` endpoint.
 
@@ -27,9 +27,9 @@ No paid APIs required. Optional free FRED API key for richer US data.
 
 ---
 
-## Build History: Phases 0–19 ✅ COMPLETE
+## Build History: Phases 0–22 ✅ COMPLETE
 
-All phases 0–18 of the `claude_plan.md` roadmap plus Phase 19 (UI/data quality) are fully shipped and verified in Docker.
+All phases 0–21 of the `claude_plan.md` roadmap plus Phase 22 (UI theming overhaul) are fully shipped and verified in Docker.
 The original build plan is done; future work should start a new phase plan.
 This section is the source of truth for cross-machine continuation.
 
@@ -59,10 +59,11 @@ This section is the source of truth for cross-machine continuation.
 - ✅ **Phase 19**: UI & Data Quality Fixes (`0d3a005`→`72477bd`). 5 sub-phases (A–E), 21 fixes. P0: dividend yield scaling, dark-mode chart Y-axis, calendar FRED filter, loading UX, KPI truncation. P1: nav overflow + mobile nav pages, treemap UX, dashboard null-safety, options IV clamp. P2: timestamp formatting, portfolio placeholders, calendar category colors, mobile theme toggle. Backend: yfinance 401 retry, DNS fix, dead Phase 18B code removal. Live-verified: all pages HTTP 200, builds green, pytest passing.
 - ✅ **Phase 20** (2026-06-26): Macro Policy Pages overhaul — 6 backend fixes, 8 frontend fixes. **Backend**: Fixed broken `funding_service.py` (wrong imports/wrong function signatures — M2, SOFR, CP spread now work). Commodities switched from yfinance `=F` tickers to FRED primary (DCOILWTICO, GOLDAMGBD228NLBR, etc.). FX heatmap switched from yfinance `=X` to FRED DEX* series (EUR/USD, GBP/USD, etc.). PPP endpoint rewritten to use FRED DEX spot rates + CPI (8 pairs). Financial Conditions: WALCL Fed BS scaled to $T, C&I loans fixed (BUSLOANS series), ciLoans added to KPIs. Leading Indicators: base year normalization added (`?base_year=2020`), ISLMPC data normalized to index=100. Inflation: Quantity Theory now computes YoY changes with dual-axis chart. COT service: multiple URL fallbacks, expanded column name candidates. **Frontend**: CentralBanksTab — time span selector (1Y/5Y/10Y/All) with proper tick formatting, full CB names (US Federal Reserve, etc.), correct Fed BS label. FinancialConditions — EPU log scale toggle. GrowthEmployment — NFP 5Y/All time buttons, fixed existing home sales Y-axis (3M–5M). Housing — existing home sales scaling (÷1M). LeadingIndicators — base year selector dropdown, ISLMPC current position dots, index labels. RegimeClock — quadrant labels centered, country selector in MacroOverview. CommoditiesTab — KPI cards and data table rendering from FRED. **Note**: COT/Positioning tab may still show empty data (CFTC source issue); Econ Lab API works but frontend needs investigation; Atlas map rendering unreliable.
 - ✅ **Phase 21** (2026-06-26): Wiki/Dictionary page. **Backend**: New `wiki_service.py` with 410 financial terms across 26 categories, each with detailed 3-5 sentence explanations. New `wiki.py` router with `GET /api/wiki/categories`, `GET /api/wiki/terms?search=&category=`, `GET /api/wiki/term/{slug}`. **Frontend**: New `/wiki` page with debounced search, category sidebar (desktop) / horizontal pills (mobile), expandable term cards with related-term cross-linking. New components: `WikiSearch.tsx`, `WikiTermCard.tsx`, `WikiCategoryNav.tsx`. Navbar/MobileNav updated with Wiki tab. Wiki types added to `types.ts`, API methods added to `api.ts`. **Bug fixes**: Fixed 3 `data.baseYear` → `baseYear` references in `LeadingIndicators.tsx`; fixed `nominalGdpYoY`/`m2YoY` → `nominalGdp`/`m2` in `InflationTab.tsx`. Live-verified: `/wiki` HTTP 200, search works, category filter works, expand/collapse works, related-term links navigate correctly.
+- ✅ **Phase 22** (2026-06-27): UI Theming Overhaul. **Color system**: Light mode surfaces switched from warm beige (`250,245,246`) to clean near-white (`248,248,251`); dark mode background from reddish-black (`15,6,8`) to neutral greyish-black (`12,12,14`). All text/border/surface tokens updated to neutral greys. Maroon accent preserved. Chart palette (`chartPalette()` in `ui.tsx`, `CHART_COLORS` in `format.ts`) synced to new backgrounds. **Components**: New `PageSkeleton` (centered spinner) and `EmptyState` (icon + title + description) base components added to `ui.tsx`, applied to `InflationTab.tsx`. **Fear & Greed gauge**: Redesigned SVG semicircle with tick marks (0/25/50/75/100), value below needle pivot, thinner stroke. **Verification**: 17 pages HTTP 200 in both themes, `tsc` clean, Docker build + recreate, 568 backend tests passing.
 
 ### Backend module map (added by this build)
 
-`services/`: `dcf_engine`, `fx_service`, `regime_service`, `valuation_engine`, `snowflake_service`, `discount_rates`, `fundamentals`, `analyst_service`, `fama_french`, `constituents`, `breadth_service`, `indices_service`, `feargreed_service`, `movers_service`, `treemap_service`, `finnhub_service`, `calendar_service`, `screener_service`, `screener_cache`, `advanced_risk`, `options_engine`, `macro_expansion_service`, `rates_service`, `cot_service`, `edgar_service`, `sector_service`, `technicals_service`, `atlas_service`, `risk_parity_service`, `carry_service`, `momentum_service`, `realized_moments_service`, `econ_lab_service`, `country_risk_service`, `centralbanks_service`, `wiki_service`, `jobs`.
+`services/`: `dcf_engine`, `fx_service`, `regime_service`, `valuation_engine`, `snowflake_service`, `discount_rates`, `fundamentals`, `analyst_service`, `fama_french`, `constituents`, `breadth_service`, `indices_service`, `feargreed_service`, `movers_service`, `treemap_service`, `finnhub_service`, `calendar_service`, `screener_service`, `screener_cache`, `advanced_risk`, `options_engine`, `macro_expansion_service`, `rates_service`, `cot_service`, `edgar_service`, `sector_service`, `technicals_service`, `atlas_service`, `risk_parity_service`, `carry_service`, `momentum_service`, `realized_moments_service`, `econ_lab_service`, `country_risk_service`, `centralbanks_service`, `wiki_service`, `risk_free_service`, `jobs`.
 Routers: `valuation`, `dashboard`, `treemap`, `calendar`, `screener`, `risk`, `options`, `market_data` (+ `/composite`), `snowflake`, `sector`, `technicals`, `atlas`, `portfolio`, `macro`, `research`, `admin` (+ `/performance`), `wiki`.
 Database: `database.py` (SQLAlchemy engine, SessionLocal), `db_models.py` (DailyPrice, DailyQuote, DailyMacro, DailyFX, JobExecution, CacheEntry).
 Middleware: `middleware.py` (DeduplicationMiddleware stub).
@@ -100,9 +101,9 @@ All external calls cached via `@cached` / `@async_cached` in `cache.py`. `Hybrid
 
 ---
 
-## Phases 14–18 — Research & Macro-Financial Intelligence ✅ COMPLETE
+## Phases 14–22 — Research, Macro-Financial Intelligence, & UI Overhaul ✅ COMPLETE
 
-All phases 14 through 18A are fully shipped (see Build History above for per-phase details). Phase 18B was merged into 18A during implementation. Phase 19 (UI/data quality) is also shipped (see Build History).
+All phases 14 through 22 are fully shipped. Phases 18B was merged into 18A. Phase 19 (UI/data quality), 20 (macro policy pages), 21 (wiki), 22 (UI theming), and Phase 23 (UI polish pass: PageSkeleton rollout, sticky tabs, mobile nav collapse, screener persistence, Yield+Policy merge, country search in EconLab, live FRED risk-free rates with per-country DCF discount rate selector) are also shipped.
 
 No remaining planned phases — the `claude_plan.md` roadmap is fully delivered. Future work should start a new phase plan (e.g. Phase 20+).
 
@@ -144,21 +145,21 @@ Items explicitly excluded from completed phases — tracked for future work.
 - **✅ Central Banks tab** — FIXED: time span selector, full CB names, Fed BS label
 - **✅ EPU log scale** — FIXED: toggle button on chart
 - **✅ RegimeClock quadrants** — FIXED: labels centered, country selector
+- **✅ Fear & Greed gauge** — FIXED (Phase 22): rebuilt SVG as cleaner semicircle with tick marks, no needle overlap
+- **✅ Active tab styling inconsistency** — FIXED (Phase 22): main nav=filled pill, sub-tabs=underline, filters=outline toggles
 - **COT/Positioning** — multiple URL fallbacks added; may still show empty (CFTC source format changes frequently)
 - **Atlas map rendering** — unreliable, likely react-simple-maps limitation
 - **Econ Lab frontend** — API works (nObs=40, R²=0.078) but frontend component needs investigation
 - **Inflation/Rates/Overview country selectors** — not yet implemented (US-only)
 
-### From Phase 19 (UI & Data Quality)
-- **Admin page navigation link** — no navbar link to `/admin`, only accessible via direct URL (minor)
-- **Markets sub-tab redundancy** — main nav items overlap with Markets page sub-tabs (cosmetic)
-- **Fear & Greed per-signal explanation** (D-05) — documentation/minor
-- **Atlas map rendering artifacts** (A-04) — likely a library limitation (react-simple-maps)
-- **Mobile bottom nav 9-item layout** — pages added but full redesign deferred (cramped on small screens)
-- **Dashboard McClellan signal explanation** (D-05) — minor documentation
-- **Options ~15min delay badge restyle** (O-04) — minor
-- **Compute-tier indicator consistency** (G-13) — minor
-- **Active tab styling inconsistency** (G-15) — minor
+### From Phase 22 (2026-06-27 — UI Theming Overhaul)
+- **Wiki backend data loading** — API returns 0 terms for `/api/wiki/terms`; `wiki_service.py` data not loaded at startup
+- **PageSkeleton rollout** — `PageSkeleton` component created but only applied to `InflationTab.tsx`; other heavy pages (Calendar, Treemap, Risk rolling metrics) still use bare `animate-pulse`
+- **Markets sub-tab redundancy** — main nav items still overlap with Markets page sub-tabs (cosmetic, pre-existing)
+
+### From Phase 23 (2026-06-27 — UI Polish Pass)
+- **Calendar event quality** — FRED release calendar entries are non-actionable and drown out real economic events. A filter or source weighting pass is needed to prioritize high-impact macro releases (CPI, NFP, FOMC, GDP) over routine data releases.
+- **Pattern Library** — The app has no shared component library for KPI strips, tab bars, or control bars. Each page hand-rolls these patterns. A `<KpiGrid>` + `<KpiCard>`, `<TabBar>`, and `<ControlBar>` component set would reduce duplication and enforce visual consistency across all 14 pages.
 
 ### From Phase 3 (Treemap)
 - **Yahoo market cap rate-limits** — large universes (S&P 500) hit rate limits on `yfinance` market cap queries

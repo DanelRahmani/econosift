@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import type { PresetDef, ScreenerCacheRow, ScreenerUniverseResponse, SnowflakeBatchResponse } from "@/lib/types";
-import { Card, Skeleton } from "@/components/ui";
+import { Card, Skeleton, PageSkeleton } from "@/components/ui";
 import { PresetPills } from "@/components/screener/PresetPills";
 import { ResultTabs, RESULT_TABS } from "@/components/screener/ResultTabs";
 import type { ResultTab } from "@/components/screener/ResultTabs";
@@ -106,7 +106,10 @@ function SparkCard({
 // ─── Page ─────────────────────────────────────────────────────────────────
 
 export default function ScreenerPage() {
-  const [index, setIndex] = useState<IndexKey>("dow");
+  const [index, setIndex] = useState<IndexKey>(() => {
+    try { return (localStorage.getItem("screener-index") as IndexKey) || "dow"; }
+    catch { return "dow"; }
+  });
   const [activePresets, setActivePresets] = useState<Set<string>>(new Set());
   const [sortKey, setSortKey] = useState("marketCap");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
@@ -151,6 +154,11 @@ export default function ScreenerPage() {
 
     return () => { alive = false; };
   }, [index, activePresets, sortKey, sortDir]);
+
+  const handleSetIndex = useCallback((v: IndexKey) => {
+    setIndex(v);
+    try { localStorage.setItem("screener-index", v); } catch { /* ignore */ }
+  }, []);
 
   const handleTogglePreset = useCallback((id: string) => {
     setActivePresets((prev) => {
@@ -203,7 +211,7 @@ export default function ScreenerPage() {
             Cache refreshed nightly.
           </p>
         </div>
-        <SegCtrl opts={INDEX_OPTS} value={index} onChange={setIndex} />
+        <SegCtrl opts={INDEX_OPTS} value={index} onChange={handleSetIndex} />
       </div>
 
       {/* Stale cache banner */}
@@ -291,13 +299,9 @@ export default function ScreenerPage() {
           <div className="text-sm text-danger py-6 text-center">{error}</div>
         )}
 
-        {loading && !data && (
-          <div className="space-y-2">
-            {[...Array(8)].map((_, i) => (
-              <Skeleton key={i} className="h-9 w-full" />
-            ))}
-          </div>
-        )}
+        {loading && !data ? (
+          <PageSkeleton text="Loading screener data…" />
+        ) : null}
 
         {!loading && !error && viewMode === "table" && (
           <div className="space-y-3">

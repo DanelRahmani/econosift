@@ -6,6 +6,7 @@ import {
   Cell, ResponsiveContainer, Legend,
 } from "recharts";
 import { Card } from "@/components/ui";
+import { SearchBar } from "@/components/SearchBar";
 import { api } from "@/lib/api";
 import type { MomentsResponse, MomentsCrossSection } from "@/lib/types";
 
@@ -104,14 +105,15 @@ export function RealizedMomentsTab() {
         <div className="flex flex-wrap items-end gap-6">
           <div className="flex-1 min-w-[160px]">
             <label className="block text-xs text-text-muted mb-1">Ticker</label>
-            <input
-              value={ticker}
-              onChange={(e) => setTicker(e.target.value.toUpperCase())}
-              onBlur={() => loadMoments(ticker, period)}
-              onKeyDown={(e) => e.key === "Enter" && loadMoments(ticker, period)}
-              className="w-full px-3 py-1.5 rounded-lg bg-surface-alt border border-border text-sm font-mono"
-              placeholder="AAPL"
-            />
+            <SearchBar onAdd={(sym) => {
+              setTicker(sym.toUpperCase());
+              loadMoments(sym.toUpperCase(), period);
+            }} />
+            {ticker && (
+              <span className="inline-flex items-center gap-1 mt-1.5 px-2 py-0.5 rounded-full bg-surface-alt border border-border text-xs font-mono">
+                {ticker}
+              </span>
+            )}
           </div>
           <div>
             <label className="block text-xs text-text-muted mb-1">Period</label>

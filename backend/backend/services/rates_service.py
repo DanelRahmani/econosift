@@ -155,7 +155,7 @@ def _compute_taylor_rule(
         fedfunds = fred_data.get("FEDFUNDS")
 
         if cpi is None or gdpc1 is None or gdppot is None or fedfunds is None:
-            return {"implied": [], "actual": []}
+            return {"implied": [], "actual": [], "output_gap": []}
 
         # π = rolling 12-month YoY CPI
         cpi = cpi.resample("MS").last().ffill()
@@ -187,10 +187,14 @@ def _compute_taylor_rule(
             {"date": str(d.date()), "value": round(float(v), 4)}
             for d, v in ff_aligned.dropna().items()
         ]
-        return {"implied": implied, "actual": actual}
+        outgap = [
+            {"date": str(d.date()), "value": round(float(v), 4)}
+            for d, v in og_aligned.dropna().items()
+        ]
+        return {"implied": implied, "actual": actual, "output_gap": outgap}
     except Exception as exc:
         log.warning("Taylor Rule computation failed: %s", exc)
-        return {"implied": [], "actual": []}
+        return {"implied": [], "actual": [], "output_gap": []}
 
 
 def _get_rates_data_sync() -> dict:

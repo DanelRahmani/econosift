@@ -50,24 +50,38 @@ def _make_key(args, kwargs) -> tuple:
 
 
 def cached(name: str | None = None):
-    """Cache a *synchronous* function's result for 60 minutes."""
+    """Cache a *synchronous* function's result for 60 minutes.
+
+    Two-tier: in-memory TTLCache (fast) → SQLite CacheEntry (persistent).
+    Survives container restarts via the database tier.
+    """
+    import json as _json
 
     def decorator(func):
         cache_name = name or func.__qualname__
-        _get_cache(cache_name)  # ensure the cache exists
+        _get_cache(cache_name)  # ensure the in-memory cache exists
+        persistent = HybridCache(cache_name, ttl_sec=_CACHE_TTL, maxsize=_CACHE_MAXSIZE)
 
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
-            # Resolve the cache by name at call time so tests (and any runtime
-            # reset) that clear/replace _caches[name] actually take effect.
             cache = _get_cache(cache_name)
-            key = _make_key(args, kwargs)
-            if key in cache:
+            raw_key = _make_key(args, kwargs)
+            if raw_key in cache:
                 _record(cache_name, True)
-                return cache[key]
+                return cache[raw_key]
+
+            # Tier 2: SQLite (survives restarts)
+            str_key = _json.dumps(raw_key, default=str, sort_keys=True)
+            db_val = persistent.get(str_key)
+            if db_val is not None:
+                _record(cache_name, True)
+                cache[raw_key] = db_val  # promote to memory
+                return db_val
+
             _record(cache_name, False)
             result = func(*args, **kwargs)
-            cache[key] = result
+            cache[raw_key] = result
+            persistent.set(str_key, result)  # persist to DB
             return result
 
         return wrapper
@@ -76,27 +90,44 @@ def cached(name: str | None = None):
 
 
 def async_cached(name: str | None = None):
-    """Cache an *async* function's result for 60 minutes."""
+    """Cache an *async* function's result for 60 minutes.
+
+    Two-tier: in-memory TTLCache (fast) → SQLite CacheEntry (persistent).
+    Survives container restarts via the database tier.
+    """
+    import json as _json
 
     def decorator(func):
         cache_name = name or func.__qualname__
-        _get_cache(cache_name)  # ensure the cache exists
+        _get_cache(cache_name)  # ensure the in-memory cache exists
         lock = _locks.setdefault(cache_name, asyncio.Lock())
+        persistent = HybridCache(cache_name, ttl_sec=_CACHE_TTL, maxsize=_CACHE_MAXSIZE)
 
         @functools.wraps(func)
         async def wrapper(*args, **kwargs):
             cache = _get_cache(cache_name)
-            key = _make_key(args, kwargs)
-            if key in cache:
+            raw_key = _make_key(args, kwargs)
+            if raw_key in cache:
                 _record(cache_name, True)
-                return cache[key]
+                return cache[raw_key]
+
             async with lock:
-                if key in cache:
+                if raw_key in cache:
                     _record(cache_name, True)
-                    return cache[key]
+                    return cache[raw_key]
+
+                # Tier 2: SQLite (survives restarts)
+                str_key = _json.dumps(raw_key, default=str, sort_keys=True)
+                db_val = persistent.get(str_key)
+                if db_val is not None:
+                    _record(cache_name, True)
+                    cache[raw_key] = db_val  # promote to memory
+                    return db_val
+
                 _record(cache_name, False)
                 result = await func(*args, **kwargs)
-                cache[key] = result
+                cache[raw_key] = result
+                persistent.set(str_key, result)  # persist to DB
                 return result
 
         return wrapper
@@ -190,8 +221,13 @@ class HybridCache:
         return None
 
     def set(self, key: str, value) -> None:
-        """Write to both memory and DB."""
+        """Write to both memory and DB.  Skips DB for non-JSON-serializable types (e.g. DataFrames)."""
         self._memory[key] = value
+        # Only persist JSON-serializable values — DataFrames/numpy arrays can't round-trip
+        try:
+            json.dumps(value)
+        except (TypeError, ValueError):
+            return  # non-serializable — memory-only is fine
         self._set_in_db(key, value)
 
     def get_stale_while_revalidate(self, key: str, max_age_sec: int = 300):

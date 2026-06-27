@@ -55,9 +55,9 @@ export function currencySymbol(code: string | undefined): string {
 }
 
 // Brand-led series palette: crimson first, then complementary hues that read
-// well on both the light (#fff) and dark (#0f0608) Axiom backgrounds.
+// well on both light and dark Axiom backgrounds.
 export const CHART_COLORS = [
-  "#c4394a", "#0065cb", "#16a34a", "#ca8a04",
+  "#c4394a", "#3b82f6", "#16a34a", "#ca8a04",
   "#0891b2", "#9333ea", "#ea580c", "#db2777",
 ];
 

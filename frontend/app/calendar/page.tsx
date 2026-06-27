@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import type { CalendarEvent, CalendarResponse } from "@/lib/types";
-import { Card, Skeleton } from "@/components/ui";
+import { Card, Skeleton, PageSkeleton } from "@/components/ui";
 import { CalendarGrid } from "@/components/calendar/CalendarGrid";
 import {
   CalendarFilters,
@@ -305,12 +305,7 @@ export default function CalendarPage() {
 
       {/* Body */}
       {loading && !data ? (
-        <Card>
-          <div className="flex flex-col items-center justify-center h-[640px] gap-3">
-            <div className="animate-spin h-8 w-8 border-2 border-accent border-t-transparent rounded-full" />
-            <p className="text-text-muted text-sm">Loading calendar…</p>
-          </div>
-        </Card>
+        <PageSkeleton text="Loading calendar…" />
       ) : error || !data ? (
         <Card>
           <div className="text-text-muted text-sm py-10 text-center">

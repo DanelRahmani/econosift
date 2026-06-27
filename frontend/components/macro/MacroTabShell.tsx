@@ -3,6 +3,7 @@ import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { Suspense } from "react";
 import dynamic from "next/dynamic";
 import { RegimeOverlay } from "./RegimeOverlay";
+import { ScrollableTabBar, PageSkeleton } from "@/components/ui";
 
 const TABS = [
   { id: "overview", label: "Overview" },
@@ -13,7 +14,7 @@ const TABS = [
   { id: "fx", label: "FX" },
   { id: "leading", label: "Leading Indicators" },
   { id: "financial", label: "Financial & Funding Conditions" },
-  { id: "sentiment", label: "Sentiment Signals" },
+  { id: "sentiment", label: "Sentiment & Positioning" },
 ];
 
 const MacroOverviewLazy = dynamic(() =>
@@ -75,7 +76,7 @@ function MacroTabShellInner() {
     <div>
       <RegimeOverlay />
       {/* Tab bar */}
-      <div className="flex overflow-x-auto border-b border-border mb-6 gap-0 no-scrollbar">
+      <ScrollableTabBar className="border-b border-border mb-6 sticky top-14 z-20 bg-background/95 backdrop-blur">
         {TABS.map((tab) => (
           <button
             key={tab.id}
@@ -89,13 +90,9 @@ function MacroTabShellInner() {
             {tab.label}
           </button>
         ))}
-      </div>
+      </ScrollableTabBar>
       {/* Active tab content */}
-      <Suspense
-        fallback={
-          <div className="h-64 animate-pulse bg-surface-alt rounded" />
-        }
-      >
+      <Suspense fallback={<PageSkeleton text="Loading tab…" />}>
         <TabContent activeTab={activeTab} />
       </Suspense>
     </div>

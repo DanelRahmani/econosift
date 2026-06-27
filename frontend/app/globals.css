@@ -4,16 +4,16 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Axiom brand palette (from axiomdigital.nl). Values are RGB triplets so
+/* Axiom brand palette. Values are RGB triplets so
    Tailwind opacity modifiers work. .dark overrides switch the whole theme. */
 :root {
   --background: 255 255 255;
-  --foreground: 26 10 12;
-  --surface: 250 245 246;
-  --surface-alt: 243 233 235;
-  --border: 236 220 223;
-  --text-secondary: 74 37 48;
-  --text-muted: 138 103 112;
+  --foreground: 15 15 20;
+  --surface: 248 248 251;
+  --surface-alt: 241 241 245;
+  --border: 228 228 234;
+  --text-secondary: 60 60 70;
+  --text-muted: 140 140 150;
   --primary: 107 15 26;        /* #6b0f1a deep maroon */
   --primary-light: 196 57 74;  /* #c4394a crimson */
   --success: 22 163 74;
@@ -23,14 +23,14 @@
 }
 
 .dark {
-  --background: 15 6 8;        /* #0f0608 */
-  --foreground: 245 238 239;   /* #f5eeef */
-  --surface: 26 10 12;         /* #1a0a0c */
-  --surface-alt: 30 12 16;     /* #1e0c10 */
-  --border: 50 23 28;          /* #32171c */
-  --text-secondary: 196 154 160; /* #c49aa0 */
-  --text-muted: 154 113 120;
-  --primary: 196 57 74;        /* #c4394a crimson */
+  --background: 12 12 14;        /* greyish-black */
+  --foreground: 242 242 247;     /* near-white */
+  --surface: 22 22 26;           /* dark card */
+  --surface-alt: 30 30 35;       /* layered surface */
+  --border: 38 38 44;            /* neutral dark border */
+  --text-secondary: 174 174 186; /* light grey secondary */
+  --text-muted: 120 120 132;
+  --primary: 196 57 74;          /* #c4394a crimson */
   --primary-light: 224 105 122;
   --success: 34 197 94;
   --warning: 234 179 8;
@@ -48,10 +48,10 @@ h1, h2, h3, .font-display {
 
 @layer components {
   .card {
-    @apply rounded-xl bg-surface border border-border p-6 shadow-lg;
+    @apply rounded-xl bg-surface border border-border p-6 shadow-lg transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md;
   }
   .btn {
-    @apply rounded-lg bg-accent hover:bg-accent-light text-white px-4 py-2 font-medium transition-colors;
+    @apply rounded-lg bg-accent hover:bg-accent-light text-white px-4 py-2 font-medium transition-colors active:scale-95;
   }
   .input {
     @apply bg-surface border border-border rounded-lg px-3 py-2 text-text-primary focus:border-accent focus:outline-none;
@@ -68,6 +68,9 @@ h1, h2, h3, .font-display {
   }
   .no-scrollbar::-webkit-scrollbar {
     display: none;
+  }
+  .btn-press {
+    @apply active:scale-95 transition-transform;
   }
 }
 
@@ -108,4 +111,9 @@ h1, h2, h3, .font-display {
 
   /* Recharts SVGs print fine — ensure they're not clipped */
   svg { overflow: visible !important; }
+}
+
+/* ── Responsive font scaling ─────────────────────────────────────────────── */
+@media (min-width: 1600px) {
+  html { font-size: 17px; }
 }

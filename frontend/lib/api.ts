@@ -32,6 +32,8 @@ import type {
   PricePoint, RiskMetric,
   CreditPulseData, YieldCurvesData, PolicyTrackerData, SovereignRiskData, MacroRegimeData,
   WikiCategoriesResponse, WikiTermsResponse,
+  PrefetchStatus,
+  BulkDatasetStatus,
 } from "./types";
 
 async function get<T>(path: string): Promise<T> {
@@ -126,6 +128,18 @@ export const api = {
   health: () =>
     get<HealthResponse>(`/admin/health`),
 
+  prefetchStart: () =>
+    post<{ status: string; progress: PrefetchStatus }>(`/admin/prefetch`, {}),
+
+  prefetchStatus: () =>
+    get<PrefetchStatus>(`/admin/prefetch/status`),
+
+  bulkDataStatus: () =>
+    get<{ datasets: Record<string, BulkDatasetStatus> }>(`/admin/bulk-data/status`),
+
+  bulkDataRefresh: () =>
+    post<{ status: string; datasets: Record<string, { rows: number; error: string | null }> }>(`/admin/bulk-data/refresh`, {}),
+
   // --- Phase 0 ---
   dcf: (
     ticker: string,
@@ -136,11 +150,14 @@ export const api = {
       `&fcf_growth=${p.fcf_growth}&terminal_growth=${p.terminal_growth}` +
       `&wacc=${p.wacc}&stage1_years=${p.stage1_years}`),
 
+  riskFreeRates: () =>
+    get<{ rates: { name: string; riskFreeRate: number; erp: number }[] }>("/valuation/risk-free-rates"),
+
   fxRates: (base: string) =>
     get<FxRatesResponse>(`/market/fx-rates?base=${encodeURIComponent(base)}`),
 
   regime: (country: string, start = 2000) =>
-    get<RegimeResponse>(`/macro/regime?country=${encodeURIComponent(country)}&start=${start}`),
+    get<RegimeResponse>(`/macro/regime-series?country=${encodeURIComponent(country)}&start=${start}`),
 
   // --- Phase 1 ---
   valuationFull: (ticker: string) =>

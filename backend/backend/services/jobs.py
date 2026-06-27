@@ -126,7 +126,7 @@ def refresh_daily_prices() -> None:
     """Fetch 1-year OHLCV history for up to 100 tracked tickers and upsert into daily_price."""
     job_id = log_job_start("refresh_daily_prices")
     try:
-        from .yfinance_service import yfinance_service as yfs
+        from .yfinance_service import get_ohlc_frame, get_close_frame
         from ..db_models import DailyPrice
 
         tickers = _get_all_tracked_tickers()
@@ -135,8 +135,8 @@ def refresh_daily_prices() -> None:
             return
 
         batch = tickers[:100]
-        ohlc_frames = yfs.get_ohlc_frame(tuple(batch), "1y")
-        close_frame = yfs.get_close_frame(tuple(batch), "1y")
+        ohlc_frames = get_ohlc_frame(tuple(batch), "1y")
+        close_frame = get_close_frame(tuple(batch), "1y")
 
         rows = 0
         with _get_session()() as session:
@@ -174,25 +174,27 @@ def refresh_daily_quotes() -> None:
     """Fetch latest fundamental snapshot for up to 50 tracked tickers and upsert into daily_quote."""
     job_id = log_job_start("refresh_daily_quotes")
     try:
-        from .yfinance_service import yfinance_service as yfs
+        from .yfinance_service import get_quote, get_info
         from ..db_models import DailyQuote
 
         tickers = _get_all_tracked_tickers()
         today = datetime.now(timezone.utc).date()
         rows = 0
 
+        from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+
         with _get_session()() as session:
             for sym in tickers[:50]:
                 try:
-                    q = yfs.get_quote(sym)
+                    q = get_quote(sym)
                     if not q:
                         continue
                     info: dict = {}
                     try:
-                        info = yfs.get_info(sym) or {}
+                        info = get_info(sym) or {}
                     except Exception:
                         pass
-                    session.merge(DailyQuote(
+                    stmt = sqlite_insert(DailyQuote).values(
                         symbol=sym,
                         date=today,
                         price=_safe_float(q.get("price")),
@@ -208,7 +210,23 @@ def refresh_daily_quotes() -> None:
                             or info.get("averageDailyVolume10Day")
                         ),
                         updated_at=_now_utc(),
-                    ))
+                    ).on_conflict_do_update(
+                        index_elements=["symbol"],
+                        set_={
+                            "date": today,
+                            "price": _safe_float(q.get("price")),
+                            "market_cap": _safe_float(info.get("marketCap")),
+                            "pe": _safe_float(info.get("trailingPE")),
+                            "forward_pe": _safe_float(info.get("forwardPE")),
+                            "div_yield": _safe_float(info.get("dividendYield")),
+                            "beta": _safe_float(info.get("beta")),
+                            "high52": _safe_float(info.get("fiftyTwoWeekHigh")),
+                            "low52": _safe_float(info.get("fiftyTwoWeekLow")),
+                            "avg_vol_20d": _safe_float(info.get("averageVolume20days") or info.get("averageDailyVolume10Day")),
+                            "updated_at": _now_utc(),
+                        },
+                    )
+                    session.execute(stmt)
                     rows += 1
                 except Exception as exc:
                     logger.debug("refresh_daily_quotes skip %s: %s", sym, exc)
@@ -268,6 +286,70 @@ def refresh_fx_rates() -> None:
 
 
 # ---------------------------------------------------------------------------
+# Job: refresh_daily_macro
+# ---------------------------------------------------------------------------
+
+def refresh_daily_macro() -> None:
+    """Fetch key FRED macro indicators and upsert into daily_macro table (US only)."""
+    job_id = log_job_start("refresh_daily_macro")
+    try:
+        from ..db_models import DailyMacro
+        from .macro_expansion_service import _fetch_fred_series_sync
+        from datetime import date as _date, timedelta
+
+        today = _date.today()
+        series_ids = [
+            "CPIAUCSL", "UNRATE", "GDPC1", "FEDFUNDS", "DGS10",
+            "PAYEMS", "M2SL", "INDPRO", "MORTGAGE30US", "CSUSHPINSA",
+        ]
+        start_str = (today - timedelta(days=90)).isoformat()
+        raw = _fetch_fred_series_sync(series_ids, start=start_str)
+
+        rows = 0
+        with _get_session()() as session:
+            for indicator_id, points in raw.items():
+                for pt in points:
+                    if pt.get("value") is None:
+                        continue
+                    session.merge(DailyMacro(
+                        indicator_id=indicator_id,
+                        country="US",
+                        date=_date.fromisoformat(pt["date"]),
+                        value=pt["value"],
+                    ))
+                    rows += 1
+            session.commit()
+
+        log_job_success(job_id, rows)
+        logger.info("refresh_daily_macro: %d rows updated", rows)
+    except Exception as exc:
+        logger.error("refresh_daily_macro failed: %s", exc)
+        log_job_failure(job_id, str(exc))
+
+
+# ---------------------------------------------------------------------------
+# Job: refresh_bulk_data
+# ---------------------------------------------------------------------------
+
+def refresh_bulk_data() -> None:
+    """Download World Bank, Fama-French, and IMF WEO bulk datasets."""
+    job_id = log_job_start("refresh_bulk_data")
+    try:
+        from .bulk_data_service import refresh_all_bulk_data
+        status = refresh_all_bulk_data()
+        total_rows = sum(v.get("rows", 0) for v in status.values())
+        errors = [f"{k}: {v['error']}" for k, v in status.items() if v.get("error")]
+        if errors:
+            log_job_failure(job_id, "; ".join(errors))
+        else:
+            log_job_success(job_id, total_rows)
+        logger.info("refresh_bulk_data: %d rows, %d sources", total_rows, len(status))
+    except Exception as exc:
+        logger.error("refresh_bulk_data failed: %s", exc)
+        log_job_failure(job_id, str(exc))
+
+
+# ---------------------------------------------------------------------------
 # Scheduler startup
 # ---------------------------------------------------------------------------
 
@@ -305,14 +387,53 @@ def start_scheduler():
         )
         scheduler.add_job(
             refresh_fx_rates,
-            CronTrigger(hour=[9, 15, 21], minute=0),
+            CronTrigger(hour="9,15,21", minute=0),
             id="refresh_fx_rates",
+            max_instances=1,
+            replace_existing=True,
+        )
+        scheduler.add_job(
+            refresh_daily_macro,
+            CronTrigger(hour=18, minute=0),
+            id="refresh_daily_macro",
+            max_instances=1,
+            replace_existing=True,
+        )
+        scheduler.add_job(
+            refresh_bulk_data,
+            CronTrigger(day_of_week="sun", hour=4, minute=0),
+            id="refresh_bulk_data",
             max_instances=1,
             replace_existing=True,
         )
 
         scheduler.start()
         logger.info("APScheduler started with %d jobs", len(scheduler.get_jobs()))
+
+        # Fire each job once at startup so tables are populated immediately
+        import threading
+        def _run_startup_jobs():
+            for fn, name in [
+                (refresh_daily_prices, "refresh_daily_prices"),
+                (refresh_daily_quotes, "refresh_daily_quotes"),
+                (refresh_fx_rates,     "refresh_fx_rates"),
+                (refresh_daily_macro,  "refresh_daily_macro"),
+            ]:
+                try:
+                    logger.info("Running startup job: %s", name)
+                    fn()
+                except Exception as exc:
+                    logger.warning("Startup job %s failed: %s", name, exc)
+            # Bulk data runs async after a delay to let FRED/yfinance warm up
+            import time as _time
+            _time.sleep(10)
+            try:
+                logger.info("Running startup job: refresh_bulk_data")
+                refresh_bulk_data()
+            except Exception as exc:
+                logger.warning("Startup job refresh_bulk_data failed: %s", exc)
+        threading.Thread(target=_run_startup_jobs, daemon=True).start()
+
         return scheduler
     except ImportError:
         logger.warning("APScheduler not installed - scheduler disabled")

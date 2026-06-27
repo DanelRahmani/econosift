@@ -1458,6 +1458,16 @@ export interface CacheStat {
   hitRate: number | null;
   size: number;
 }
+export interface DbHealth {
+  daily_price?: number;
+  daily_quote?: number;
+  daily_macro?: number;
+  daily_fx?: number;
+  job_execution?: number;
+  cache_entries?: number;
+  cache_size_kb?: number;
+  error?: string;
+}
 export interface HealthResponse {
   status: string;
   uptimeSeconds: number;
@@ -1468,7 +1478,28 @@ export interface HealthResponse {
     overallHitRate: number | null;
     ttlSeconds: number;
   };
-  config: { fredApiKey: boolean };
+  config: { fredApiKey: boolean; finnhubApiKey: boolean };
+  database: DbHealth;
+}
+
+export interface BulkDatasetStatus {
+  last_ok: string | null;
+  last_attempt: string | null;
+  error: string | null;
+  rows: number | null;
+  size_kb: number | null;
+}
+
+export interface PrefetchStatus {
+  running: boolean;
+  started_at: string | null;
+  completed_at: string | null;
+  total: number;
+  done: number;
+  ok: number;
+  failed: number;
+  current: string | null;
+  errors: { label: string; error: string }[];
 }
 
 // --- Phase 14: Research Hub ---
@@ -1736,6 +1767,9 @@ export interface WikiTermsResponse {
 
 export interface MacroRegimeData {
   regime: "Goldilocks" | "Reflationary" | "Stagflation" | "Deflationary";
+  quadrant: 1 | 2 | 3 | 4;
+  growth_z: number | null;
+  inflation_z: number | null;
   growth_signal: "rising" | "falling";
   inflation_signal: "above" | "below";
   metrics: {
@@ -1746,4 +1780,5 @@ export interface MacroRegimeData {
     yield_spread_2y10y: number | null;
   };
   asset_signals: Record<string, "overweight" | "underweight" | "neutral">;
+  allocation: Record<string, number>;
 }

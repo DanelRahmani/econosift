@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import type { InflationData } from "@/lib/types";
-import { Card } from "@/components/ui";
+import { Card, PageSkeleton } from "@/components/ui";
 import {
   LineChart,
   Line,
@@ -59,13 +59,7 @@ export function InflationTab() {
   }, []);
 
   if (loading) {
-    return (
-      <div className="space-y-4">
-        {Array.from({ length: 5 }).map((_, i) => (
-          <div key={i} className="h-40 animate-pulse bg-surface-alt rounded" />
-        ))}
-      </div>
-    );
+    return <PageSkeleton text="Loading inflation data…" />;
   }
 
   if (error || !data) {

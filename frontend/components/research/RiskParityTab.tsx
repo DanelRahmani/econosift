@@ -6,6 +6,7 @@ import {
   ResponsiveContainer, Legend,
 } from "recharts";
 import { Card } from "@/components/ui";
+import { SearchBar } from "@/components/SearchBar";
 import { api } from "@/lib/api";
 import type { RiskParityWeights, RiskParityBacktest } from "@/lib/types";
 
@@ -69,12 +70,27 @@ export function RiskParityTab() {
         <div className="flex flex-wrap items-end gap-4">
           <div className="flex-1 min-w-[240px]">
             <label className="block text-xs text-text-muted mb-1">Tickers (multi-asset basket)</label>
-            <input
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              className="w-full px-3 py-1.5 rounded-lg bg-surface-alt border border-border text-sm font-mono"
-              placeholder="SPY, TLT, GLD, DJP"
-            />
+            <div className="space-y-2">
+              <SearchBar onAdd={(sym) => {
+                const current = input.split(",").map(t => t.trim().toUpperCase()).filter(Boolean);
+                if (!current.includes(sym.toUpperCase())) {
+                  setInput([...current, sym.toUpperCase()].join(", "));
+                }
+              }} />
+              {tickers.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {tickers.map((t) => (
+                    <span key={t} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-alt border border-border text-xs font-mono">
+                      {t}
+                      <button onClick={() => {
+                        const next = tickers.filter(x => x !== t);
+                        setInput(next.join(", "));
+                      }} className="text-text-muted hover:text-danger leading-none">&times;</button>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
           <div>
             <label className="block text-xs text-text-muted mb-1">Period</label>

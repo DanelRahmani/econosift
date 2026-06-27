@@ -6,22 +6,22 @@ import { usePathname } from "next/navigation";
 import { ThemeToggle } from "./ThemeToggle";
 
 const primaryTabs = [
-  { href: "/dashboard", label: "Dashboard", icon: "M3 13h4l3 7 4-14 3 7h4" },
   { href: "/markets", label: "Markets", icon: "M3 13h4l3 7 4-14 3 7h4" },
   { href: "/screener", label: "Screener", icon: "M3 4h18M3 9h13M3 14h9M3 19h5M17 14l2 2 4-4" },
   { href: "/portfolio", label: "Portfolio", icon: "M11 3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-6M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" },
   { href: "/research", label: "Research", icon: "M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" },
   { href: "/macro", label: "Macro", icon: "M4 19V5m0 14h16M8 15l3-4 3 3 4-6" },
-  { href: "/calendar", label: "Calendar", icon: "M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2z" },
 ];
 
 const drawerTabs = [
-  { href: "/atlas", label: "Atlas" },
-  { href: "/wiki", label: "Wiki" },
+  { href: "/dashboard", label: "Dashboard" },
+  { href: "/calendar", label: "Calendar" },
   { href: "/risk", label: "Risk" },
   { href: "/options", label: "Options" },
-  { href: "/yield", label: "Yield" },
-  { href: "/policy", label: "Policy & Sovereign" },
+  { href: "/yield", label: "Rates & Policy" },
+  { href: "/atlas", label: "Atlas" },
+  { href: "/wiki", label: "Wiki" },
+  { href: "/admin", label: "Admin" },
 ];
 
 export function MobileNav() {
