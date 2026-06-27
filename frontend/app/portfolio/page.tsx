@@ -20,6 +20,7 @@ import { EfficientFrontier } from "@/components/portfolio/EfficientFrontier";
 import { MonteCarlo } from "@/components/portfolio/MonteCarlo";
 import { BlackLitterman } from "@/components/portfolio/BlackLitterman";
 import { StressTesting } from "@/components/portfolio/StressTesting";
+import { ScenarioTab } from "@/components/portfolio/ScenarioTab";
 
 const LS_KEY = "axiom_portfolio";
 
@@ -33,7 +34,7 @@ const DEFAULT_HOLDINGS: Holding[] = [
 const PERIODS = ["1y", "2y", "3y"] as const;
 type Period = (typeof PERIODS)[number];
 
-const TABS = ["Overview", "Risk", "Attribution", "Optimize"] as const;
+const TABS = ["Overview", "Risk", "Attribution", "Optimize", "Scenario"] as const;
 type Tab = (typeof TABS)[number];
 
 function loadFromStorage(): Holding[] {
@@ -264,6 +265,11 @@ export default function PortfolioPage() {
             <BlackLitterman holdings={validHoldings} period={period} />
             <StressTesting holdings={validHoldings} period={period} />
           </>
+        )}
+
+        {/* ── Scenario ── */}
+        {tab === "Scenario" && (
+          <ScenarioTab holdings={validHoldings} />
         )}
       </div>
     </main>

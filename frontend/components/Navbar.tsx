@@ -6,25 +6,22 @@ import { usePathname } from "next/navigation";
 import { ThemeToggle } from "./ThemeToggle";
 
 const primaryTabs = [
+  { href: "/dashboard", label: "Dashboard" },
   { href: "/markets", label: "Markets" },
   { href: "/screener", label: "Screener" },
   { href: "/portfolio", label: "Portfolio" },
   { href: "/research", label: "Research" },
   { href: "/macro", label: "Macro" },
   { href: "/calendar", label: "Calendar" },
-  { href: "/atlas", label: "Atlas" },
-  { href: "/wiki", label: "Wiki" },
 ];
 
 const moreTabs = [
-  { href: "/dashboard", label: "Dashboard" },
+  { href: "/atlas", label: "Atlas" },
+  { href: "/wiki", label: "Wiki" },
   { href: "/risk", label: "Risk" },
   { href: "/options", label: "Options" },
-  { href: "/treemap", label: "Treemap" },
-  { href: "/scenario", label: "Scenario" },
   { href: "/yield", label: "Yield" },
   { href: "/policy", label: "Policy & Sovereign" },
-  { href: "/sectors", label: "Sectors" },
 ];
 
 export function Navbar() {
@@ -48,7 +45,7 @@ export function Navbar() {
   return (
     <nav className="sticky top-0 z-50 bg-surface/80 border-b border-border backdrop-blur">
       <div className="max-w-7xl mx-auto px-4 h-14 flex items-center gap-6">
-        <Link href="/markets" className="font-display font-extrabold text-lg tracking-tight shrink-0">
+        <Link href="/dashboard" className="font-display font-extrabold text-lg tracking-tight shrink-0">
           <span className="text-accent">Axiom</span>{" "}
           <span className="text-text-primary">Finance</span>
         </Link>
