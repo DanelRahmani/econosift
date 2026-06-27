@@ -16,8 +16,8 @@ A self-hosted, Dockerised financial analytics platform covering the full investm
 | **Markets** | `/markets` | Price charts, technical indicators (MACD, Bollinger Bands, Ichimoku Cloud, Fibonacci, Pivot Points), risk metrics (VaR, Sharpe, Beta, GARCH), 8-model valuation engine + DCF with per-country discount rate selector (live FRED risk-free rates for US, EU, UK, Japan, etc.) + Snowflake composite score, financial ratios, options & IV analytics, news feed, 13F institutional holdings, Form 4 insider transactions. Sub-tabs: Overview, Technicals, Valuation, Ratios, News & Events, Sectors, Treemap |
 | **Screener** | `/screener` | S&P 500 / Nasdaq 100 / Dow 30 universe, 20+ preset signals (Golden Cross, Undervalued, Quality Growth, High Short Interest, etc.), overnight-warmed cache, 9 result tabs with sparkline gallery |
 | **Portfolio** | `/portfolio` | Efficient frontier, Black-Litterman model, Monte Carlo simulation, Fama-French 3/5-factor attribution, Kelly criterion position sizing, risk contribution decomposition, stress testing |
-| **Research** | `/research` | 5-tab quant hub: Risk Parity (ERC/inverse-vol backtest), FX Carry (G10 carry + backtest), Momentum (decile backtest), Realized Moments (GK variance, skew), Econometric Lab (pooled OLS with ~200-country searchable selector) |
-| **Macro** | `/macro` | 9-tab hub: Overview, Inflation, Growth & Employment, Housing, Commodities, FX, Leading Indicators, Financial & Funding Conditions, Sentiment & Positioning |
+| **Research** | `/research` | 5-tab quant hub: **Risk Parity** (ERC/inverse-vol backtest), **FX Carry** (G10 carry + backtest), **Momentum** (decile backtest), **Realized Moments** (GK variance, skew, cross-sectional tail test), **Econometric Lab** (pooled OLS with ~200-country searchable selector) |
+| **Macro** | `/macro` | 9-tab hub: **Overview** (FX rates, country comparison, regime clock with WB data for ALL countries), **Inflation**, **Growth & Employment**, **Housing**, **Commodities** (FRED primary), **FX**, **Leading Indicators**, **Financial & Funding Conditions** (EPU, SOFR, CP spreads, Fed BS), **Sentiment & Positioning** |
 | **Risk** | `/risk` | Rolling metrics (20D/60D/120D/252D), GARCH(1,1) volatility forecasting, Hurst exponent, Ornstein-Uhlenbeck mean-reversion, Engle-Granger cointegration, correlation matrix, historical stress scenarios (2008, COVID, 2022 rates, dot-com) |
 | **Options** | `/options` | Implied volatility (IV30, IV Rank, IV Percentile), Greeks (Delta, Gamma, Theta, Vega, Rho), term structure, volatility smile, OI profile, max pain, Black-Scholes pricing, CRR binomial tree, Monte Carlo options pricing |
 | **Calendar** | `/calendar` | Economic releases (CPI, NFP, FOMC, GDP, etc.), earnings reports with EPS surprise, ex-dividend dates, IPOs, central bank meeting schedule — sourced from FRED + Finnhub |
@@ -57,7 +57,7 @@ The maroon/crimson accent is the Axiom brand signature — it provides a distinc
 | **Data** | yfinance, pandas, pandas-datareader, numpy, scipy |
 | **Frontend** | Next.js 14 (App Router), React 18, TypeScript, Tailwind CSS, Recharts, React Query v5 |
 | **Infra** | Docker Compose, Nginx reverse proxy, SQLite (WAL mode) |
-| **Sources** | Yahoo Finance, FRED, World Bank, OECD, IMF, Ken French Data Library, Finnhub, ECB, DB.nomics |
+| **Sources** | Yahoo Finance, FRED, World Bank, IMF, BIS, OECD, Ken French Data Library, Finnhub, ECB, DB.nomics, Eurostat |
 
 ---
 
@@ -124,7 +124,8 @@ The backend serves under `/api` (proxied by Nginx). Key endpoint groups:
 | `GET /api/macro/leading` | LEI, CFNAI, ISM PMI, GSCPI, IS-LM-PC framework |
 | `GET /api/macro/financial-conditions` | NFCI, STLFSI, Fed balance sheet, EPU |
 | `GET /api/macro/positioning` | COT speculative/commercial positions |
-| `GET /api/macro/regime` | Goldilocks/Overheating/Slowdown/Stagflation regime clock |
+| `GET /api/macro/regime` | 4-quadrant macro regime classifier (growth × inflation) with Z-scores, asset allocation signals |
+| `GET /api/macro/regime-series` | Historical regime time series for any country (World Bank data, ~200 countries) |
 | `GET /api/macro/country-risk` | 6-KPI traffic-light sovereign panel |
 | `GET /api/macro/centralbanks` | Policy rates for 7 CBs, meeting calendar, Fed BS |
 | `POST /api/macro/regress` | Pooled OLS econometric lab |
@@ -198,7 +199,11 @@ The backend serves under `/api` (proxied by Nginx). Key endpoint groups:
 ### Admin
 | Endpoint | Purpose |
 |----------|---------|
-| `GET /api/admin/performance` | Cache hit rates, uptime |
+| `GET /api/admin/health` | Backend health, uptime, cache stats, DB row counts |
+| `POST /api/admin/prefetch` | Trigger cache warming (95 tasks, rate-limited) |
+| `GET /api/admin/prefetch/status` | Prefetch progress with completion % |
+| `GET /api/admin/bulk-data/status` | Bulk data download status (World Bank, IMF, Fama-French, BIS) |
+| `POST /api/admin/bulk-data/refresh` | Trigger bulk data refresh (runs in background) |
 | `GET /api/health` | Health check |
 
 ---
@@ -222,11 +227,12 @@ axiomfinance/
 │       │   ├── market.py        # Market data endpoints
 │       │   ├── valuation.py     # Valuation engine endpoints
 │       │   └── ...
-│       ├── services/            # 35+ service modules
-│       │   ├── wiki_service.py  # 410-term dictionary data
-│       │   ├── valuation_engine.py
+│       ├── services/            # 38+ service modules
+│       │   ├── wiki_service.py       # 410-term dictionary data
+│       │   ├── bulk_data_service.py  # WB/IMF/Fama-French/BIS bulk downloads
+│       │   ├── prefetch_service.py   # Cache warming with rate limiting
 │       │   └── ...
-│       └── sources/             # 7-source macro data pipeline
+│       └── sources/             # 4-source macro data pipeline (World Bank, IMF, BIS, FRED)
 ├── frontend/
 │   ├── Dockerfile
 │   ├── next.config.js
