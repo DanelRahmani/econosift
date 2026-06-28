@@ -203,14 +203,14 @@ async def taylor_rule():
 
 @router.get("/inflation")
 async def inflation(country: str = Query("US", description="ISO2 country code (FRED data is US-only)")):
-    """CPI, Core CPI, PCE, Core PCE, PPI, breakevens, M2, Quantity Theory."""
+    """CPI, Core CPI, PCE, Core PCE, PPI, breakevens, Michigan survey, M2, Quantity Theory."""
     if country.upper() != "US":
         return {"asOf": None, "kpis": {}, "history": {}, "note": "FRED data is US-only. For cross-country data use /macro/data or /macro/country-risk."}
     from ..services.macro_expansion_service import fetch_fred_series
 
     series_ids = (
         "CPIAUCSL", "CPILFESL", "PCEPI", "PCEPILFE", "PPIFIS",
-        "T5YIE", "T5YIFR", "T10YIE", "M2SL", "GDP",
+        "T5YIE", "T5YIFR", "T10YIE", "MICH", "M2SL", "GDP",
     )
     data = await fetch_fred_series(series_ids, start="2000-01-01")
 
@@ -230,6 +230,7 @@ async def inflation(country: str = Query("US", description="ISO2 country code (F
             "pceYoY": _latest(pce_yoy),
             "corePceYoY": _latest(core_pce_yoy),
             "breakeven5y": _latest(data.get("T5YIE", [])),
+            "michigan5y": _latest(data.get("MICH", [])),
         },
         "history": {
             "cpiYoY": cpi_yoy,
@@ -240,6 +241,7 @@ async def inflation(country: str = Query("US", description="ISO2 country code (F
             "breakeven5y": data.get("T5YIE", []),
             "breakeven10y": data.get("T10YIE", []),
             "forward5y5y": data.get("T5YIFR", []),
+            "michigan5y": data.get("MICH", []),
             "m2": data.get("M2SL", []),
             "m2Yoy": m2_yoy,
         },
@@ -352,6 +354,81 @@ async def housing(country: str = Query("US", description="ISO2 country code (FRE
         },
         "recessionPeriods": recessions,
     }
+
+
+@router.get("/housing/global")
+async def housing_global():
+    """BIS residential property prices for major economies (real, 2010=100).
+
+    Returns price indices and YoY changes for ~20 countries for cross-country comparison.
+    """
+    from ..sources.source_bis import get_property_prices_bulk
+
+    COUNTRIES_BIS = [
+        "US", "GB", "DE", "FR", "IT", "ES", "NL", "CH", "SE", "NO",
+        "CA", "AU", "NZ", "JP", "KR", "CN",
+    ]
+    raw = await get_property_prices_bulk(tuple(COUNTRIES_BIS), real=True)
+
+    from ..config import COUNTRY_NAMES
+    countries_out = []
+    for iso2 in COUNTRIES_BIS:
+        pts = raw.get(iso2, [])
+        if not pts:
+            continue
+        # Sort by date, get latest value and compute YoY
+        pts.sort(key=lambda x: x["date"])
+        latest = pts[-1]
+        # Date format: quarterly "2020-Q1" etc. — extract year
+        latest_date = latest["date"]
+        try:
+            y = int(latest_date.split("-Q")[0]) if "-Q" in latest_date else int(latest_date)
+        except (ValueError, IndexError):
+            y = None
+        # Find latest value from previous year (any quarter)
+        prev_val = None
+        if y is not None:
+            prev_year_pts = [p for p in pts if str(y - 1) in str(p["date"])]
+            if prev_year_pts:
+                # Average all quarters of previous year
+                prev_val = sum(p["value"] for p in prev_year_pts) / len(prev_year_pts)
+        # Average latest year's quarters for current value
+        cur_year_pts = [p for p in pts if str(y) in str(p["date"])] if y is not None else [latest]
+        cur_val = sum(p["value"] for p in cur_year_pts) / len(cur_year_pts) if cur_year_pts else latest["value"]
+        yoy = round((cur_val / prev_val - 1) * 100, 2) if prev_val and prev_val > 0 else None
+        name = COUNTRY_NAMES.get(iso2, iso2)
+        countries_out.append({
+            "iso2": iso2,
+            "name": name,
+            "latestIndex": latest["value"],
+            "latestDate": latest["date"],
+            "yoyChange": yoy,
+            "history": pts[-40:],  # last 10 years of quarterly data
+        })
+
+    countries_out.sort(key=lambda c: c["yoyChange"] or float("-inf"), reverse=True)
+    return {
+        "asOf": str(date.today()),
+        "source": "BIS (Bank for International Settlements)",
+        "note": "Real residential property price indices, 2010=100",
+        "countries": countries_out,
+    }
+
+
+@router.get("/fiscal")
+async def fiscal_sustainability():
+    """Fiscal sustainability dashboard: debt/GDP, fiscal balance, tax revenue,
+    r-g differential, and gross savings for 18 major economies."""
+    from ..services.fiscal_service import get_fiscal_data
+    return await get_fiscal_data()
+
+
+@router.get("/trade")
+async def trade_flows():
+    """Trade flows dashboard: exports/GDP, imports/GDP, trade balance,
+    trade openness, and merchandise trade for 18 major economies."""
+    from ..services.trade_service import get_trade_data
+    return await get_trade_data()
 
 
 # Commodity config: (display name, sector, FRED series for spot price)
@@ -792,6 +869,57 @@ async def financial_conditions(country: str = Query("US", description="ISO2 coun
             "ciLoans": ci_loans,
             "economicPolicyUncertainty": data.get("USEPUINDXD", []),
         },
+    }
+
+
+@router.get("/credit-gaps")
+async def credit_gaps():
+    """BIS credit-to-GDP gaps for major economies.
+
+    Returns latest gap (% of GDP) and history for each country.
+    Gaps >10pp signal elevated systemic risk per BIS methodology.
+    """
+    from ..sources.source_bis import get_credit_gaps_bulk
+
+    COUNTRIES = ["US", "GB", "DE", "FR", "IT", "ES", "NL", "CH", "SE",
+                 "CA", "AU", "JP", "KR", "CN"]
+    raw = await get_credit_gaps_bulk(tuple(COUNTRIES))
+
+    from ..config import COUNTRY_NAMES
+    countries_out = []
+    for iso2 in COUNTRIES:
+        pts = raw.get(iso2, [])
+        if not pts:
+            continue
+        pts.sort(key=lambda x: x["date"])
+        latest = pts[-1] if pts else None
+        name = COUNTRY_NAMES.get(iso2, iso2)
+        # BIS methodology: gap >10 = elevated risk, gap >2 = warning
+        gap_val = latest["value"] if latest else None
+        if gap_val is not None:
+            if gap_val > 10:
+                signal = "red"
+            elif gap_val > 2:
+                signal = "yellow"
+            else:
+                signal = "green"
+        else:
+            signal = "unknown"
+        countries_out.append({
+            "iso2": iso2,
+            "name": name,
+            "latestGap": gap_val,
+            "latestDate": latest["date"] if latest else None,
+            "signal": signal,
+            "history": pts[-40:] if pts else [],
+        })
+
+    countries_out.sort(key=lambda c: c["latestGap"] or float("-inf"), reverse=True)
+    return {
+        "asOf": str(date.today()),
+        "source": "BIS (Bank for International Settlements)",
+        "note": "Credit-to-GDP gap = deviation from long-term trend. >10pp = elevated systemic risk.",
+        "countries": countries_out,
     }
 
 

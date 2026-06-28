@@ -1,8 +1,9 @@
 "use client";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import type { HousingData } from "@/lib/types";
+import type { HousingData, GlobalHousingData } from "@/lib/types";
 import { Card } from "@/components/ui";
+import { shortCountryName } from "@/lib/format";
 import {
   LineChart,
   Line,
@@ -13,6 +14,9 @@ import {
   Legend,
   ResponsiveContainer,
   ReferenceArea,
+  BarChart,
+  Bar,
+  Cell,
 } from "recharts";
 
 const GRID = "rgba(255,255,255,0.08)";
@@ -43,6 +47,7 @@ export function HousingTab() {
   const [data, setData] = useState<HousingData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [globalHousing, setGlobalHousing] = useState<GlobalHousingData | null>(null);
 
   useEffect(() => {
     api
@@ -50,6 +55,7 @@ export function HousingTab() {
       .then(setData)
       .catch(() => setError(true))
       .finally(() => setLoading(false));
+    api.macroHousingGlobal().then(setGlobalHousing).catch(() => {});
   }, []);
 
   if (loading) {
@@ -228,6 +234,55 @@ export function HousingTab() {
               />
             </LineChart>
           </ResponsiveContainer>
+        </Card>
+      )}
+
+      {/* Global Property Prices (BIS) */}
+      {globalHousing && globalHousing.countries.length > 0 && (
+        <Card className="p-4">
+          <h3 className="font-semibold mb-1">
+            🌍 Global Real House Price Index (2010=100)
+          </h3>
+          <p className="text-xs text-text-secondary mb-3">
+            BIS residential property prices, inflation-adjusted. YoY% change shown.
+          </p>
+          <ResponsiveContainer width="100%" height={320}>
+            <BarChart
+              data={globalHousing.countries.map((c) => ({
+                name: c.name,
+                yoy: c.yoyChange ?? 0,
+              }))}
+              layout="vertical"
+              margin={{ left: 80, right: 40 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
+              <XAxis type="number" tickFormatter={(v) => `${v}%`} tick={{ fontSize: 11 }} />
+              <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={90} tickFormatter={shortCountryName} />
+              <Tooltip formatter={(v: number) => [`${v?.toFixed(2)}%`, "YoY Change"]} />
+              <Bar dataKey="yoy" radius={[0, 4, 4, 0]}>
+                {(globalHousing.countries.map((c) => (
+                  <Cell
+                    key={c.iso2}
+                    fill={(c.yoyChange ?? 0) >= 0 ? "#10b981" : "#ef4444"}
+                    fillOpacity={0.8}
+                  />
+                )) as any)}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3">
+            {globalHousing.countries.slice(0, 8).map((c) => (
+              <div key={c.iso2} className="text-xs">
+                <span className="text-text-secondary">{c.name}</span>{" "}
+                <span className={(c.yoyChange ?? 0) >= 0 ? "text-success font-medium" : "text-danger font-medium"}>
+                  {c.yoyChange != null ? `${c.yoyChange > 0 ? "+" : ""}${c.yoyChange.toFixed(1)}%` : "—"}
+                </span>
+              </div>
+            ))}
+          </div>
+          <p className="text-xs text-text-secondary mt-2">
+            Source: {globalHousing.source}. {globalHousing.note}
+          </p>
         </Card>
       )}
     </div>

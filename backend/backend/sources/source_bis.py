@@ -74,7 +74,12 @@ def _parse_bis_flat(df: pd.DataFrame, iso2_filter: str | None = None,
     iso2_filter : if set, only return rows for this ISO2 code
     freq : 'A' for annual, 'Q' for quarterly, 'M' for monthly
     """
-    col_area = next(c for c in df.columns if "REF_AREA" in c)
+    # Some BIS datasets use REF_AREA, others use BORROWERS_CTY for country
+    col_area = next((c for c in df.columns if "REF_AREA" in c), None)
+    if col_area is None:
+        col_area = next((c for c in df.columns if "BORROWERS_CTY" in c), None)
+    if col_area is None:
+        raise KeyError("No REF_AREA or BORROWERS_CTY column found in BIS data")
     col_time = next(c for c in df.columns if "TIME_PERIOD" in c)
     col_val = next(c for c in df.columns if "OBS_VALUE" in c)
     col_freq = next((c for c in df.columns if "FREQ" in c), None)
@@ -213,9 +218,9 @@ async def get_credit_gap(iso2: str = "US") -> list[dict]:
         df = _fetch_bis_zip("credit_gap")
         if df is None:
             return []
-        # Filter to actual credit-to-GDP ratios (not gaps)
+        # Filter to credit-to-GDP gaps (C = gap: actual minus trend)
         col_type = next(c for c in df.columns if "CG_DTYPE" in c)
-        df = df[df[col_type].str.startswith("A:", na=False)]
+        df = df[df[col_type].str.startswith("C:", na=False)]
         # All sectors, private non-financial
         col_borrower = next(c for c in df.columns if "TC_BORROWERS" in c)
         df = df[df[col_borrower].str.startswith("P:", na=False)]
@@ -227,3 +232,106 @@ async def get_credit_gap(iso2: str = "US") -> list[dict]:
     except Exception as exc:
         logger.warning("BIS credit gap query failed for %s: %s", iso2, exc)
         return []
+
+
+@async_cached("bis_property")
+async def get_property_prices(iso2: str = "US", real: bool = True) -> list[dict]:
+    """Get residential property price index for a country (quarterly, 2010=100).
+
+    Returns list of {date, value} dicts.  Set real=False for nominal prices.
+    BIS UNIT_MEASURE codes: 628 = index (2010=100), 771 = YoY% change.
+    VALUE column: R = real, N = nominal.
+    """
+    try:
+        df = _fetch_bis_zip("property")
+        if df is None:
+            return []
+        # Filter to index measure (628), not YoY changes (771)
+        col_measure = next(c for c in df.columns if "MEASURE" in c.upper())
+        df = df[df[col_measure].str.startswith("628:", na=False)]
+        # Filter real vs nominal via VALUE column
+        col_value_type = next((c for c in df.columns if c.startswith("VALUE:")), None)
+        if col_value_type:
+            prefix = "R:" if real else "N:"
+            df = df[df[col_value_type].str.startswith(prefix, na=False)]
+        # Residential only (exclude commercial) via REF_SECTOR if present
+        col_sector = next((c for c in df.columns if "REF_SECTOR" in c.upper()), None)
+        if col_sector:
+            df = df[df[col_sector].str.startswith("R:", na=False)]
+        parsed = _parse_bis_flat(df, iso2_filter=iso2, freq="Q")
+        return [
+            {"date": str(r["year"]), "value": round(float(r["value"]), 2)}
+            for _, r in parsed.iterrows()
+        ]
+    except Exception as exc:
+        logger.warning("BIS property price query failed for %s: %s", iso2, exc)
+        return []
+
+
+@async_cached("bis_property_bulk")
+async def get_property_prices_bulk(iso2_tuple: tuple[str, ...], real: bool = True) -> dict[str, list[dict]]:
+    """Get residential property prices for multiple countries in one call.
+
+    Returns {iso2: [{date, value}, ...]}.
+    """
+    iso2_list = list(iso2_tuple)
+    result: dict[str, list[dict]] = {}
+    try:
+        df = _fetch_bis_zip("property")
+        if df is None:
+            return result
+        # Filter to index measure (628), not YoY changes (771)
+        col_measure = next(c for c in df.columns if "MEASURE" in c.upper())
+        df = df[df[col_measure].str.startswith("628:", na=False)]
+        # Filter real vs nominal via VALUE column
+        col_value_type = next((c for c in df.columns if c.startswith("VALUE:")), None)
+        if col_value_type:
+            prefix = "R:" if real else "N:"
+            df = df[df[col_value_type].str.startswith(prefix, na=False)]
+        col_sector = next((c for c in df.columns if "REF_SECTOR" in c.upper()), None)
+        if col_sector:
+            df = df[df[col_sector].str.startswith("R:", na=False)]
+        for iso2 in iso2_list:
+            parsed = _parse_bis_flat(df, iso2_filter=iso2, freq="Q")
+            if parsed.empty:
+                continue
+            result[iso2] = [
+                {"date": str(r["year"]), "value": round(float(r["value"]), 2)}
+                for _, r in parsed.iterrows()
+            ]
+        return result
+    except Exception as exc:
+        logger.warning("BIS property bulk query failed: %s", exc)
+        return result
+
+
+@async_cached("bis_credit_gap_bulk")
+async def get_credit_gaps_bulk(iso2_tuple: tuple[str, ...]) -> dict[str, list[dict]]:
+    """Get credit-to-GDP gaps for multiple countries in one call.
+
+    Returns {iso2: [{date, value}, ...]} where value is gap in % of GDP.
+    """
+    iso2_list = list(iso2_tuple)
+    result: dict[str, list[dict]] = {}
+    try:
+        df = _fetch_bis_zip("credit_gap")
+        if df is None:
+            return result
+        # Filter to credit-to-GDP gaps (C = gap: actual minus trend)
+        col_type = next(c for c in df.columns if "CG_DTYPE" in c)
+        df = df[df[col_type].str.startswith("C:", na=False)]  # C = credit-to-GDP gaps
+        # All sectors, private non-financial
+        col_borrower = next(c for c in df.columns if "TC_BORROWERS" in c)
+        df = df[df[col_borrower].str.startswith("P:", na=False)]
+        for iso2 in iso2_list:
+            parsed = _parse_bis_flat(df, iso2_filter=iso2, freq="Q")
+            if parsed.empty:
+                continue
+            result[iso2] = [
+                {"date": str(r["year"]), "value": round(float(r["value"]), 4)}
+                for _, r in parsed.iterrows()
+            ]
+        return result
+    except Exception as exc:
+        logger.warning("BIS credit gap bulk query failed: %s", exc)
+        return result

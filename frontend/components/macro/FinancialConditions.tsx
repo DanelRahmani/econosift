@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import type { FinancialConditionsData } from "@/lib/types";
+import type { FinancialConditionsData, CreditGapsData } from "@/lib/types";
 import { Card } from "@/components/ui";
 import {
   LineChart,
@@ -15,6 +15,9 @@ import {
   ReferenceLine,
   AreaChart,
   Area,
+  BarChart,
+  Bar,
+  Cell,
 } from "recharts";
 
 const GRID = "rgba(255,255,255,0.08)";
@@ -56,6 +59,7 @@ export function FinancialConditions() {
   const [error, setError] = useState(false);
   const [epuLogScale, setEpuLogScale] = useState(false);
   const [fundingData, setFundingData] = useState<any>(null);
+  const [creditGaps, setCreditGaps] = useState<CreditGapsData | null>(null);
 
   useEffect(() => {
     api
@@ -64,6 +68,7 @@ export function FinancialConditions() {
       .catch(() => setError(true))
       .finally(() => setLoading(false));
     api.macroFunding().then(setFundingData).catch(() => {});
+    api.macroCreditGaps().then(setCreditGaps).catch(() => {});
   }, []);
 
   if (loading) {
@@ -325,6 +330,45 @@ export function FinancialConditions() {
             )}
           </div>
         </>
+      )}
+
+      {/* ── BIS Credit-to-GDP Gaps ── */}
+      {creditGaps && creditGaps.countries.length > 0 && (
+        <Card className="p-4">
+          <h3 className="font-semibold mb-1">
+            🌍 Global Credit-to-GDP Gaps
+          </h3>
+          <p className="text-xs text-text-secondary mb-3">
+            {creditGaps.note}. Green &lt;2pp · Yellow 2–10pp · Red &gt;10pp.
+          </p>
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart
+              data={creditGaps.countries.map((c) => ({
+                name: c.name,
+                gap: c.latestGap ?? 0,
+                signal: c.signal,
+              }))}
+              layout="vertical"
+              margin={{ left: 80, right: 40 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
+              <XAxis type="number" tickFormatter={(v) => `${v}pp`} tick={{ fontSize: 11 }} />
+              <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} />
+              <Tooltip formatter={(v: number) => [`${v?.toFixed(2)} pp`, "Credit-to-GDP Gap"]} />
+              <ReferenceLine x={10} stroke="#ef4444" strokeDasharray="4 4" label="BIS threshold" />
+              <ReferenceLine x={2} stroke="#f59e0b" strokeDasharray="4 4" />
+              <Bar dataKey="gap" radius={[0, 4, 4, 0]}>
+                {(creditGaps.countries.map((c) => {
+                  const color = c.signal === "red" ? "#ef4444" : c.signal === "yellow" ? "#f59e0b" : "#10b981";
+                  return <Cell key={c.iso2} fill={color} fillOpacity={0.8} />;
+                }) as any)}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+          <p className="text-xs text-text-secondary mt-2">
+            Source: {creditGaps.source}. Gaps measure deviation from long-term credit/GDP trend.
+          </p>
+        </Card>
       )}
     </div>
   );

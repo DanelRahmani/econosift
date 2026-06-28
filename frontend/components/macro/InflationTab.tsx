@@ -94,6 +94,14 @@ export function InflationTab() {
     "5Y Breakeven": pt.value,
     "10Y Breakeven": history.breakeven10y?.[i]?.value ?? null,
     "5Y5Y Forward": history.forward5y5y?.[i]?.value ?? null,
+    "Michigan 5Y": history.michigan5y?.[i]?.value ?? null,
+  }));
+
+  // Chart 3b: Market-Implied (5Y Breakeven) vs Survey-Implied (Michigan 5Y)
+  const msData = (history.breakeven5y ?? []).map((pt, i) => ({
+    date: pt.date.slice(0, 7),
+    "Market 5Y BE": pt.value,
+    "Michigan 5Y": history.michigan5y?.[i]?.value ?? null,
   }));
 
   // Chart 4: M2 vs CPI (dual axis)
@@ -135,6 +143,7 @@ export function InflationTab() {
           color={kpiColor(kpis.corePceYoY)}
         />
         <KpiCard label="5Y Breakeven" value={kpis.breakeven5y} />
+        <KpiCard label="Michigan 5Y Expectations" value={kpis.michigan5y} />
       </div>
 
       {/* Chart 1: Inflation measures multi-line */}
@@ -198,6 +207,29 @@ export function InflationTab() {
               <Line type="monotone" dataKey="5Y Breakeven" stroke="#f59e0b" dot={false} strokeWidth={1.5} />
               <Line type="monotone" dataKey="10Y Breakeven" stroke="#ef4444" dot={false} strokeWidth={1.5} />
               <Line type="monotone" dataKey="5Y5Y Forward" stroke="#10b981" dot={false} strokeWidth={1.5} strokeDasharray="4 4" />
+            <Line type="monotone" dataKey="Michigan 5Y" stroke="#f97316" dot={false} strokeWidth={1.5} strokeDasharray="6 3" />
+            </LineChart>
+          </ResponsiveContainer>
+        </Card>
+      )}
+
+      {/* Chart 3b: Market vs Survey Inflation */}
+      {msData.length > 0 && (
+        <Card className="p-4">
+          <h3 className="font-semibold mb-1">Market-Implied vs Survey-Implied Inflation</h3>
+          <p className="text-xs text-text-secondary mb-3">
+            5Y Breakeven (market-implied, from TIPS) vs Michigan 5Y Survey (consumer expectations). Divergence signals market pricing different inflation than consumers expect.
+          </p>
+          <ResponsiveContainer width="100%" height={220}>
+            <LineChart data={msData}>
+              <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
+              <XAxis dataKey="date" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
+              <YAxis tickFormatter={(v) => `${v}%`} tick={{ fontSize: 11 }} />
+              <Tooltip formatter={(v: number) => [`${v?.toFixed(2)}%`]} />
+              <Legend />
+              <ReferenceLine y={2} stroke="rgba(255,255,255,0.25)" strokeDasharray="4 4" />
+              <Line type="monotone" dataKey="Market 5Y BE" stroke="#f59e0b" dot={false} strokeWidth={2} />
+              <Line type="monotone" dataKey="Michigan 5Y" stroke="#3b82f6" dot={false} strokeWidth={1.5} strokeDasharray="5 5" />
             </LineChart>
           </ResponsiveContainer>
         </Card>

@@ -14,6 +14,7 @@ from ..services import risk_parity_service as rp
 from ..services import carry_service
 from ..services import momentum_service
 from ..services import realized_moments_service
+from ..services import dupont_service
 
 router = APIRouter(prefix="/api/research", tags=["research"])
 
@@ -91,5 +92,14 @@ async def get_moments_crosssection(
 ):
     try:
         return realized_moments_service.get_crosssection(universe, window)
+    except Exception as exc:  # pragma: no cover - defensive
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@router.get("/dupont")
+async def get_dupont():
+    """Sector DuPont decomposition — median margin / turnover / leverage / ROE per GICS sector."""
+    try:
+        return dupont_service.get_sector_dupont()
     except Exception as exc:  # pragma: no cover - defensive
         raise HTTPException(status_code=500, detail=str(exc)) from exc

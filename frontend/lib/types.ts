@@ -865,6 +865,7 @@ export interface InflationData {
     pceYoY: number | null;
     corePceYoY: number | null;
     breakeven5y: number | null;
+    michigan5y: number | null;
   };
   history: {
     cpiYoY: MacroTimeSeries[];
@@ -875,6 +876,7 @@ export interface InflationData {
     breakeven5y: MacroTimeSeries[];
     breakeven10y: MacroTimeSeries[];
     forward5y5y: MacroTimeSeries[];
+    michigan5y: MacroTimeSeries[];
     m2: MacroTimeSeries[];
     m2Yoy: MacroTimeSeries[];
   };
@@ -924,6 +926,22 @@ export interface HousingData {
     existingHomeSales: MacroTimeSeries[];
   };
   recessionPeriods: { start: string; end: string }[];
+}
+
+// BIS Global Housing (Phase 25)
+export interface GlobalHousingCountry {
+  iso2: string;
+  name: string;
+  latestIndex: number | null;
+  latestDate: string | null;
+  yoyChange: number | null;
+  history: MacroTimeSeries[];
+}
+export interface GlobalHousingData {
+  asOf: string | null;
+  source: string;
+  note: string;
+  countries: GlobalHousingCountry[];
 }
 
 // Commodities
@@ -1014,6 +1032,100 @@ export interface FinancialConditionsData {
     creditCardDelinquency: MacroTimeSeries[];
     ciLoans: MacroTimeSeries[];
     economicPolicyUncertainty: MacroTimeSeries[];
+  };
+}
+
+// BIS Credit-to-GDP Gaps (Phase 25)
+export interface CreditGapCountry {
+  iso2: string;
+  name: string;
+  latestGap: number | null;
+  latestDate: string | null;
+  signal: "green" | "yellow" | "red" | "unknown";
+  history: MacroTimeSeries[];
+}
+export interface CreditGapsData {
+  asOf: string | null;
+  source: string;
+  note: string;
+  countries: CreditGapCountry[];
+}
+
+// Fiscal Sustainability (Phase 25)
+export interface FiscalCountryKpis {
+  debtGdp: number | null;
+  debtGdpSignal: "green" | "yellow" | "red" | "unknown";
+  fiscalBalance: number | null;
+  fiscalBalanceSignal: "green" | "yellow" | "red" | "unknown";
+  taxRevenue: number | null;
+  taxRevenueSignal: "green" | "yellow" | "red" | "unknown";
+  govtRevenue: number | null;
+  govtExpenditure: number | null;
+  grossSavings: number | null;
+  gdpGrowth: number | null;
+  primaryBalance: number | null;
+  adverseDynamics: boolean;
+}
+export interface FiscalCountry {
+  iso2: string;
+  iso3: string;
+  name: string;
+  latestYear: number;
+  kpis: FiscalCountryKpis;
+  history: {
+    debtGdp: MacroTimeSeries[];
+    fiscalBalance: MacroTimeSeries[];
+    taxRevenue: MacroTimeSeries[];
+    gdpGrowth: MacroTimeSeries[];
+    govtRevenue: MacroTimeSeries[];
+    govtExpenditure: MacroTimeSeries[];
+    grossSavings: MacroTimeSeries[];
+  };
+}
+export interface FiscalData {
+  asOf: string | null;
+  source: string;
+  countries: FiscalCountry[];
+  summary: {
+    avgDebtGdp: number | null;
+    avgFiscalBalance: number | null;
+    adverseDynamicsCount: number;
+    totalCountries: number;
+  };
+}
+
+// Trade Flows (Phase 26)
+export interface TradeCountryKpis {
+  exportsGdp: number | null;
+  importsGdp: number | null;
+  tradeBalance: number | null;
+  tradeOpenness: number | null;
+  merchandiseTrade: number | null;
+}
+export interface TradeCountry {
+  iso2: string;
+  iso3: string;
+  name: string;
+  latestYear: number;
+  kpis: TradeCountryKpis;
+  history: {
+    exportsGdp: MacroTimeSeries[];
+    importsGdp: MacroTimeSeries[];
+    tradeBalance: MacroTimeSeries[];
+    merchandiseTrade: MacroTimeSeries[];
+  };
+}
+export interface TradeData {
+  asOf: string | null;
+  source: string;
+  countries: TradeCountry[];
+  summary: {
+    avgExportsGdp: number | null;
+    avgImportsGdp: number | null;
+    avgTradeBalance: number | null;
+    topSurplusCountry: string | null;
+    topSurplusValue: number | null;
+    totalCountries: number;
   };
 }
 
@@ -1490,6 +1602,17 @@ export interface BulkDatasetStatus {
   size_kb: number | null;
 }
 
+export interface ConfigResponse {
+  fredApiKey: string | null;
+  finnhubApiKey: string | null;
+  restartRequired?: boolean;
+}
+
+export interface ConfigUpdateRequest {
+  fredApiKey?: string;
+  finnhubApiKey?: string;
+}
+
 export interface PrefetchStatus {
   running: boolean;
   started_at: string | null;
@@ -1603,6 +1726,133 @@ export interface MomentsCrossSection {
   deciles: MomentsCrossDecile[];
   names: MomentsNameRow[];
   missing: string[];
+  error?: string;
+}
+
+// --- Phase 27: Sector DuPont ---
+export interface DupontSectorRow {
+  sector: string;
+  netMargin: number | null;
+  assetTurnover: number | null;
+  equityMultiplier: number | null;
+  roe: number | null;
+  tickerCount: number;
+}
+export interface DupontResponse {
+  sectors: DupontSectorRow[];
+  asOf: string | null;
+  tickerCount: number;
+  note?: string;
+  error?: string;
+}
+
+// --- Phase 27: Corporate Health ---
+export interface ZScoreDetail {
+  zScore: number | null;
+  zone: "Safe" | "Grey" | "Distress" | "unknown";
+  components: {
+    x1_workingCapitalToAssets: number | null;
+    x2_retainedEarningsToAssets: number | null;
+    x3_ebitToAssets: number | null;
+    x4_marketValueToLiabilities: number | null;
+    x5_salesToAssets: number | null;
+  };
+  isFinancial: boolean;
+  note?: string;
+}
+export interface PiotroskiDetail {
+  score: number;
+  maxScore: number;
+  interpretation: "Strong" | "Average" | "Weak";
+  criteria: Record<string, boolean | null>;
+}
+export interface BeneishDetail {
+  mScore: number | null;
+  manipulationLikely: boolean | null;
+  interpretation: string;
+  indexes: Record<string, number | null>;
+  mComponents: Record<string, number | null>;
+  validComponents: number;
+  totalComponents: number;
+}
+export interface CorporateHealthResponse {
+  ticker: string;
+  name: string;
+  sector: string | null;
+  industry: string | null;
+  price: number | null;
+  altmanZ: ZScoreDetail;
+  piotroski: PiotroskiDetail;
+  beneish: BeneishDetail;
+  asOf: string | null;
+  error?: string;
+}
+
+// --- Phase 27: Dividend Analysis ---
+export interface DividendAnalysisResponse {
+  ticker: string;
+  name: string;
+  sector: string | null;
+  price: number | null;
+  dividendYield: number | null;
+  latestAnnualDividend: number | null;
+  latestYear: number | null;
+  cagr5y: number | null;
+  cagr10y: number | null;
+  consecutiveGrowthYears: number;
+  payoutRatio: number | null;
+  fcfPayoutRatio: number | null;
+  sustainabilityScore: number;
+  sustainabilityLabel: "Strong" | "Adequate" | "Weak";
+  ddmFairValue: number | null;
+  ddmGrowthRate: number | null;
+  ddmUpsidePct: number | null;
+  annualDividends: Record<string, number>;
+  asOf: string | null;
+  error?: string;
+}
+
+// --- Phase 27: Insider Trading Aggregator ---
+export interface InsiderClusterBuy {
+  ticker: string;
+  insiderCount: number;
+  transactionCount: number;
+  totalValue: number;
+  dateRange: string;
+}
+export interface InsiderSectorSentiment {
+  sector: string;
+  buys: number;
+  sells: number;
+  netBuyRatio: number;
+  totalBuyValue: number;
+  totalSellValue: number;
+}
+export interface InsiderTopTrade {
+  ticker: string;
+  insiderName: string;
+  title: string | null;
+  transactionType: string;
+  shares: number | null;
+  pricePerShare: number | null;
+  totalValue: number | null;
+  date: string | null;
+  sector: string;
+}
+export interface InsiderAggregateResponse {
+  asOf: string | null;
+  tickersChecked: number;
+  tickersWithData: number;
+  totalTransactions: number;
+  buyCount: number;
+  sellCount: number;
+  buySellRatio: number | null;
+  totalBuyValue: number;
+  totalSellValue: number;
+  valueRatio: number | null;
+  clusterBuys: InsiderClusterBuy[];
+  sectorSentiment: InsiderSectorSentiment[];
+  topTrades: InsiderTopTrade[];
   error?: string;
 }
 

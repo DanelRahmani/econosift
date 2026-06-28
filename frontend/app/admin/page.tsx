@@ -1,8 +1,9 @@
 "use client";
 
+// cache-bust: 2026-06-28 api-keys-admin
 import { useEffect, useState, useCallback } from "react";
 import { api } from "@/lib/api";
-import type { HealthResponse, PrefetchStatus, BulkDatasetStatus } from "@/lib/types";
+import type { HealthResponse, PrefetchStatus, BulkDatasetStatus, ConfigResponse } from "@/lib/types";
 import { Card, Skeleton } from "@/components/ui";
 
 function fmtUptime(sec: number): string {
@@ -128,6 +129,9 @@ export default function AdminPage() {
             <Stat label="Finnhub API Key" value={data.config.finnhubApiKey ? "Set" : "Missing"} tone={data.config.finnhubApiKey ? "pos" : "neg"} />
           </div>
 
+          {/* API Keys */}
+          <ApiKeysSection />
+
           <Card>
             <h2 className="text-sm font-semibold mb-4 text-text-secondary">Cache Performance by Source</h2>
             <div className="overflow-x-auto">
@@ -204,6 +208,176 @@ function DbStat({ label, value }: { label: string; value: string }) {
       <div className="text-xs text-text-muted mb-0.5">{label}</div>
       <div className="text-sm font-mono text-text-primary">{value}</div>
     </div>
+  );
+}
+
+function ApiKeysSection() {
+  const [config, setConfig] = useState<ConfigResponse | null>(null);
+  const [editing, setEditing] = useState<"fred" | "finnhub" | null>(null);
+  const [inputValue, setInputValue] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+  const [restartBanner, setRestartBanner] = useState(false);
+
+  useEffect(() => {
+    api.config().then(setConfig).catch(() => setConfig(null));
+  }, []);
+
+  const startEdit = (key: "fred" | "finnhub") => {
+    setEditing(key);
+    setError(null);
+    setSaved(false);
+    setInputValue("");
+  };
+
+  const cancelEdit = () => {
+    setEditing(null);
+    setInputValue("");
+    setError(null);
+    setSaved(false);
+  };
+
+  const save = async () => {
+    const val = inputValue.trim();
+    if (!val) {
+      setError("API key cannot be empty.");
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    setSaved(false);
+    try {
+      const body = editing === "fred"
+        ? { fredApiKey: val }
+        : { finnhubApiKey: val };
+      const res = await api.updateConfig(body);
+      setConfig(res);
+      setSaved(true);
+      setEditing(null);
+      if (res.restartRequired) {
+        setRestartBanner(true);
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to save.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const masked = (v: string | null | undefined) => v ?? <span className="text-text-muted">Not set</span>;
+
+  return (
+    <Card>
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-sm font-semibold text-text-secondary">API Keys</h2>
+        {restartBanner && (
+          <span className="text-xs text-warning bg-warning/10 rounded px-2 py-0.5 font-medium">
+            Restart required to apply changes
+          </span>
+        )}
+      </div>
+      <p className="text-xs text-text-muted mb-4">
+        Keys are validated before saving and written to <code className="bg-surface-alt px-1 rounded">.env</code>.
+        Recreate the Docker container for changes to take effect.
+      </p>
+
+      {/* FRED */}
+      <div className="flex items-center justify-between py-2 border-b border-border/50">
+        <div>
+          <span className="text-sm font-medium text-text-primary">FRED</span>
+          <span className="text-xs text-text-muted ml-2">api.stlouisfed.org</span>
+        </div>
+        <div className="flex items-center gap-3">
+          {editing === "fred" ? (
+            <>
+              <input
+                type="text"
+                placeholder="Paste FRED API key…"
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                disabled={saving}
+                className="w-64 px-2 py-1 text-xs font-mono border border-border rounded bg-surface text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent"
+              />
+              <button
+                onClick={save}
+                disabled={saving}
+                className="px-2 py-1 text-xs font-medium rounded bg-success text-white hover:bg-success/80 disabled:opacity-50"
+              >{saving ? "Validating…" : "Save"}</button>
+              <button
+                onClick={cancelEdit}
+                disabled={saving}
+                className="px-2 py-1 text-xs font-medium rounded border border-border text-text-secondary hover:text-text-primary"
+              >Cancel</button>
+            </>
+          ) : (
+            <>
+              <span className="text-xs font-mono text-text-primary">
+                {masked(config?.fredApiKey)}
+              </span>
+              <button
+                onClick={() => startEdit("fred")}
+                className="px-2 py-0.5 text-xs font-medium rounded border border-border text-text-secondary hover:text-text-primary hover:bg-surface-alt transition-colors"
+              >Edit</button>
+            </>
+          )}
+        </div>
+      </div>
+      {editing === "fred" && error && (
+        <div className="text-xs text-danger mt-1">{error}</div>
+      )}
+      {editing === "fred" && saved && (
+        <div className="text-xs text-success mt-1">✓ Key saved</div>
+      )}
+
+      {/* Finnhub */}
+      <div className="flex items-center justify-between py-2">
+        <div>
+          <span className="text-sm font-medium text-text-primary">Finnhub</span>
+          <span className="text-xs text-text-muted ml-2">finnhub.io</span>
+        </div>
+        <div className="flex items-center gap-3">
+          {editing === "finnhub" ? (
+            <>
+              <input
+                type="text"
+                placeholder="Paste Finnhub API key…"
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                disabled={saving}
+                className="w-64 px-2 py-1 text-xs font-mono border border-border rounded bg-surface text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent"
+              />
+              <button
+                onClick={save}
+                disabled={saving}
+                className="px-2 py-1 text-xs font-medium rounded bg-success text-white hover:bg-success/80 disabled:opacity-50"
+              >{saving ? "Validating…" : "Save"}</button>
+              <button
+                onClick={cancelEdit}
+                disabled={saving}
+                className="px-2 py-1 text-xs font-medium rounded border border-border text-text-secondary hover:text-text-primary"
+              >Cancel</button>
+            </>
+          ) : (
+            <>
+              <span className="text-xs font-mono text-text-primary">
+                {masked(config?.finnhubApiKey)}
+              </span>
+              <button
+                onClick={() => startEdit("finnhub")}
+                className="px-2 py-0.5 text-xs font-medium rounded border border-border text-text-secondary hover:text-text-primary hover:bg-surface-alt transition-colors"
+              >Edit</button>
+            </>
+          )}
+        </div>
+      </div>
+      {editing === "finnhub" && error && (
+        <div className="text-xs text-danger mt-1">{error}</div>
+      )}
+      {editing === "finnhub" && saved && (
+        <div className="text-xs text-success mt-1">✓ Key saved</div>
+      )}
+    </Card>
   );
 }
 

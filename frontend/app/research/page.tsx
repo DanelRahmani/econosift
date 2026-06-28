@@ -6,6 +6,7 @@ import { RiskParityTab } from "@/components/research/RiskParityTab";
 import { FxCarryTab } from "@/components/research/FxCarryTab";
 import { MomentumTab } from "@/components/research/MomentumTab";
 import { RealizedMomentsTab } from "@/components/research/RealizedMomentsTab";
+import { DupontTab } from "@/components/research/DupontTab";
 import { EconLabTab } from "@/components/macro/EconLabTab";
 
 const TABS = [
@@ -13,6 +14,7 @@ const TABS = [
   { key: "carry", label: "FX Carry" },
   { key: "momentum", label: "Momentum" },
   { key: "moments", label: "Realized Moments" },
+  { key: "dupont", label: "Sector DuPont" },
   { key: "econlab", label: "Econometric Lab" },
 ] as const;
 type TabKey = (typeof TABS)[number]["key"];
@@ -55,6 +57,7 @@ function ResearchPageInner() {
       {tab === "carry" && <FxCarryTab />}
       {tab === "momentum" && <MomentumTab />}
       {tab === "moments" && <RealizedMomentsTab />}
+      {tab === "dupont" && <DupontTab />}
       {tab === "econlab" && <EconLabTab />}
     </main>
   );

@@ -35,6 +35,16 @@ _WB_CODES: dict[str, str] = {
     "debt_gdp":        "GC.DOD.TOTL.GD.ZS",
     "current_account": "BN.CAB.XOKA.GD.ZS",
     "gdp_per_capita":  "NY.GDP.PCAP.KD",
+    # Fiscal (Phase 25)
+    "tax_revenue":     "GC.TAX.TOTL.GD.ZS",
+    "govt_expenditure": "GC.XPN.TOTL.GD.ZS",
+    "govt_revenue":    "GC.REV.XGRT.GD.ZS",
+    "gross_savings":   "NY.GNS.ICTR.ZS",
+    "fiscal_balance":  "GC.NLD.TOTL.GD.ZS",
+    # Trade flows (Phase 26)
+    "exports_gdp":     "NE.EXP.GNFS.ZS",
+    "imports_gdp":     "NE.IMP.GNFS.ZS",
+    "merchandise_trade": "TG.VAL.TOTL.GD.ZS",
 }
 
 # IMF WEO indicator codes (matching source_imf.py INDICATOR_MAP)

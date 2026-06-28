@@ -44,6 +44,32 @@ export function fmtLarge(v: number | null | undefined): string {
   return v.toFixed(2);
 }
 
+/** Abbreviate long country names for bar chart Y-axis labels.
+ *  Maps full names to common short forms (max ~10 chars). */
+const COUNTRY_ABBREV: Record<string, string> = {
+  "United States": "US",
+  "United Kingdom": "UK",
+  "South Korea": "S. Korea",
+  "Netherlands": "Netherlands",
+  "Switzerland": "Switzerland",
+  "Norway": "Norway",
+  "Sweden": "Sweden",
+  "Germany": "Germany",
+  "France": "France",
+  "Italy": "Italy",
+  "Spain": "Spain",
+  "Canada": "Canada",
+  "Australia": "Australia",
+  "Japan": "Japan",
+  "China": "China",
+  "India": "India",
+  "Brazil": "Brazil",
+  "Mexico": "Mexico",
+};
+export function shortCountryName(name: string): string {
+  return COUNTRY_ABBREV[name] ?? name;
+}
+
 export const CURRENCY_SYMBOLS: Record<string, string> = {
   USD: "$", EUR: "€", GBP: "£", JPY: "¥", CNY: "¥",
   CHF: "Fr", CAD: "C$", AUD: "A$", INR: "₹", KRW: "₩",

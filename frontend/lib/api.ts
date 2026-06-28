@@ -26,7 +26,7 @@ import type {
   TechnicalsResponse,
   AtlasIndicator, AtlasRegion, AtlasTimelineResponse, AtlasSnapshotResponse,
   RiskParityWeights, RiskParityBacktest, CarryTable, CarryBacktest, MomentumResponse,
-  MomentsResponse, MomentsCrossSection,
+  MomentsResponse, MomentsCrossSection, DupontResponse, CorporateHealthResponse, DividendAnalysisResponse, InsiderAggregateResponse,
   RegressResponse,
   CountryRiskData, CentralBanksData,
   PricePoint, RiskMetric,
@@ -34,6 +34,8 @@ import type {
   WikiCategoriesResponse, WikiTermsResponse,
   PrefetchStatus,
   BulkDatasetStatus,
+  ConfigResponse, ConfigUpdateRequest,
+  GlobalHousingData, CreditGapsData, FiscalData, TradeData,
 } from "./types";
 
 async function get<T>(path: string): Promise<T> {
@@ -53,6 +55,21 @@ async function post<T>(path: string, body: unknown): Promise<T> {
   });
   if (!res.ok) {
     throw new Error(`API ${path} failed: ${res.status}`);
+  }
+  return res.json() as Promise<T>;
+}
+
+async function put<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(`/api${path}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const detail = await res.json().catch(() => ({}));
+    const msg = (detail as Record<string, unknown>)?.detail || `${path} failed: ${res.status}`;
+    throw new Error(String(msg));
   }
   return res.json() as Promise<T>;
 }
@@ -139,6 +156,12 @@ export const api = {
 
   bulkDataRefresh: () =>
     post<{ status: string; datasets: Record<string, { rows: number; error: string | null }> }>(`/admin/bulk-data/refresh`, {}),
+
+  config: () =>
+    get<ConfigResponse>(`/admin/config`),
+
+  updateConfig: (body: ConfigUpdateRequest) =>
+    put<ConfigResponse>(`/admin/config`, body),
 
   // --- Phase 0 ---
   dcf: (
@@ -292,6 +315,9 @@ export const api = {
   macroHousing: () =>
     get<HousingData>(`/macro/housing`),
 
+  macroHousingGlobal: () =>
+    get<GlobalHousingData>(`/macro/housing/global`),
+
   macroCommodities: () =>
     get<CommoditiesData>(`/macro/commodities`),
 
@@ -306,6 +332,15 @@ export const api = {
 
   macroFinancialConditions: () =>
     get<FinancialConditionsData>(`/macro/financial-conditions`),
+
+  macroCreditGaps: () =>
+    get<CreditGapsData>(`/macro/credit-gaps`),
+
+  macroFiscal: () =>
+    get<FiscalData>(`/macro/fiscal`),
+
+  macroTrade: () =>
+    get<TradeData>(`/macro/trade`),
 
   macroCot: () =>
     get<CotData>(`/macro/positioning`),
@@ -401,6 +436,22 @@ export const api = {
 
   momentsCrosssection: (universe = "dow", window = 21): Promise<MomentsCrossSection> =>
     get(`/research/moments/crosssection?universe=${encodeURIComponent(universe)}&window=${window}`),
+
+  // --- Phase 27: Sector DuPont ---
+  researchDupont: (): Promise<DupontResponse> =>
+    get("/research/dupont"),
+
+  // --- Phase 27: Corporate Health ---
+  corporateHealth: (ticker: string): Promise<CorporateHealthResponse> =>
+    get(`/corporate/health?ticker=${encodeURIComponent(ticker)}`),
+
+  // --- Phase 27: Dividend Analysis ---
+  dividendAnalysis: (ticker: string): Promise<DividendAnalysisResponse> =>
+    get(`/dividend/analysis?ticker=${encodeURIComponent(ticker)}`),
+
+  // --- Phase 27: Insider Trading Aggregator ---
+  insiderAggregate: (): Promise<InsiderAggregateResponse> =>
+    get("/insider/aggregate"),
 
   // --- Phase 15: Econometric Lab ---
   macroRegress: (dep: string, indep: string[], countries: string[], start: number, end: number): Promise<RegressResponse> =>

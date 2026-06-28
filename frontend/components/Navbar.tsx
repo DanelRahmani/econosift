@@ -17,6 +17,10 @@ const primaryTabs = [
 
 const moreTabs = [
   { href: "/calendar", label: "Calendar" },
+  { href: "/trade", label: "Trade" },
+  { href: "/corporate", label: "Corporate Health" },
+  { href: "/dividends", label: "Dividends" },
+  { href: "/insider", label: "Insider Trading" },
   { href: "/risk", label: "Risk" },
   { href: "/options", label: "Options" },
   { href: "/yield", label: "Rates & Policy" },
