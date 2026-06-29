@@ -13,6 +13,7 @@ from datetime import datetime
 
 from ..cache import async_cached
 from . import atlas_service
+from ..sources import source_bis
 
 log = logging.getLogger(__name__)
 
@@ -21,12 +22,13 @@ CRISIS_COUNTRIES = [
     "CA", "AU", "NZ", "JP", "KR", "CN", "IN", "BR", "MX", "ZA",
 ]
 
-# FRED or WB indicator keys for the 5 crisis signals
+# FRED or WB indicator keys for the crisis signals
 _INDICATORS = [
     "current_account",  # BN.CAB.XOKA.GD.ZS
     "inflation",        # FP.CPI.TOTL.ZG
     "debt_gdp",         # GC.DOD.TOTL.GD.ZS (for context, not signal)
     "short_term_debt",  # DT.DOD.DSTC.ZS
+    "reserves_total",   # FI.RES.TOTL.CD (Phase 32)
 ]
 
 
@@ -37,9 +39,9 @@ def _latest(year_map: dict[int, float]) -> float | None:
 
 
 def _signal_color(flags: int) -> str:
-    if flags >= 4:
+    if flags >= 5:
         return "red"
-    elif flags >= 2:
+    elif flags >= 3:
         return "yellow"
     return "green"
 
@@ -51,13 +53,22 @@ async def get_currency_crisis() -> dict:
 
     from ..config import ISO2_TO_ISO3, COUNTRY_NAMES
 
-    # Fetch indicators
-    (wb_ca, wb_inf, wb_std, wb_debt) = await asyncio.gather(
+    # Fetch World Bank indicators + reserves
+    (wb_ca, wb_inf, wb_std, wb_debt, wb_res) = await asyncio.gather(
         atlas_service._wb_timeline("current_account", start, end),
         atlas_service._wb_timeline("inflation", start, end),
         atlas_service._wb_timeline("short_term_debt", start, end),
         atlas_service._wb_timeline("debt_gdp", start, end),
+        atlas_service._wb_timeline("reserves_total", start, end),
     )
+
+    # Fetch BIS effective FX data
+    bis_iso2s = tuple(CRISIS_COUNTRIES)
+    bis_fx_raw: dict[str, list[dict]] = {}
+    try:
+        bis_fx_raw = await source_bis.get_effective_fx_bulk(bis_iso2s)
+    except Exception:
+        log.warning("BIS effective FX fetch failed, skipping FX overvaluation signal")
 
     countries_out = []
     for iso2 in CRISIS_COUNTRIES:
@@ -68,16 +79,31 @@ async def get_currency_crisis() -> dict:
         inf_map = wb_inf.get(iso3, {})
         std_map = wb_std.get(iso3, {})
         debt_map = wb_debt.get(iso3, {})
+        res_map = wb_res.get(iso3, {})
 
         ca_val = _latest(ca_map)
         inf_val = _latest(inf_map)
         std_val = _latest(std_map)
         debt_val = _latest(debt_map)
 
-        # Compute reserves decline rate (simplified: use current account
-        # as proxy for external vulnerability)
-        # Real exchange rate overvaluation proxy: use inflation differential
-        # vs US as rough PPP deviation indicator
+        # Compute reserves decline rate (% YoY)
+        reserves_decline: float | None = None
+        if res_map and len(res_map) >= 2:
+            yrs = sorted(res_map)
+            prev_res, cur_res = res_map[yrs[-2]], res_map[yrs[-1]]
+            if prev_res and prev_res != 0:
+                reserves_decline = round(((cur_res - prev_res) / prev_res) * -100, 1)
+
+        # Compute FX overvaluation (% above 5Y average)
+        fx_overval: float | None = None
+        bis_history = bis_fx_raw.get(iso2, [])
+        if len(bis_history) >= 5:
+            recent = bis_history[-5:]  # last 5 annual values
+            values = [p["value"] for p in recent]
+            avg5y = sum(values) / len(values)
+            latest_fx = values[-1]
+            if avg5y and avg5y != 0:
+                fx_overval = round(((latest_fx - avg5y) / avg5y) * 100, 1)
 
         flags = 0
         factors = []
@@ -108,22 +134,34 @@ async def get_currency_crisis() -> dict:
         elif debt_val is not None and debt_val > 60:
             factors.append(f"Debt/GDP {debt_val:.0f}% >60%")
 
-        # 5. Combined: high inflation + CA deficit
-        if inf_val is not None and ca_val is not None and inf_val > 5 and ca_val < -2:
+        # 5. Reserves declining > 10% YoY
+        if reserves_decline is not None and reserves_decline > 10:
             flags += 1
-            factors.append("Inflation + CA deficit (twin deficits)")
+            factors.append(f"Reserves declining {reserves_decline:.0f}% YoY")
+        elif reserves_decline is not None and reserves_decline > 5:
+            factors.append(f"Reserves declining {reserves_decline:.0f}% YoY")
+
+        # 6. FX overvaluation > 15% above 5Y trend
+        if fx_overval is not None and fx_overval > 15:
+            flags += 1
+            factors.append(f"FX overvalued {fx_overval:.0f}% vs 5Y avg")
+        elif fx_overval is not None and fx_overval > 10:
+            factors.append(f"FX overvalued {fx_overval:.0f}% vs 5Y avg")
 
         color = _signal_color(flags)
 
         countries_out.append({
             "iso2": iso2, "name": name,
             "compositeScore": flags,
+            "maxScore": 6,
             "signal": color,
             "kpis": {
                 "currentAccount": ca_val,
                 "inflation": inf_val,
                 "shortTermDebt": std_val,
                 "debtGdp": debt_val,
+                "reservesDecline": reserves_decline,
+                "fxOvervaluation": fx_overval,
             },
             "factors": factors,
         })
@@ -135,8 +173,8 @@ async def get_currency_crisis() -> dict:
 
     return {
         "asOf": str(datetime.now().date()),
-        "source": "World Bank / IMF",
-        "methodology": "Kaminsky-Lizondo-Reinhart (1998) signal extraction",
+        "source": "World Bank / IMF / BIS",
+        "methodology": "Kaminsky-Lizondo-Reinhart (1998) 6-signal extraction model",
         "countries": countries_out,
         "summary": {
             "redCount": red_count,

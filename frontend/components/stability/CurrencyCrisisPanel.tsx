@@ -71,9 +71,9 @@ export function CurrencyCrisisPanel() {
               <SignalDot color={c.signal} />
             </div>
             <div className="text-xs text-text-secondary mb-2">
-              Score: {c.compositeScore}/5 flags
+              Score: {c.compositeScore}/{c.maxScore ?? 6} flags
             </div>
-            <div className="grid grid-cols-2 gap-1 text-xs">
+            <div className="grid grid-cols-3 gap-1 text-xs">
               <div className={signalColor(c.kpis.currentAccount != null && c.kpis.currentAccount < -5 ? "red" : "")}>
                 CA: {c.kpis.currentAccount != null ? `${c.kpis.currentAccount.toFixed(1)}%` : "N/A"}
               </div>
@@ -85,6 +85,12 @@ export function CurrencyCrisisPanel() {
               </div>
               <div className={signalColor(c.kpis.debtGdp != null && c.kpis.debtGdp > 90 ? "red" : "")}>
                 Debt/GDP: {c.kpis.debtGdp != null ? `${c.kpis.debtGdp.toFixed(0)}%` : "N/A"}
+              </div>
+              <div className={signalColor(c.kpis.reservesDecline != null && c.kpis.reservesDecline > 10 ? "red" : "")}>
+                Reserves Δ: {c.kpis.reservesDecline != null ? `${c.kpis.reservesDecline.toFixed(0)}%` : "N/A"}
+              </div>
+              <div className={signalColor(c.kpis.fxOvervaluation != null && c.kpis.fxOvervaluation > 15 ? "red" : "")}>
+                FX Overval: {c.kpis.fxOvervaluation != null ? `${c.kpis.fxOvervaluation.toFixed(0)}%` : "N/A"}
               </div>
             </div>
             {c.factors.length > 0 && (

@@ -66,6 +66,7 @@ _WB_CODES: dict[str, str] = {
     "coal_rents":      "NY.GDP.COAL.RT.ZS",
     # Currency Crisis (Phase 28)
     "short_term_debt": "DT.DOD.DSTC.ZS",
+    "reserves_total":  "FI.RES.TOTL.CD",
     # Banking Stability (Phase 28)
     "npl_ratio":       "FB.AST.NPER.ZS",
     "bank_capital":    "FB.BNK.CAPA.ZS",

@@ -415,3 +415,48 @@ async def get_crossborder_claims() -> list[dict]:
     except Exception as exc:
         logger.warning("BIS crossborder query failed: %s", exc)
         return []
+
+
+# ---------------------------------------------------------------------------
+# Effective exchange rates (nominal broad indices, 2010=100)
+# ---------------------------------------------------------------------------
+
+@async_cached("bis_effective_fx_bulk")
+async def get_effective_fx_bulk(iso2_tuple: tuple[str, ...]) -> dict[str, list[dict]]:
+    """Get BIS nominal effective exchange rate indices for multiple countries.
+
+    The BIS effective FX index is a trade-weighted basket (2010=100).
+    Higher = stronger currency. Used to detect overvaluation vs long-term trend.
+
+    Returns {iso2: [{date, value}, ...]} sorted by date ascending.
+    Uses asyncio.to_thread to avoid blocking the event loop during HTTP fetch.
+    """
+    import asyncio as _asyncio
+
+    iso2_list = list(iso2_tuple)
+    result: dict[str, list[dict]] = {}
+    try:
+        df = await _asyncio.to_thread(_fetch_bis_zip, "fx_effective")
+        if df is None or df.empty:
+            return result
+
+        # Filter to nominal broad index (measure N: Nominal, B: Broad)
+        col_measure = next((c for c in df.columns if "MEASURE" in c.upper()), None)
+        if col_measure:
+            # EER nominal broad starts with "N:B:" in BIS data
+            df = df[df[col_measure].str.startswith("N:B:", na=False)]
+
+        for iso2 in iso2_list:
+            parsed = _parse_bis_flat(df, iso2_filter=iso2, freq="A")
+            if parsed.empty:
+                continue
+            pts = [
+                {"date": str(int(r["year"])), "value": round(float(r["value"]), 2)}
+                for _, r in parsed.iterrows()
+            ]
+            pts.sort(key=lambda p: p["date"])
+            result[iso2] = pts
+        return result
+    except Exception as exc:
+        logger.warning("BIS effective FX bulk query failed: %s", exc)
+        return result
