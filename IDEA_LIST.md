@@ -27,7 +27,7 @@ any frontend) to show competitiveness linkages.
 - **Data:** World Bank `NE.EXP.GNFS.ZS` (exports), `NE.IMP.GNFS.ZS` (imports), `TG.VAL.TOTL.GD.ZS` (merchandise trade). BIS effective FX via `WS_EER_csv_flat.zip` (already in `source_bis.py`).
 - **Why implementable:** All 3 WB indicators need only new entries in `INDICATOR_MAP`. BIS effective FX already downloaded — just needs a router endpoint. No new source packages.
 
-### P0 — Corporate Health Monitor (`/corporate`)
+### ✅ P0 — Corporate Health Monitor (`/corporate`) — **DONE (Phase 27)**
 
 Altman Z-Score, Piotroski F-Score (9-point fundamental strength), and Beneish M-Score (earnings
 manipulation detection) for any ticker. Aggregate by sector/industry to show systemic bankruptcy
@@ -36,7 +36,7 @@ risk trends. Market-cap-weighted aggregate Z-score as a recession leading indica
 - **Data:** yfinance balance sheet (total assets, working capital, retained earnings, market cap, total liabilities, EBIT, sales), income statement (net income, revenue, gross margin, SGA, depreciation), and cash flow (operating cash flow). All available via existing `yfinance_service.py`.
 - **Why implementable:** Pure calculation service — all inputs are in yfinance's standard `.balance_sheet`, `.financials`, and `.cashflow` DataFrames. No new data sources needed. Z-score formula is public domain (Altman 1968). Piotroski and Beneish formulas are also public.
 
-### P1 — Dividend Analysis (`/dividends`)
+### ✅ P1 — Dividend Analysis (`/dividends`) — **DONE (Phase 27)**
 
 Dividend yield, 5Y/10Y dividend growth rate, payout ratio, and dividend sustainability score per
 ticker. Dividend aristocrats screener (25+ years consecutive increases). Sector dividend yield
@@ -45,7 +45,7 @@ comparison. Dividend discount model (DDM) fair value estimation.
 - **Data:** yfinance `.dividends` time series and `.financials` (net income, shares outstanding for per-share calculations). Finnhub earnings calendar already provides ex-dividend dates.
 - **Why implementable:** Dividend history is a standard yfinance attribute. Payout ratio = dividends / net income (both available). DDM is a simple Gordon growth model. Needs a new router + frontend page.
 
-### P1 — Banking & Financial Stability (`/stability`)
+### ✅ P1 — Banking & Financial Stability (`/stability`) — **DONE (Phase 31)**
 
 Bank NPL ratios, capital adequacy ratios, bank Z-scores, and domestic credit growth for ~200
 countries. BIS credit-to-GDP gaps as early warning indicators (gaps >10% signal elevated systemic
@@ -55,7 +55,7 @@ model with traffic-light output.
 - **Data:** World Bank `FB.AST.NPER.ZS` (NPL ratio), `FB.BNK.CAPA.ZS` (bank capital/assets), `GFDD.SI.01` (bank Z-score), `FS.AST.DOMO.GD.ZS` (domestic credit). BIS credit gap data already downloaded via `WS_CREDIT_GAP_csv_flat.zip` in `source_bis.py` — never exposed via any router. FRED stress indices already in `credit_market.py`.
 - **Why implementable:** BIS credit gaps and WB banking indicators only need new indicator mapping + router endpoints. FRED financial stress data is already wired via `get_credit_pulse()`. Most of the work is frontend.
 
-### P2 — Cross-Border Finance (`/crossborder`)
+### ✅ P2 — Cross-Border Finance (`/crossborder`) — **DONE (Phase 31)**
 
 BIS locational banking statistics — cross-border claims by nationality and residence, international
 debt securities outstanding. Visualize global financial interconnectedness via a chord diagram or
@@ -106,7 +106,7 @@ Lorenz curve visualization per country with decade-over-decade comparison.
 - **Data:** World Bank `SI.POV.GINI` (Gini), `SI.DST.10TH.10` / `SI.DST.FRST.10` (income decile shares), `SI.POV.DDAY` ($2.15 poverty), `SI.POV.LMIC` ($3.65), `SI.POV.UMIC` ($6.85). GDP per capita already mapped via `NY.GDP.PCAP.KD`.
 - **Why implementable:** 5 new WB codes. Coverage is spottier than macro indicators (Gini may have gaps for some developing countries) but sufficient for major economies and aggregate trends. Lorenz curve is a straightforward cumulative distribution chart.
 
-### P2 — Business Dynamism Tab
+### ✅ P2 — Business Dynamism Tab — **DONE (Phase 30)**
 
 New business formation density (registrations per 1,000 working-age population), private sector
 credit growth, and historical Doing Business scores (discontinued in 2021 but historical data
@@ -119,7 +119,7 @@ available). Track entrepreneurship as a leading indicator for employment growth.
 
 ## 3. 🛠️ New Tools & Analytical Models
 
-### P0 — Insider Trading Aggregator
+### ✅ P0 — Insider Trading Aggregator — **DONE (Phase 27)**
 
 EDGAR Form 4 data is already fetched per-ticker on the Markets page. Aggregate across the entire
 market: compute insider buy/sell ratio, detect cluster buying (≥3 insiders buying the same stock
@@ -139,7 +139,7 @@ warning (green/yellow/red) per country with contributing factor breakdown.
 - **Data:** All inputs already in the pipeline — reserves via `FI.RES.TOTL.CD` (country risk), current account via `BN.CAB.XOKA.GD.ZS` (atlas/macro), effective FX via BIS (source_bis.py), inflation via `FP.CPI.TOTL.ZG` (atlas/macro). Short-term debt as % of total external debt via WB `DT.DOD.DSTC.ZS`.
 - **Why implementable:** Pure model logic. Only one new WB code needed (short-term debt share). The methodology follows well-known academic early warning literature (Kaminsky, Lizondo & Reinhart 1998; IMF Vulnerability Exercises).
 
-### P1 — Sector DuPont Analysis
+### ✅ P1 — Sector DuPont Analysis — **DONE (Phase 27)**
 
 Decompose ROE into three drivers — net profit margin × asset turnover × equity multiplier — for
 every sector using aggregated yfinance financials. Visualize which sectors drive ROE through margin
@@ -148,7 +148,7 @@ efficiency vs leverage vs asset utilization. Spot leverage buildups before they 
 - **Data:** yfinance financials for all S&P 500 constituents (constituent list already in `constituents.py`). Net income, revenue, total assets, and shareholder equity are all standard yfinance fields. Sector mapping already exists in `sector_service.py`.
 - **Why implementable:** DuPont formula is trivial arithmetic. Aggregation by sector is a GROUP BY on existing screener data. The screener cache already warms fundamentals for the S&P 500 universe.
 
-### P2 — Sovereign Default Probability Model
+### ✅ P2 — Sovereign Default Probability Model — **DONE (Phase 31)**
 
 Logistic regression or probit model trained on historical sovereign default data (Reinhart &
 Rogoff dataset, available as academic CSV). Predictors: debt/GDP, fiscal balance, current account,
@@ -158,7 +158,7 @@ probability for each country with confidence bands.
 - **Data:** Predictors all available from World Bank/IMF (already mapped). Training data from Reinhart & Rogoff "This Time Is Different" dataset (publicly available CSV from Carmen Reinhart's website, ~70KB). Model fitting uses scipy/numpy only (consistent with Econ Lab's no-statsmodels rule).
 - **Why implementable:** True P2 because it needs a new static CSV file loaded and a nontrivial model fitting pipeline. But all predictor data is already in the system, the training dataset is tiny and freely available, and the Econ Lab already proves scipy-only regression works.
 
-### P2 — M&A / Corporate Actions Tracker
+### ✅ P2 — M&A / Corporate Actions Tracker — **DONE (Phase 30)**
 
 Dashboard tracking announced M&A deals, deal values, acquisition premiums, and sector M&A activity
 heatmap. Calendar of upcoming shareholder meetings and corporate actions.
@@ -198,7 +198,7 @@ inflation) using already-mapped CPI data. Track yield curve slopes across countr
 - **Data:** FRED has G7 10Y yields (`IRLTLT01` OECD series, or country-specific series like `GBRTLT01`, `JPNTLT01`). BIS has broader government bond yield data. ECB has euro area yields via ecbdata. Frankfurter can provide FX context.
 - **Why implementable:** ~10 new FRED series IDs. The existing `/yield` page already has US spot curve rendering — adding more countries is the same pattern with a country selector.
 
-### P1 — Inflation Expectations → Inflation Tab
+### ✅ P1 — Inflation Expectations → Inflation Tab — **DONE (Phase 27)**
 
 Add 5Y/5Y forward inflation swap rate, breakeven inflation rates (already partially in `/yield`),
 University of Michigan survey inflation expectations, and NY Fed consumer expectations survey.
@@ -217,7 +217,7 @@ to trade disruptions based on concentrated import sources and essential goods de
 - **Data:** World Bank trade indicators (already partially mapped). Bilateral trade data from IMF Direction of Trade Statistics (DOTS) if available via imfp, or computed from WB merchandise trade data. Food import share via `TM.VAL.FOOD.ZS.UN` and fuel import share via `TM.VAL.FUEL.ZS.UN`.
 - **Why implementable:** The Atlas already has 6 map layers with the year slider — adding a 7th is a straightforward extension. Trade concentration needs bilateral data which may require IMF DOTS exploration (the main P1 uncertainty), but the food/fuel import shares are direct WB indicators.
 
-### P2 — Demographics Overlay → Atlas
+### ✅ P2 — Demographics Overlay → Atlas — **DONE (Phase 30)**
 
 Population growth (already mapped), age dependency ratio, urbanization rate, and life expectancy
 as new Atlas map layers. Long-term pension sustainability heatmap combining old-age dependency
@@ -226,7 +226,7 @@ ratio with fiscal capacity. Population projection overlays for 2030/2050.
 - **Data:** World Bank `SP.POP.DPND` (age dependency), `SP.URB.TOTL.IN.ZS` (urbanization), `SP.DYN.LE00.IN` (life expectancy), `SP.POP.GROW` (population growth — already mapped? Check). Population growth is `SP.POP.TOTL` (total population) which is already mapped in `INDICATOR_MAP`.
 - **Why implementable:** 3 new WB codes. Atlas layer extension is proven pattern. Population projections could use UN World Population Prospects (free CSV download) as a one-time static data load.
 
-### P2 — Short Interest Dashboard → Markets Panel
+### ✅ P2 — Short Interest Dashboard → Markets Panel — **DONE (Phase 30)**
 
 Show most-shorted stocks (highest % of float short), short squeeze candidates (high short interest
 + high borrow cost + small float), and sector aggregate short interest trends. Overlay with options
@@ -310,19 +310,48 @@ Beginner-friendly toggles, narrative walkthroughs explaining metrics, academic-s
 
 ---
 
-## 7. 🧭 Navigation Reshuffle (from `UX_Reshuffle.md`)
+## 7. 🧭 Navigation Reshuffle Plan
 
-A detailed proposal to restructure the flat 16-item navbar into 5 pillars (Discover / Analyze / Build / Macro / Learn) with 11 grouped items. Also removes 6 redundant Markets sub-tabs, merges 4 Macro sub-tabs into standalone pages, and adds `/scenario` to nav.
+**Status:** Not started — detailed audit in [`UX_Reshuffle.md`](./UX_Reshuffle.md) (will be deleted after this is done).
 
-**Status:** Not started — implementation tracked in [`UX_Reshuffle.md`](./UX_Reshuffle.md).
+### Problem
 
-### Key Actions
-- **Navbar**: Desktop 11 items in 5 groups; Mobile 8 items + drawer for overflow
-- **Markets tabs to remove**: Sectors, Screener, Portfolio, Rankings, FX, Risk (full) — replace Risk with mini KPI strip in Overview
-- **Macro tabs to remove/redirect**: Rates & Yields → `/yield`, Country Risk → `/policy`, Central Banks → `/policy`, Econometric Lab → `/research`, Funding → merged into Financial Conditions
-- **Pages to promote**: `/scenario` (orphan → nav under Build pillar)
-- **URL redirects**: 301 / next.config.js rewrites for all changed routes
-- **Effort**: Medium — 8-step implementation order outlined in UX_Reshuffle.md
+The current top-level navigation is a **flat 16-item bar** with no grouping, mixing micro (per-ticker) tools with macro (global) tools and reference pages. This creates severe cognitive load.
+
+### Proposed Nav Hierarchy (5 Pillars)
+
+| Pillar | Items |
+|--------|-------|
+| **Discover** | Dashboard, Screener, Treemap, Calendar |
+| **Analyze** | Markets (5 streamlined tabs), Risk, Options |
+| **Build** | Portfolio, Research (5 tabs, incl. Econ Lab moved from Macro), Scenario |
+| **Macro** | Macro Overview (8 condensed tabs), Yield, Policy & Sovereign (merged), Atlas |
+| **Learn** | Wiki |
+
+### Markets Tab Reductions (10 → 5)
+- **Remove**: Sectors (→ `/sectors`), Screener (→ `/screener`), Portfolio (→ `/portfolio`), Rankings (→ `/screener`), FX (→ `/macro?tab=FX`), Risk (replace with mini KPI strip in Overview)
+- **Keep**: Overview, Technicals, Valuation, Ratios, News & Events
+
+### Macro Tab Reductions (15 → 8)
+- **Remove/redirect**: Rates & Yields (→ `/yield`), Country Risk (→ `/policy`), Central Banks (→ `/policy`), Econometric Lab (→ `/research`), Funding (merged into Financial Conditions)
+- **Keep**: Overview, Inflation, Growth & Employment, Housing, Commodities, FX, Leading Indicators, Financial & Funding Conditions, Sentiment Signals
+
+### Pages to Promote
+- **`/scenario`** — orphaned stress lab → promoted to nav under Build pillar
+- **`/admin`** — orphaned health dashboard → optionally add under Settings/gear icon
+
+### URL Redirects (301 / next.config.js rewrites)
+12 old URLs need redirects, preserving query params where applicable (e.g., `/markets?tab=Portfolio&t=AAPL` → `/portfolio?t=AAPL`).
+
+### Implementation Order
+1. Navbar restructure (Navbar.tsx + MobileNav.tsx)
+2. Markets tab removals
+3. Macro tab removals/redirects
+4. Move Econometric Lab → /research
+5. Merge Policy + Sovereign
+6. Promote /scenario to nav
+7. Add next.config.js rewrites
+8. Test: pytest + tsc + Docker rebuild + curl each path
 
 ---
 
@@ -353,4 +382,4 @@ A detailed proposal to restructure the flat 16-item navbar into 5 pillars (Disco
 | 21 | Demographics → Atlas Overlay | Enhance | P2 | 3 WB codes + UN projections | Medium | ✅ DONE Phase 30 |
 | 22 | Short Interest → Markets Panel | Enhance | P2 | Finnhub endpoint | Small | ✅ DONE Phase 30 |
 
-**Completed:** 16/22 · **Remaining:** 6 (1 P0 · 5 P1 · 0 P2)
+**Completed:** 16/22 · **Remaining:** 6 (0 P0 · 6 P1 · 0 P2)
