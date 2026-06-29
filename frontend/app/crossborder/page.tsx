@@ -1,7 +1,7 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
-import type { CrossborderData, CrossborderClaim } from "@/lib/types";
+import type { CrossborderData, FactbookCountry } from "@/lib/types";
 import { Card, PageSkeleton } from "@/components/ui";
 
 function fmtUsd(v: number): string {
@@ -13,15 +13,30 @@ function fmtUsd(v: number): string {
 
 export default function CrossborderPage() {
   const [data, setData] = useState<CrossborderData | null>(null);
+  const [countries, setCountries] = useState<FactbookCountry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
   useEffect(() => {
-    api.crossborderClaims()
-      .then(setData)
+    Promise.all([api.crossborderClaims(), api.factbookCountries()])
+      .then(([d, c]) => { setData(d); setCountries(c); })
       .catch(() => setError(true))
       .finally(() => setLoading(false));
   }, []);
+
+  // Build lookup: iso3 → {flag, name} and iso2 → {flag, name}
+  const flagMap = useMemo(() => {
+    const m: Record<string, { flag: string; name: string }> = {};
+    countries.forEach((c) => {
+      m[c.iso2] = { flag: c.flag, name: c.name };
+      if (c.iso3) m[c.iso3] = { flag: c.flag, name: c.name };
+    });
+    return m;
+  }, [countries]);
+
+  function flagFor(code: string) {
+    return flagMap[code]?.flag || "";
+  }
 
   if (loading) {
     return (
@@ -125,16 +140,16 @@ export default function CrossborderPage() {
           <div className="flex">
             <div className="w-12 shrink-0" />
             {debtors.map((d) => (
-              <div key={d} className="w-14 text-center text-[10px] font-medium text-text-muted px-1">
-                {d}
+              <div key={d} className="w-14 text-center text-[10px] font-medium text-text-muted px-1" title={flagMap[d]?.name || d}>
+                <span className="text-sm">{flagFor(d)}</span><br />{d}
               </div>
             ))}
           </div>
           {/* Data rows */}
           {creditors.map((cred) => (
             <div key={cred} className="flex items-center">
-              <div className="w-12 shrink-0 text-right pr-2 text-[10px] font-medium text-text-muted">
-                {cred}
+              <div className="w-12 shrink-0 text-right pr-2 text-[10px] font-medium text-text-muted" title={flagMap[cred]?.name || cred}>
+                <span className="text-sm">{flagFor(cred)}</span>&nbsp;{cred}
               </div>
               {debtors.map((deb) => {
                 const val = lookup[cred]?.[deb];
@@ -171,10 +186,10 @@ export default function CrossborderPage() {
               </tr>
             </thead>
             <tbody>
-              {topCreditors.map(([iso2, total], i) => (
-                <tr key={iso2} className="border-b border-border/50">
+              {topCreditors.map(([iso, total], i) => (
+                <tr key={iso} className="border-b border-border/50">
                   <td className="py-1.5 text-text-muted text-xs">{i + 1}</td>
-                  <td className="py-1.5 font-mono">{iso2}</td>
+                  <td className="py-1.5 font-mono"><span className="mr-1">{flagFor(iso)}</span>{flagMap[iso]?.name || iso}</td>
                   <td className="py-1.5 text-right font-mono">{fmtUsd(total)}</td>
                 </tr>
               ))}
@@ -192,10 +207,10 @@ export default function CrossborderPage() {
               </tr>
             </thead>
             <tbody>
-              {topDebtors.map(([iso2, total], i) => (
-                <tr key={iso2} className="border-b border-border/50">
+              {topDebtors.map(([iso, total], i) => (
+                <tr key={iso} className="border-b border-border/50">
                   <td className="py-1.5 text-text-muted text-xs">{i + 1}</td>
-                  <td className="py-1.5 font-mono">{iso2}</td>
+                  <td className="py-1.5 font-mono"><span className="mr-1">{flagFor(iso)}</span>{flagMap[iso]?.name || iso}</td>
                   <td className="py-1.5 text-right font-mono">{fmtUsd(total)}</td>
                 </tr>
               ))}
@@ -220,8 +235,8 @@ export default function CrossborderPage() {
             {claims.slice(0, 20).map((c, i) => (
               <tr key={`${c.creditor}-${c.debtor}`} className="border-b border-border/50">
                 <td className="py-1.5 text-text-muted text-xs">{i + 1}</td>
-                <td className="py-1.5 font-mono">{c.creditor}</td>
-                <td className="py-1.5 font-mono">{c.debtor}</td>
+                <td className="py-1.5 font-mono"><span className="mr-1">{flagFor(c.creditor)}</span>{flagMap[c.creditor]?.name || c.creditor}</td>
+                <td className="py-1.5 font-mono"><span className="mr-1">{flagFor(c.debtor)}</span>{flagMap[c.debtor]?.name || c.debtor}</td>
                 <td className="py-1.5 text-right font-mono">{fmtUsd(c.value_usd)}</td>
               </tr>
             ))}
