@@ -24,6 +24,7 @@ const moreTabs = [
   { href: "/risk", label: "Risk" },
   { href: "/options", label: "Options" },
   { href: "/yield", label: "Rates & Policy" },
+  { href: "/stability", label: "Stability" },
   { href: "/wiki", label: "Wiki" },
   { href: "/admin", label: "Admin" },
 ];

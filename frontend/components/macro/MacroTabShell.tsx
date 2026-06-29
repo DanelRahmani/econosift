@@ -11,6 +11,10 @@ const TABS = [
   { id: "employment", label: "Growth & Employment" },
   { id: "housing", label: "Housing" },
   { id: "fiscal", label: "Fiscal" },
+  { id: "labor", label: "Labor" },
+  { id: "energy", label: "Energy & Climate" },
+  { id: "inequality", label: "Inequality" },
+  { id: "business", label: "Business Dynamism" },
   { id: "commodities", label: "Commodities" },
   { id: "fx", label: "FX" },
   { id: "leading", label: "Leading Indicators" },
@@ -32,6 +36,18 @@ const HousingTabLazy = dynamic(() =>
 );
 const FiscalTabLazy = dynamic(() =>
   import("./FiscalTab").then((m) => ({ default: m.FiscalTab }))
+);
+const LaborTabLazy = dynamic(() =>
+  import("./LaborTab").then((m) => ({ default: m.LaborTab }))
+);
+const EnergyTabLazy = dynamic(() =>
+  import("./EnergyTab").then((m) => ({ default: m.EnergyTab }))
+);
+const InequalityTabLazy = dynamic(() =>
+  import("./InequalityTab").then((m) => ({ default: m.InequalityTab }))
+);
+const BusinessTabLazy = dynamic(() =>
+  import("./BusinessTab").then((m) => ({ default: m.BusinessTab }))
 );
 const CommoditiesTabLazy = dynamic(() =>
   import("./CommoditiesTab").then((m) => ({ default: m.CommoditiesTab }))
@@ -56,6 +72,10 @@ function TabContent({ activeTab }: { activeTab: string }) {
     case "employment":  return <GrowthEmploymentLazy />;
     case "housing":     return <HousingTabLazy />;
     case "fiscal":      return <FiscalTabLazy />;
+    case "labor":       return <LaborTabLazy />;
+    case "energy":      return <EnergyTabLazy />;
+    case "inequality":  return <InequalityTabLazy />;
+    case "business":    return <BusinessTabLazy />;
     case "commodities": return <CommoditiesTabLazy />;
     case "fx":          return <FxTabLazy />;
     case "leading":     return <LeadingIndicatorsLazy />;

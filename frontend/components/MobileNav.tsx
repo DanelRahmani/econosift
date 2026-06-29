@@ -23,6 +23,7 @@ const drawerTabs = [
   { href: "/risk", label: "Risk" },
   { href: "/options", label: "Options" },
   { href: "/yield", label: "Rates & Policy" },
+  { href: "/stability", label: "Stability" },
   { href: "/atlas", label: "Atlas" },
   { href: "/wiki", label: "Wiki" },
   { href: "/admin", label: "Admin" },

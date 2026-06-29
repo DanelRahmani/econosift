@@ -1129,6 +1129,79 @@ export interface TradeData {
   };
 }
 
+// Business Dynamism (Phase 30)
+export interface BusinessCountryKpis {
+  newBusinessDensity: number | null;
+  newBusinessDensitySignal: string;
+  startupTime: number | null;
+  startupTimeSignal: string;
+  doingBusinessScore: number | null;
+}
+export interface BusinessCountry {
+  iso2: string;
+  iso3: string;
+  name: string;
+  latestYear: number;
+  kpis: BusinessCountryKpis;
+  history: {
+    newBusinessDensity: MacroTimeSeries[];
+    startupTime: MacroTimeSeries[];
+    doingBusinessScore: MacroTimeSeries[];
+  };
+}
+export interface BusinessData {
+  asOf: string | null;
+  source: string;
+  countries: BusinessCountry[];
+  summary: {
+    avgBusinessDensity: number | null;
+    avgStartupDays: number | null;
+    avgDoingBusinessScore: number | null;
+    totalCountries: number;
+  };
+}
+
+// Labor Market (Phase 28 stub)
+export interface LaborData {
+  asOf: string | null;
+  source: string;
+  countries: any[];
+  summary: Record<string, any>;
+  methodology?: string;
+}
+// Energy & Climate (Phase 28 stub)
+export interface EnergyData {
+  asOf: string | null;
+  source: string;
+  countries: any[];
+  summary: Record<string, any>;
+  methodology?: string;
+}
+// Inequality (Phase 29 stub)
+export interface InequalityData {
+  asOf: string | null;
+  source: string;
+  countries: any[];
+  summary: Record<string, any>;
+  methodology?: string;
+}
+// Currency Crisis (Phase 28 stub)
+export interface CurrencyCrisisData {
+  asOf: string | null;
+  source: string;
+  countries: any[];
+  summary: Record<string, any>;
+  methodology?: string;
+}
+// Banking Stability (Phase 28 stub)
+export interface BankingStabilityData {
+  asOf: string | null;
+  source: string;
+  countries: any[];
+  summary: Record<string, any>;
+  methodology?: string;
+}
+
 // COT Positioning
 export interface CotContract {
   name: string;
@@ -1948,6 +2021,16 @@ export interface CreditPulseData {
 }
 
 export interface YieldCurvePoint { tenor: string; years: number; yield: number | null; }
+export interface GlobalYieldCountry {
+  iso2: string;
+  name: string;
+  yield_10y: number | null;
+  spread_vs_us: number | null;
+  spread_vs_de: number | null;
+  spread_vs_jp: number | null;
+  real_yield: number | null;
+  inflation: number | null;
+}
 export interface YieldCurvesData {
   us_curve: {
     points: YieldCurvePoint[];
@@ -1959,6 +2042,7 @@ export interface YieldCurvesData {
   breakevens: Record<string, number | null>;
   term_premium: { current: number | null; history: MacroTimeSeries[] };
   foreign_10y: Record<string, { yield_10y: number | null; spread_vs_us: number | null }>;
+  global_yields?: GlobalYieldCountry[];
 }
 
 export interface PolicyDivergenceEntry {

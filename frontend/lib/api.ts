@@ -35,7 +35,9 @@ import type {
   PrefetchStatus,
   BulkDatasetStatus,
   ConfigResponse, ConfigUpdateRequest,
-  GlobalHousingData, CreditGapsData, FiscalData, TradeData,
+  GlobalHousingData, CreditGapsData, FiscalData, TradeData, LaborData, EnergyData,
+  CurrencyCrisisData, BankingStabilityData, InequalityData,
+  BusinessData,
 } from "./types";
 
 async function get<T>(path: string): Promise<T> {
@@ -342,6 +344,18 @@ export const api = {
   macroTrade: () =>
     get<TradeData>(`/macro/trade`),
 
+  macroBusiness: () =>
+    get<BusinessData>(`/macro/business`),
+
+  macroLabor: () =>
+    get<LaborData>(`/macro/labor`),
+
+  macroEnergy: () =>
+    get<EnergyData>(`/macro/energy`),
+
+  macroInequality: () =>
+    get<InequalityData>(`/macro/inequality`),
+
   macroCot: () =>
     get<CotData>(`/macro/positioning`),
 
@@ -471,6 +485,11 @@ export const api = {
   macroRegime: () => get<MacroRegimeData>("/macro/regime"),
   macroTaylorRule: () => get<any>("/macro/taylor-rule"),
   macroSentiment: () => get<any>("/macro/sentiment"),
+
+  // --- Phase 28: Stability ---
+  stabilityCurrencyCrisis: () => get<CurrencyCrisisData>("/stability/currency-crisis"),
+  stabilityBanking: () => get<BankingStabilityData>("/stability/banking"),
+
   // --- Phase 18B: Scenario Lab ---
   macroFunding: () => get<any>("/macro/funding"),
   scenarioHistorical: () => get<any>("/scenario/historical"),

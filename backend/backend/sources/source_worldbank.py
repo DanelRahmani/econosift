@@ -29,6 +29,39 @@ INDICATOR_MAP = {
     "exports_gdp": "NE.EXP.GNFS.ZS",
     "imports_gdp": "NE.IMP.GNFS.ZS",
     "merchandise_trade": "TG.VAL.TOTL.GD.ZS",
+    # Labor market (Phase 28)
+    "lfpr": "SL.TLF.CACT.ZS",
+    "youth_unemp": "SL.UEM.1524.ZS",
+    "emp_pop_ratio": "SL.EMP.TOTL.SP.ZS",
+    "vulnerable_emp": "SL.EMP.VULN.ZS",
+    "gdp_per_worker": "SL.GDP.PCAP.EM.KD",
+    # Energy & Climate (Phase 28)
+    "co2_per_capita": "EN.ATM.CO2E.PC",
+    "renewable_share": "EG.FEC.RNEW.ZS",
+    "energy_imports": "EG.IMP.CONS.ZS",
+    "oil_rents": "NY.GDP.PETR.RT.ZS",
+    "gas_rents": "NY.GDP.NGAS.RT.ZS",
+    "coal_rents": "NY.GDP.COAL.RT.ZS",
+    # Currency Crisis (Phase 28)
+    "short_term_debt": "DT.DOD.DSTC.ZS",
+    # Banking Stability (Phase 28)
+    "npl_ratio": "FB.AST.NPER.ZS",
+    "bank_capital": "FB.BNK.CAPA.ZS",
+    "bank_zscore": "GFDD.SI.01",
+    "domestic_credit": "FS.AST.DOMO.GD.ZS",
+    # Inequality & Development (Phase 29)
+    "gini": "SI.POV.GINI",
+    "income_top10": "SI.DST.10TH.10",
+    "income_bottom40": "SI.DST.FRST.20",
+    "poverty_215": "SI.POV.DDAY",
+    "poverty_365": "SI.POV.LMIC",
+    "poverty_685": "SI.POV.UMIC",
+    # Supply Chain (Phase 29)
+    "food_imports": "TM.VAL.FOOD.ZS.UN",
+    "fuel_imports": "TM.VAL.FUEL.ZS.UN",
+    # Business Dynamism (Phase 30)
+    "new_business_density": "IC.BUS.NDNS.ZS",
+    "startup_time": "IC.REG.DURS",
 }
 
 

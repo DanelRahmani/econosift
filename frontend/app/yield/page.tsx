@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import type { RatesData } from "@/lib/types";
+import type { RatesData, GlobalYieldCountry } from "@/lib/types";
 import { MultiCountryYieldChart } from "@/components/yield/MultiCountryYieldChart";
 import { Card as UiCard, PageSkeleton } from "@/components/ui";
 import { CHART_COLORS } from "@/lib/format";
@@ -14,7 +14,7 @@ import {
   BarChart, Bar, ReferenceLine,
 } from "recharts";
 
-const TABS = ["US Curve", "Foreign Spreads", "Real & Breakeven", "US Rates Detail", "Policy Tracker", "Sovereign Risk", "Central Banks"] as const;
+const TABS = ["US Curve", "Foreign Spreads", "Global Yields", "Real & Breakeven", "US Rates Detail", "Policy Tracker", "Sovereign Risk", "Central Banks"] as const;
 
 function KpiCard({ label, value, badge }: { label: string; value: string; badge?: string }) {
   return (
@@ -201,6 +201,109 @@ function USRatesDetailTab() {
   );
 }
 
+// ─── Global Yields Tab ─────────────────────────────────────────────
+function GlobalYieldsTab({ data: countries }: { data: GlobalYieldCountry[] }) {
+  const GRID = "rgba(128,128,128,0.18)";
+  if (!countries || countries.length === 0) {
+    return <div className="text-muted text-sm py-8 text-center">No global yield data available.</div>;
+  }
+
+  // Summary KPIs
+  const withYields = countries.filter(c => c.yield_10y != null);
+  const highest = withYields[0];
+  const lowest = withYields[withYields.length - 1];
+  const avgYield = withYields.length > 0
+    ? withYields.reduce((s, c) => s + (c.yield_10y ?? 0), 0) / withYields.length
+    : null;
+  const widestSpread = [...countries]
+    .filter(c => c.spread_vs_us != null)
+    .sort((a, b) => Math.abs(b.spread_vs_us!) - Math.abs(a.spread_vs_us!))[0];
+
+  const fmt = (v: number | null, decimals = 2) => v != null ? `${v > 0 ? "+" : ""}${v.toFixed(decimals)}%` : "N/A";
+  const fmtPct = (v: number | null, decimals = 2) => v != null ? `${v.toFixed(decimals)}%` : "N/A";
+
+  return (
+    <div className="space-y-6">
+      {/* KPI Row */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <KpiCard label="Countries Covered" value={String(withYields.length)} />
+        <KpiCard label="Highest 10Y" value={fmtPct(highest?.yield_10y ?? null)} badge={highest?.name} />
+        <KpiCard label="Lowest 10Y" value={fmtPct(lowest?.yield_10y ?? null)} badge={lowest?.name} />
+        <KpiCard label="Average 10Y" value={fmtPct(avgYield)} />
+        <KpiCard label="Widest vs US" value={fmt(widestSpread?.spread_vs_us ?? null)} badge={widestSpread?.name} />
+      </div>
+
+      {/* Yield Spread Matrix Table */}
+      <UiCard className="p-4 overflow-x-auto">
+        <h3 className="font-semibold mb-3">Global 10Y Government Bond Yields &amp; Spreads</h3>
+        <p className="text-xs text-text-secondary mb-4">
+          Real yield = nominal 10Y − latest CPI inflation (World Bank). Sorted by nominal yield.
+        </p>
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-left text-xs text-text-secondary border-b border-border">
+              <th className="py-2 pr-4">Country</th>
+              <th className="py-2 px-2 text-right">Nominal 10Y</th>
+              <th className="py-2 px-2 text-right">Real Yield</th>
+              <th className="py-2 px-2 text-right">Inflation</th>
+              <th className="py-2 px-2 text-right">vs US</th>
+              <th className="py-2 px-2 text-right">vs Germany</th>
+              <th className="py-2 px-2 text-right">vs Japan</th>
+            </tr>
+          </thead>
+          <tbody>
+            {countries.filter(c => c.yield_10y != null).map((c) => (
+              <tr key={c.iso2} className="border-b border-border/50 hover:bg-surface-alt/50">
+                <td className="py-2 pr-4 font-medium">{c.name}</td>
+                <td className={`py-2 px-2 text-right font-mono ${(c.yield_10y ?? 0) > 6 ? "text-red-400" : (c.yield_10y ?? 0) < 1 ? "text-green-400" : ""}`}>
+                  {fmtPct(c.yield_10y)}
+                </td>
+                <td className={`py-2 px-2 text-right font-mono ${(c.real_yield ?? 0) < -1 ? "text-red-400" : (c.real_yield ?? 0) > 2 ? "text-green-400" : ""}`}>
+                  {fmtPct(c.real_yield)}
+                </td>
+                <td className="py-2 px-2 text-right font-mono text-text-secondary">{fmtPct(c.inflation)}</td>
+                <td className={`py-2 px-2 text-right font-mono ${(c.spread_vs_us ?? 0) > 3 ? "text-red-400" : ""}`}>
+                  {fmt(c.spread_vs_us)}
+                </td>
+                <td className={`py-2 px-2 text-right font-mono ${(c.spread_vs_de ?? 0) > 2 ? "text-amber-400" : ""}`}>
+                  {fmt(c.spread_vs_de)}
+                </td>
+                <td className={`py-2 px-2 text-right font-mono ${(c.spread_vs_jp ?? 0) > 4 ? "text-amber-400" : ""}`}>
+                  {fmt(c.spread_vs_jp)}
+                </td>
+              </tr>
+            ))}
+            {countries.filter(c => c.yield_10y == null).map((c) => (
+              <tr key={c.iso2} className="border-b border-border/50 text-text-secondary">
+                <td className="py-2 pr-4">{c.name}</td>
+                <td colSpan={6} className="py-2 px-2 text-center text-xs">Data unavailable</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </UiCard>
+
+      {/* Yield Bar Chart */}
+      <UiCard className="p-4">
+        <h3 className="font-semibold mb-3">10Y Government Bond Yields — Ranked</h3>
+        <ResponsiveContainer width="100%" height={Math.max(300, withYields.length * 24)}>
+          <BarChart
+            data={withYields.map(c => ({ name: c.name, yield: c.yield_10y, real: c.real_yield }))}
+            layout="vertical" margin={{ left: 100, right: 40 }}
+          >
+            <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
+            <XAxis type="number" tickFormatter={(v) => `${v}%`} tick={{ fontSize: 11 }} />
+            <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={95} />
+            <Tooltip formatter={(v: number) => [`${v?.toFixed(2)}%`]} />
+            <Bar dataKey="yield" fill="#3b82f6" radius={[0, 3, 3, 0]} name="Nominal 10Y" />
+            <Bar dataKey="real" fill="#10b981" radius={[0, 3, 3, 0]} name="Real Yield" />
+          </BarChart>
+        </ResponsiveContainer>
+      </UiCard>
+    </div>
+  );
+}
+
 export default function YieldPage() {
   const [tab, setTab] = useState<(typeof TABS)[number]>("US Curve");
   const { data, isLoading, error } = useQuery({
@@ -211,7 +314,7 @@ export default function YieldPage() {
   if (isLoading) return <div className="p-8 text-muted">Loading yield curve data…</div>;
   if (error || !data) return <div className="p-8 text-red-400">Failed to load yield data.</div>;
 
-  const { us_curve, foreign_10y, real_yields, breakevens, term_premium } = data;
+  const { us_curve, foreign_10y, real_yields, breakevens, term_premium, global_yields } = data;
   const fmt = (v: number | null, decimals = 2) => v != null ? `${v.toFixed(decimals)}%` : "N/A";
 
   return (
@@ -265,6 +368,8 @@ export default function YieldPage() {
           <MultiCountryYieldChart data={foreign_10y} />
         </div>
       )}
+
+      {tab === "Global Yields" && <GlobalYieldsTab data={global_yields ?? []} />}
 
       {tab === "Real & Breakeven" && (
         <div className="bg-surface rounded-lg p-4 border border-border">

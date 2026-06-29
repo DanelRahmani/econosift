@@ -269,7 +269,7 @@ data for gamma squeeze detection.
 | 7 | Labor Market Deep Dive | Macro Tab | P1 | 5 WB codes + 2 FRED | Medium | |
 | 8 | Energy Transition & Climate | Macro Tab | P1 | 6 new WB codes | Medium | |
 | 9 | Inequality & Development | Macro Tab | P1 | 5 new WB codes | Medium | |
-| 10 | Business Dynamism | Macro Tab | P2 | 2 WB codes + static JSON | Small | |
+| 10 | Business Dynamism | Macro Tab | P2 | 2 WB codes + static JSON | Small | ✅ DONE Phase 30 |
 | 11 | Insider Trading Aggregator | Tool | P0 | No — aggregate existing data | Medium | ✅ DONE Phase 27 |
 | 12 | Currency Crisis Early Warning | Tool | P1 | 1 new WB code | Medium | |
 | 13 | Sector DuPont Analysis | Tool | P1 | No — existing screener data | Small | ✅ DONE Phase 27 |
@@ -283,4 +283,4 @@ data for gamma squeeze detection.
 | 21 | Demographics → Atlas Overlay | Enhance | P2 | 3 WB codes + UN projections | Medium | |
 | 22 | Short Interest → Markets Panel | Enhance | P2 | Finnhub endpoint | Small | |
 
-**Completed:** 9/22 · **Remaining:** 13 (2 P0 · 7 P1 · 4 P2)
+**Completed:** 10/22 · **Remaining:** 12 (2 P0 · 7 P1 · 3 P2)

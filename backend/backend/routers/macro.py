@@ -431,6 +431,14 @@ async def trade_flows():
     return await get_trade_data()
 
 
+@router.get("/business")
+async def business_dynamism():
+    """Business dynamism dashboard: new business density, startup time,
+    and historical Doing Business scores for 20 major economies."""
+    from ..services.business_service import get_business_data
+    return await get_business_data()
+
+
 # Commodity config: (display name, sector, FRED series for spot price)
 _COMMODITY_CONFIG = [
     ("WTI Crude Oil", "Energy", "DCOILWTICO"),

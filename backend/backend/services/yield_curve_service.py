@@ -1,12 +1,19 @@
 """Multi-country yield curve service — Phase 18A.
 
 Fetches US spot curve (11 tenors), real yields (TIPS), breakevens,
-ACM term premium, and 8 foreign 10Y yields via FRED.
+ACM term premium, and 20+ foreign 10Y yields via FRED.
 """
 from __future__ import annotations
 
+import asyncio
+import logging
+from datetime import datetime
+
 from ..cache import async_cached
 from . import macro_expansion_service as mes
+from . import atlas_service
+
+log = logging.getLogger(__name__)
 
 _US_TENORS = [
     ("1m",  "DGS1MO",  1 / 12),
@@ -28,24 +35,43 @@ _REAL_TENORS = [
     ("30y", "DFII30", 30),
 ]
 _BREAKEVEN_SERIES = {"5y": "T5YIE", "10y": "T10YIE", "30y": "T30YIE"}
-_FOREIGN = {
-    "Germany":   "IRLTLT01DEM156N",
-    "UK":        "IRLTLT01GBM156N",
-    "Japan":     "IRLTLT01JPM156N",
-    "France":    "IRLTLT01FRM156N",
-    "Italy":     "IRLTLT01ITM156N",
-    "Canada":    "IRLTLT01CAM156N",
-    "Australia": "IRLTLT01AUM156N",
-    "Spain":     "IRLTLT01ESM156N",
+# ISO2-keyed dict with name + FRED series per country (23 countries)
+_FOREIGN: dict[str, dict[str, str]] = {
+    "DE": {"name": "Germany",      "fred": "IRLTLT01DEM156N"},
+    "GB": {"name": "UK",           "fred": "IRLTLT01GBM156N"},
+    "JP": {"name": "Japan",        "fred": "IRLTLT01JPM156N"},
+    "FR": {"name": "France",       "fred": "IRLTLT01FRM156N"},
+    "IT": {"name": "Italy",        "fred": "IRLTLT01ITM156N"},
+    "CA": {"name": "Canada",       "fred": "IRLTLT01CAM156N"},
+    "AU": {"name": "Australia",    "fred": "IRLTLT01AUM156N"},
+    "ES": {"name": "Spain",        "fred": "IRLTLT01ESM156N"},
+    "KR": {"name": "South Korea",  "fred": "IRLTLT01KRM156N"},
+    "CH": {"name": "Switzerland",  "fred": "IRLTLT01CHM156N"},
+    "SE": {"name": "Sweden",       "fred": "IRLTLT01SEM156N"},
+    "NO": {"name": "Norway",       "fred": "IRLTLT01NOM156N"},
+    "NL": {"name": "Netherlands",  "fred": "IRLTLT01NLM156N"},
+    "NZ": {"name": "New Zealand",  "fred": "IRLTLT01NZM156N"},
+    "BE": {"name": "Belgium",      "fred": "IRLTLT01BEM156N"},
+    "AT": {"name": "Austria",      "fred": "IRLTLT01ATM156N"},
+    "PT": {"name": "Portugal",     "fred": "IRLTLT01PTM156N"},
+    "IE": {"name": "Ireland",      "fred": "IRLTLT01IEM156N"},
+    "FI": {"name": "Finland",      "fred": "IRLTLT01FIM156N"},
+    "DK": {"name": "Denmark",      "fred": "IRLTLT01DKM156N"},
+    "PL": {"name": "Poland",       "fred": "IRLTLT01PLM156N"},
+    "MX": {"name": "Mexico",       "fred": "IRLTLT01MXM156N"},
+    "ZA": {"name": "South Africa", "fred": "IRLTLT01ZAM156N"},
 }
+
 _ALL_SERIES = tuple(
     [sid for _, sid, _ in _US_TENORS]
     + [sid for _, sid, _ in _REAL_TENORS]
     + list(_BREAKEVEN_SERIES.values())
     + ["ACMTP10"]
-    + list(_FOREIGN.values())
+    + [info["fred"] for info in _FOREIGN.values()]
 )
 _START = "2000-01-01"
+
+from ..config import ISO2_TO_ISO3 as _ISO2_TO_ISO3
 
 
 def _latest(pts: list[dict]) -> float | None:
@@ -65,10 +91,35 @@ async def _fetch_series() -> dict:
     return await mes.fetch_fred_series(_ALL_SERIES, start=_START)
 
 
+async def _get_cpi_map() -> dict[str, float | None]:
+    """Fetch latest annual CPI inflation for all yield countries via World Bank.
+    Returns {iso2: latest_inflation_pct or None}."""
+    try:
+        cur_year = datetime.now().year
+        wb_inf = await atlas_service._wb_timeline("inflation", cur_year - 3, cur_year - 1)
+    except Exception:
+        log.warning("Failed to fetch WB CPI for real yields", exc_info=True)
+        return {}
+    cpi_map: dict[str, float | None] = {}
+    for iso2 in _FOREIGN:
+        iso3 = _ISO2_TO_ISO3.get(iso2, iso2.upper())
+        year_map = wb_inf.get(iso3, {})
+        if year_map:
+            latest_yr = max(year_map)
+            cpi_map[iso2] = round(float(year_map[latest_yr]), 2)
+        else:
+            cpi_map[iso2] = None
+    return cpi_map
+
+
 @async_cached("yield_curves")
 async def get_yield_curves() -> dict:
-    """Return structured yield curve data for US + 8 foreign markets."""
-    data = await _fetch_series()
+    """Return structured yield curve data for US + 20+ foreign markets
+    with yield spread matrix and real yields."""
+    data, cpi_map = await asyncio.gather(
+        _fetch_series(),
+        _get_cpi_map(),
+    )
 
     # US spot curve
     curve_points = [
@@ -80,8 +131,8 @@ async def get_yield_curves() -> dict:
     dgs10 = _latest(data.get("DGS10",  []))
     dgs3m = _latest(data.get("DGS3MO", []))
 
-    spread_2y10y  = round(dgs10 - dgs2,  4) if dgs10 is not None and dgs2  is not None else None
-    spread_3m10y  = round(dgs10 - dgs3m, 4) if dgs10 is not None and dgs3m is not None else None
+    spread_2y10y = round(dgs10 - dgs2, 4) if dgs10 is not None and dgs2 is not None else None
+    spread_3m10y = round(dgs10 - dgs3m, 4) if dgs10 is not None and dgs3m is not None else None
 
     # Real yields (TIPS)
     real_points = [
@@ -102,11 +153,11 @@ async def get_yield_curves() -> dict:
         "history": tp_hist[-120:],
     }
 
-    # Foreign 10Y yields + spread vs US
+    # Legacy foreign_10y (backward compat)
     foreign: dict = {}
-    for name, sid in _FOREIGN.items():
-        val = _latest(data.get(sid, []))
-        foreign[name] = {
+    for iso2, info in _FOREIGN.items():
+        val = _latest(data.get(info["fred"], []))
+        foreign[info["name"]] = {
             "yield_10y": val,
             "spread_vs_us": (
                 round(val - dgs10, 4)
@@ -114,6 +165,31 @@ async def get_yield_curves() -> dict:
                 else None
             ),
         }
+
+    # Global yields with spread matrix and real yields
+    de_yield = _latest(data.get(_FOREIGN["DE"]["fred"], []))
+    jp_yield = _latest(data.get(_FOREIGN["JP"]["fred"], []))
+
+    global_yields: list[dict] = []
+    for iso2, info in _FOREIGN.items():
+        fred_sid = info["fred"]
+        series = data.get(fred_sid, [])
+        nominal = _latest(series)
+        cpi = cpi_map.get(iso2)
+        real = round(nominal - cpi, 2) if nominal is not None and cpi is not None else None
+        spread_us = round(nominal - dgs10, 2) if nominal is not None and dgs10 is not None else None
+        spread_de = round(nominal - de_yield, 2) if nominal is not None and de_yield is not None else None
+        spread_jp = round(nominal - jp_yield, 2) if nominal is not None and jp_yield is not None else None
+        history_vals = [p for p in series if p.get("value") is not None]
+        history = [{"date": p["date"][:10], "value": round(float(p["value"]), 4)} for p in history_vals[-60:]]
+        global_yields.append({
+            "iso2": iso2, "name": info["name"],
+            "yield_10y": nominal, "real_yield": real, "inflation": cpi,
+            "spread_vs_us": spread_us, "spread_vs_de": spread_de, "spread_vs_jp": spread_jp,
+            "history": history,
+        })
+
+    global_yields.sort(key=lambda c: c["yield_10y"] or float("-inf"), reverse=True)
 
     return {
         "us_curve": {
@@ -126,4 +202,5 @@ async def get_yield_curves() -> dict:
         "breakevens":   breakevens,
         "term_premium": term_premium,
         "foreign_10y":  foreign,
+        "global_yields": global_yields,
     }
