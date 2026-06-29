@@ -43,7 +43,7 @@ async def generate_summary(prompt: str, model: str = "gemini-2.0-flash") -> str:
     url = GEMINI_URL.format(model=model)
     payload = {
         "contents": [{"parts": [{"text": SYSTEM_PROMPT + "\n\n" + prompt}]}],
-        "generationConfig": {"temperature": 0.4, "maxOutputTokens": 8192, "topP": 0.95},
+        "generationConfig": {"temperature": 0.4, "maxOutputTokens": 2048, "topP": 0.95},
     }
 
     try:
