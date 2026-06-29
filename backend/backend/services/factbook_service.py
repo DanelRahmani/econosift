@@ -178,18 +178,21 @@ def _extract_sections(entry: dict) -> list[dict]:
 
     # ── Translations (5 major languages only) ──
     trans = entry.get("translations", {})
-    if isinstance(trans, dict) and trans:
+    if isinstance(trans, dict):
         trans_fields = []
-        # English, French, Russian, Spanish, Mandarin Chinese only
-        priority = ["eng", "fra", "rus", "spa", "zho"]
-        for lang in priority:
+        # English, French, Russian, Spanish, Mandarin Chinese
+        # Note: 'eng' doesn't exist in translations (dataset is English-native)
+        # so we use the common name for English
+        common_name = name_data.get("common", entry.get("name", ""))
+        trans_fields.append({"label": "ENG — " + str(common_name), "value": str(common_name)})
+        for lang in ["fra", "rus", "spa", "zho"]:
             t = trans.get(lang, {})
             if isinstance(t, dict):
                 official = t.get("official", "")
                 common = t.get("common", "")
                 label = f"{lang.upper()} — {common}" if common else lang.upper()
                 trans_fields.append({"label": label, "value": official if official else str(common)})
-        if trans_fields:
+        if len(trans_fields) > 1:  # always at least English
             sections.append({"title": "Name Translations", "fields": trans_fields})
 
     return sections
