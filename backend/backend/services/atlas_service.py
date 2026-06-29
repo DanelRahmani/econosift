@@ -146,50 +146,51 @@ _REGION_MAP: dict[str, set[str]] = {
 # Country universe (cached sync)
 # ---------------------------------------------------------------------------
 
-@cached("atlas_country_universe")
 def _country_universe() -> list[dict]:
-    """Return list of {iso3, name, id, regions} for all non-aggregate WB economies."""
+    """Return list of {iso3, name, regions} for all non-aggregate WB economies.
+
+    Primary source is a pre-generated static JSON file shipped with the repo
+    (regenerated periodically).  Falls back to a live wbgapi call only if the
+    file is missing or corrupt — the WB economy list changes very rarely.
+    """
+    import json as _json
+    import os as _os
+
+    # Tier 1 — static JSON (always available, zero-latency)
+    static_path = _os.path.join(_os.path.dirname(__file__), "..", "..", "data", "country_universe.json")
+    try:
+        if _os.path.exists(static_path):
+            with open(static_path, "r", encoding="utf-8") as fh:
+                data = _json.load(fh)
+            if isinstance(data, list) and len(data) > 100:
+                return data
+            logger.warning("country_universe.json is too short (%s entries), falling back to API", len(data) if isinstance(data, list) else type(data))
+    except Exception:
+        logger.exception("Failed to load country_universe.json, falling back to API")
+
+    # Tier 2 — live wbgapi (fallback)
     try:
         import wbgapi as wb
-        import pycountry
 
         countries: list[dict] = []
         for eco in wb.economy.list():
-            # skip aggregates (regions, income groups, etc.)
             if eco.get("aggregate"):
                 continue
             iso3: str = eco.get("id", "")
             if not iso3:
                 continue
             name: str = eco.get("value") or eco.get("name") or iso3
-
-            # ISO 3166-1 numeric id
-            numeric_id: str | None = None
-            try:
-                pc = pycountry.countries.get(alpha_3=iso3)
-                if pc:
-                    numeric_id = pc.numeric  # zero-padded string "004" etc.
-            except Exception:
-                pass
-
-            # Regions this country belongs to
             regions: list[str] = [
                 region_id
                 for region_id, members in _REGION_MAP.items()
                 if iso3 in members
             ]
-
-            countries.append({
-                "iso3": iso3,
-                "name": name,
-                "id": numeric_id,
-                "regions": regions,
-            })
+            countries.append({"iso3": iso3, "name": name, "regions": regions})
 
         return countries
 
     except Exception:
-        logger.exception("atlas _country_universe failed")
+        logger.exception("atlas _country_universe failed (both static file and live API)")
         return []
 
 
