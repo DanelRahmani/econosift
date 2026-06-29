@@ -16,13 +16,14 @@ interface Option {
 interface Props {
   summaryType: "company" | "macro" | "dashboard";
   title: string;
-  /** Optional list of selectable items. When provided, clickable chips appear. */
   options?: Option[];
-  /** Called with model, force flag, and the selected item keys. */
+  /** Placeholder text for the search input when many options exist. */
+  searchPlaceholder?: string;
+  /** Called with model, force flag, and the selected item keys (includes freeform entries). */
   onGenerate: (model: string, force: boolean, selected: string[]) => Promise<AiSummaryResponse>;
 }
 
-export function AiSummaryPanel({ summaryType, title, options, onGenerate }: Props) {
+export function AiSummaryPanel({ summaryType, title, options, searchPlaceholder, onGenerate }: Props) {
   const [model, setModel] = useState("gemini-2.0-flash");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<AiSummaryResponse | null>(null);
@@ -30,12 +31,13 @@ export function AiSummaryPanel({ summaryType, title, options, onGenerate }: Prop
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Set<string>>(() => {
     if (options && options.length > 0) {
-      // Default: select the first few (top ~5) so users aren't overwhelmed
       const count = Math.min(5, options.length);
       return new Set(options.slice(0, count).map((o) => o.key));
     }
     return new Set();
   });
+  // Freeform custom entries typed by user (not in options list)
+  const [custom, setCustom] = useState<Map<string, string>>(new Map());
 
   const hasOptions = options && options.length > 0;
   const showSearch = hasOptions && options.length > MAX_VISIBLE_OPTIONS;
@@ -68,13 +70,58 @@ export function AiSummaryPanel({ summaryType, title, options, onGenerate }: Prop
     } else {
       setSelected(new Set(options.map((o) => o.key)));
     }
+    setCustom(new Map()); // clear custom entries on toggle-all
+  }
+
+  function addCustom(label: string) {
+    const key = `custom:${label}`;
+    setCustom((prev) => new Map(prev).set(key, label));
+    setSelected((prev) => new Set(prev).add(key));
+    setSearch("");
+  }
+
+  function removeCustom(key: string) {
+    setCustom((prev) => {
+      const next = new Map(prev);
+      next.delete(key);
+      return next;
+    });
+    setSelected((prev) => {
+      const next = new Set(prev);
+      next.delete(key);
+      return next;
+    });
+  }
+
+  function handleSearchKey(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key !== "Enter") return;
+    const val = search.trim();
+    if (!val) return;
+    // If it matches an existing option, toggle that pill instead
+    const match = options?.find(
+      (o) => o.label.toLowerCase() === val.toLowerCase() || o.key.toLowerCase() === val.toLowerCase()
+    );
+    if (match && selected.has(match.key)) {
+      setSearch("");
+      return; // already selected, do nothing
+    }
+    if (match) {
+      toggle(match.key);
+      setSearch("");
+      return;
+    }
+    // Not in options — add as custom entry
+    addCustom(val);
   }
 
   async function handleGenerate(force: boolean) {
     setLoading(true);
     setError(null);
     try {
-      const sel = hasOptions ? Array.from(selected) : [];
+      // Resolve keys: option keys pass through as-is, custom: keys become the label text
+      const sel = hasOptions
+        ? Array.from(selected).map((k) => (k.startsWith("custom:") ? custom.get(k) ?? k.slice(7) : k))
+        : [];
       const r = await onGenerate(model, force, sel);
       setResult(r);
     } catch (e) {
@@ -111,9 +158,10 @@ export function AiSummaryPanel({ summaryType, title, options, onGenerate }: Prop
             {showSearch && (
               <input
                 type="text"
-                placeholder={`Search ${options.length} items…`}
+                placeholder={searchPlaceholder ?? `Search ${options.length} items…`}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
+                onKeyDown={handleSearchKey}
                 disabled={loading}
                 className="flex-1 px-2 py-1 text-xs border border-border rounded bg-surface text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent"
               />
@@ -128,6 +176,18 @@ export function AiSummaryPanel({ summaryType, title, options, onGenerate }: Prop
           </div>
           {/* Chips */}
           <div className="flex flex-wrap gap-1.5">
+            {/* Custom entries first */}
+            {Array.from(custom.entries()).map(([key, label]) => (
+              <button
+                key={key}
+                onClick={() => removeCustom(key)}
+                disabled={loading}
+                className="px-2 py-0.5 rounded-md text-xs font-medium border transition-colors bg-accent/15 border-accent/40 text-accent border-dashed"
+                title="Click to remove"
+              >
+                {label} ✕
+              </button>
+            ))}
             {visibleOptions.map((opt) => (
               <button
                 key={opt.key}
@@ -142,8 +202,8 @@ export function AiSummaryPanel({ summaryType, title, options, onGenerate }: Prop
                 {opt.label}
               </button>
             ))}
-            {visibleOptions.length === 0 && (
-              <span className="text-xs text-text-muted">No matching items.</span>
+            {visibleOptions.length === 0 && custom.size === 0 && (
+              <span className="text-xs text-text-muted">No matching items. Type a name and press Enter to add.</span>
             )}
           </div>
           {/* Selected count */}

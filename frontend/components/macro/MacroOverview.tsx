@@ -207,6 +207,7 @@ export function MacroOverview() {
         summaryType="macro"
         title="AI Macro Summary"
         options={countries.map((c) => ({ key: c.iso2, label: c.name }))}
+        searchPlaceholder="Search for countries…"
         onGenerate={(model, force, sel) => api.aiMacro(sel.length ? sel : selected, model, force)}
       />
     </div>
