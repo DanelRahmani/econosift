@@ -20,6 +20,7 @@ const drawerTabs = [
   { href: "/corporate", label: "Corporate Health" },
   { href: "/dividends", label: "Dividends" },
   { href: "/insider", label: "Insider Trading" },
+  { href: "/mergers", label: "M&A" },
   { href: "/risk", label: "Risk" },
   { href: "/options", label: "Options" },
   { href: "/yield", label: "Rates & Policy" },

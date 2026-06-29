@@ -1226,6 +1226,35 @@ export interface ShortInterestData {
   sectorSummary: ShortInterestSectorSummary[];
 }
 
+// M&A Tracker (Phase 30)
+export interface MADeal {
+  date: string;
+  headline: string;
+  acquirer: string;
+  target: string;
+  value: number | null;
+  sector: string;
+  source: string;
+  url: string;
+}
+export interface MAMonthlyVolume {
+  month: string;
+  count: number;
+  totalValue: number | null;
+}
+export interface MASectorHeatmap {
+  sector: string;
+  dealCount: number;
+  avgValue: number | null;
+}
+export interface MAData {
+  asOf: string | null;
+  source: string;
+  deals: MADeal[];
+  monthlyVolume: MAMonthlyVolume[];
+  sectorHeatmap: MASectorHeatmap[];
+}
+
 // COT Positioning
 export interface CotContract {
   name: string;

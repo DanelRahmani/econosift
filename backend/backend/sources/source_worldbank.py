@@ -62,6 +62,10 @@ INDICATOR_MAP = {
     # Business Dynamism (Phase 30)
     "new_business_density": "IC.BUS.NDNS.ZS",
     "startup_time": "IC.REG.DURS",
+    # Demographics (Phase 30)
+    "age_dependency": "SP.POP.DPND",
+    "urbanization": "SP.URB.TOTL.IN.ZS",
+    "life_expectancy": "SP.DYN.LE00.IN",
 }
 
 

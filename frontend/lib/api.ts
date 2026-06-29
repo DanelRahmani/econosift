@@ -37,7 +37,7 @@ import type {
   ConfigResponse, ConfigUpdateRequest,
   GlobalHousingData, CreditGapsData, FiscalData, TradeData, LaborData, EnergyData,
   CurrencyCrisisData, BankingStabilityData, InequalityData,
-  BusinessData, ShortInterestData,
+  BusinessData, ShortInterestData, MAData,
 } from "./types";
 
 async function get<T>(path: string): Promise<T> {
@@ -367,6 +367,9 @@ export const api = {
 
   marketShortInterest: (tickerOrUniverse: string) =>
     get<ShortInterestData>(`/market/short-interest?${tickerOrUniverse === "sp500" ? "universe=sp500" : `ticker=${encodeURIComponent(tickerOrUniverse)}`}`),
+
+  mergers: () =>
+    get<MAData>(`/mergers`),
 
   snowflake: (ticker: string) =>
     get<SnowflakeResponse>(`/snowflake?ticker=${encodeURIComponent(ticker)}`),

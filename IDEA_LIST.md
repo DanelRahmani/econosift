@@ -274,13 +274,13 @@ data for gamma squeeze detection.
 | 12 | Currency Crisis Early Warning | Tool | P1 | 1 new WB code | Medium | |
 | 13 | Sector DuPont Analysis | Tool | P1 | No — existing screener data | Small | ✅ DONE Phase 27 |
 | 14 | Sovereign Default Model | Tool | P2 | Academic CSV + model logic | Large | |
-| 15 | M&A / Corporate Actions | Tool | P2 | Finnhub endpoint check | Small | |
+| 15 | M&A / Corporate Actions | Tool | P2 | Finnhub endpoint check | Small | ✅ DONE Phase 30 |
 | 16 | BIS Property → Housing Tab | Enhance | P0 | No — BIS data already downloaded | Small | ✅ DONE Phase 25 |
 | 17 | BIS Credit Gaps → Financial Tab | Enhance | P0 | No — BIS data already downloaded | Small | ✅ DONE Phase 25 |
 | 18 | Global Bond Yields → /yield | Enhance | P1 | ~10 FRED series IDs | Medium | |
 | 19 | Inflation Expectations → Inflation Tab | Enhance | P1 | 3 FRED series IDs | Small | ✅ DONE Phase 27 |
 | 20 | Supply Chain → Atlas Overlay | Enhance | P1 | 2 WB codes + bilateral data | Medium | |
-| 21 | Demographics → Atlas Overlay | Enhance | P2 | 3 WB codes + UN projections | Medium | |
+| 21 | Demographics → Atlas Overlay | Enhance | P2 | 3 WB codes + UN projections | Medium | ✅ DONE Phase 30 |
 | 22 | Short Interest → Markets Panel | Enhance | P2 | Finnhub endpoint | Small | ✅ DONE Phase 30 |
 
-**Completed:** 11/22 · **Remaining:** 11 (2 P0 · 7 P1 · 2 P2)
+**Completed:** 13/22 · **Remaining:** 9 (2 P0 · 7 P1 · 0 P2)

@@ -13,6 +13,7 @@ from .routers import (
     portfolio, screener, admin, dashboard, treemap, calendar, risk, options,
     market_data, snowflake, sector, technicals, atlas, research, credit,
     yield_curve, policy, sovereign, scenario, wiki, corporate, dividend, insider,
+    mergers,
 )
 from .services import screener_service
 
@@ -75,3 +76,4 @@ app.include_router(wiki.router)
 app.include_router(corporate.router)
 app.include_router(dividend.router)
 app.include_router(insider.router)
+app.include_router(mergers.router)

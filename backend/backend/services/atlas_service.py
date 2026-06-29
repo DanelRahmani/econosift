@@ -26,6 +26,9 @@ INDICATORS: list[dict] = [
     {"id": "gini",           "label": "Gini Coefficient (0=equal, 100=unequal)", "unit": "", "goodDirection": "low"},
     {"id": "food_imports",   "label": "Food Imports (% of merchandise imports)", "unit": "%", "goodDirection": "high"},
     {"id": "fuel_imports",   "label": "Fuel Imports (% of merchandise imports)", "unit": "%", "goodDirection": "high"},
+    {"id": "age_dependency", "label": "Age Dependency Ratio (% of working-age)", "unit": "%", "goodDirection": "low"},
+    {"id": "urbanization",   "label": "Urban Population (% of total)", "unit": "%", "goodDirection": "neutral"},
+    {"id": "life_expectancy","label": "Life Expectancy at Birth (years)", "unit": "years", "goodDirection": "high"},
 ]
 
 _INDICATOR_IDS = {ind["id"] for ind in INDICATORS}
@@ -81,6 +84,10 @@ _WB_CODES: dict[str, str] = {
     # Business Dynamism (Phase 30)
     "new_business_density": "IC.BUS.NDNS.ZS",
     "startup_time": "IC.REG.DURS",
+    # Demographics (Phase 30)
+    "age_dependency": "SP.POP.DPND",
+    "urbanization": "SP.URB.TOTL.IN.ZS",
+    "life_expectancy": "SP.DYN.LE00.IN",
 }
 
 # IMF WEO indicator codes (matching source_imf.py INDICATOR_MAP)
