@@ -61,11 +61,11 @@ async def get_inequality_data() -> dict:
         atlas_service._wb_timeline("poverty_365", start, end),
     )
 
-    from ..config import ISO2_TO_ISO3, COUNTRY_NAMES
+    from ..config import iso2_to_iso3, COUNTRY_NAMES
 
     countries_out = []
-    for iso2 in INEQ_COUNTRIES:
-        iso3 = ISO2_TO_ISO3.get(iso2, iso2)
+    for iso2 in INEQUALITY_COUNTRIES:
+        iso3 = iso2_to_iso3(iso2)
         name = COUNTRY_NAMES.get(iso2, iso2)
 
         gini_map = wb_gini.get(iso3, {})

@@ -150,12 +150,35 @@ export function CountrySelector({
         </span>
       </div>
 
-      <input
-        className="input w-full"
-        placeholder="Search countries…"
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-      />
+      <div className="relative">
+        <input
+          className="input w-full"
+          placeholder="Search countries…"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+        />
+
+        {/* ---- Typeahead dropdown (positioned below input) ---- */}
+        {open && results.length > 0 && (
+          <div className="absolute z-20 left-0 right-0 top-full mt-1 bg-surface border border-border rounded-lg shadow-lg max-h-48 overflow-auto">
+            {loading && (
+              <div className="px-3 py-2 text-xs text-text-muted">Searching…</div>
+            )}
+            {results.map((r) => (
+              <button
+                key={r.iso3}
+                onClick={() => pick(r.iso2)}
+                className="w-full text-left px-3 py-2 text-sm text-text-primary hover:bg-surface-alt transition-colors border-b border-border/50 last:border-b-0"
+              >
+                <span className="font-medium">{r.name}</span>
+                <span className="text-text-muted ml-2 text-xs">
+                  {r.iso2}{r.iso2 !== r.iso3 ? ` / ${r.iso3}` : ""}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* ---- Selected pills (including custom / typeahead adds) ---- */}
       {selected.length > 0 && (
@@ -179,28 +202,6 @@ export function CountrySelector({
               </span>
             );
           })}
-        </div>
-      )}
-
-      {/* ---- Typeahead dropdown ---- */}
-      {open && results.length > 0 && (
-        <div className="absolute z-20 left-0 right-0 bg-surface border border-border rounded-lg shadow-lg max-h-48 overflow-auto"
-             style={{ top: selected.length > 0 ? "104px" : "68px" }}>
-          {loading && (
-            <div className="px-3 py-2 text-xs text-text-muted">Searching…</div>
-          )}
-          {results.map((r) => (
-            <button
-              key={r.iso3}
-              onClick={() => pick(r.iso2)}
-              className="w-full text-left px-3 py-2 text-sm text-text-primary hover:bg-surface-alt transition-colors border-b border-border/50 last:border-b-0"
-            >
-              <span className="font-medium">{r.name}</span>
-              <span className="text-text-muted ml-2 text-xs">
-                {r.iso2}{r.iso2 !== r.iso3 ? ` / ${r.iso3}` : ""}
-              </span>
-            </button>
-          ))}
         </div>
       )}
 

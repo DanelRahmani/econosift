@@ -5,14 +5,14 @@ import asyncio
 import pandas as pd
 
 from ..cache import async_cached
-from ..config import ISO2_TO_ISO3, COUNTRY_NAMES
+from ..config import iso2_to_iso3, COUNTRY_NAMES
 from ..models import SeriesResult, make_series
 
 SOURCE_LABEL = "DB.nomics (OECD/BIS)"
 
 
 def _series_path(indicator_key: str, iso2: str) -> str | None:
-    iso3 = ISO2_TO_ISO3.get(iso2)
+    iso3 = iso2_to_iso3(iso2)
     if indicator_key == "unemployment" and iso3:
         return f"OECD/MEI/{iso3}.LRHUTTTT.STSA.M"
     if indicator_key == "inflation" and iso3:

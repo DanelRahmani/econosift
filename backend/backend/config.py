@@ -52,6 +52,28 @@ COUNTRIES: list[dict[str, str]] = [
 
 COUNTRY_NAMES: dict[str, str] = {c["iso2"]: c["name"] for c in COUNTRIES}
 
+# ── dynamic ISO2 → ISO3 lookup ──────────────────────────────────────────
+
+def iso2_to_iso3(iso2: str) -> str:
+    """Convert an ISO2 country code to ISO3.
+
+    Uses the static mapping first (20 predefined countries, instant).
+    Falls back to pycountry for any other World Bank economy (e.g. AR→ARG).
+    If pycountry is unavailable or the code is unrecognised, returns the
+    original value so data sources can attempt a direct lookup.
+    """
+    iso2 = iso2.upper()
+    if iso2 in ISO2_TO_ISO3:
+        return ISO2_TO_ISO3[iso2]
+    try:
+        import pycountry
+        pc = pycountry.countries.get(alpha_2=iso2)
+        if pc:
+            return pc.alpha_3
+    except Exception:
+        pass
+    return iso2  # last resort — let the data source try with the ISO2 code
+
 # Indicator catalogue for /api/macro/indicators.
 INDICATORS: list[dict] = [
     {"id": "gdp_growth", "label": "GDP Growth (annual %)", "unit": "%",

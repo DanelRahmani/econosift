@@ -50,8 +50,8 @@ async def get_trade_data() -> dict:
 
     countries_out = []
     for iso2 in TRADE_COUNTRIES:
-        from ..config import ISO2_TO_ISO3, COUNTRY_NAMES
-        iso3 = ISO2_TO_ISO3.get(iso2, iso2)
+        from ..config import iso2_to_iso3, COUNTRY_NAMES
+        iso3 = iso2_to_iso3(iso2)
         name = COUNTRY_NAMES.get(iso2, iso3_to_name.get(iso3, iso2))
 
         exp_pts = wb_exports.get(iso3, {})

@@ -5,7 +5,7 @@ import asyncio
 import pandas as pd
 
 from ..cache import async_cached
-from ..config import ISO2_TO_ISO3, COUNTRY_NAMES
+from ..config import iso2_to_iso3, COUNTRY_NAMES
 from ..models import SeriesResult, make_series
 
 SOURCE_LABEL = "World Bank"
@@ -105,7 +105,7 @@ async def fetch(indicator_key: str, countries: tuple[str, ...],
     series_id = INDICATOR_MAP.get(indicator_key)
     if not series_id:
         return []
-    iso3_to_iso2 = {ISO2_TO_ISO3.get(c, c): c for c in countries}
+    iso3_to_iso2 = {iso2_to_iso3(c): c for c in countries}
     iso3_list = list(iso3_to_iso2.keys())
 
     # Try bulk data first

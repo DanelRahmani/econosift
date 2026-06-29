@@ -71,7 +71,7 @@ _ALL_SERIES = tuple(
 )
 _START = "2000-01-01"
 
-from ..config import ISO2_TO_ISO3 as _ISO2_TO_ISO3
+from ..config import iso2_to_iso3 as _iso2_to_iso3
 
 
 def _latest(pts: list[dict]) -> float | None:
@@ -102,7 +102,7 @@ async def _get_cpi_map() -> dict[str, float | None]:
         return {}
     cpi_map: dict[str, float | None] = {}
     for iso2 in _FOREIGN:
-        iso3 = _ISO2_TO_ISO3.get(iso2, iso2.upper())
+        iso3 = _iso2_to_iso3(iso2)
         year_map = wb_inf.get(iso3, {})
         if year_map:
             latest_yr = max(year_map)

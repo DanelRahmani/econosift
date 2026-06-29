@@ -9,7 +9,7 @@ import pandas as pd
 from scipy import stats
 
 from ..cache import async_cached
-from ..config import ISO2_TO_ISO3, COUNTRY_NAMES
+from ..config import iso2_to_iso3, COUNTRY_NAMES
 from ..sources import source_worldbank as wb
 
 _VALID: set[str] = set(wb.INDICATOR_MAP)

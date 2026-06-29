@@ -282,7 +282,7 @@ def _download_imf() -> dict:
 def load_imf(indicator_key: str, iso2_list: list[str],
              start: int, end: int) -> pd.DataFrame | None:
     from ..sources.source_imf import INDICATOR_MAP as IMAP
-    from ..config import ISO2_TO_ISO3
+    from ..config import iso2_to_iso3
 
     imf_code = IMAP.get(indicator_key)
     if not imf_code:
@@ -295,7 +295,7 @@ def load_imf(indicator_key: str, iso2_list: list[str],
     if not path.exists():
         return None
 
-    iso3_set = {ISO2_TO_ISO3.get(c, c.upper()) for c in iso2_list}
+    iso3_set = {iso2_to_iso3(c) for c in iso2_list}
     try:
         df = pd.read_parquet(path)
         mask = df["iso3"].isin(iso3_set) & (df["year"] >= start) & (df["year"] <= end)

@@ -51,7 +51,7 @@ async def get_currency_crisis() -> dict:
     cur_year = datetime.now().year
     start, end = 2014, cur_year - 1
 
-    from ..config import ISO2_TO_ISO3, COUNTRY_NAMES
+    from ..config import iso2_to_iso3, COUNTRY_NAMES
 
     # Fetch World Bank indicators + reserves
     (wb_ca, wb_inf, wb_std, wb_debt, wb_res) = await asyncio.gather(
@@ -72,7 +72,7 @@ async def get_currency_crisis() -> dict:
 
     countries_out = []
     for iso2 in CRISIS_COUNTRIES:
-        iso3 = ISO2_TO_ISO3.get(iso2, iso2)
+        iso3 = iso2_to_iso3(iso2)
         name = COUNTRY_NAMES.get(iso2, iso2)
 
         ca_map = wb_ca.get(iso3, {})
