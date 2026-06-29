@@ -1,4 +1,4 @@
-# Axiom Finance — Tech Stack (Phases 0–19)
+# Axiom Finance — Tech Stack (Phases 0–31)
 
 ## Overview
 
@@ -29,7 +29,7 @@ Axiom Finance is a self-hosted financial analytics dashboard. The system is spli
 | Two-tier cache | HybridCache (memory → SQLite) | Composite endpoint: checks memory first, then SQLite, then yfinance |
 | HTTP client | httpx, requests | Async external HTTP calls + sync fallbacks |
 | Config | python-dotenv | Loads `.env` (FRED_API_KEY, FINNHUB_API_KEY, DATABASE_URL, etc.) |
-| Testing | pytest, pytest-asyncio, httpx | 508+ unit + async endpoint tests with mock yfinance bundles |
+| Testing | pytest, pytest-asyncio, httpx | 568+ unit + async endpoint tests with mock yfinance bundles |
 
 ---
 
@@ -80,36 +80,35 @@ Axiom Finance is a self-hosted financial analytics dashboard. The system is spli
 | CFTC | COT positioning data (CSV) | No |
 | OECD | Immediate central-bank rates, 3-month interbank rates (IRSTCI01*, IR3TIB01*) | No |
 | Wikipedia MediaWiki API | S&P 500 / Nasdaq-100 / Dow 30 constituents | No |
+| BIS (source_bis) | CPI, policy rates, FX, credit gaps, property prices, effective FX (ZIP downloads) | No |
 
 ---
 
-## 11 Core Pages (full investment research stack)
+## 24 Pages (full investment research stack)
 
 | Page | Route | Content |
 |------|-------|---------|
 | **Dashboard** | `/dashboard` | Market breadth, global indices, Fear & Greed, top movers |
-| **Markets** | `/markets` | Price charts, technicals (MACD/BB/Ichimoku/Fib/Pivots), valuation (8 models + DCF + Snowflake), ratios, risk (VaR/Sharpe/Beta/GARCH), options & IV, news, 13F/Form 4 |
-| **Screener** | `/screener` | S&P 500 / Nasdaq 100 / Dow 30 universe, 20+ preset signals, 9 result tabs, overnight cache |
-| **Portfolio** | `/portfolio` | Efficient frontier, Black-Litterman, Monte Carlo, Fama-French attribution, stress testing |
-| **Risk** | `/risk` | Rolling metrics, GARCH, Hurst, cointegration, historical stress scenarios |
-| **Options** | `/options` | IV analytics (IV30/Rank/Percentile), Greeks, term structure, OI profile, binomial pricing |
-| **Sectors** | `/sectors` | SPDR ETF returns, rotation clock, industry drill-down |
-| **Treemap** | `/treemap` | S&P 500 / Nasdaq / Dow squarified treemap |
+| **Markets** | `/markets` | Price charts, technicals, 8-model valuation + DCF, Snowflake, ratios, risk, options & IV, news, 13F/Form 4 |
+| **Screener** | `/screener` | Multi-index screener, 20+ presets, 9 result tabs, overnight cache |
+| **Portfolio** | `/portfolio` | Efficient frontier, Black-Litterman, Monte Carlo, Fama-French, stress testing |
+| **Research** | `/research` | Risk Parity, FX Carry, Momentum, Realized Moments, Econometric Lab |
+| **Risk** | `/risk` | Rolling metrics, GARCH, Hurst, cointegration, stress scenarios, MC |
+| **Options** | `/options` | IV30/Rank/Percentile, Greeks, term structure, smile, OI, binomial/MC pricing |
+| **Macro** | `/macro` | 16-tab hub: Overview, Inflation, Growth, Housing, Commodities, FX, Leading, Financial Conditions, Positioning, Country Risk, CB, Econ Lab, Fiscal, Labor, Energy, Inequality |
 | **Calendar** | `/calendar` | Earnings, dividends, macro releases, IPOs, CB meetings |
-| **Macro** | `/macro` | 12-tab hub: rates, inflation, growth, housing, commodities, FX, leading indicators, financial conditions, COT, Econometric Lab, Country Risk, Central Banks |
-| **Atlas** | `/atlas` | Choropleth world map: 6 macro indicators, ~200 countries, 2000–2024, year slider, regional blocs |
-
-## 4 Additional Pages (Phase 18A — Macro-Financial Intelligence)
-
-| Page | Route | Content |
-|------|-------|---------|
-| **Research** | `/research` | Risk Parity, FX Carry, Cross-Sectional Momentum, Realized Moments |
-| **Yield Curve** | `/yield` | US spot curve, TIPS real yields, breakevens, ACM term premium |
-| **Policy Tracker** | `/policy` | CB divergence, G10 carry differentials, policy surprises |
-| **Sovereign Risk** | `/sovereign` | 6-KPI traffic-light rankings, ~200 countries |
-
-## 1 Deferred Page (Phase 18B)
-
-| Page | Route | Content |
-|------|-------|---------|
-| **Scenario Lab** | `/scenario` | Stress scenario designer (basic stub, deferred) |
+| **Yield** | `/yield` | US spot curve, TIPS real yields, breakevens, ACM term premium |
+| **Policy** | `/policy` | CB divergence, G10 carry differentials |
+| **Sovereign** | `/sovereign` | 6-KPI traffic-light sovereign risk |
+| **Atlas** | `/atlas` | World choropleth: 6 indicators, ~200 countries, year slider, regional blocs |
+| **Wiki** | `/wiki` | 410-term financial dictionary, 26 categories, search |
+| **Trade** | `/trade` | Exports/imports %GDP, trade balances, openness indices, BIS FX |
+| **Corporate Health** | `/corporate` | Altman Z, Piotroski 9-pt, Beneish M, sector aggregate Z |
+| **Dividends** | `/dividends` | Yield, growth, payout, aristocrats, DDM |
+| **Insider** | `/insider` | Aggregate buy/sell ratio, cluster detection, smart money index |
+| **Mergers** | `/mergers` | M&A deals, deal values, premiums, sector heatmap |
+| **Stability** | `/stability` | Currency Crisis EWS (KLR), Banking Stability (NPL, Z-scores, credit gaps) |
+| **Cross-Border** | `/crossborder` | BIS locational banking stats, debt securities |
+| **Country Profiles** | `/country/{iso2}` | CIA World Factbook profiles |
+| **Admin** | `/admin` | Backend health, cache stats, API keys management |
+| **Scenario** | `/scenario` | Stress scenario designer (Phase 18B stub) |

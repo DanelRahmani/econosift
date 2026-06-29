@@ -8,7 +8,7 @@ A self-hosted, Dockerised financial analytics platform covering the full investm
 
 ## 📊 What's Inside
 
-### Pages (14 total)
+### Pages (24 total)
 
 | Page | Path | Description |
 |------|------|-------------|
@@ -21,10 +21,20 @@ A self-hosted, Dockerised financial analytics platform covering the full investm
 | **Risk** | `/risk` | Rolling metrics (20D/60D/120D/252D), GARCH(1,1) volatility forecasting, Hurst exponent, Ornstein-Uhlenbeck mean-reversion, Engle-Granger cointegration, correlation matrix, historical stress scenarios (2008, COVID, 2022 rates, dot-com) |
 | **Options** | `/options` | Implied volatility (IV30, IV Rank, IV Percentile), Greeks (Delta, Gamma, Theta, Vega, Rho), term structure, volatility smile, OI profile, max pain, Black-Scholes pricing, CRR binomial tree, Monte Carlo options pricing |
 | **Calendar** | `/calendar` | Economic releases (CPI, NFP, FOMC, GDP, etc.), earnings reports with EPS surprise, ex-dividend dates, IPOs, central bank meeting schedule — sourced from FRED + Finnhub |
-| **Rates & Policy** | `/yield` | US Treasury spot curve, foreign spreads, real yields & breakevens, ACM term premium, policy rate divergence (7 CBs), G10 carry differentials, sovereign risk rankings, central bank policy rate history |
+| **Yield** | `/yield` | US Treasury spot curve, foreign spreads, real yields & breakevens, ACM term premium |
+| **Policy** | `/policy` | Central bank policy rate divergence, G10 carry differentials |
+| **Sovereign** | `/sovereign` | 6-KPI traffic-light sovereign risk rankings, ~200 countries |
 | **Atlas** | `/atlas` | Choropleth world map of 6 macro indicators across ~200 countries (2000–2024), year-slider animation, regional blocs (G7, G20, Eurozone, Emerging Markets), Top-10/Bottom-10 rankings |
 | **Wiki** | `/wiki` | 🔍 Searchable financial dictionary — **410+ terms** across **26 categories**, each with a detailed 3-5 sentence explanation. Category sidebar, debounced search, expandable cards, related-term cross-linking |
-| **Admin** | `/admin` | Backend health dashboard, cache stats, job execution history |
+| **Trade** | `/trade` | Exports/imports %GDP, trade balances, openness indices, BIS effective exchange rates |
+| **Corporate Health** | `/corporate` | Altman Z-Score, Piotroski F-Score (9-point), Beneish M-Score, sector aggregate Z |
+| **Dividends** | `/dividends` | Dividend yield, 5Y/10Y growth, payout ratio, aristocrats screener, DDM fair value |
+| **Insider** | `/insider` | Aggregate insider buy/sell ratio, cluster detection, sector sentiment, smart money index |
+| **Mergers** | `/mergers` | M&A deal tracking, deal values, acquisition premiums, sector activity heatmap |
+| **Stability** | `/stability` | Currency Crisis Early Warning (KLR), Banking Stability (NPL, Z-scores, BIS credit gaps) |
+| **Cross-Border** | `/crossborder` | BIS locational banking statistics, international debt securities |
+| **Country Profiles** | `/country/{iso2}` | CIA World Factbook data — geography, demographics, economy |
+| **Admin** | `/admin` | Backend health dashboard, cache stats, job execution history, API keys management |
 
 > **Note:** Sectors and Treemap views are embedded as sub-tabs within the Markets page at `/markets?tab=Sectors` and `/markets?tab=Treemap`.
 
@@ -54,10 +64,14 @@ The maroon/crimson accent is the Axiom brand signature — it provides a distinc
 | Layer | Technology |
 |-------|-----------|
 | **Backend** | Python 3.12, FastAPI, uvicorn |
-| **Data** | yfinance, pandas, pandas-datareader, numpy, scipy |
-| **Frontend** | Next.js 14 (App Router), React 18, TypeScript, Tailwind CSS, Recharts, React Query v5 |
-| **Infra** | Docker Compose, Nginx reverse proxy, SQLite (WAL mode) |
-| **Sources** | Yahoo Finance, FRED, World Bank, IMF, BIS, OECD, Ken French Data Library, Finnhub, ECB, DB.nomics, Eurostat |
+| **Data** | yfinance ≥0.2.40, pandas, numpy, scipy, pandas-datareader, fredapi, wbgapi, imfp, ecbdata, dbnomics |
+| **Quant** | arch (GARCH), pyarrow (parquet), pandas-ta, openpyxl, cachetools |
+| **Persistence** | SQLAlchemy ≥2.0, APScheduler ≥3.10, SQLite (WAL mode) |
+| **Frontend** | Next.js 14 (App Router), React 18, TypeScript, Tailwind CSS, Recharts |
+| **Data Fetching** | @tanstack/react-query v5 (server cache), React Suspense + lazy (code splitting) |
+| **Infra** | Docker Compose, Nginx reverse proxy (gzip, proxy_next_upstream retry) |
+| **Testing** | pytest, pytest-asyncio (backend) · Playwright (E2E) |
+| **Sources** | Yahoo Finance, FRED, World Bank, IMF, BIS, OECD, Ken French Data Library, Finnhub, ECB, DB.nomics, Eurostat, CFTC, EDGAR, Wikipedia MediaWiki API |
 
 ---
 
@@ -108,6 +122,44 @@ The backend serves under `/api` (proxied by Nginx). Key endpoint groups:
 | `GET /api/valuation/dcf?ticker=` | Two-stage DCF with sensitivity grid |
 | `GET /api/snowflake?ticker=` | 5-axis Snowflake composite score |
 | `GET /api/snowflake/batch?tickers=` | Batch Snowflake scores |
+
+### Corporate Health
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /api/corporate/health?ticker=` | Altman Z-Score, Piotroski 9-pt, Beneish M-Score |
+
+### Dividends
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /api/dividend?ticker=` | Dividend yield, growth rate, payout ratio, aristocrats status |
+| `GET /api/dividend/ddm?ticker=` | DDM fair value estimation |
+
+### Insider
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /api/insider/aggregate` | Aggregate buy/sell ratio, cluster detection, smart money index |
+
+### Mergers
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /api/mergers` | M&A deals, deal values, premiums, sector heatmap |
+
+### Stability
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /api/stability/currency-crisis` | KLR early warning system (traffic-light per country) |
+| `GET /api/stability/banking` | NPL ratios, capital adequacy, Z-scores, BIS credit gaps |
+
+### Cross-Border
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /api/crossborder/claims` | BIS locational banking statistics |
+| `GET /api/crossborder/securities` | International debt securities |
+
+### Country Profiles
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /api/factbook/country/{iso2}` | CIA World Factbook profile (geography, demographics, economy) |
 
 ### Macro
 | Endpoint | Purpose |
@@ -236,7 +288,7 @@ axiomfinance/
 ├── frontend/
 │   ├── Dockerfile
 │   ├── next.config.js
-│   ├── app/                     # Next.js 14 App Router (12 pages)
+│   ├── app/                     # Next.js 14 App Router (24 pages)
 │   │   ├── wiki/page.tsx
 │   │   ├── markets/page.tsx
 │   │   └── ...

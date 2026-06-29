@@ -17,7 +17,7 @@ backend/
 │
 ├── backend/                    # Python package (importable as `backend`)
 │   ├── __init__.py
-│   ├── main.py                 # FastAPI app factory: mounts 25 routers, CORS config, lifespan (DB init, scheduler)
+│   ├── main.py                 # FastAPI app factory: mounts 33 routers, CORS config, lifespan (DB init, scheduler)
 │   ├── config.py               # Settings loaded from environment (FRED_API_KEY, FINNHUB_API_KEY, DATABASE_URL)
 │   ├── models.py               # Pydantic request/response models
 │   ├── cache.py                # @cached / @async_cached decorators (cachetools TTL, 60-min default, 2048 maxsize)
