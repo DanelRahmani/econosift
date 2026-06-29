@@ -15,6 +15,7 @@ import { InstitutionalHolders } from "@/components/markets/InstitutionalHolders"
 import { InsiderActivity } from "@/components/markets/InsiderActivity";
 import { Watchlist } from "@/components/Watchlist";
 import { AiSummaryPanel } from "@/components/AiSummaryPanel";
+import { WalkthroughBanner } from "@/components/WalkthroughBanner";
 import { SnowflakeChart } from "@/components/markets/SnowflakeChart";
 import { TabSkeleton } from "@/components/markets/TabSkeleton";
 import { TreemapChart } from "@/components/markets/Treemap";
@@ -194,6 +195,7 @@ function MarketsPageInner() {
 
   return (
     <div className="space-y-6">
+      <WalkthroughBanner pageKey="markets" />
       <div className="flex flex-wrap items-center gap-4" data-hide-print>
         <SearchBar onAdd={addTicker} />
         <div className="flex flex-wrap gap-2">

@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ThemeToggle } from "./ThemeToggle";
+import { LearningToggle } from "./LearningToggle";
 
 const primaryTabs = [
   { href: "/markets", label: "Markets", icon: "M3 13h4l3 7 4-14 3 7h4" },
@@ -72,6 +73,9 @@ export function MobileNav() {
             </svg>
             <span className="text-[10px] font-medium">More</span>
           </button>
+          <div className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2 px-0.5 min-w-[3rem]">
+            <LearningToggle className="scale-75" />
+          </div>
           <div className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2 px-0.5 min-w-[3rem]">
             <ThemeToggle />
           </div>

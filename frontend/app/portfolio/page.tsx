@@ -24,6 +24,7 @@ import { BlackLitterman } from "@/components/portfolio/BlackLitterman";
 import { StressTesting } from "@/components/portfolio/StressTesting";
 import { ScenarioTab } from "@/components/portfolio/ScenarioTab";
 import { TransactionLog } from "@/components/portfolio/TransactionLog";
+import { WalkthroughBanner } from "@/components/WalkthroughBanner";
 
 const LS_KEY = "axiom_portfolio";
 
@@ -157,6 +158,7 @@ function PortfolioPageInner() {
 
   return (
     <main className="max-w-7xl mx-auto px-4 py-6 space-y-6">
+      <WalkthroughBanner pageKey="portfolio" />
       {/* Header */}
       <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
         <div>

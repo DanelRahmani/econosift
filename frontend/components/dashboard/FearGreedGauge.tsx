@@ -6,6 +6,7 @@ import { api } from "@/lib/api";
 import type { FearGreedResponse } from "@/lib/types";
 import { Card, Skeleton, chartTooltipStyle } from "@/components/ui";
 import { useTheme } from "@/components/ThemeProvider";
+import { MetricTooltip } from "@/components/MetricTooltip";
 
 /**
  * Fear & Greed Index (compute tier 🟢): a semicircular speedometer gauge for
@@ -35,7 +36,9 @@ export function FearGreedGauge() {
   return (
     <Card>
       <div className="flex items-center justify-between mb-2">
-        <h2 className="text-sm font-semibold text-text-secondary">Fear &amp; Greed Index</h2>
+        <h2 className="text-sm font-semibold text-text-secondary">
+          <MetricTooltip metricKey="fearGreed">Fear &amp; Greed Index</MetricTooltip>
+        </h2>
         <span className="text-xs text-text-muted font-mono">{data.asOf ?? "—"}</span>
       </div>
 

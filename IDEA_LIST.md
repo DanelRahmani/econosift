@@ -26,7 +26,7 @@
 
 ## 3. 🧠 Remaining Ideas
 
-### P3 — Portfolio Transaction Log
+### P3 — Portfolio Transaction Log ✅ DONE (Phase 37)
 Add buy/sell dates, cost basis, and realized P&L tracking (currently theoretical allocations only).
 - **Data:** User input only — no external data needed.
 

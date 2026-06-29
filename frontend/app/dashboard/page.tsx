@@ -9,6 +9,7 @@ import { RegimeDetector } from "@/components/macro/RegimeDetector";
 import { YieldCurve } from "@/components/macro/YieldCurve";
 import { SectorHeatmap } from "@/components/markets/SectorHeatmap";
 import { AiSummaryPanel } from "@/components/AiSummaryPanel";
+import { WalkthroughBanner } from "@/components/WalkthroughBanner";
 import { api } from "@/lib/api";
 
 /**
@@ -20,6 +21,7 @@ import { api } from "@/lib/api";
 export default function DashboardPage() {
   return (
     <div className="space-y-6">
+      <WalkthroughBanner pageKey="dashboard" />
       <BreadthBar />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

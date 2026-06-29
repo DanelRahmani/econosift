@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ThemeToggle } from "./ThemeToggle";
+import { LearningToggle } from "./LearningToggle";
 
 const primaryTabs = [
   { href: "/dashboard", label: "Dashboard" },
@@ -121,7 +122,8 @@ export function Navbar() {
             )}
           </div>
         </div>
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-2">
+          <LearningToggle />
           <ThemeToggle />
         </div>
       </div>

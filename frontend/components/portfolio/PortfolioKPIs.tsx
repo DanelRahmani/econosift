@@ -1,6 +1,8 @@
 "use client";
 
 import type { PortfolioAnalysis } from "@/lib/types";
+import { MetricTooltip } from "@/components/MetricTooltip";
+import { WalkthroughBanner } from "@/components/WalkthroughBanner";
 
 interface Props {
   data: PortfolioAnalysis | null;
@@ -18,7 +20,7 @@ function fmtRaw(v: number | null | undefined, decimals = 2) {
 }
 
 interface KPICardProps {
-  label: string;
+  label: React.ReactNode;
   value: string;
   color?: string;
 }
@@ -74,31 +76,31 @@ export function PortfolioKPIs({ data, loading }: Props) {
   return (
     <div className="flex gap-3 flex-wrap">
       <KPICard
-        label="Total Return"
+        label={<MetricTooltip metricKey="totalReturn">Total Return</MetricTooltip>}
         value={totalReturn !== null ? `${totalReturn.toFixed(2)}%` : "—"}
         color={retColor(totalReturn)}
       />
       <KPICard
-        label="Ann. Return"
+        label={<MetricTooltip metricKey="annReturn">Ann. Return</MetricTooltip>}
         value={annReturn !== null ? `${annReturn.toFixed(2)}%` : "—"}
         color={retColor(annReturn)}
       />
       <KPICard
-        label="Ann. Volatility"
+        label={<MetricTooltip metricKey="volatility">Ann. Volatility</MetricTooltip>}
         value={annVol !== null ? `${annVol.toFixed(2)}%` : "—"}
       />
       <KPICard
-        label="Sharpe Ratio"
+        label={<MetricTooltip metricKey="sharpe">Sharpe Ratio</MetricTooltip>}
         value={m.sharpe !== null ? m.sharpe.toFixed(2) : "—"}
         color={m.sharpe !== null && m.sharpe >= 1 ? "text-green-500" : undefined}
       />
       <KPICard
-        label="Max Drawdown"
+        label={<MetricTooltip metricKey="maxDrawdown">Max Drawdown</MetricTooltip>}
         value={maxDD !== null ? `${maxDD.toFixed(2)}%` : "—"}
         color={ddColor(maxDD)}
       />
       <KPICard
-        label="Beta"
+        label={<MetricTooltip metricKey="beta">Beta</MetricTooltip>}
         value={m.beta !== null ? m.beta.toFixed(2) : "—"}
       />
     </div>

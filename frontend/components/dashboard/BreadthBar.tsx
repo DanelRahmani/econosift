@@ -6,6 +6,7 @@ import { api } from "@/lib/api";
 import type { BreadthResponse } from "@/lib/types";
 import { Skeleton } from "@/components/ui";
 import { fmtNum } from "@/lib/format";
+import { MetricTooltip } from "@/components/MetricTooltip";
 
 /**
  * Market breadth bar (compute tier 🟢). Sticky strip of S&P 500 internals:
@@ -66,7 +67,7 @@ export function BreadthBar({ index = "sp500" }: { index?: string }) {
         <Kpi label="% > SMA50" value={pct(data.pctAboveSma50)} tone={tone(data.pctAboveSma50)} />
         <Kpi label="% > SMA200" value={pct(data.pctAboveSma200)} tone={tone(data.pctAboveSma200)} />
         <Kpi
-          label="McClellan Osc"
+          label={<MetricTooltip metricKey="mcclellan">McClellan Osc</MetricTooltip>}
           value={fmtNum(data.mcclellanOscillator, 1)}
           tone={(data.mcclellanOscillator ?? 0) >= 0 ? "up" : "down"}
         />
@@ -93,7 +94,7 @@ export function BreadthBar({ index = "sp500" }: { index?: string }) {
   );
 }
 
-function Kpi({ label, value, tone }: { label: string; value: string | number; tone?: "up" | "down" | "flat" }) {
+function Kpi({ label, value, tone }: { label: React.ReactNode; value: string | number; tone?: "up" | "down" | "flat" }) {
   const color = tone === "up" ? "text-success" : tone === "down" ? "text-danger" : "text-text-primary";
   return (
     <div className="rounded-lg bg-surface-alt px-3 py-2">
