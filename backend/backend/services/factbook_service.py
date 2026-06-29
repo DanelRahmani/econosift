@@ -244,11 +244,23 @@ def get_country_profile(iso2: str) -> dict | None:
     iso3 = (entry.get("cca3") or entry.get("ISO3") or "").upper()
 
     sections = _extract_sections(entry)
+    borders = entry.get("borders", []) if isinstance(entry.get("borders"), list) else []
+    # Convert border cca3 codes to cca2 for frontend matching
+    border_iso2s = []
+    for b in borders:
+        border_entry = data["by_iso3"].get(b)
+        if border_entry:
+            border_iso2s.append(border_entry.get("cca2", b))
+        else:
+            border_iso2s.append(b)  # keep as-is if not found
+    region = entry.get("region", "")
 
     return {
         "iso2": iso2,
         "iso3": iso3,
         "name": str(name),
         "flag": str(flag),
+        "region": str(region),
+        "borders": border_iso2s,
         "sections": sections,
     }

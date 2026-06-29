@@ -46,6 +46,17 @@ export default function CountryDetailPage() {
       .slice(0, 30);
   }, [countries, search]);
 
+  // Build neighbor pills: borders first, then same-region countries
+  const neighborPills = useMemo(() => {
+    if (!countries.length || !profile) return [];
+    const borderSet = new Set(profile.borders || []);
+    const sameRegion = countries.filter(
+      (c) => c.region === profile.region && c.iso2 !== profile.iso2 && !borderSet.has(c.iso2)
+    );
+    const borderCountries = countries.filter((c) => borderSet.has(c.iso2));
+    return [...borderCountries, ...sameRegion.slice(0, 12 - borderCountries.length)];
+  }, [countries, profile]);
+
   // Close dropdown on click outside
   useEffect(() => {
     if (!dropdownOpen) return;
@@ -158,6 +169,28 @@ export default function CountryDetailPage() {
           </p>
         </div>
       </div>
+
+      {/* Neighbor Pills — Atlas-style */}
+      {neighborPills.length > 0 && (
+        <div className="flex gap-2 flex-wrap items-center">
+          <span className="text-xs font-medium text-text-muted mr-1 shrink-0">
+            {profile.borders?.length ? "Borders & Neighbors" : "Same Region"}:
+          </span>
+          {neighborPills.map((c) => (
+            <button
+              key={c.iso2}
+              onClick={() => navigateTo(c.iso2)}
+              className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                profile.borders?.includes(c.iso2)
+                  ? "bg-surface-alt border-accent/40 text-accent hover:bg-accent/10"
+                  : "bg-surface-alt border-border text-text-secondary hover:text-text-primary hover:border-accent/40"
+              }`}
+            >
+              {c.flag} {c.name}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Sections — 2-column on desktop */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

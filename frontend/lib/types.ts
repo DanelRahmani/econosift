@@ -1240,6 +1240,8 @@ export interface FactbookProfile {
   iso3: string;
   name: string;
   flag: string;
+  region: string;
+  borders: string[];
   sections: FactbookSection[];
 }
 export interface FactbookCountry {
