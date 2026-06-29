@@ -67,10 +67,10 @@
 
 | Phase | Date | Description |
 |-------|------|-------------|
-| Phase 37 | 2026-06-30 | Portfolio Transaction Log: buy/sell tracking with cost basis, realized P&L (FIFO lot matching), localStorage + optional SQLite sync. New Transactions tab on /portfolio. |
-| Phase 38 | 2026-06-30 | Learning Layers: beginner/expert mode toggle, 60+ metric tooltips with explanations, page walkthrough banners on Dashboard/Markets/Portfolio. |
-| Phase 39 | 2026-06-30 | Cross-Asset & Factor Analytics: 3 new Research Hub tabs — Cross-Asset Correlation (stocks/bonds/commodities/FX matrix), FX-Macro Link (6 commodity pairs with lead/lag), Multi-Country Portfolio (FX-adjusted returns, currency exposure). |
-| Phase 40 | 2026-06-30 | Navigation Reshuffle: grouped More dropdown with 5 section headers (Discover/Analyze/Markets & Data/Global/Reference). Renamed "M&A" → "Mergers & Acquisitions", "Rates & Policy" → "Yield". Primary bar unchanged per user direction. IDEA_LIST: all 3 P3 items complete. |
+| Phase 37 | 2026-06-30 | Portfolio Transaction Log: buy/sell tracking with cost basis, realized P&L (FIFO lot matching), localStorage + optional SQLite sync. New Transactions tab on /portfolio. | `b661e68` |
+| Phase 38 | 2026-06-30 | Learning Layers: beginner/expert mode toggle, 60+ metric tooltips with explanations, page walkthrough banners on Dashboard/Markets/Portfolio. | `fdbae7c` |
+| Phase 39 | 2026-06-30 | Cross-Asset & Factor Analytics: 3 new Research Hub tabs — Cross-Asset Correlation (stocks/bonds/commodities/FX matrix), FX-Macro Link (6 commodity pairs with lead/lag), Multi-Country Portfolio (FX-adjusted returns, currency exposure). | `ace186b` |
+| Phase 40 | 2026-06-30 | Navigation Reshuffle: grouped More dropdown with 5 section headers (Discover/Analyze/Markets & Data/Global/Reference). Renamed "M&A" → "Mergers & Acquisitions", "Rates & Policy" → "Yield". Primary bar unchanged per user direction. IDEA_LIST: all 3 P3 items complete. | `6e4a752` |
 
 ---
 
