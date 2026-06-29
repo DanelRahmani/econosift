@@ -25,7 +25,7 @@ Axiom Finance is a self-hosted financial analytics platform built on FastAPI + N
 - **Stability** (`/stability`): Currency Crisis Early Warning System (KLR 1998), Banking Stability (NPL, capital adequacy, Z-scores, BIS credit gaps)
 - **Cross-Border** (`/crossborder`): BIS locational banking statistics, international debt securities, global financial interconnectedness
 - **Country Profiles** (`/country/{iso2}`): CIA World Factbook data per country — geography, demographics, economy
-- **AI Summaries** (on-request): AI-powered company analysis (per ticker on Markets), macro summary (per country selection on Macro), daily market briefing (Dashboard). Uses Google Gemini free-tier API with model selector, SQLite caching, and clickable stock/country selectors.
+- **AI Summaries** (on-request): AI-powered company analysis with clickable ticker pills (select any combination on Markets), macro summary with searchable 20-country pill selector on Macro Overview, and daily market briefing on Dashboard. Uses Google Gemini free-tier API (2048 max output tokens) with model selector, SQLite caching, and source attribution for all summaries.
 - **Admin** (`/admin`): Backend health dashboard, cache stats, API keys management (FRED/Finnhub/Gemini validation)
 
 No paid APIs required. Optional free FRED API key & FINNHUB API key for richer US data, and free Gemini API key for AI summaries.
