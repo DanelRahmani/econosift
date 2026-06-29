@@ -1,8 +1,13 @@
 "use client";
 
-import { useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Country } from "@/lib/types";
-import { api } from "@/lib/api";
+
+interface WbResult {
+  iso2: string;
+  iso3: string;
+  name: string;
+}
 
 export function CountrySelector({
   countries, selected, onChange, max = 8,
@@ -13,27 +18,56 @@ export function CountrySelector({
   max?: number;
 }) {
   const [q, setQ] = useState("");
-  const [searchResults, setSearchResults] = useState<{ iso2: string; name: string; region: string }[]>([]);
-  const [searching, setSearching] = useState(false);
+  const [results, setResults] = useState<WbResult[]>([]);
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const boxRef = useRef<HTMLDivElement>(null);
 
-  // Merge backend search results as pseudo-Country objects (shown in "Search Results" group)
-  const allCountries: Country[] = useMemo(() => {
-    const extras: Country[] = searchResults
-      .filter((r) => !countries.some((c) => c.iso2 === r.iso2))
-      .map((r) => ({ iso2: r.iso2, name: r.name, region: "Search Results" }));
-    return [...countries, ...extras];
-  }, [countries, searchResults]);
+  // Debounced typeahead against World Bank country universe
+  useEffect(() => {
+    if (!q.trim() || q.trim().length < 2) {
+      setResults([]);
+      setOpen(false);
+      return;
+    }
+    const t = setTimeout(async () => {
+      setLoading(true);
+      try {
+        const res = await fetch(`/api/macro/search-countries?q=${encodeURIComponent(q.trim())}`);
+        const data = await res.json();
+        const filtered = (data.countries || []).filter(
+          (r: WbResult) => !selected.includes(r.iso2) && !countries.some((c) => c.iso2 === r.iso2)
+        );
+        setResults(filtered);
+        if (filtered.length > 0) setOpen(true);
+      } catch {
+        setResults([]);
+      } finally {
+        setLoading(false);
+      }
+    }, 300);
+    return () => clearTimeout(t);
+  }, [q]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const grouped = useMemo(() => {
-    const filtered = allCountries.filter(
-      (c) => c.name.toLowerCase().includes(q.toLowerCase()) ||
-             c.iso2.toLowerCase().includes(q.toLowerCase()));
-    const byRegion: Record<string, Country[]> = {};
-    filtered.forEach((c) => {
-      (byRegion[c.region] ||= []).push(c);
-    });
-    return byRegion;
-  }, [allCountries, q]);
+  // Close dropdown on outside click
+  useEffect(() => {
+    function onClick(e: MouseEvent) {
+      if (boxRef.current && !boxRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, []);
+
+  function pick(iso2: string) {
+    if (!selected.includes(iso2) && selected.length < max) {
+      onChange([...selected, iso2]);
+    }
+    setQ("");
+    setResults([]);
+    setOpen(false);
+  }
 
   function toggle(iso2: string) {
     if (selected.includes(iso2)) {
@@ -43,62 +77,53 @@ export function CountrySelector({
     }
   }
 
-  async function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key !== "Enter") return;
-    const val = q.trim();
-    if (!val) return;
-
-    // If matches an existing country in the local list, toggle it
-    const match = countries.find(
-      (c) => c.name.toLowerCase() === val.toLowerCase() || c.iso2.toLowerCase() === val.toLowerCase()
-    );
-    if (match) {
-      if (!selected.includes(match.iso2) && selected.length >= max) return;
-      toggle(match.iso2);
-      setQ("");
-      return;
-    }
-
-    // Query the World Bank country database
-    if (selected.length >= max) return;
-    setSearching(true);
-    try {
-      const res = await fetch(`/api/macro/search-countries?q=${encodeURIComponent(val)}`);
-      const data = await res.json();
-      const found = data.countries?.[0];
-      if (found && found.iso2) {
-        // Add to our search results so it appears as a pill
-        setSearchResults((prev) => {
-          if (prev.some((r) => r.iso2 === found.iso2)) return prev;
-          return [...prev, { iso2: found.iso2, name: found.name, region: "Search Results" }];
-        });
-        // Add to selection
-        if (!selected.includes(found.iso2)) {
-          onChange([...selected, found.iso2]);
-        }
-        setQ("");
-      }
-    } catch {
-      // silent fail
-    } finally {
-      setSearching(false);
-    }
-  }
+  const grouped = useMemo(() => {
+    const qLower = q.toLowerCase().trim();
+    const filtered = qLower
+      ? countries.filter(
+          (c) => c.name.toLowerCase().includes(qLower) || c.iso2.toLowerCase().includes(qLower)
+        )
+      : countries;
+    const byRegion: Record<string, Country[]> = {};
+    filtered.forEach((c) => {
+      (byRegion[c.region] ||= []).push(c);
+    });
+    return byRegion;
+  }, [countries, q]);
 
   return (
-    <div>
+    <div ref={boxRef} className="relative">
       <div className="flex items-center justify-between mb-2">
         <span className="text-sm font-medium text-text-secondary">Countries</span>
         <span className="text-xs text-text-muted">{selected.length}/{max}</span>
       </div>
       <input
         className="input w-full mb-3"
-        placeholder={searching ? "Searching World Bank data…" : "Search for countries…"}
+        placeholder="Search countries…"
         value={q}
         onChange={(e) => setQ(e.target.value)}
-        onKeyDown={handleKeyDown}
-        disabled={searching}
       />
+
+      {/* Typeahead dropdown */}
+      {open && results.length > 0 && (
+        <div className="absolute z-20 left-0 right-0 top-[68px] bg-surface border border-border rounded-lg shadow-lg max-h-48 overflow-auto">
+          {loading && (
+            <div className="px-3 py-2 text-xs text-text-muted">Searching…</div>
+          )}
+          {results.map((r) => (
+            <button
+              key={r.iso3}
+              onClick={() => pick(r.iso2)}
+              className="w-full text-left px-3 py-2 text-sm text-text-primary hover:bg-surface-alt transition-colors border-b border-border/50 last:border-b-0"
+            >
+              <span className="font-medium">{r.name}</span>
+              <span className="text-text-muted ml-2 text-xs">{r.iso2}{r.iso2 !== r.iso3 ? ` / ${r.iso3}` : ""}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Predefined pills grouped by region */}
       <div className="max-h-64 overflow-auto space-y-3 pr-1">
         {Object.entries(grouped).map(([region, list]) => (
           <div key={region}>
