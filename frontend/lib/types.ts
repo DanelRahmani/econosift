@@ -1239,8 +1239,11 @@ export interface FactbookProfile {
   iso2: string;
   iso3: string;
   name: string;
+  localName: string;
+  frenchName: string;
   flag: string;
   region: string;
+  continent: string;
   borders: string[];
   sections: FactbookSection[];
 }

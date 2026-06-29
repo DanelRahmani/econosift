@@ -176,16 +176,24 @@ def _extract_sections(entry: dict) -> list[dict]:
         codes.append({"label": "Alternative Spellings", "value": ", ".join(str(a) for a in alt_spell[:10])})
     sections.append({"title": "International Codes", "fields": codes})
 
-    # ── Translations (5 major languages only) ──
+    # ── Translations (local + 5 major languages) ──
     trans = entry.get("translations", {})
     if isinstance(trans, dict):
         trans_fields = []
-        # English, French, Russian, Spanish, Mandarin Chinese
-        # Note: 'eng' doesn't exist in translations (dataset is English-native)
-        # so we use the common name for English
         common_name = name_data.get("common", entry.get("name", ""))
+        # Local language first (primary language of the country)
+        local_lang_code = list(languages.keys())[0] if languages else None
+        local_common = ""
+        if local_lang_code and local_lang_code in trans:
+            local_common = trans[local_lang_code].get("common", "")
+            local_official = trans[local_lang_code].get("official", "")
+            label = f"{local_lang_code.upper()} (Local) — {local_common}" if local_common else f"{local_lang_code.upper()} (Local)"
+            trans_fields.append({"label": label, "value": local_official or local_common})
+        # English
         trans_fields.append({"label": "ENG — " + str(common_name), "value": str(common_name)})
         for lang in ["fra", "rus", "spa", "zho"]:
+            if lang == local_lang_code:
+                continue  # already added above
             t = trans.get(lang, {})
             if isinstance(t, dict):
                 official = t.get("official", "")
@@ -290,12 +298,32 @@ def get_country_profile(iso2: str) -> dict | None:
             border_iso2s.append(b)  # keep as-is if not found
     region = entry.get("region", "")
 
+    # Local name (primary language common name)
+    local_name = ""
+    languages = entry.get("languages", {})
+    if isinstance(languages, dict) and languages:
+        local_lang_code = list(languages.keys())[0]
+        translations = entry.get("translations", {})
+        if isinstance(translations, dict) and local_lang_code in translations:
+            local_name = translations[local_lang_code].get("common", "")
+
+    # French name
+    french_name = ""
+    translations = entry.get("translations", {})
+    if isinstance(translations, dict):
+        fra = translations.get("fra", {})
+        if isinstance(fra, dict):
+            french_name = fra.get("common", "")
+
     return {
         "iso2": iso2,
         "iso3": iso3,
         "name": str(name),
+        "localName": str(local_name),
+        "frenchName": str(french_name),
         "flag": str(flag),
         "region": str(region),
+        "continent": str(region),  # region is the continent in REST Countries
         "borders": border_iso2s,
         "sections": sections,
     }

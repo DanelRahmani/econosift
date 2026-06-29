@@ -133,7 +133,18 @@ export default function CountryDetailPage() {
           className="w-20 h-auto rounded shadow-sm" />
         <div>
           <h1 className="text-3xl font-bold text-text-primary">{profile.name}</h1>
-          <p className="text-sm text-text-muted">{profile.iso2}{profile.iso3 ? ' · ' + profile.iso3 : ''}</p>
+          <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1">
+            {profile.localName && (
+              <span className="text-sm text-text-secondary">{profile.localName} <span className="text-[11px] text-text-muted">(local)</span></span>
+            )}
+            {profile.frenchName && (
+              <span className="text-sm text-text-secondary">{profile.frenchName} <span className="text-[11px] text-text-muted">(French)</span></span>
+            )}
+          </div>
+          {profile.continent && (
+            <p className="text-xs text-text-muted mt-1.5">{profile.continent}</p>
+          )}
+          <p className="text-xs text-text-muted mt-0.5">{profile.iso2}{profile.iso3 ? ' · ' + profile.iso3 : ''}</p>
         </div>
       </div>
 
