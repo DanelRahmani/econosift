@@ -263,8 +263,8 @@ data for gamma squeeze detection.
 | 1 | Trade Flows & Globalization | New Page | P0 | No — 3 new WB codes | Medium | ✅ DONE Phase 26 |
 | 2 | Corporate Health Monitor | New Page | P0 | No — yfinance financials | Medium | ✅ DONE Phase 27 |
 | 3 | Dividend Analysis | New Page | P1 | No — yfinance dividends | Small | ✅ DONE Phase 27 |
-| 4 | Banking & Financial Stability | New Page | P1 | No — WB codes + BIS wiring | Large | |
-| 5 | Cross-Border Finance | New Page | P2 | BIS banking stats ZIP | Large | |
+|| 4 | Banking & Financial Stability | New Page | P1 | No — WB codes + BIS wiring | Large | ✅ DONE Phase 31 |
+|| 5 | Cross-Border Finance | New Page | P2 | BIS LBS ZIP (fallback: WB trade) | Large | ✅ DONE Phase 31 |
 | 6 | Fiscal Sustainability | Macro Tab | P0 | No — 4 new WB codes | Small | ✅ DONE Phase 25 |
 | 7 | Labor Market Deep Dive | Macro Tab | P1 | 5 WB codes + 2 FRED | Medium | |
 | 8 | Energy Transition & Climate | Macro Tab | P1 | 6 new WB codes | Medium | |
@@ -273,7 +273,7 @@ data for gamma squeeze detection.
 | 11 | Insider Trading Aggregator | Tool | P0 | No — aggregate existing data | Medium | ✅ DONE Phase 27 |
 | 12 | Currency Crisis Early Warning | Tool | P1 | 1 new WB code | Medium | |
 | 13 | Sector DuPont Analysis | Tool | P1 | No — existing screener data | Small | ✅ DONE Phase 27 |
-| 14 | Sovereign Default Model | Tool | P2 | Academic CSV + model logic | Large | |
+|| 14 | Sovereign Default Model | Tool | P2 | Bundled RR data + scipy logit | Large | ✅ DONE Phase 31 |
 | 15 | M&A / Corporate Actions | Tool | P2 | Finnhub endpoint check | Small | ✅ DONE Phase 30 |
 | 16 | BIS Property → Housing Tab | Enhance | P0 | No — BIS data already downloaded | Small | ✅ DONE Phase 25 |
 | 17 | BIS Credit Gaps → Financial Tab | Enhance | P0 | No — BIS data already downloaded | Small | ✅ DONE Phase 25 |
@@ -283,4 +283,4 @@ data for gamma squeeze detection.
 | 21 | Demographics → Atlas Overlay | Enhance | P2 | 3 WB codes + UN projections | Medium | ✅ DONE Phase 30 |
 | 22 | Short Interest → Markets Panel | Enhance | P2 | Finnhub endpoint | Small | ✅ DONE Phase 30 |
 
-**Completed:** 13/22 · **Remaining:** 9 (2 P0 · 7 P1 · 0 P2)
+**Completed:** 16/22 · **Remaining:** 6 (1 P0 · 5 P1 · 0 P2)

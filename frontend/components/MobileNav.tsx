@@ -21,6 +21,8 @@ const drawerTabs = [
   { href: "/dividends", label: "Dividends" },
   { href: "/insider", label: "Insider Trading" },
   { href: "/mergers", label: "M&A" },
+  { href: "/country", label: "Countries" },
+  { href: "/crossborder", label: "Cross-Border" },
   { href: "/risk", label: "Risk" },
   { href: "/options", label: "Options" },
   { href: "/yield", label: "Rates & Policy" },

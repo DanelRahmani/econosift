@@ -38,6 +38,8 @@ import type {
   GlobalHousingData, CreditGapsData, FiscalData, TradeData, LaborData, EnergyData,
   CurrencyCrisisData, BankingStabilityData, InequalityData,
   BusinessData, ShortInterestData, MAData,
+  FactbookCountry, FactbookProfile, CrossborderData,
+  SovereignDefaultData,
 } from "./types";
 
 async function get<T>(path: string): Promise<T> {
@@ -371,6 +373,15 @@ export const api = {
   mergers: () =>
     get<MAData>(`/mergers`),
 
+  factbookCountries: () =>
+    get<FactbookCountry[]>(`/countries`),
+
+  factbookCountry: (iso2: string) =>
+    get<FactbookProfile>(`/countries/${encodeURIComponent(iso2)}`),
+
+  crossborderClaims: () =>
+    get<CrossborderData>(`/crossborder/claims`),
+
   snowflake: (ticker: string) =>
     get<SnowflakeResponse>(`/snowflake?ticker=${encodeURIComponent(ticker)}`),
 
@@ -488,6 +499,7 @@ export const api = {
   yieldCurves: () => get<YieldCurvesData>("/yield/curves"),
   policyTracker: () => get<PolicyTrackerData>("/policy/tracker"),
   sovereignRisk: () => get<SovereignRiskData>("/sovereign/risk"),
+  sovereignDefaultProb: () => get<SovereignDefaultData>("/sovereign/default-prob"),
   macroRegime: () => get<MacroRegimeData>("/macro/regime"),
   macroTaylorRule: () => get<any>("/macro/taylor-rule"),
   macroSentiment: () => get<any>("/macro/sentiment"),

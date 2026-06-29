@@ -14,7 +14,7 @@ import {
   BarChart, Bar, ReferenceLine,
 } from "recharts";
 
-const TABS = ["US Curve", "Foreign Spreads", "Global Yields", "Real & Breakeven", "US Rates Detail", "Policy Tracker", "Sovereign Risk", "Central Banks"] as const;
+const TABS = ["US Curve", "Foreign Spreads", "Global Yields", "Real & Breakeven", "US Rates Detail", "Policy Tracker", "Sovereign Risk", "Central Banks", "Default Risk"] as const;
 
 function KpiCard({ label, value, badge }: { label: string; value: string; badge?: string }) {
   return (
@@ -395,6 +395,7 @@ export default function YieldPage() {
       {tab === "Policy Tracker" && <PolicyTrackerTab />}
       {tab === "Sovereign Risk" && <SovereignRiskTab />}
       {tab === "Central Banks" && <CentralBanksTab />}
+      {tab === "Default Risk" && <DefaultRiskTab />}
     </div>
   );
 }
@@ -512,6 +513,96 @@ function SovereignRiskTab() {
       <UiCard className="p-4">
         <h2 className="text-sm font-medium mb-4 text-muted">All Countries — Sovereign Risk</h2>
         <SovereignSpreadTable countries={countries} />
+      </UiCard>
+    </div>
+  );
+}
+
+/* ─── Default Risk tab (Phase 31) ──────────────────────────────────── */
+function DefaultRiskTab() {
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["sovereignDefault"],
+    queryFn: api.sovereignDefaultProb,
+  });
+
+  if (isLoading) return <div className="p-8 text-muted">Computing default probabilities…</div>;
+  if (error || !data) return <div className="p-8 text-red-400">Failed to load default model.</div>;
+  if (data.error) return <div className="p-8 text-amber-400">{data.error}</div>;
+
+  const { model, countries } = data;
+  const redCount = countries.filter((c) => c.signal === "red").length;
+  const yellowCount = countries.filter((c) => c.signal === "yellow").length;
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <KpiCard label="Countries" value={String(countries.length)} />
+        <KpiCard label="High Risk" value={String(redCount)} badge=">20%" />
+        <KpiCard label="Medium Risk" value={String(yellowCount)} badge="5-20%" />
+        <KpiCard label="Pseudo R²" value={model?.pseudoR2?.toFixed(3) ?? "—"} />
+      </div>
+
+      {model && (
+        <UiCard className="p-4">
+          <h2 className="text-sm font-medium mb-3 text-muted">Model Summary · {model.nObs} observations</h2>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="text-text-muted border-b border-border/50">
+                  <th className="py-1.5 text-left">Predictor</th>
+                  <th className="py-1.5 text-right">Coef</th>
+                  <th className="py-1.5 text-right">Std Err</th>
+                  <th className="py-1.5 text-right">t</th>
+                  <th className="py-1.5 text-right">p</th>
+                </tr>
+              </thead>
+              <tbody>
+                {model.coefficients.map((c) => (
+                  <tr key={c.name} className="border-b border-border/30">
+                    <td className="py-1.5 font-mono">{c.name}{c.stars ? <span className="text-accent ml-1">{c.stars}</span> : null}</td>
+                    <td className="py-1.5 text-right font-mono">{c.coef?.toFixed(4)}</td>
+                    <td className="py-1.5 text-right font-mono">{c.stdErr?.toFixed(4) ?? "—"}</td>
+                    <td className="py-1.5 text-right font-mono">{c.tStat?.toFixed(2) ?? "—"}</td>
+                    <td className="py-1.5 text-right font-mono">{c.pValue?.toFixed(4) ?? "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </UiCard>
+      )}
+
+      <UiCard className="p-4">
+        <h2 className="text-sm font-medium mb-3 text-muted">Default Probabilities · sorted by 5Y risk</h2>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-text-secondary border-b border-border text-xs">
+                <th className="py-2 text-left">Country</th>
+                <th className="py-2 text-right">1Y Prob</th>
+                <th className="py-2 text-right">5Y Prob</th>
+                <th className="py-2 text-center">Signal</th>
+              </tr>
+            </thead>
+            <tbody>
+              {countries.map((c) => (
+                <tr key={c.iso3} className="border-b border-border/30 hover:bg-surface-alt/50">
+                  <td className="py-1.5">
+                    <span className="font-mono text-xs text-text-muted mr-2">{c.iso3}</span>
+                    {c.name}
+                  </td>
+                  <td className="py-1.5 text-right font-mono">{(c.prob1y * 100).toFixed(1)}%</td>
+                  <td className="py-1.5 text-right font-mono">{(c.prob5y * 100).toFixed(1)}%</td>
+                  <td className="py-1.5 text-center">
+                    <span className={`inline-block w-3 h-3 rounded-full ${
+                      c.signal === "red" ? "bg-red-500" : c.signal === "yellow" ? "bg-amber-500" : "bg-green-500"
+                    }`} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </UiCard>
     </div>
   );

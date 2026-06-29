@@ -1226,6 +1226,72 @@ export interface ShortInterestData {
   sectorSummary: ShortInterestSectorSummary[];
 }
 
+// Factbook Country Profiles (Phase 31)
+export interface FactbookField {
+  label: string;
+  value: string;
+}
+export interface FactbookSection {
+  title: string;
+  fields: FactbookField[];
+}
+export interface FactbookProfile {
+  iso2: string;
+  iso3: string;
+  name: string;
+  flag: string;
+  sections: FactbookSection[];
+}
+export interface FactbookCountry {
+  iso2: string;
+  iso3: string;
+  name: string;
+  flag: string;
+  region: string;
+}
+
+// Cross-Border Finance (Phase 31)
+export interface CrossborderClaim {
+  creditor: string;
+  debtor: string;
+  value_usd: number;
+}
+export interface CrossborderData {
+  claims: CrossborderClaim[];
+  source: string;
+  asOf: string;
+}
+
+// Sovereign Default Probability (Phase 31)
+export interface SovereignDefaultCoefficient {
+  name: string;
+  coef: number;
+  stdErr: number | null;
+  tStat: number | null;
+  pValue: number | null;
+  stars: string;
+}
+export interface SovereignDefaultModel {
+  pseudoR2: number | null;
+  nObs: number;
+  converged: boolean;
+  coefficients: SovereignDefaultCoefficient[];
+}
+export interface SovereignDefaultCountry {
+  iso3: string;
+  name: string;
+  prob1y: number;
+  prob5y: number;
+  signal: "green" | "yellow" | "red";
+}
+export interface SovereignDefaultData {
+  model: SovereignDefaultModel | null;
+  countries: SovereignDefaultCountry[];
+  asOf: string;
+  source: string;
+  error?: string;
+}
+
 // M&A Tracker (Phase 30)
 export interface MADeal {
   date: string;

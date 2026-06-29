@@ -45,7 +45,7 @@ def _save_status(status: dict) -> None:
 def get_bulk_status() -> dict:
     s = _load_status()
     result = {}
-    for key in ("worldbank", "famafrench", "imf_weo", "bis"):
+    for key in ("worldbank", "famafrench", "imf_weo", "bis", "factbook", "reinhart_rogoff"):
         entry = s.get(key, {})
         result[key] = {
             "last_ok": entry.get("last_ok"),
@@ -335,6 +335,13 @@ BIS_DATASETS = {
         "iso2_filter": None,
         "label": "BIS Exchange Rates",
     },
+    "bis_crossborder": {
+        "zip_key": "crossborder",
+        "measure_filter": None,
+        "freq": "Q",
+        "iso2_filter": None,
+        "label": "BIS Cross-Border Claims (LBS)",
+    },
 }
 
 
@@ -343,9 +350,10 @@ def _download_bis_dataset(ds: dict) -> dict:
     import io as _io, zipfile as _zipfile
 
     url_map = {
-        "cpi":    "https://data.bis.org/static/bulk/WS_LONG_CPI_csv_flat.zip",
-        "policy": "https://data.bis.org/static/bulk/WS_CBPOL_csv_flat.zip",
-        "fx":     "https://data.bis.org/static/bulk/WS_XRU_csv_flat.zip",
+        "cpi":          "https://data.bis.org/static/bulk/WS_LONG_CPI_csv_flat.zip",
+        "policy":       "https://data.bis.org/static/bulk/WS_CBPOL_csv_flat.zip",
+        "fx":           "https://data.bis.org/static/bulk/WS_XRU_csv_flat.zip",
+        "crossborder":  "https://data.bis.org/static/bulk/WS_LBS_csv_flat.zip",
     }
     url = url_map.get(ds["zip_key"])
     if not url:
@@ -414,6 +422,53 @@ def _download_bis_dataset(ds: dict) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# OpenFactbook — CIA World Factbook country profiles
+# ---------------------------------------------------------------------------
+
+FACTBOOK_URL = "https://raw.githubusercontent.com/mledoze/countries/master/dist/countries.json"
+FACTBOOK_PATH = DATA_DIR / "factbook.json"
+
+
+def _download_factbook() -> dict:
+    """Download countries JSON (REST Countries format), validate, and store locally."""
+    try:
+        resp = httpx.get(FACTBOOK_URL, timeout=120)
+        resp.raise_for_status()
+        data = resp.json()
+        count = len(data) if isinstance(data, list) else 0
+        if count == 0:
+            return {"rows": 0, "error": "empty or invalid JSON structure"}
+        FACTBOOK_PATH.write_text(resp.text, encoding="utf-8")
+        return {"rows": count, "error": None}
+    except Exception as exc:
+        logger.warning("Factbook download failed: %s", exc)
+        return {"rows": 0, "error": str(exc)}
+
+
+# ---------------------------------------------------------------------------
+# Reinhart & Rogoff — Historical Sovereign Default Dataset
+# ---------------------------------------------------------------------------
+
+RR_URL = "https://raw.githubusercontent.com/danielmarcelin/reinhart-rogoff-data/main/RR_Defaults.csv"
+RR_PATH = DATA_DIR / "rr_defaults.parquet"
+
+
+def _download_reinhart_rogoff() -> dict:
+    """Download Reinhart & Rogoff sovereign default CSV and store as parquet."""
+    try:
+        resp = httpx.get(RR_URL, timeout=60)
+        resp.raise_for_status()
+        df = pd.read_csv(io.StringIO(resp.text))
+        if df.empty:
+            return {"rows": 0, "error": "empty CSV"}
+        df.to_parquet(RR_PATH, index=False)
+        return {"rows": len(df), "error": None}
+    except Exception as exc:
+        logger.warning("Reinhart-Rogoff download failed: %s", exc)
+        return {"rows": 0, "error": str(exc)}
+
+
+# ---------------------------------------------------------------------------
 # Master refresh
 # ---------------------------------------------------------------------------
 
@@ -455,19 +510,54 @@ def refresh_all_bulk_data() -> dict:
         except Exception as exc:
             status["imf_weo"] = {**status.get("imf_weo", {}), "last_attempt": now, "error": str(exc)}
 
-        # BIS datasets
+        # BIS datasets (includes crossborder)
+        total_bis_rows = 0
         for ds_key, ds_config in BIS_DATASETS.items():
             try:
                 bis_result = _download_bis_dataset(ds_config)
-                status["bis"] = {
-                    "last_attempt": now,
-                    "last_ok": now if not bis_result["error"] else status.get("bis", {}).get("last_ok"),
-                    "error": bis_result["error"],
-                    "rows": (status.get("bis", {}).get("rows", 0) or 0) + bis_result["rows"],
-                    "size_kb": _dir_size(DATA_DIR, "cpi") or _dir_size(DATA_DIR, "policy") or _dir_size(DATA_DIR, "fx"),
-                }
+                total_bis_rows += bis_result["rows"]
+                if bis_result["error"]:
+                    status["bis"] = {
+                        **status.get("bis", {}),
+                        "last_attempt": now,
+                        "error": (status.get("bis", {}).get("error", "") + "; " + bis_result["error"]).strip("; "),
+                        "rows": total_bis_rows,
+                        "size_kb": _dir_size(DATA_DIR, "cpi") or _dir_size(DATA_DIR, "policy") or _dir_size(DATA_DIR, "fx") or _dir_size(DATA_DIR, "crossborder"),
+                    }
+                else:
+                    status["bis"] = {
+                        "last_attempt": now,
+                        "last_ok": now,
+                        "error": None,
+                        "rows": total_bis_rows,
+                        "size_kb": _dir_size(DATA_DIR, "cpi") or _dir_size(DATA_DIR, "policy") or _dir_size(DATA_DIR, "fx") or _dir_size(DATA_DIR, "crossborder"),
+                    }
             except Exception as exc:
                 status["bis"] = {**status.get("bis", {}), "last_attempt": now, "error": str(exc)}
+
+        # Factbook
+        try:
+            fb = _download_factbook()
+            status["factbook"] = {
+                "last_attempt": now,
+                "last_ok": now if not fb["error"] else status.get("factbook", {}).get("last_ok"),
+                "error": fb["error"], "rows": fb["rows"],
+                "size_kb": _file_size(FACTBOOK_PATH),
+            }
+        except Exception as exc:
+            status["factbook"] = {**status.get("factbook", {}), "last_attempt": now, "error": str(exc)}
+
+        # Reinhart & Rogoff
+        try:
+            rr = _download_reinhart_rogoff()
+            status["reinhart_rogoff"] = {
+                "last_attempt": now,
+                "last_ok": now if not rr["error"] else status.get("reinhart_rogoff", {}).get("last_ok"),
+                "error": rr["error"], "rows": rr["rows"],
+                "size_kb": _file_size(RR_PATH),
+            }
+        except Exception as exc:
+            status["reinhart_rogoff"] = {**status.get("reinhart_rogoff", {}), "last_attempt": now, "error": str(exc)}
 
     _save_status(status)
     logger.info("Bulk data refresh: %s", {k: f"{v.get('rows',0)} rows" for k, v in status.items()})

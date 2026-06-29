@@ -31,6 +31,7 @@ BIS_ZIPS = {
     "fx_effective": "https://data.bis.org/static/bulk/WS_EER_csv_flat.zip",
     "credit_gap":   "https://data.bis.org/static/bulk/WS_CREDIT_GAP_csv_flat.zip",
     "property":     "https://data.bis.org/static/bulk/WS_SPP_csv_flat.zip",
+    "crossborder":  "https://data.bis.org/static/bulk/WS_LBS_csv_flat.zip",
 }
 
 # Currencies where standard quote is "USD per unit" → need to invert BIS value
@@ -335,3 +336,82 @@ async def get_credit_gaps_bulk(iso2_tuple: tuple[str, ...]) -> dict[str, list[di
     except Exception as exc:
         logger.warning("BIS credit gap bulk query failed: %s", exc)
         return result
+
+
+# ---------------------------------------------------------------------------
+# Cross-border banking claims (Locational Banking Statistics)
+# ---------------------------------------------------------------------------
+
+@async_cached("bis_crossborder")
+async def get_crossborder_claims() -> list[dict]:
+    """Get top cross-border banking claims from BIS LBS data.
+
+    Parses creditor (REF_AREA) → debtor (COUNTERPART_AREA) claims in USD.
+    Filters to latest quarter, aggregates by country pair, returns top-20.
+
+    Returns list of {creditor, debtor, value_usd} dicts sorted by value descending.
+    """
+    try:
+        df = _fetch_bis_zip("crossborder")
+        if df is None or df.empty:
+            return []
+
+        # Identify columns: creditor = REF_AREA, debtor = COUNTERPART_AREA
+        col_creditor = next((c for c in df.columns if "REF_AREA" in c), None)
+        col_debtor = next((c for c in df.columns if "COUNTERPART_AREA" in c), None)
+        col_time = next((c for c in df.columns if "TIME_PERIOD" in c), None)
+        col_val = next((c for c in df.columns if "OBS_VALUE" in c), None)
+        col_freq = next((c for c in df.columns if "FREQ" in c), None)
+
+        if not (col_creditor and col_debtor and col_time and col_val):
+            logger.warning("BIS crossborder: missing required columns")
+            return []
+
+        df = df.copy()
+
+        # Extract ISO2 codes from "US: United States" format
+        df["creditor"] = df[col_creditor].str.extract(r"^([A-Z]{2}):")
+        df["debtor"] = df[col_debtor].str.extract(r"^([A-Z]{2}):")
+
+        # Filter to quarterly frequency
+        if col_freq:
+            df = df[df[col_freq].str.startswith("Q:", na=False)]
+
+        # Parse value
+        df["value"] = pd.to_numeric(df[col_val], errors="coerce")
+        df = df[df["value"].notna()]
+
+        # Parse time as proper quarterly for latest-quarter filtering
+        parts = df[col_time].str.extract(r"^(\d{4})-Q(\d)$")
+        df["year"] = pd.to_numeric(parts[0], errors="coerce")
+        df["quarter"] = pd.to_numeric(parts[1], errors="coerce")
+        df = df[df["year"].notna() & df["quarter"].notna()]
+        df["year"] = df["year"].astype(int)
+        df["quarter"] = df["quarter"].astype(int)
+
+        if df.empty:
+            return []
+
+        # Get latest quarter
+        max_row = df.loc[df["year"].idxmax()]
+        latest_year = int(max_row["year"])
+        latest_q = int(df[df["year"] == latest_year]["quarter"].max())
+        df = df[(df["year"] == latest_year) & (df["quarter"] == latest_q)]
+
+        # Aggregate by (creditor, debtor) pair
+        grouped = df.groupby(["creditor", "debtor"])["value"].sum().reset_index()
+        grouped = grouped.sort_values("value", ascending=False)
+
+        # Return top-20
+        claims = []
+        for _, row in grouped.head(20).iterrows():
+            claims.append({
+                "creditor": str(row["creditor"]),
+                "debtor": str(row["debtor"]),
+                "value_usd": round(float(row["value"]), 1),
+            })
+
+        return claims
+    except Exception as exc:
+        logger.warning("BIS crossborder query failed: %s", exc)
+        return []

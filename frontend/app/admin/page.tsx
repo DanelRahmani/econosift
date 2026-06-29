@@ -408,13 +408,17 @@ function BulkDataSection() {
     famafrench: "Fama-French",
     imf_weo: "IMF WEO",
     bis: "BIS",
+    factbook: "OpenFactbook",
+    reinhart_rogoff: "Reinhart & Rogoff",
   };
 
   const descriptions: Record<string, string> = {
     worldbank: "GDP growth, inflation, unemployment, debt/GDP, current account, GDP/capita — ~200 countries, 1960–2024",
     famafrench: "3-factor model: Mkt-RF, SMB, HML, RF — monthly, 1926–present",
     imf_weo: "GDP growth, inflation, unemployment, debt/GDP, current account, GDP/capita — ~190 countries with forecasts",
-    bis: "CPI (YoY %), central bank policy rates, exchange rates (standard FX convention) — annual, 1913–present",
+    bis: "CPI, policy rates, exchange rates, credit gaps, property prices, cross-border banking claims — annual/quarterly",
+    factbook: "CIA World Factbook country profiles — ~260 countries with geography, people, government, economy, energy, military sections",
+    reinhart_rogoff: "Historical sovereign default dataset — 70+ countries, 1800–2019, external + domestic default flags",
   };
 
   if (!bulk || !Object.keys(bulk).length) return null;
