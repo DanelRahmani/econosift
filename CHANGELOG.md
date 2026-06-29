@@ -57,6 +57,7 @@
 | Phase 31 | 2026-06-29 | Banking & Financial Stability (/stability): NPL, capital adequacy, Z-scores, BIS credit gaps. Cross-Border Finance (/crossborder): BIS locational banking stats, debt securities. Sovereign Default Probability Model |
 | Phase 32 | 2026-06-29 | Wired 3 macro tabs that were built but missing router endpoints: Labor Market Deep Dive (/macro?tab=labor), Energy Transition & Climate (/macro?tab=energy), Inequality & Development (/macro?tab=inequality). ~15 lines in macro.py — services, frontend, and WB data were already complete |
 | Phase 33 | 2026-06-29 | Currency Crisis Early Warning: upgraded from 5-signal proxy model to 6-signal KLR model. Added real reserves decline (FI.RES.TOTL.CD via WB) and FX overvaluation (BIS effective FX vs 5Y average) signals. Registered stability router in main.py (was missing). Updated frontend to show 6-KPI grid per country with Score: X/6 flags |
+| Phase 34 | 2026-06-29 | Supply Chain Vulnerability Atlas layer: created supply_chain_service.py computing composite score from food_imports + fuel_imports (both already live). Added as 13th Atlas indicator — choropleth map + color scale + rankings auto-render. IMF DOTS (Tier A) and WB partner shares (Tier B) investigated but inaccessible. IDEA_LIST: 22/22 complete 🎉 |
 
 ---
 

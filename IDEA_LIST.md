@@ -190,7 +190,7 @@ Already implemented in Phase 18A. The `/yield` page includes a full "Global Yiel
 
 **Files:** `yield_curve_service.py` (23-country foreign yield data + spread matrix), `yield/page.tsx` (GlobalYieldsTab component), `MultiCountryYieldChart.tsx`, types in `frontend/lib/types.ts`.
 
-### P1 — Supply Chain Vulnerability → Atlas Overlay
+### ✅ P1 — Supply Chain Vulnerability → Atlas Overlay — **DONE (Phase 34)**
 
 Compute import concentration (Herfindahl index of import partners), food import dependency, and
 energy import dependency per country. Add as a new Atlas map layer. Identify countries vulnerable
@@ -352,6 +352,6 @@ The current top-level navigation is a **flat 16-item bar** with no grouping, mix
 | 2 | Energy Transition & Climate | Macro Tab | P1 | 6 new WB codes | Medium | ✅ DONE Phase 32 |
 | 3 | Inequality & Development | Macro Tab | P1 | 5 new WB codes | Medium | ✅ DONE Phase 32 |
 | 4 | Currency Crisis Early Warning | Tool | P1 | 1 new WB code | Medium | ✅ DONE Phase 33 |
-| 5 | Supply Chain → Atlas Overlay | Enhance | P1 | 2 WB codes + bilateral data | Medium | 🟢 Food/fuel import layers live; Herfindahl TBD |
+| 5 | Supply Chain → Atlas Overlay | Enhance | P1 | 2 WB codes + bilateral data | Medium | ✅ DONE Phase 34 |
 
-**Completed:** 21/22 · **Remaining:** 1 (0 P0 · 1 P1 · 0 P2)
+**Completed:** 22/22 · **Remaining:** 0 🎉

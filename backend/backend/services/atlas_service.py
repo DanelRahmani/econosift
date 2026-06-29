@@ -29,6 +29,7 @@ INDICATORS: list[dict] = [
     {"id": "age_dependency", "label": "Age Dependency Ratio (% of working-age)", "unit": "%", "goodDirection": "low"},
     {"id": "urbanization",   "label": "Urban Population (% of total)", "unit": "%", "goodDirection": "neutral"},
     {"id": "life_expectancy","label": "Life Expectancy at Birth (years)", "unit": "years", "goodDirection": "high"},
+    {"id": "supply_chain_vulnerability", "label": "Supply Chain Vulnerability Score", "unit": "%", "goodDirection": "low"},
 ]
 
 _INDICATOR_IDS = {ind["id"] for ind in INDICATORS}
@@ -301,6 +302,37 @@ async def get_timeline(indicator: str, start: int = 2000, end: int = 2024) -> di
 
     meta = next(m for m in INDICATORS if m["id"] == indicator)
     universe = _country_universe()
+
+    # Computed indicators (not direct WB codes)
+    if indicator == "supply_chain_vulnerability":
+        from .supply_chain_service import get_supply_chain_data
+        sc_data = await get_supply_chain_data()
+        # Build timeline format from supply chain data
+        countries_out: list[dict] = []
+        sc_by_iso2 = {c["iso2"]: c for c in sc_data["countries"]}
+        for country in universe:
+            iso2 = country["id"]
+            sc = sc_by_iso2.get(iso2, {})
+            values: dict[str, float | None] = {}
+            for y in range(start, end + 1):
+                # Supply chain data only has latest, use for most recent year
+                values[str(y)] = sc.get("compositeScore") if y == end else None
+            countries_out.append({
+                "iso3": country["iso3"],
+                "id": country["id"],
+                "name": country["name"],
+                "regions": country["regions"],
+                "values": values,
+            })
+        return {
+            "indicator": indicator,
+            "label": meta["label"],
+            "unit": meta["unit"],
+            "goodDirection": meta["goodDirection"],
+            "start": start,
+            "end": end,
+            "countries": countries_out,
+        }
 
     wb_data, imf_data = await asyncio.gather(
         _wb_timeline(indicator, start, end),
