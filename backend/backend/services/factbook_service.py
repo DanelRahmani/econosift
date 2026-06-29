@@ -41,6 +41,43 @@ def _resolve_local_lang(languages: dict, translations: dict) -> str | None:
             return alt
     return None
 
+
+def _get_local_name(entry: dict) -> tuple[str, str, str] | None:
+    """Get the country's local-language name.
+    
+    Tries translations first (with B/T code mapping), then falls back
+    to name.native. Returns (display_code, common_name, official_name) or None.
+    """
+    languages = entry.get("languages", {})
+    if not isinstance(languages, dict) or not languages:
+        return None
+    translations = entry.get("translations", {})
+    name_data = entry.get("name", {}) if isinstance(entry.get("name"), dict) else {}
+    native = name_data.get("native", {}) if isinstance(name_data, dict) else {}
+
+    # Try translations first
+    if isinstance(translations, dict):
+        code = _resolve_local_lang(languages, translations)
+        if code:
+            t = translations[code]
+            common = t.get("common", "") if isinstance(t, dict) else ""
+            official = t.get("official", "") if isinstance(t, dict) else ""
+            if common:
+                return (code.upper(), common, official)
+
+    # Fall back to name.native (first matching language)
+    if isinstance(native, dict):
+        for lang_code in languages:
+            if lang_code in native:
+                n = native[lang_code]
+                if isinstance(n, dict):
+                    common = n.get("common", "")
+                    official = n.get("official", "")
+                    if common:
+                        return (lang_code.upper(), common, official)
+
+    return None
+
 # Paths: try bulk-download location first, then manual placement
 # Bulk data service stores in /app/data/bulk/ — same as other bulk datasets
 _DATA_DIR = Path("/app/data") if Path("/app/data").exists() else (Path(__file__).resolve().parent.parent / "data")
@@ -208,12 +245,12 @@ def _extract_sections(entry: dict) -> list[dict]:
         trans_fields = []
         common_name = name_data.get("common", entry.get("name", ""))
         # Local language first (primary language of the country)
-        local_lang_code = _resolve_local_lang(languages, trans)
-        local_common = ""
-        if local_lang_code:
-            local_common = trans[local_lang_code].get("common", "")
-            local_official = trans[local_lang_code].get("official", "")
-            label = f"{local_lang_code.upper()} (Local) — {local_common}" if local_common else f"{local_lang_code.upper()} (Local)"
+        local = _get_local_name(entry)
+        local_lang_code = None
+        if local:
+            local_lang_code, local_common, local_official = local
+            display_code = local_lang_code
+            label = f"{display_code} (Local) — {local_common}"
             trans_fields.append({"label": label, "value": local_official or local_common})
         # English
         trans_fields.append({"label": "ENG — " + str(common_name), "value": str(common_name)})
@@ -326,13 +363,9 @@ def get_country_profile(iso2: str) -> dict | None:
 
     # Local name (primary language common name)
     local_name = ""
-    languages = entry.get("languages", {})
-    if isinstance(languages, dict) and languages:
-        translations = entry.get("translations", {})
-        if isinstance(translations, dict):
-            local_lang_code = _resolve_local_lang(languages, translations)
-            if local_lang_code:
-                local_name = translations[local_lang_code].get("common", "")
+    local = _get_local_name(entry)
+    if local:
+        local_name = local[1]  # common name
 
     # French name
     french_name = ""
