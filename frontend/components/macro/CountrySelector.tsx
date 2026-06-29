@@ -12,9 +12,18 @@ export function CountrySelector({
   max?: number;
 }) {
   const [q, setQ] = useState("");
+  const [custom, setCustom] = useState<string[]>([]);
+
+  // Merge custom entries as pseudo-Country objects
+  const allCountries: Country[] = useMemo(() => {
+    const extras: Country[] = custom
+      .filter((n) => !countries.some((c) => c.iso2 === n || c.name.toLowerCase() === n.toLowerCase()))
+      .map((n) => ({ iso2: n, name: n, region: "Custom" }));
+    return [...countries, ...extras];
+  }, [countries, custom]);
 
   const grouped = useMemo(() => {
-    const filtered = countries.filter(
+    const filtered = allCountries.filter(
       (c) => c.name.toLowerCase().includes(q.toLowerCase()) ||
              c.iso2.toLowerCase().includes(q.toLowerCase()));
     const byRegion: Record<string, Country[]> = {};
@@ -22,7 +31,7 @@ export function CountrySelector({
       (byRegion[c.region] ||= []).push(c);
     });
     return byRegion;
-  }, [countries, q]);
+  }, [allCountries, q]);
 
   function toggle(iso2: string) {
     if (selected.includes(iso2)) {
@@ -30,6 +39,32 @@ export function CountrySelector({
     } else if (selected.length < max) {
       onChange([...selected, iso2]);
     }
+  }
+
+  function removeCustom(name: string) {
+    setCustom((prev) => prev.filter((n) => n !== name));
+    onChange(selected.filter((c) => c !== name));
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key !== "Enter") return;
+    const val = q.trim();
+    if (!val) return;
+    // If matches an existing country, toggle it
+    const match = allCountries.find(
+      (c) => c.name.toLowerCase() === val.toLowerCase() || c.iso2.toLowerCase() === val.toLowerCase()
+    );
+    if (match) {
+      if (!selected.includes(match.iso2) && selected.length >= max) return;
+      toggle(match.iso2);
+      setQ("");
+      return;
+    }
+    // Not in list — add as custom if under limit
+    if (selected.length >= max) return;
+    if (!custom.includes(val)) setCustom((prev) => [...prev, val]);
+    onChange([...selected, val]);
+    setQ("");
   }
 
   return (
@@ -40,9 +75,10 @@ export function CountrySelector({
       </div>
       <input
         className="input w-full mb-3"
-        placeholder="Filter countries…"
+        placeholder="Search for countries…"
         value={q}
         onChange={(e) => setQ(e.target.value)}
+        onKeyDown={handleKeyDown}
       />
       <div className="max-h-64 overflow-auto space-y-3 pr-1">
         {Object.entries(grouped).map(([region, list]) => (
