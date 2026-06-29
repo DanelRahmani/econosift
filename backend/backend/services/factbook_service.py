@@ -229,30 +229,41 @@ def get_country_profile(iso2: str) -> dict | None:
         from .factbook_profiles_service import get_factbook_profile, _load_factbook_file, _extract_field, ISO2_TO_GEC as FB_ISO2
         fb_sections = get_factbook_profile(iso2)
         if fb_sections:
-            # Merge factbook Introduction into REST Introduction
-            fb_intro = None
-            rest_intro = None
-            other_fb = []
-            other_rest = []
-            for s in fb_sections:
-                if s["title"] == "Introduction":
-                    fb_intro = s
-                else:
-                    other_fb.append(s)
-            for s in sections:
-                if s["title"] == "Introduction":
-                    rest_intro = s
-                else:
-                    other_rest.append(s)
-            if rest_intro or fb_intro:
-                merged_intro = {"title": "Introduction", "fields": []}
-                if rest_intro:
-                    merged_intro["fields"].extend(rest_intro["fields"])
-                if fb_intro:
-                    merged_intro["fields"].extend(fb_intro["fields"])
-                sections = [merged_intro] + other_fb + other_rest
-            else:
-                sections = fb_sections + sections
+            # Merge duplicates: REST Geography → factbook Geography, REST People → factbook People
+            fb_by_title = {s["title"]: s for s in fb_sections}
+            rest_by_title = {s["title"]: s for s in sections}
+            # Merge Introduction
+            merged = {}
+            intro = {"title": "Introduction", "fields": []}
+            if rest_by_title.get("Introduction"):
+                intro["fields"].extend(rest_by_title["Introduction"]["fields"])
+            if fb_by_title.get("Introduction"):
+                intro["fields"].extend(fb_by_title["Introduction"]["fields"])
+            merged["Introduction"] = intro
+            # Merge Geography
+            geo = fb_by_title.pop("Geography", {"title": "Geography", "fields": []})
+            if rest_by_title.get("Geography"):
+                geo.setdefault("fields", []).extend(rest_by_title["Geography"]["fields"])
+            merged["Geography"] = geo
+            # Merge People & Society
+            people = fb_by_title.pop("People and Society", {"title": "People and Society", "fields": []})
+            if rest_by_title.get("People & Society"):
+                people.setdefault("fields", []).extend(rest_by_title["People & Society"]["fields"])
+            merged["People and Society"] = people
+
+            # Business-first ordering
+            order = ["Introduction", "Economy", "Government", "Geography",
+                     "People and Society", "Communications", "Energy",
+                     "Military and Security", "Transnational Issues",
+                     "International Codes", "Name Translations"]
+            sections = []
+            for key in order:
+                if key in merged:
+                    sections.append(merged[key])
+                elif key in fb_by_title:
+                    sections.append(fb_by_title[key])
+                elif key in rest_by_title:
+                    sections.append(rest_by_title[key])
 
         # Add civil aircraft registration code to International Codes
         gec = FB_ISO2.get(iso2)
