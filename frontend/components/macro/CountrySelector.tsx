@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useCallback } from "react";
 import type { Country } from "@/lib/types";
+import { api } from "@/lib/api";
 
 export function CountrySelector({
   countries, selected, onChange, max = 8,
@@ -12,15 +13,16 @@ export function CountrySelector({
   max?: number;
 }) {
   const [q, setQ] = useState("");
-  const [custom, setCustom] = useState<string[]>([]);
+  const [searchResults, setSearchResults] = useState<{ iso2: string; name: string; region: string }[]>([]);
+  const [searching, setSearching] = useState(false);
 
-  // Merge custom entries as pseudo-Country objects
+  // Merge backend search results as pseudo-Country objects (shown in "Search Results" group)
   const allCountries: Country[] = useMemo(() => {
-    const extras: Country[] = custom
-      .filter((n) => !countries.some((c) => c.iso2 === n || c.name.toLowerCase() === n.toLowerCase()))
-      .map((n) => ({ iso2: n, name: n, region: "Custom" }));
+    const extras: Country[] = searchResults
+      .filter((r) => !countries.some((c) => c.iso2 === r.iso2))
+      .map((r) => ({ iso2: r.iso2, name: r.name, region: "Search Results" }));
     return [...countries, ...extras];
-  }, [countries, custom]);
+  }, [countries, searchResults]);
 
   const grouped = useMemo(() => {
     const filtered = allCountries.filter(
@@ -41,17 +43,13 @@ export function CountrySelector({
     }
   }
 
-  function removeCustom(name: string) {
-    setCustom((prev) => prev.filter((n) => n !== name));
-    onChange(selected.filter((c) => c !== name));
-  }
-
-  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+  async function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key !== "Enter") return;
     const val = q.trim();
     if (!val) return;
-    // If matches an existing country, toggle it
-    const match = allCountries.find(
+
+    // If matches an existing country in the local list, toggle it
+    const match = countries.find(
       (c) => c.name.toLowerCase() === val.toLowerCase() || c.iso2.toLowerCase() === val.toLowerCase()
     );
     if (match) {
@@ -60,11 +58,31 @@ export function CountrySelector({
       setQ("");
       return;
     }
-    // Not in list — add as custom if under limit
+
+    // Query the World Bank country database
     if (selected.length >= max) return;
-    if (!custom.includes(val)) setCustom((prev) => [...prev, val]);
-    onChange([...selected, val]);
-    setQ("");
+    setSearching(true);
+    try {
+      const res = await fetch(`/api/macro/search-countries?q=${encodeURIComponent(val)}`);
+      const data = await res.json();
+      const found = data.countries?.[0];
+      if (found && found.iso2) {
+        // Add to our search results so it appears as a pill
+        setSearchResults((prev) => {
+          if (prev.some((r) => r.iso2 === found.iso2)) return prev;
+          return [...prev, { iso2: found.iso2, name: found.name, region: "Search Results" }];
+        });
+        // Add to selection
+        if (!selected.includes(found.iso2)) {
+          onChange([...selected, found.iso2]);
+        }
+        setQ("");
+      }
+    } catch {
+      // silent fail
+    } finally {
+      setSearching(false);
+    }
   }
 
   return (
@@ -75,10 +93,11 @@ export function CountrySelector({
       </div>
       <input
         className="input w-full mb-3"
-        placeholder="Search for countries…"
+        placeholder={searching ? "Searching World Bank data…" : "Search for countries…"}
         value={q}
         onChange={(e) => setQ(e.target.value)}
         onKeyDown={handleKeyDown}
+        disabled={searching}
       />
       <div className="max-h-64 overflow-auto space-y-3 pr-1">
         {Object.entries(grouped).map(([region, list]) => (

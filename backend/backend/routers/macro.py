@@ -41,6 +41,65 @@ async def countries():
     return {"countries": COUNTRIES}
 
 
+@router.get("/search-countries")
+async def search_countries(q: str = Query("")):
+    """Search the full World Bank country universe (~200 economies) by name or code.
+
+    Returns ISO2 + name matches so the frontend can add any WB-tracked country
+    to the chart selection, not just the 20 predefined ones.
+    """
+    if not q or len(q.strip()) < 2:
+        return {"countries": []}
+
+    from ..services.atlas_service import _country_universe
+
+    try:
+        import pycountry
+    except ImportError:
+        return {"countries": []}
+
+    q_lower = q.strip().lower()
+    results: list[dict] = []
+    seen: set[str] = set()
+
+    for eco in _country_universe():
+        iso3 = eco.get("iso3", "")
+        name = eco.get("name", "")
+        if not iso3 or not name:
+            continue
+
+        name_lower = name.lower()
+
+        # Match by name substring or exact ISO3 code
+        if q_lower in name_lower or q_lower == iso3.lower():
+            if iso3 in seen:
+                continue
+            seen.add(iso3)
+
+            # Convert ISO3 → ISO2 where possible
+            iso2 = ""
+            try:
+                pc = pycountry.countries.get(alpha_3=iso3)
+                if pc:
+                    iso2 = getattr(pc, "alpha_2", "") or ""
+            except Exception:
+                pass
+
+            results.append({
+                "iso2": iso2 or iso3,  # fallback to ISO3 if no ISO2 mapping
+                "iso3": iso3,
+                "name": name,
+            })
+
+    # Sort by relevance (exact match first, then starts-with, then contains)
+    results.sort(key=lambda r: (
+        0 if r["name"].lower() == q_lower else 1 if r["name"].lower().startswith(q_lower) else 2,
+        r["name"],
+    ))
+
+    return {"countries": results[:25]}
+
+
 @router.get("/data")
 async def data(
     countries: str = Query(...),
