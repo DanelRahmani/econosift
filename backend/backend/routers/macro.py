@@ -439,6 +439,30 @@ async def business_dynamism():
     return await get_business_data()
 
 
+@router.get("/labor")
+async def labor_market():
+    """Labor market deep dive: LFPR, youth unemployment, employment/population
+    ratio, vulnerable employment, GDP per worker for 20 major economies."""
+    from ..services.labor_service import get_labor_data
+    return await get_labor_data()
+
+
+@router.get("/energy")
+async def energy_climate():
+    """Energy transition & climate dashboard: CO2/capita, renewable share,
+    energy imports, oil/gas/coal rents for 20 major economies."""
+    from ..services.energy_service import get_energy_data
+    return await get_energy_data()
+
+
+@router.get("/inequality")
+async def inequality():
+    """Inequality & development dashboard: Gini coefficient, income shares,
+    poverty headcount ratios for 20 major economies."""
+    from ..services.inequality_service import get_inequality_data
+    return await get_inequality_data()
+
+
 # Commodity config: (display name, sector, FRED series for spot price)
 _COMMODITY_CONFIG = [
     ("WTI Crude Oil", "Energy", "DCOILWTICO"),
