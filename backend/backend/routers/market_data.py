@@ -69,3 +69,14 @@ async def market_composite(
     quotes = [q for q in quote_results if q is not None]
 
     return {"prices": prices, "risk": [], "quotes": quotes}
+
+
+@router.get("/short-interest")
+async def short_interest(
+    ticker: str = Query(None, description="Single ticker, e.g. AAPL"),
+    universe: str = Query(None, description="Universe: sp500"),
+):
+    """Short interest data from Finnhub: % of float short, days to cover,
+    squeeze score, and sector aggregates."""
+    from ..services.short_interest_service import get_short_interest
+    return await get_short_interest(ticker=ticker, universe=universe)

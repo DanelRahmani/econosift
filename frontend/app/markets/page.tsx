@@ -34,6 +34,9 @@ const TechnicalsTab = lazy(() =>
 const RatiosTab = lazy(() =>
   import("@/components/markets/RatiosTab").then((m) => ({ default: m.RatiosTab }))
 );
+const ShortInterestPanel = lazy(() =>
+  import("@/components/markets/ShortInterestPanel").then((m) => ({ default: m.ShortInterestPanel }))
+);
 const PERIODS = ["1mo", "3mo", "6mo", "1y", "2y", "5y"];
 const BENCHMARKS = [
   { value: "", label: "Auto" },
@@ -43,7 +46,7 @@ const BENCHMARKS = [
   { value: "^RUT", label: "Russell 2000" },
 ];
 const SEC_PERIODS = ["1d", "1w", "1m", "3m", "ytd", "1y"] as const;
-const TABS = ["Overview", "Technicals", "Valuation", "Ratios", "News & Events", "Sectors", "Treemap"] as const;
+const TABS = ["Overview", "Technicals", "Valuation", "Ratios", "News & Events", "Sectors", "Treemap", "Short Interest"] as const;
 type Tab = (typeof TABS)[number];
 
 function MarketsPageInner() {
@@ -458,6 +461,12 @@ function MarketsPageInner() {
             )}
           </Card>
         </div>
+      )}
+
+      {tab === "Short Interest" && (
+        <Suspense fallback={<div className="h-40 animate-pulse bg-surface-alt rounded" />}>
+          <ShortInterestPanel />
+        </Suspense>
       )}
     </div>
   );

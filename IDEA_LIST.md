@@ -281,6 +281,6 @@ data for gamma squeeze detection.
 | 19 | Inflation Expectations → Inflation Tab | Enhance | P1 | 3 FRED series IDs | Small | ✅ DONE Phase 27 |
 | 20 | Supply Chain → Atlas Overlay | Enhance | P1 | 2 WB codes + bilateral data | Medium | |
 | 21 | Demographics → Atlas Overlay | Enhance | P2 | 3 WB codes + UN projections | Medium | |
-| 22 | Short Interest → Markets Panel | Enhance | P2 | Finnhub endpoint | Small | |
+| 22 | Short Interest → Markets Panel | Enhance | P2 | Finnhub endpoint | Small | ✅ DONE Phase 30 |
 
-**Completed:** 10/22 · **Remaining:** 12 (2 P0 · 7 P1 · 3 P2)
+**Completed:** 11/22 · **Remaining:** 11 (2 P0 · 7 P1 · 2 P2)

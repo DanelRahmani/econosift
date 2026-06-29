@@ -1202,6 +1202,30 @@ export interface BankingStabilityData {
   methodology?: string;
 }
 
+// Short Interest (Phase 30)
+export interface ShortInterestItem {
+  ticker: string;
+  shortFloat: number | null;
+  daysToCover: number | null;
+  squeezeScore: number | null;
+  sector: string;
+  asOf: string | null;
+}
+export interface ShortInterestSectorSummary {
+  sector: string;
+  avgShortFloat: number;
+  maxShortFloat: number;
+  tickerCount: number;
+}
+export interface ShortInterestData {
+  asOf: string | null;
+  source: string;
+  items: ShortInterestItem[];
+  mostShorted: ShortInterestItem[];
+  squeezeCandidates: ShortInterestItem[];
+  sectorSummary: ShortInterestSectorSummary[];
+}
+
 // COT Positioning
 export interface CotContract {
   name: string;
