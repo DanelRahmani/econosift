@@ -2290,3 +2290,59 @@ export interface PnLSummary {
   total_realized_pnl: number;
   total_return_pct: number;
 }
+
+// --- Phase 39: Cross-Asset & Factor Analytics ---
+export interface CrossAssetCorrelation {
+  assets: string[];
+  labels: string[];
+  matrix: (number | null)[][];
+  rolling: {
+    dates: string[];
+    values: number[];
+  };
+}
+
+export interface FxMacroLinkItem {
+  fxPair: string;
+  commodity: string;
+  label: string;
+  currentCorrelation: number | null;
+  bestLag: number;
+  bestLagCorrelation: number;
+  rollingCorrelation: {
+    dates: string[];
+    values: number[];
+  };
+  series: { date: string; fx: number | null; commodity: number | null }[];
+}
+
+export interface FxMacroLinkResponse {
+  links: FxMacroLinkItem[];
+  error?: string;
+}
+
+export interface MultiCountryHoldingInput {
+  ticker: string;
+  weight: number;
+  currency: string;
+}
+
+export interface MultiCountryHoldingReturn {
+  ticker: string;
+  weight: number;
+  annReturn: number | null;
+  annVolatility: number | null;
+}
+
+export interface MultiCountryPortfolio {
+  holdings: MultiCountryHoldingReturn[];
+  series: { date: string; value: number }[];
+  metrics: {
+    annReturn: number;
+    annVolatility: number;
+    sharpe: number;
+  };
+  countryAllocation: Record<string, number>;
+  currencyExposure: Record<string, number>;
+  error?: string;
+}

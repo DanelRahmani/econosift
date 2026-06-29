@@ -34,7 +34,7 @@ Add buy/sell dates, cost basis, and realized P&L tracking (currently theoretical
 Multi-country portfolio builder, factor attribution, FX/commodity macro-link panels, cross-asset correlation heatmaps.
 - **Data:** All existing data — pure calculation + visualization. Significant effort.
 
-### P3 — Learning Layers
+### P3 — Learning Layers ✅ DONE (Phase 38)
 Beginner-friendly toggles, narrative walkthroughs explaining metrics, academic-style embedded notebooks.
 - **Data:** No new data — educational UX layer.
 

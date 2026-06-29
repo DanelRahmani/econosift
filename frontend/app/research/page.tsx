@@ -7,6 +7,9 @@ import { MomentumTab } from "@/components/research/MomentumTab";
 import { RealizedMomentsTab } from "@/components/research/RealizedMomentsTab";
 import { DupontTab } from "@/components/research/DupontTab";
 import { EconLabTab } from "@/components/macro/EconLabTab";
+import { CrossAssetCorrelation } from "@/components/research/CrossAssetCorrelation";
+import { FxMacroLink } from "@/components/research/FxMacroLink";
+import { MultiCountryPortfolio } from "@/components/research/MultiCountryPortfolio";
 import { useUrlState } from "@/lib/useUrlState";
 
 const TABS = [
@@ -14,6 +17,9 @@ const TABS = [
   { key: "carry", label: "FX Carry" },
   { key: "momentum", label: "Momentum" },
   { key: "moments", label: "Realized Moments" },
+  { key: "crossasset", label: "Cross-Asset" },
+  { key: "fxmacro", label: "FX-Macro Link" },
+  { key: "multicountry", label: "Multi-Country" },
   { key: "dupont", label: "Sector DuPont" },
   { key: "econlab", label: "Econometric Lab" },
 ] as const;
@@ -57,6 +63,9 @@ function ResearchPageInner() {
       {tab === "carry" && <FxCarryTab />}
       {tab === "momentum" && <MomentumTab />}
       {tab === "moments" && <RealizedMomentsTab />}
+      {tab === "crossasset" && <CrossAssetCorrelation />}
+      {tab === "fxmacro" && <FxMacroLink />}
+      {tab === "multicountry" && <MultiCountryPortfolio />}
       {tab === "dupont" && <DupontTab />}
       {tab === "econlab" && <EconLabTab />}
     </main>

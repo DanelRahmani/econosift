@@ -15,6 +15,7 @@ from ..services import carry_service
 from ..services import momentum_service
 from ..services import realized_moments_service
 from ..services import dupont_service
+from ..services import cross_asset_service
 
 router = APIRouter(prefix="/api/research", tags=["research"])
 
@@ -102,4 +103,51 @@ async def get_dupont():
     try:
         return dupont_service.get_sector_dupont()
     except Exception as exc:  # pragma: no cover - defensive
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+# ── Phase 39: Cross-Asset & Factor Analytics ──────────────────────────
+
+class CrossAssetRequest(BaseModel):
+    tickers: list[str] = Field(default_factory=lambda: ["SPY", "TLT", "GLD", "EURUSD=X"])
+    period: str = Field(default="3y", pattern="^(1y|2y|3y|5y|max)$")
+
+
+class MultiCountryHolding(BaseModel):
+    ticker: str
+    weight: float = Field(default=1.0, ge=0.0)
+    currency: str = Field(default="USD")
+
+
+class MultiCountryRequest(BaseModel):
+    holdings: list[MultiCountryHolding]
+    period: str = Field(default="3y", pattern="^(1y|2y|3y|5y|max)$")
+
+
+@router.post("/cross-asset-correlation")
+async def cross_asset_correlation(req: CrossAssetRequest):
+    """Cross-asset correlation matrix for mixed stocks/bonds/commodities/FX pairs."""
+    try:
+        return await cross_asset_service.get_cross_asset_correlations(req.tickers, req.period)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@router.get("/fx-macro-link")
+async def fx_macro_link():
+    """FX / commodity / macro linkage — rolling correlations and lead/lag analysis."""
+    try:
+        return await cross_asset_service.get_fx_macro_link()
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@router.post("/multi-country-portfolio")
+async def multi_country_portfolio(req: MultiCountryRequest):
+    """Multi-country portfolio with FX-adjusted returns and currency exposure breakdown."""
+    try:
+        holdings = [{"ticker": h.ticker, "weight": h.weight, "currency": h.currency}
+                     for h in req.holdings]
+        return await cross_asset_service.get_multi_country_portfolio(holdings, req.period)
+    except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc

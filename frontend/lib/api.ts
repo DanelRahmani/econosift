@@ -42,6 +42,7 @@ import type {
   SovereignDefaultData,
   AiSummaryResponse, AiSummaryHistoryItem,
   Transaction, PnLSummary,
+  CrossAssetCorrelation, FxMacroLinkResponse, MultiCountryPortfolio, MultiCountryHoldingInput,
 } from "./types";
 
 async function get<T>(path: string): Promise<T> {
@@ -548,6 +549,16 @@ export const api = {
 
   computePnL: (transactions: Transaction[], currentPrices: Record<string, number>) =>
     post<PnLSummary>("/portfolio/transactions/pnl", { transactions, current_prices: currentPrices }),
+
+  // --- Phase 39: Cross-Asset & Factor Analytics ---
+  crossAssetCorrelation: (tickers: string[], period = "3y") =>
+    post<CrossAssetCorrelation>("/research/cross-asset-correlation", { tickers, period }),
+
+  fxMacroLink: () =>
+    get<FxMacroLinkResponse>("/research/fx-macro-link"),
+
+  multiCountryPortfolio: (holdings: MultiCountryHoldingInput[], period = "3y") =>
+    post<MultiCountryPortfolio>("/research/multi-country-portfolio", { holdings, period }),
 };
 
 // --- Phase 17.E: React Query ---
