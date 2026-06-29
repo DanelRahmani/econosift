@@ -93,28 +93,32 @@ def _extract_sections(entry: dict) -> list[dict]:
     capital = entry.get("capital", [])
     capital_str = capital[0] if isinstance(capital, list) and capital else ""
 
-    # ── Introduction ──
+    # ── Introduction (with comms fields merged in) ──
     intro = []
     if name_data.get("official"):
         intro.append({"label": "Official Name", "value": str(name_data["official"])})
     if name_data.get("common"):
         intro.append({"label": "Common Name", "value": str(name_data["common"])})
-    # Native names
-    native = name_data.get("native", {})
-    if isinstance(native, dict):
-        for lang_code, lang_name in native.items():
-            if isinstance(lang_name, dict):
-                off = lang_name.get("official", "")
-                if off and off != name_data.get("official", ""):
-                    intro.append({"label": f"Native Name ({lang_code})", "value": str(off)})
     intro.append({"label": "Capital", "value": capital_str or "N/A"})
     intro.append({"label": "Region", "value": str(entry.get("region", "") or "N/A")})
     sub = entry.get("subregion", "")
     if sub:
         intro.append({"label": "Subregion", "value": str(sub)})
-    status = entry.get("status", "")
-    if status:
-        intro.append({"label": "Status", "value": str(status)})
+    # Currency, Calling Code, TLD — merged from old Government section
+    currencies = entry.get("currencies", {})
+    if isinstance(currencies, dict) and currencies:
+        cur_list = [f"{info.get('name', code)} ({info.get('symbol', code)})" if isinstance(info, dict) else str(code)
+                    for code, info in currencies.items()]
+        intro.append({"label": "Currency", "value": ", ".join(cur_list)})
+    idd = entry.get("idd", {})
+    if isinstance(idd, dict):
+        root = idd.get("root", "")
+        if root:
+            suffixes = idd.get("suffixes", [])
+            intro.append({"label": "Calling Code", "value": f"{root}{' (x'+suffixes[0]+')' if suffixes else ''}"})
+    tld = entry.get("tld", [])
+    if tld:
+        intro.append({"label": "Internet TLD", "value": ", ".join(str(t) for t in tld)})
     indep = entry.get("independent")
     if indep is not None:
         intro.append({"label": "Independent", "value": "Yes" if indep else "No"})
@@ -157,28 +161,6 @@ def _extract_sections(entry: dict) -> list[dict]:
         people.append({"label": "Note", "value": "Population data not available in this dataset"})
     sections.append({"title": "People & Society", "fields": people})
 
-    # ── Government ──
-    gov = []
-    gov.append({"label": "Capital", "value": capital_str or "N/A"})
-    currencies = entry.get("currencies", {})
-    if isinstance(currencies, dict) and currencies:
-        cur_list = [f"{info.get('name', code)} ({info.get('symbol', code)})" if isinstance(info, dict) else str(code)
-                    for code, info in currencies.items()]
-        gov.append({"label": "Currencies", "value": ", ".join(cur_list)})
-    idd = entry.get("idd", {})
-    if isinstance(idd, dict):
-        root = idd.get("root", "")
-        suffixes = idd.get("suffixes", [])
-        if root:
-            if suffixes:
-                gov.append({"label": "Calling Code", "value": f"{root} (x{suffixes[0]}) — {len(suffixes)} area codes"})
-            else:
-                gov.append({"label": "Calling Code", "value": str(root)})
-    tld = entry.get("tld", [])
-    if tld:
-        gov.append({"label": "Internet TLD", "value": ", ".join(str(t) for t in tld)})
-    sections.append({"title": "Government & Communications", "fields": gov})
-
     # ── International Codes ──
     codes = []
     codes.append({"label": "ISO 3166-1 Alpha-2", "value": str(entry.get("cca2", ""))})
@@ -194,25 +176,19 @@ def _extract_sections(entry: dict) -> list[dict]:
         codes.append({"label": "Alternative Spellings", "value": ", ".join(str(a) for a in alt_spell[:10])})
     sections.append({"title": "International Codes", "fields": codes})
 
-    # ── Translations ──
+    # ── Translations (5 major languages only) ──
     trans = entry.get("translations", {})
     if isinstance(trans, dict) and trans:
         trans_fields = []
-        # Show a curated set of major languages
-        priority = ["fra", "spa", "deu", "ara", "zho", "rus", "jpn", "por", "ita", "nld", "kor", "tur", "pol", "swe", "fin"]
-        shown = set()
-        for lang in priority + sorted(trans.keys()):
-            if lang in shown:
-                continue
+        # English, French, Russian, Spanish, Mandarin Chinese only
+        priority = ["eng", "fra", "rus", "spa", "zho"]
+        for lang in priority:
             t = trans.get(lang, {})
             if isinstance(t, dict):
                 official = t.get("official", "")
                 common = t.get("common", "")
                 label = f"{lang.upper()} — {common}" if common else lang.upper()
-                shown.add(lang)
                 trans_fields.append({"label": label, "value": official if official else str(common)})
-            if len(shown) >= 12:
-                break
         if trans_fields:
             sections.append({"title": "Name Translations", "fields": trans_fields})
 
@@ -250,7 +226,31 @@ def get_country_profile(iso2: str) -> dict | None:
         from .factbook_profiles_service import get_factbook_profile
         fb_sections = get_factbook_profile(iso2)
         if fb_sections:
-            sections = fb_sections + sections  # Factbook first, REST Countries after
+            # Merge factbook Introduction into REST Introduction (keep REST fields as top, factbook narrative after)
+            fb_intro = None
+            rest_intro = None
+            other_fb = []
+            other_rest = []
+            for s in fb_sections:
+                if s["title"] == "Introduction":
+                    fb_intro = s
+                else:
+                    other_fb.append(s)
+            for s in sections:
+                if s["title"] == "Introduction":
+                    rest_intro = s
+                else:
+                    other_rest.append(s)
+            # Build merged introduction: rest fields first, then factbook narrative
+            if rest_intro or fb_intro:
+                merged_intro = {"title": "Introduction", "fields": []}
+                if rest_intro:
+                    merged_intro["fields"].extend(rest_intro["fields"])
+                if fb_intro:
+                    merged_intro["fields"].extend(fb_intro["fields"])
+                sections = [merged_intro] + other_fb + other_rest
+            else:
+                sections = fb_sections + sections
     except Exception:
         pass
     borders = entry.get("borders", []) if isinstance(entry.get("borders"), list) else []
