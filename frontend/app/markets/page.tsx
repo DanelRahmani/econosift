@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect, Suspense, lazy } from "react";
+import { useState, useEffect, Suspense, lazy, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
+import { useUrlState } from "@/lib/useUrlState";
 import type { EventsResponse } from "@/lib/types";
 import { SearchBar } from "@/components/SearchBar";
 import { Card, Skeleton, ChartSkeleton, ScrollableTabBar, ExportPdfButton } from "@/components/ui";
@@ -52,19 +53,25 @@ type Tab = (typeof TABS)[number];
 
 function MarketsPageInner() {
   const router = useRouter();
-  const searchParams = useSearchParams();
 
-  const [tickers, setTickers] = useState<string[]>(() => {
-    const t = searchParams.get("t");
-    return t ? t.split(",").filter(Boolean) : ["AAPL", "MSFT"];
+  const [urlState, setUrlState] = useUrlState({
+    t: "AAPL,MSFT",
+    p: "1y",
+    tab: "Overview",
+    b: "",
   });
-  const [period, setPeriod] = useState<string>(() => searchParams.get("p") ?? "1y");
-  const [tab, setTab] = useState<Tab>(() => {
-    const v = searchParams.get("tab") ?? "";
-    return (TABS as readonly string[]).includes(v) ? (v as Tab) : "Overview";
-  });
+
+  // Derive typed helpers from URL string state.
+  const tickers = useMemo(
+    () => urlState.t.split(",").filter(Boolean),
+    [urlState.t],
+  );
+  const tickersKey = urlState.t;
+  const period = urlState.p;
+  const tab = (TABS as readonly string[]).includes(urlState.tab) ? (urlState.tab as Tab) : "Overview";
+  const benchmark = urlState.b;
+
   const [showWatchlist, setShowWatchlist] = useState(false);
-  const [benchmark, setBenchmark] = useState<string>(() => searchParams.get("b") ?? "");
 
   // Sector state
   const [secReturns, setSecReturns] = useState<SectorReturnsResponse | null>(null);
@@ -115,11 +122,8 @@ function MarketsPageInner() {
     return () => { alive = false; };
   }, [tab, tmIndex, tmPeriod]);
 
-  const tickersKey = tickers.join(",");
-
   // Redirect old deprecated tabs
   useEffect(() => {
-    const oldTab = searchParams.get("tab");
     const redirectMap: Record<string, string> = {
       Risk: `/risk${tickers.length ? `?t=${tickersKey}` : ""}`,
       Portfolio: `/portfolio${tickers.length ? `?t=${tickersKey}` : ""}`,
@@ -127,22 +131,11 @@ function MarketsPageInner() {
       Screener: "/screener",
       FX: "/macro?tab=FX",
     };
-    if (oldTab && redirectMap[oldTab]) {
-      router.replace(redirectMap[oldTab]);
+    if (urlState.tab && redirectMap[urlState.tab]) {
+      router.replace(redirectMap[urlState.tab]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // Keep URL in sync with current state so it can be bookmarked / shared
-  useEffect(() => {
-    const params = new URLSearchParams();
-    if (tickers.length) params.set("t", tickers.join(","));
-    params.set("p", period);
-    params.set("tab", tab);
-    if (benchmark) params.set("b", benchmark);
-    router.replace(`/markets?${params.toString()}`, { scroll: false });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tickersKey, period, tab, benchmark]);
 
   const { data: prices, isLoading: pricesLoading } = useQuery({
     queryKey: ["market-prices", tickersKey, period, benchmark ?? ""],
@@ -173,15 +166,17 @@ function MarketsPageInner() {
   const events = eventsData ?? [];
 
   function addTicker(sym: string) {
-    setTickers((prev) => (prev.includes(sym) ? prev : [...prev, sym]));
+    const next = tickers.includes(sym) ? tickers : [...tickers, sym];
+    setUrlState({ t: next.join(",") });
   }
   function removeTicker(sym: string) {
-    setTickers((prev) => prev.filter((t) => t !== sym));
+    const next = tickers.filter((t) => t !== sym);
+    setUrlState({ t: next.join(",") });
   }
 
   function handleSnowflakeClick(t: string) {
     if (t === "Valuation" || t === "Ratios" || t === "Sectors") {
-      setTab(t as Tab);
+      setUrlState({ tab: t });
     } else {
       const redirects: Record<string, string> = {
         Portfolio: `/portfolio?t=${tickersKey}`,
@@ -191,6 +186,10 @@ function MarketsPageInner() {
       const dest = redirects[t];
       if (dest) router.push(dest);
     }
+  }
+
+  function setTab(t: Tab) {
+    setUrlState({ tab: t });
   }
 
   return (
@@ -238,12 +237,12 @@ function MarketsPageInner() {
         </ScrollableTabBar>
         {(tab === "Overview" || tab === "Technicals" || tab === "Valuation") && (
           <div className="flex items-center gap-3">
-            {tab === "Overview" && (
+            {(tab === "Overview" || tab === "Technicals") && (
               <label className="flex items-center gap-1.5 text-xs text-text-muted">
                 <span>Benchmark</span>
                 <select
                   value={benchmark}
-                  onChange={(e) => setBenchmark(e.target.value)}
+                  onChange={(e) => setUrlState({ b: e.target.value })}
                   className="rounded-md bg-surface-alt border border-border px-2 py-1 text-xs text-text-primary"
                 >
                   {BENCHMARKS.map((b) => (
@@ -256,7 +255,7 @@ function MarketsPageInner() {
               {PERIODS.map((p) => (
                 <button
                   key={p}
-                  onClick={() => setPeriod(p)}
+                  onClick={() => setUrlState({ p })}
                   className={`px-2.5 py-1 rounded-md text-xs font-mono transition-colors ${
                     period === p ? "bg-surface-alt text-text-primary" : "text-text-muted hover:text-text-primary"
                   }`}

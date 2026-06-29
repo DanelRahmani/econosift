@@ -28,14 +28,15 @@
 
 Older brainstorming ideas. Only items not yet fully shipped are listed below.
 
-### ⚠️ P2 — Shareable URLs / Deep Linking — **Partial**
+### ✅ P2 — Shareable URLs / Deep Linking — **Done Phase 36**
 Encode dashboard state (selected tickers, period, active tab) in URL query string for bookmarking/sharing.
 - **Data:** URL state only. Pure frontend.
-- **Status:** Markets page syncs state to URL; not yet rolled out to all pages.
+- **Status:** Rolled out to all 11 pages with user-selectable state via `useUrlState` hook.
 
-### ⚠️ P2 — Configurable Benchmark Override — **Partial**
+### ✅ P2 — Configurable Benchmark Override — **Done Phase 36**
 Let users manually override auto-detected benchmark (e.g., AAPL vs ^NDX instead of ^GSPC) via UI dropdown.
-- **Data:** No new data needed. Backend supports `&benchmark=` param; no frontend UI dropdown yet.
+- **Data:** No new data needed. Backend already supported `&benchmark=` param.
+- **Status:** Benchmark dropdown now on Markets (Overview + Technicals) and Risk page, wired to all backend endpoints.
 
 ### P3 — Portfolio Transaction Log
 Add buy/sell dates, cost basis, and realized P&L tracking (currently theoretical allocations only).

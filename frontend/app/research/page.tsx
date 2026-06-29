@@ -1,13 +1,13 @@
 "use client";
 
-import { Suspense, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 import { RiskParityTab } from "@/components/research/RiskParityTab";
 import { FxCarryTab } from "@/components/research/FxCarryTab";
 import { MomentumTab } from "@/components/research/MomentumTab";
 import { RealizedMomentsTab } from "@/components/research/RealizedMomentsTab";
 import { DupontTab } from "@/components/research/DupontTab";
 import { EconLabTab } from "@/components/macro/EconLabTab";
+import { useUrlState } from "@/lib/useUrlState";
 
 const TABS = [
   { key: "riskparity", label: "Risk Parity" },
@@ -19,14 +19,14 @@ const TABS = [
 ] as const;
 type TabKey = (typeof TABS)[number]["key"];
 
-function resolveTab(param: string | null): TabKey {
+function resolveTab(param: string): TabKey {
   if (param && TABS.some((t) => t.key === param)) return param as TabKey;
   return "riskparity";
 }
 
 function ResearchPageInner() {
-  const searchParams = useSearchParams();
-  const [tab, setTab] = useState<TabKey>(resolveTab(searchParams.get("tab")));
+  const [urlState, setUrlState] = useUrlState({ tab: "riskparity" });
+  const tab = resolveTab(urlState.tab);
 
   return (
     <main className="max-w-7xl mx-auto px-4 py-6 space-y-6">
@@ -41,7 +41,7 @@ function ResearchPageInner() {
         {TABS.map((t) => (
           <button
             key={t.key}
-            onClick={() => setTab(t.key)}
+            onClick={() => setUrlState({ tab: t.key })}
             className={`px-4 py-2 text-sm font-medium -mb-px border-b-2 transition-colors whitespace-nowrap ${
               tab === t.key
                 ? "border-accent text-text-primary"

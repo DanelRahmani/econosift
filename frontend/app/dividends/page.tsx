@@ -1,11 +1,11 @@
 "use client";
 
 import { Suspense, useEffect, useState, useCallback } from "react";
-import { useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
 import type { DividendAnalysisResponse } from "@/lib/types";
 import { Card, PageSkeleton } from "@/components/ui";
 import { TickerSearch } from "@/components/TickerSearch";
+import { useUrlState } from "@/lib/useUrlState";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine,
@@ -26,8 +26,8 @@ function KpiCard({ label, value, sub, color }: {
 }
 
 function DividendsPageInner() {
-  const searchParams = useSearchParams();
-  const [ticker, setTicker] = useState(searchParams.get("ticker") ?? "");
+  const [urlState, setUrlState] = useUrlState({ ticker: "" });
+  const ticker = urlState.ticker;
   const [data, setData] = useState<DividendAnalysisResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -50,19 +50,16 @@ function DividendsPageInner() {
   }, []);
 
   useEffect(() => {
-    const param = searchParams.get("ticker");
-    if (param) {
-      setTicker(param);
-      fetchAnalysis(param);
+    if (ticker) {
+      fetchAnalysis(ticker);
     }
-  }, [searchParams, fetchAnalysis]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (ticker.trim()) {
-      const url = new URL(window.location.href);
-      url.searchParams.set("ticker", ticker.trim().toUpperCase());
-      window.history.replaceState({}, "", url.toString());
+      setUrlState({ ticker: ticker.trim().toUpperCase() });
       fetchAnalysis(ticker);
     }
   };
@@ -86,10 +83,7 @@ function DividendsPageInner() {
         <TickerSearch
           value={ticker}
           onChange={(t) => {
-            setTicker(t);
-            const url = new URL(window.location.href);
-            url.searchParams.set("ticker", t);
-            window.history.replaceState({}, "", url.toString());
+            setUrlState({ ticker: t });
             fetchAnalysis(t);
           }}
           placeholder="Search company name or ticker (KO, JNJ, PG)…"

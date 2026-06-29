@@ -1,8 +1,8 @@
 "use client";
 import { Suspense, useState } from "react";
-import { useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { useUrlState } from "@/lib/useUrlState";
 import { PolicyDivergenceTable } from "@/components/policy/PolicyDivergenceTable";
 import { SovereignSpreadTable } from "@/components/sovereign/SovereignSpreadTable";
 import { CentralBanksTab } from "@/components/macro/CentralBanksTab";
@@ -27,7 +27,7 @@ const TABS = [
 ] as const;
 type TabId = (typeof TABS)[number]["id"];
 
-function resolveTab(param: string | null): TabId {
+function resolveTab(param: string): TabId {
   if (param && TABS.some((t) => t.id === param)) return param as TabId;
   return "policy";
 }
@@ -289,8 +289,8 @@ function SovereignRiskTab() {
 
 // ─── Main page (wrapped in Suspense for useSearchParams) ──────────
 function PolicyPageInner() {
-  const searchParams = useSearchParams();
-  const [tab, setTab] = useState<TabId>(resolveTab(searchParams.get("tab")));
+  const [urlState, setUrlState] = useUrlState({ tab: "policy" });
+  const tab = resolveTab(urlState.tab);
 
   return (
     <div className="p-6 space-y-6">
@@ -301,7 +301,7 @@ function PolicyPageInner() {
         {TABS.map((t) => (
           <button
             key={t.id}
-            onClick={() => setTab(t.id)}
+            onClick={() => setUrlState({ tab: t.id })}
             className={`px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
               tab === t.id
                 ? "border-accent text-accent"

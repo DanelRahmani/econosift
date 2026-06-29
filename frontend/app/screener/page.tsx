@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, Suspense } from "react";
 import { api } from "@/lib/api";
 import type { PresetDef, ScreenerCacheRow, ScreenerUniverseResponse, SnowflakeBatchResponse } from "@/lib/types";
 import { Card, Skeleton, PageSkeleton } from "@/components/ui";
+import { useUrlState } from "@/lib/useUrlState";
 import { PresetPills } from "@/components/screener/PresetPills";
 import { ResultTabs, RESULT_TABS } from "@/components/screener/ResultTabs";
 import type { ResultTab } from "@/components/screener/ResultTabs";
@@ -105,16 +106,24 @@ function SparkCard({
 
 // ─── Page ─────────────────────────────────────────────────────────────────
 
-export default function ScreenerPage() {
-  const [index, setIndex] = useState<IndexKey>(() => {
-    try { return (localStorage.getItem("screener-index") as IndexKey) || "dow"; }
-    catch { return "dow"; }
+function ScreenerPageInner() {
+  const [urlState, setUrlState] = useUrlState({
+    index: "sp500",
+    presets: "",
+    tab: "Overview",
   });
-  const [activePresets, setActivePresets] = useState<Set<string>>(new Set());
+
+  const index = (INDEX_OPTS.map((o) => o.key) as readonly string[]).includes(urlState.index)
+    ? (urlState.index as IndexKey)
+    : "sp500";
+  const activePresets = new Set<string>(
+    urlState.presets ? urlState.presets.split(",").filter(Boolean) : [],
+  );
+  const [viewMode, setViewMode] = useState<"table" | "charts">("table");
+
   const [sortKey, setSortKey] = useState("marketCap");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
-  const [resultTab, setResultTab] = useState<ResultTab>("Overview");
-  const [viewMode, setViewMode] = useState<"table" | "charts">("table");
+  const resultTab = urlState.tab as ResultTab;
 
   const [presetDefs, setPresetDefs] = useState<PresetDef[]>([]);
   const [data, setData] = useState<ScreenerUniverseResponse | null>(null);
@@ -156,17 +165,16 @@ export default function ScreenerPage() {
   }, [index, activePresets, sortKey, sortDir]);
 
   const handleSetIndex = useCallback((v: IndexKey) => {
-    setIndex(v);
-    try { localStorage.setItem("screener-index", v); } catch { /* ignore */ }
-  }, []);
+    setUrlState({ index: v });
+  }, [setUrlState]);
 
   const handleTogglePreset = useCallback((id: string) => {
-    setActivePresets((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  }, []);
+    const current = urlState.presets ? urlState.presets.split(",").filter(Boolean) : [];
+    const next = current.includes(id)
+      ? current.filter((p) => p !== id)
+      : [...current, id];
+    setUrlState({ presets: next.join(",") });
+  }, [urlState.presets, setUrlState]);
 
   const handleSort = useCallback((key: string) => {
     setSortKey((prev) => {
@@ -243,7 +251,7 @@ export default function ScreenerPage() {
         />
         {activePresets.size > 0 && (
           <button
-            onClick={() => setActivePresets(new Set())}
+            onClick={() => setUrlState({ presets: "" })}
             className="mt-3 text-xs text-text-muted hover:text-text-primary underline"
           >
             Clear all filters
@@ -305,7 +313,7 @@ export default function ScreenerPage() {
 
         {!loading && !error && viewMode === "table" && (
           <div className="space-y-3">
-            <ResultTabs active={resultTab} onChange={setResultTab} />
+            <ResultTabs active={resultTab} onChange={(t) => setUrlState({ tab: t })} />
             <ScreenerTable
               rows={results}
               tab={resultTab}
@@ -333,5 +341,13 @@ export default function ScreenerPage() {
         )}
       </Card>
     </main>
+  );
+}
+
+export default function ScreenerPage() {
+  return (
+    <Suspense fallback={<PageSkeleton text="Loading screener…" />}>
+      <ScreenerPageInner />
+    </Suspense>
   );
 }

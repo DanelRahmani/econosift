@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, Suspense } from "react";
 import { api } from "@/lib/api";
 import { PageSkeleton } from "@/components/ui";
+import { useUrlState } from "@/lib/useUrlState";
 import type { Holding, PortfolioAnalysis, CorrelationData, RiskContribData, CAPMData } from "@/lib/types";
 // RiskContribData is RiskContribItem[] (flat list), CorrelationData has matrix as number[][]
 
@@ -58,10 +59,13 @@ function saveToStorage(holdings: Holding[]) {
   }
 }
 
-export default function PortfolioPage() {
+function PortfolioPageInner() {
+  const [urlState, setUrlState] = useUrlState({ p: "3y", tab: "Overview" });
+
+  const period = (PERIODS as readonly string[]).includes(urlState.p) ? (urlState.p as Period) : "3y";
+  const tab = (TABS as readonly string[]).includes(urlState.tab) ? (urlState.tab as Tab) : "Overview";
+
   const [holdings, setHoldings] = useState<Holding[]>(DEFAULT_HOLDINGS);
-  const [period, setPeriod] = useState<Period>("3y");
-  const [tab, setTab] = useState<Tab>("Overview");
 
   // Overview data
   const [analyzeData, setAnalyzeData] = useState<PortfolioAnalysis | null>(null);
@@ -164,7 +168,7 @@ export default function PortfolioPage() {
           {PERIODS.map((p) => (
             <button
               key={p}
-              onClick={() => setPeriod(p)}
+              onClick={() => setUrlState({ p })}
               className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
                 period === p
                   ? "bg-accent text-white"
@@ -200,7 +204,7 @@ export default function PortfolioPage() {
         {TABS.map((t) => (
           <button
             key={t}
-            onClick={() => setTab(t)}
+            onClick={() => setUrlState({ tab: t })}
             className={`px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors ${
               tab === t
                 ? "border-b-2 border-accent text-accent"
@@ -270,5 +274,13 @@ export default function PortfolioPage() {
         )}
       </div>
     </main>
+  );
+}
+
+export default function PortfolioPage() {
+  return (
+    <Suspense fallback={<PageSkeleton text="Loading portfolio…" />}>
+      <PortfolioPageInner />
+    </Suspense>
   );
 }

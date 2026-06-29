@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, Suspense } from "react";
 import { api } from "@/lib/api";
 import type { CalendarEvent, CalendarResponse } from "@/lib/types";
 import { Card, Skeleton, PageSkeleton } from "@/components/ui";
+import { useUrlState } from "@/lib/useUrlState";
 import { CalendarGrid } from "@/components/calendar/CalendarGrid";
 import {
   CalendarFilters,
@@ -120,9 +121,12 @@ function defaultFilters(): CalendarFilterState {
 // Page
 // ─────────────────────────────────────────────
 
-export default function CalendarPage() {
+function CalendarPageInner() {
   // ── Navigation state ──────────────────────
-  const [index, setIndex] = useState<IndexKey>("dow");
+  const [urlState, setUrlState] = useUrlState({ index: "dow" });
+  const index = (INDEX_OPTS.map((o) => o.key) as readonly string[]).includes(urlState.index)
+    ? (urlState.index as IndexKey)
+    : "dow";
   const [monday, setMonday] = useState<Date>(() => getWeekMonday(new Date()));
 
   // ── Data state ────────────────────────────
@@ -242,7 +246,7 @@ export default function CalendarPage() {
           <div className="flex flex-wrap gap-x-6 gap-y-3 items-center">
             <div className="flex items-center gap-2">
               <span className="text-xs text-text-muted font-medium">Index</span>
-              <SegCtrl opts={INDEX_OPTS} value={index} onChange={setIndex} />
+              <SegCtrl opts={INDEX_OPTS} value={index} onChange={(v) => setUrlState({ index: v })} />
             </div>
 
             {/* Week navigation */}
@@ -320,5 +324,13 @@ export default function CalendarPage() {
         </Card>
       )}
     </div>
+  );
+}
+
+export default function CalendarPage() {
+  return (
+    <Suspense fallback={<PageSkeleton text="Loading calendar…" />}>
+      <CalendarPageInner />
+    </Suspense>
   );
 }

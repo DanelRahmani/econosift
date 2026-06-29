@@ -1,11 +1,11 @@
 "use client";
 
 import { Suspense, useEffect, useState, useCallback } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { useTheme } from "@/components/ThemeProvider";
 import { Skeleton } from "@/components/ui";
 import { SearchBar } from "@/components/SearchBar";
+import { useUrlState } from "@/lib/useUrlState";
 import { IVKPIRow } from "@/components/options/IVKPIRow";
 import { ChainTable } from "@/components/options/ChainTable";
 import { IVTermStructure } from "@/components/options/IVTermStructure";
@@ -28,15 +28,17 @@ function computeDTE(exp: string): number {
 }
 
 function OptionsPageInner() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
   const { theme } = useTheme();
 
-  const [ticker, setTicker] = useState<string>(
-    (searchParams.get("t") ?? "AAPL").toUpperCase()
-  );
-  const [expiry, setExpiry] = useState<string>("");
-  const [tab, setTab] = useState<Tab>("Chain");
+  const [urlState, setUrlState] = useUrlState({
+    t: "AAPL",
+    e: "",
+    tab: "Chain",
+  });
+
+  const ticker = urlState.t.toUpperCase();
+  const expiry = urlState.e;
+  const tab = (TABS as readonly string[]).includes(urlState.tab) ? (urlState.tab as Tab) : "Chain";
   const [showOTMOnly, setShowOTMOnly] = useState(false);
 
   // Data
@@ -55,14 +57,6 @@ function OptionsPageInner() {
   const [smileLoading, setSmileLoading] = useState(false);
   const [oiLoading, setOiLoading] = useState(false);
 
-  // URL sync
-  useEffect(() => {
-    const params = new URLSearchParams();
-    params.set("t", ticker);
-    if (expiry) params.set("e", expiry);
-    router.replace(`/options?${params.toString()}`, { scroll: false });
-  }, [ticker, expiry, router]);
-
   // Fetch KPIs, expiries, and term structure when ticker changes
   const fetchTickerData = useCallback(async () => {
     if (!ticker.trim()) return;
@@ -71,7 +65,7 @@ function OptionsPageInner() {
     setChain(null);
     setSmile([]);
     setOiProfile(null);
-    setExpiry("");
+    setUrlState({ e: "" });
     setExpiries([]);
 
     // Parallel fetches
@@ -99,7 +93,7 @@ function OptionsPageInner() {
       const exps = expiriesResult.value ?? [];
       setExpiries(exps);
       if (exps.length > 0) {
-        setExpiry(exps[0]);
+        setUrlState({ e: exps[0] });
       }
     } else {
       setExpiries([]);
@@ -158,7 +152,7 @@ function OptionsPageInner() {
   }, [fetchExpiryData, expiry]);
 
   function handleSearch(sym: string) {
-    setTicker(sym.toUpperCase());
+    setUrlState({ t: sym.toUpperCase(), e: "" });
   }
 
   return (
@@ -197,7 +191,7 @@ function OptionsPageInner() {
         ) : expiries.length > 0 ? (
           <select
             value={expiry}
-            onChange={(e) => setExpiry(e.target.value)}
+            onChange={(e) => setUrlState({ e: e.target.value })}
             className="px-3 py-1.5 rounded-lg border border-border bg-surface text-sm font-mono focus:outline-none focus:ring-1 focus:ring-accent"
           >
             {expiries.map((exp) => (
@@ -224,7 +218,7 @@ function OptionsPageInner() {
         {TABS.map((t) => (
           <button
             key={t}
-            onClick={() => setTab(t)}
+            onClick={() => setUrlState({ tab: t })}
             className={`px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors ${
               tab === t
                 ? "border-b-2 border-accent text-accent"

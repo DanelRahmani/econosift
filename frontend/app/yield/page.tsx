@@ -1,7 +1,8 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { useUrlState } from "@/lib/useUrlState";
 import type { RatesData, GlobalYieldCountry } from "@/lib/types";
 import { MultiCountryYieldChart } from "@/components/yield/MultiCountryYieldChart";
 import { Card as UiCard, PageSkeleton } from "@/components/ui";
@@ -304,8 +305,9 @@ function GlobalYieldsTab({ data: countries }: { data: GlobalYieldCountry[] }) {
   );
 }
 
-export default function YieldPage() {
-  const [tab, setTab] = useState<(typeof TABS)[number]>("US Curve");
+function YieldPageInner() {
+  const [urlState, setUrlState] = useUrlState({ tab: "US Curve" });
+  const tab = urlState.tab;
   const { data, isLoading, error } = useQuery({
     queryKey: ["yieldCurves"],
     queryFn: api.yieldCurves,
@@ -338,7 +340,7 @@ export default function YieldPage() {
         {TABS.map((t) => (
           <button
             key={t}
-            onClick={() => setTab(t)}
+            onClick={() => setUrlState({ tab: t })}
             className={`px-4 py-2 text-sm whitespace-nowrap border-b-2 -mb-px transition-colors ${
               tab === t ? "border-accent text-accent" : "border-transparent text-muted hover:text-foreground"
             }`}
@@ -605,5 +607,13 @@ function DefaultRiskTab() {
         </div>
       </UiCard>
     </div>
+  );
+}
+
+export default function YieldPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-muted">Loading…</div>}>
+      <YieldPageInner />
+    </Suspense>
   );
 }

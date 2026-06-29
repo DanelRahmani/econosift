@@ -1,11 +1,11 @@
 "use client";
 
 import { Suspense, useEffect, useState, useCallback } from "react";
-import { useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
 import type { CorporateHealthResponse } from "@/lib/types";
 import { Card, PageSkeleton } from "@/components/ui";
 import { TickerSearch } from "@/components/TickerSearch";
+import { useUrlState } from "@/lib/useUrlState";
 
 function KpiCard({ label, value, sub, color }: {
   label: string; value: string; sub?: string; color?: string;
@@ -30,8 +30,8 @@ function fmtPct(v: number | null | undefined): string {
 }
 
 function CorporatePageInner() {
-  const searchParams = useSearchParams();
-  const [ticker, setTicker] = useState(searchParams.get("ticker") ?? "");
+  const [urlState, setUrlState] = useUrlState({ ticker: "" });
+  const ticker = urlState.ticker;
   const [data, setData] = useState<CorporateHealthResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -54,20 +54,16 @@ function CorporatePageInner() {
   }, []);
 
   useEffect(() => {
-    const param = searchParams.get("ticker");
-    if (param) {
-      setTicker(param);
-      fetchHealth(param);
+    if (ticker) {
+      fetchHealth(ticker);
     }
-  }, [searchParams, fetchHealth]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (ticker.trim()) {
-      // Update URL
-      const url = new URL(window.location.href);
-      url.searchParams.set("ticker", ticker.trim().toUpperCase());
-      window.history.replaceState({}, "", url.toString());
+      setUrlState({ ticker: ticker.trim().toUpperCase() });
       fetchHealth(ticker);
     }
   };
@@ -86,11 +82,7 @@ function CorporatePageInner() {
         <TickerSearch
           value={ticker}
           onChange={(t) => {
-            setTicker(t);
-            // Auto-fetch when ticker selected from dropdown
-            const url = new URL(window.location.href);
-            url.searchParams.set("ticker", t);
-            window.history.replaceState({}, "", url.toString());
+            setUrlState({ ticker: t });
             fetchHealth(t);
           }}
           placeholder="Search company name or ticker (AAPL, TSLA, GE)…"

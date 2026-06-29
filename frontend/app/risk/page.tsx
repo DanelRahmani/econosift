@@ -1,11 +1,11 @@
 "use client";
 
 import { Suspense, useEffect, useState, useCallback } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { useTheme } from "@/components/ThemeProvider";
 import { Skeleton } from "@/components/ui";
 import { SearchBar } from "@/components/SearchBar";
+import { useUrlState } from "@/lib/useUrlState";
 import { RiskKPIRow } from "@/components/risk/RiskKPIRow";
 import { RollingMetricsChart } from "@/components/risk/RollingMetricsChart";
 import { ExtendedRiskTable } from "@/components/risk/ExtendedRiskTable";
@@ -31,15 +31,30 @@ type Tab = (typeof TABS)[number];
 const WINDOWS = [20, 60, 120, 252] as const;
 type Window = (typeof WINDOWS)[number];
 
+const BENCHMARKS = [
+  { value: "", label: "Auto" },
+  { value: "^GSPC", label: "S&P 500" },
+  { value: "^NDX", label: "Nasdaq 100" },
+  { value: "^DJI", label: "Dow Jones" },
+  { value: "^RUT", label: "Russell 2000" },
+];
+
 function RiskPageInner() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
   const { theme } = useTheme();
 
-  const [tickersStr, setTickersStr] = useState<string>(searchParams.get("t") ?? "AAPL");
-  const [period, setPeriod] = useState<Period>((searchParams.get("p") as Period) ?? "3y");
-  const [window, setWindow] = useState<Window>(252);
-  const [tab, setTab] = useState<Tab>("Rolling Metrics");
+  const [urlState, setUrlState] = useUrlState({
+    t: "AAPL",
+    p: "3y",
+    tab: "Rolling Metrics",
+    w: "252",
+    b: "",
+  });
+
+  const tickersStr = urlState.t;
+  const period = (PERIODS as readonly string[]).includes(urlState.p) ? (urlState.p as Period) : "3y";
+  const tab = (TABS as readonly string[]).includes(urlState.tab) ? (urlState.tab as Tab) : "Rolling Metrics";
+  const window = (WINDOWS as readonly number[]).includes(Number(urlState.w)) ? (Number(urlState.w) as Window) : 252;
+  const benchmark = urlState.b;
 
   // Data state
   const [baseMetrics, setBaseMetrics] = useState<RiskMetric[]>([]);
@@ -52,55 +67,47 @@ function RiskPageInner() {
   const [extendedLoading, setExtendedLoading] = useState(false);
   const [corrLoading, setCorrLoading] = useState(false);
 
-  // URL sync
-  useEffect(() => {
-    const params = new URLSearchParams();
-    params.set("t", tickersStr);
-    params.set("p", period);
-    router.replace(`/risk?${params.toString()}`, { scroll: false });
-  }, [tickersStr, period, router]);
-
   // Fetch base risk (for KPI row)
   const fetchBase = useCallback(async () => {
     if (!tickersStr.trim()) return;
     setBaseLoading(true);
     try {
-      const res = await api.risk(tickersStr, "1y", 0.04);
+      const res = await api.risk(tickersStr, "1y", 0.04, benchmark || undefined);
       setBaseMetrics(res.metrics);
     } catch {
       setBaseMetrics([]);
     } finally {
       setBaseLoading(false);
     }
-  }, [tickersStr]);
+  }, [tickersStr, benchmark]);
 
   // Fetch rolling
   const fetchRolling = useCallback(async () => {
     if (!tickersStr.trim()) return;
     setRollingLoading(true);
     try {
-      const res: RollingMetricsResponse = await api.riskRolling(tickersStr, period, window);
+      const res: RollingMetricsResponse = await api.riskRolling(tickersStr, period, window, benchmark || undefined);
       setRollingData(res.tickers ?? []);
     } catch {
       setRollingData([]);
     } finally {
       setRollingLoading(false);
     }
-  }, [tickersStr, period, window]);
+  }, [tickersStr, period, window, benchmark]);
 
   // Fetch extended
   const fetchExtended = useCallback(async () => {
     if (!tickersStr.trim()) return;
     setExtendedLoading(true);
     try {
-      const res: ExtendedRiskResponse = await api.riskExtended(tickersStr, period);
+      const res: ExtendedRiskResponse = await api.riskExtended(tickersStr, period, benchmark || undefined);
       setExtendedData(res.tickers ?? []);
     } catch {
       setExtendedData([]);
     } finally {
       setExtendedLoading(false);
     }
-  }, [tickersStr, period]);
+  }, [tickersStr, period, benchmark]);
 
   // Fetch correlation
   const fetchCorr = useCallback(async () => {
@@ -132,20 +139,17 @@ function RiskPageInner() {
   const firstExtended = extendedData[0] ?? null;
 
   function handleSearch(sym: string) {
-    const existing = tickersStr.split(",").map((t) => t.trim()).filter(Boolean);
+    const existing = tickerList;
     if (!existing.includes(sym.toUpperCase())) {
-      setTickersStr([...existing, sym.toUpperCase()].join(","));
+      setUrlState({ t: [...existing, sym.toUpperCase()].join(",") });
     } else {
-      setTickersStr(sym.toUpperCase());
+      setUrlState({ t: sym.toUpperCase() });
     }
   }
 
   function removeTicker(sym: string) {
-    const remaining = tickersStr
-      .split(",")
-      .map((t) => t.trim())
-      .filter((t) => t && t !== sym);
-    setTickersStr(remaining.join(",") || "AAPL");
+    const remaining = tickerList.filter((t) => t !== sym);
+    setUrlState({ t: remaining.join(",") || "AAPL" });
   }
 
   const tickerList = tickersStr.split(",").map((t) => t.trim()).filter(Boolean);
@@ -162,12 +166,25 @@ function RiskPageInner() {
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
+          {/* Benchmark */}
+          <label className="flex items-center gap-1.5 text-xs text-text-muted">
+            <span>Benchmark</span>
+            <select
+              value={benchmark}
+              onChange={(e) => setUrlState({ b: e.target.value })}
+              className="rounded-md bg-surface-alt border border-border px-2 py-1 text-xs text-text-primary"
+            >
+              {BENCHMARKS.map((b) => (
+                <option key={b.value} value={b.value}>{b.label}</option>
+              ))}
+            </select>
+          </label>
           {/* Period */}
           <div className="flex gap-1">
             {PERIODS.map((p) => (
               <button
                 key={p}
-                onClick={() => setPeriod(p)}
+                onClick={() => setUrlState({ p })}
                 className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
                   period === p
                     ? "bg-accent text-white"
@@ -216,7 +233,7 @@ function RiskPageInner() {
         {TABS.map((t) => (
           <button
             key={t}
-            onClick={() => setTab(t)}
+            onClick={() => setUrlState({ tab: t })}
             className={`px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors ${
               tab === t
                 ? "border-b-2 border-accent text-accent"
@@ -237,7 +254,7 @@ function RiskPageInner() {
               {WINDOWS.map((w) => (
                 <button
                   key={w}
-                  onClick={() => setWindow(w)}
+                  onClick={() => setUrlState({ w: String(w) })}
                   className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
                     window === w
                       ? "bg-accent text-white"
