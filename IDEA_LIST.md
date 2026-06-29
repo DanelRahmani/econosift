@@ -1,7 +1,7 @@
 # Axiom Finance — Feature Idea List
 
-> Last cleaned: 2026-06-29 — 28 items removed (Phases 18A, 25–35), AI Company & AI Macro summaries now shipped in Phase 35.
-> Remaining: 5 pending/partial ideas + Navigation Reshuffle Plan.
+> Last cleaned: 2026-06-29 — Phase 36 shipped (Shareable URLs + Benchmark Override). 2 P2 items removed.
+> Remaining: 3 P3 ideas + Navigation Reshuffle Plan.
 
 ---
 
@@ -24,19 +24,7 @@
 
 ---
 
-## 3. 🧠 Additional Ideas — Pending & Partially Done
-
-Older brainstorming ideas. Only items not yet fully shipped are listed below.
-
-### ✅ P2 — Shareable URLs / Deep Linking — **Done Phase 36**
-Encode dashboard state (selected tickers, period, active tab) in URL query string for bookmarking/sharing.
-- **Data:** URL state only. Pure frontend.
-- **Status:** Rolled out to all 11 pages with user-selectable state via `useUrlState` hook.
-
-### ✅ P2 — Configurable Benchmark Override — **Done Phase 36**
-Let users manually override auto-detected benchmark (e.g., AAPL vs ^NDX instead of ^GSPC) via UI dropdown.
-- **Data:** No new data needed. Backend already supported `&benchmark=` param.
-- **Status:** Benchmark dropdown now on Markets (Overview + Technicals) and Risk page, wired to all backend endpoints.
+## 3. 🧠 Remaining Ideas
 
 ### P3 — Portfolio Transaction Log
 Add buy/sell dates, cost basis, and realized P&L tracking (currently theoretical allocations only).
@@ -92,17 +80,3 @@ The current top-level navigation is a **flat 16-item bar** with no grouping, mix
 6. Promote /scenario to nav
 7. Add next.config.js rewrites
 8. Test: pytest + tsc + Docker rebuild + curl each path
-
----
-
-## Summary Matrix
-
-| # | Idea | Category | Priority | New Data Needed? | Effort | Status |
-|---|------|----------|----------|------------------|--------|--------|
-| 1 | Labor Market Deep Dive | Macro Tab | P1 | 5 WB codes + 2 FRED | Medium | ✅ DONE Phase 32 |
-| 2 | Energy Transition & Climate | Macro Tab | P1 | 6 new WB codes | Medium | ✅ DONE Phase 32 |
-| 3 | Inequality & Development | Macro Tab | P1 | 5 new WB codes | Medium | ✅ DONE Phase 32 |
-| 4 | Currency Crisis Early Warning | Tool | P1 | 1 new WB code | Medium | ✅ DONE Phase 33 |
-| 5 | Supply Chain → Atlas Overlay | Enhance | P1 | 2 WB codes + bilateral data | Medium | ✅ DONE Phase 34 |
-
-**Completed:** 22/22 · **Remaining:** 0 🎉
