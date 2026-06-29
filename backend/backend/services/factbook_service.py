@@ -15,6 +15,32 @@ from ..cache import cached
 
 logger = logging.getLogger(__name__)
 
+# ISO 639-2 B/T code mismatches in REST Countries translations
+# languages uses T codes (fas, deu) but translations keys use B codes (per, ger)
+_LANG_ALT_CODES: dict[str, str] = {
+    "fas": "per",  # Persian/Farsi: T=fas, B=per
+    "prs": "per",  # Dari (Afghan Persian): no ISO 639-2, map to per
+    "deu": "ger",  # German: T=deu, B=ger (defensive, usually both work)
+}
+_LANG_ALT_CODES_REV: dict[str, str] = {v: k for k, v in _LANG_ALT_CODES.items()}
+
+
+def _resolve_local_lang(languages: dict, translations: dict) -> str | None:
+    """Find the translation key matching the country's primary language.
+    
+    Tries direct match first, then ISO 639-2 B↔T alternates, then all language codes.
+    Returns the matching translation key or None.
+    """
+    if not languages or not translations:
+        return None
+    for lang_code in languages:
+        if lang_code in translations:
+            return lang_code
+        alt = _LANG_ALT_CODES.get(lang_code) or _LANG_ALT_CODES_REV.get(lang_code)
+        if alt and alt in translations:
+            return alt
+    return None
+
 # Paths: try bulk-download location first, then manual placement
 # Bulk data service stores in /app/data/bulk/ — same as other bulk datasets
 _DATA_DIR = Path("/app/data") if Path("/app/data").exists() else (Path(__file__).resolve().parent.parent / "data")
@@ -182,9 +208,9 @@ def _extract_sections(entry: dict) -> list[dict]:
         trans_fields = []
         common_name = name_data.get("common", entry.get("name", ""))
         # Local language first (primary language of the country)
-        local_lang_code = list(languages.keys())[0] if languages else None
+        local_lang_code = _resolve_local_lang(languages, trans)
         local_common = ""
-        if local_lang_code and local_lang_code in trans:
+        if local_lang_code:
             local_common = trans[local_lang_code].get("common", "")
             local_official = trans[local_lang_code].get("official", "")
             label = f"{local_lang_code.upper()} (Local) — {local_common}" if local_common else f"{local_lang_code.upper()} (Local)"
@@ -302,10 +328,11 @@ def get_country_profile(iso2: str) -> dict | None:
     local_name = ""
     languages = entry.get("languages", {})
     if isinstance(languages, dict) and languages:
-        local_lang_code = list(languages.keys())[0]
         translations = entry.get("translations", {})
-        if isinstance(translations, dict) and local_lang_code in translations:
-            local_name = translations[local_lang_code].get("common", "")
+        if isinstance(translations, dict):
+            local_lang_code = _resolve_local_lang(languages, translations)
+            if local_lang_code:
+                local_name = translations[local_lang_code].get("common", "")
 
     # French name
     french_name = ""
