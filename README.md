@@ -2,7 +2,7 @@
 
 A self-hosted, Dockerised financial analytics platform covering the full investment research stack — from macroeconomics to options pricing, portfolio optimisation to financial term dictionary.
 
-**No paid APIs required.** Optional free [FRED API key](https://fred.stlouisfed.org/docs/api/api_key.html) for richer US macro data and [Finnhub API key](https://finnhub.io/) for earnings, calendar events, and insider transactions.
+**No paid APIs required.** Optional free [FRED API key](https://fred.stlouisfed.org/docs/api/api_key.html) for richer US macro data, [Finnhub API key](https://finnhub.io/) for earnings and insider transactions, and [Gemini API key](https://aistudio.google.com/apikey) for AI-powered company, macro, and dashboard summaries.
 
 ---
 

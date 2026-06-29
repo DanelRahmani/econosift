@@ -1787,7 +1787,7 @@ export interface HealthResponse {
     overallHitRate: number | null;
     ttlSeconds: number;
   };
-  config: { fredApiKey: boolean; finnhubApiKey: boolean };
+  config: { fredApiKey: boolean; finnhubApiKey: boolean; geminiApiKey: boolean };
   database: DbHealth;
 }
 
@@ -1802,12 +1802,14 @@ export interface BulkDatasetStatus {
 export interface ConfigResponse {
   fredApiKey: string | null;
   finnhubApiKey: string | null;
+  geminiApiKey: string | null;
   restartRequired?: boolean;
 }
 
 export interface ConfigUpdateRequest {
   fredApiKey?: string;
   finnhubApiKey?: string;
+  geminiApiKey?: string;
 }
 
 export interface PrefetchStatus {
@@ -2239,4 +2241,21 @@ export interface MacroRegimeData {
   };
   asset_signals: Record<string, "overweight" | "underweight" | "neutral">;
   allocation: Record<string, number>;
+}
+
+
+// --- AI-Powered Summaries (Gemini) ---
+export interface AiSummaryResponse {
+  summary_type: "company" | "macro" | "dashboard";
+  context_key: string;
+  summary_text: string;
+  model_used: string;
+  created_at: string;
+  cached: boolean;
+}
+export interface AiSummaryHistoryItem {
+  id: number;
+  summary_text: string;
+  model_used: string;
+  created_at: string;
 }

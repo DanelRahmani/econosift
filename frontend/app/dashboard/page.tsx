@@ -8,6 +8,8 @@ import { TopMovers } from "@/components/dashboard/TopMovers";
 import { RegimeDetector } from "@/components/macro/RegimeDetector";
 import { YieldCurve } from "@/components/macro/YieldCurve";
 import { SectorHeatmap } from "@/components/markets/SectorHeatmap";
+import { AiSummaryPanel } from "@/components/AiSummaryPanel";
+import { api } from "@/lib/api";
 
 /**
  * Phase 2 dashboard landing page. Layout: sticky breadth bar → Fear & Greed +
@@ -42,6 +44,12 @@ export default function DashboardPage() {
       </div>
 
       <SectorHeatmap />
+
+      <AiSummaryPanel
+        summaryType="dashboard"
+        title="AI Daily Briefing"
+        onGenerate={(model, force) => api.aiDashboard(model, force)}
+      />
     </div>
   );
 }

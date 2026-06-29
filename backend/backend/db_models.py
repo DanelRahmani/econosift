@@ -115,3 +115,21 @@ class CacheEntry(Base):
     __table_args__ = (
         PrimaryKeyConstraint("cache_name", "key"),
     )
+
+
+class AiSummary(Base):
+    """AI-generated summaries cached with type + context key."""
+
+    __tablename__ = "ai_summary"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    summary_type = Column(String, nullable=False)   # "company" | "macro" | "dashboard"
+    context_key = Column(String, nullable=False)     # ticker / "US,DE,JP" / "daily"
+    model_used = Column(String, nullable=False)      # e.g. "gemini-2.0-flash"
+    summary_text = Column(String, nullable=False)
+    prompt_sent = Column(String)                     # for debugging
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index("ix_ai_summary_lookup", "summary_type", "context_key"),
+    )

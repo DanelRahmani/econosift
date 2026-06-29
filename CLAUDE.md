@@ -25,9 +25,10 @@ Axiom Finance is a self-hosted financial analytics platform built on FastAPI + N
 - **Stability** (`/stability`): Currency Crisis Early Warning System (KLR 1998), Banking Stability (NPL, capital adequacy, Z-scores, BIS credit gaps)
 - **Cross-Border** (`/crossborder`): BIS locational banking statistics, international debt securities, global financial interconnectedness
 - **Country Profiles** (`/country/{iso2}`): CIA World Factbook data per country — geography, demographics, economy
-- **Admin** (`/admin`): Backend health dashboard, cache stats, API keys management (FRED/Finnhub validation)
+- **AI Summaries** (on-request): AI-powered company analysis (per ticker on Markets), macro summary (per country selection on Macro), daily market briefing (Dashboard). Uses Google Gemini free-tier API with model selector, SQLite caching, and clickable stock/country selectors.
+- **Admin** (`/admin`): Backend health dashboard, cache stats, API keys management (FRED/Finnhub/Gemini validation)
 
-No paid APIs required. Optional free FRED API key & FINNHUB API key for richer US data.
+No paid APIs required. Optional free FRED API key & FINNHUB API key for richer US data, and free Gemini API key for AI summaries.
 
 ## Tech Stack
 
@@ -46,9 +47,9 @@ No paid APIs required. Optional free FRED API key & FINNHUB API key for richer U
 
 ## Build History
 
-See [`CHANGELOG.md`](./CHANGELOG.md) for the full build history (Phases 0–31 ✅ COMPLETE).
+See [`CHANGELOG.md`](./CHANGELOG.md) for the full build history (Phases 0–35 ✅ COMPLETE).
 
-The original `claude_plan.md` roadmap (Phases 0–12) is fully delivered, as is the Phase 13–24 expansion and the Phase 25–31 IDEA_LIST delivery. All phases are shipped and verified in Docker. Future work should start a new phase plan (e.g. Phase 32+).
+The original `claude_plan.md` roadmap (Phases 0–12) is fully delivered, as is the Phase 13–24 expansion, the Phase 25–34 IDEA_LIST delivery, and Phase 35 AI summaries. All phases are shipped and verified in Docker. Future work should start a new phase plan (e.g. Phase 36+).
 
 > **After completing each phase, add a one-line entry to [`CHANGELOG.md`](./CHANGELOG.md)** with phase number, date, and concise description of what was shipped.
 

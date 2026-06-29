@@ -40,6 +40,7 @@ import type {
   BusinessData, ShortInterestData, MAData,
   FactbookCountry, FactbookProfile, CrossborderData,
   SovereignDefaultData,
+  AiSummaryResponse, AiSummaryHistoryItem,
 } from "./types";
 
 async function get<T>(path: string): Promise<T> {
@@ -523,6 +524,19 @@ export const api = {
     if (category) params.set("category", category);
     return get<WikiTermsResponse>(`/wiki/terms?${params}`);
   },
+
+  // --- AI Summaries (Gemini) ---
+  aiCompany: (ticker: string, model: string, forceRegenerate: boolean) =>
+    post<AiSummaryResponse>("/ai/company", { ticker, model, force_regenerate: forceRegenerate }),
+
+  aiMacro: (countries: string[], model: string, forceRegenerate: boolean) =>
+    post<AiSummaryResponse>("/ai/macro", { countries, model, force_regenerate: forceRegenerate }),
+
+  aiDashboard: (model: string, forceRegenerate: boolean) =>
+    post<AiSummaryResponse>("/ai/dashboard", { model, force_regenerate: forceRegenerate }),
+
+  aiHistory: (summaryType: string, contextKey: string) =>
+    get<{ items: AiSummaryHistoryItem[] }>(`/ai/history/${summaryType}/${encodeURIComponent(contextKey)}`),
 };
 
 // --- Phase 17.E: React Query ---

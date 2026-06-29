@@ -13,6 +13,7 @@ import { MacroDashboard } from "./MacroDashboard";
 import { CountrySelector } from "./CountrySelector";
 import { IndicatorSelector } from "./IndicatorSelector";
 import { MacroChart } from "./MacroChart";
+import { AiSummaryPanel } from "@/components/AiSummaryPanel";
 
 const CURRENT_YEAR = new Date().getFullYear();
 const FORECASTABLE = new Set([
@@ -201,6 +202,13 @@ export function MacroOverview() {
       </div>
 
       <InflationHeatmap selected={selected} countries={countries} />
+
+      <AiSummaryPanel
+        summaryType="macro"
+        title="AI Macro Summary"
+        options={selected.map((iso) => ({ key: iso, label: countries.find((c) => c.iso2 === iso)?.name ?? iso }))}
+        onGenerate={(model, force, sel) => api.aiMacro(sel.length ? sel : selected, model, force)}
+      />
     </div>
   );
 }

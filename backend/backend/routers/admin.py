@@ -11,7 +11,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from .. import cache
-from ..config import FRED_API_KEY, FINNHUB_API_KEY
+from ..config import FRED_API_KEY, FINNHUB_API_KEY, GEMINI_API_KEY
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -29,7 +29,7 @@ async def health():
     db_health: dict = {}
     try:
         from ..database import SessionLocal
-        from ..db_models import DailyPrice, DailyQuote, DailyMacro, DailyFX, JobExecution, CacheEntry
+        from ..db_models import DailyPrice, DailyQuote, DailyMacro, DailyFX, JobExecution, CacheEntry, AiSummary
         with SessionLocal() as session:
             db_health = {
                 "daily_price": session.query(DailyPrice).count(),
@@ -38,6 +38,7 @@ async def health():
                 "daily_fx":    session.query(DailyFX).count(),
                 "job_execution": session.query(JobExecution).count(),
                 "cache_entries": session.query(CacheEntry).count(),
+                "ai_summaries": session.query(AiSummary).count(),
             }
             # Add total cache size
             total_bytes = session.query(CacheEntry.value_json).all()
@@ -58,6 +59,7 @@ async def health():
         "config": {
             "fredApiKey": bool(FRED_API_KEY),
             "finnhubApiKey": bool(FINNHUB_API_KEY),
+            "geminiApiKey": bool(GEMINI_API_KEY),
         },
         "database": db_health,
     }
@@ -181,6 +183,7 @@ if not os.path.isfile(_ENV_PATH):
 class _ConfigUpdate(BaseModel):
     fredApiKey: str | None = None
     finnhubApiKey: str | None = None
+    geminiApiKey: str | None = None
 
 
 def _mask_key(key: str | None) -> str | None:
@@ -240,12 +243,28 @@ async def _validate_finnhub_key(key: str) -> bool:
         return False
 
 
+async def _validate_gemini_key(key: str) -> bool:
+    """Test a Gemini API key by listing available models."""
+    url = f"https://generativelanguage.googleapis.com/v1beta/models?key={key}"
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.get(url)
+            if resp.status_code != 200:
+                return False
+            data = resp.json()
+            # Valid key returns {"models": [...]}; invalid returns {"error": {...}}
+            return "models" in data and "error" not in data
+    except Exception:
+        return False
+
+
 @router.get("/config")
 async def get_config():
-    """Return masked FRED and Finnhub API keys."""
+    """Return masked API keys."""
     return {
         "fredApiKey": _mask_key(FRED_API_KEY),
         "finnhubApiKey": _mask_key(FINNHUB_API_KEY),
+        "geminiApiKey": _mask_key(GEMINI_API_KEY),
     }
 
 
@@ -274,6 +293,13 @@ async def update_config(body: _ConfigUpdate):
             errors.append("Finnhub API key cannot be empty.")
         elif not await _validate_finnhub_key(body.finnhubApiKey):
             errors.append("Finnhub API key is invalid — check and try again.")
+
+    # --- Validate Gemini key if provided --------------------------------------
+    if body.geminiApiKey is not None:
+        if not body.geminiApiKey.strip():
+            errors.append("Gemini API key cannot be empty.")
+        elif not await _validate_gemini_key(body.geminiApiKey):
+            errors.append("Gemini API key is invalid — check and try again.")
 
     if errors:
         raise HTTPException(status_code=400, detail="; ".join(errors))
@@ -307,11 +333,25 @@ async def update_config(body: _ConfigUpdate):
             content = content.rstrip("\n") + f"\nFINNHUB_API_KEY={key}\n"
         updated_any = True
 
+    if body.geminiApiKey is not None:
+        key = body.geminiApiKey.strip()
+        if re.search(r"^GEMINI_API_KEY=", content, flags=re.MULTILINE):
+            content = re.sub(
+                r"^GEMINI_API_KEY=.*$",
+                f"GEMINI_API_KEY={key}",
+                content,
+                flags=re.MULTILINE,
+            )
+        else:
+            content = content.rstrip("\n") + f"\nGEMINI_API_KEY={key}\n"
+        updated_any = True
+
     if updated_any:
         _write_env(content)
 
     return {
         "fredApiKey": _mask_key(body.fredApiKey if body.fredApiKey is not None else FRED_API_KEY),
         "finnhubApiKey": _mask_key(body.finnhubApiKey if body.finnhubApiKey is not None else FINNHUB_API_KEY),
+        "geminiApiKey": _mask_key(body.geminiApiKey if body.geminiApiKey is not None else GEMINI_API_KEY),
         "restartRequired": updated_any,
     }

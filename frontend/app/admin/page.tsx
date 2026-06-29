@@ -118,7 +118,7 @@ export default function AdminPage() {
         <Skeleton className="h-40" />
       ) : data ? (
         <>
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-6 gap-3">
             <Stat label="Status" value={data.status.toUpperCase()} tone="pos" />
             <Stat label="Uptime" value={fmtUptime(data.uptimeSeconds)} />
             <Stat
@@ -127,6 +127,7 @@ export default function AdminPage() {
             />
             <Stat label="FRED API Key" value={data.config.fredApiKey ? "Set" : "Missing"} tone={data.config.fredApiKey ? "pos" : "neg"} />
             <Stat label="Finnhub API Key" value={data.config.finnhubApiKey ? "Set" : "Missing"} tone={data.config.finnhubApiKey ? "pos" : "neg"} />
+            <Stat label="Gemini API Key" value={data.config.geminiApiKey ? "Set" : "Missing"} tone={data.config.geminiApiKey ? "pos" : "neg"} />
           </div>
 
           {/* API Keys */}
@@ -213,7 +214,7 @@ function DbStat({ label, value }: { label: string; value: string }) {
 
 function ApiKeysSection() {
   const [config, setConfig] = useState<ConfigResponse | null>(null);
-  const [editing, setEditing] = useState<"fred" | "finnhub" | null>(null);
+  const [editing, setEditing] = useState<"fred" | "finnhub" | "gemini" | null>(null);
   const [inputValue, setInputValue] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -224,7 +225,7 @@ function ApiKeysSection() {
     api.config().then(setConfig).catch(() => setConfig(null));
   }, []);
 
-  const startEdit = (key: "fred" | "finnhub") => {
+  const startEdit = (key: "fred" | "finnhub" | "gemini") => {
     setEditing(key);
     setError(null);
     setSaved(false);
@@ -250,7 +251,9 @@ function ApiKeysSection() {
     try {
       const body = editing === "fred"
         ? { fredApiKey: val }
-        : { finnhubApiKey: val };
+        : editing === "finnhub"
+        ? { finnhubApiKey: val }
+        : { geminiApiKey: val };
       const res = await api.updateConfig(body);
       setConfig(res);
       setSaved(true);
@@ -375,6 +378,54 @@ function ApiKeysSection() {
         <div className="text-xs text-danger mt-1">{error}</div>
       )}
       {editing === "finnhub" && saved && (
+        <div className="text-xs text-success mt-1">✓ Key saved</div>
+      )}
+
+      {/* Gemini */}
+      <div className="flex items-center justify-between py-2">
+        <div>
+          <span className="text-sm font-medium text-text-primary">Gemini</span>
+          <span className="text-xs text-text-muted ml-2">aistudio.google.com</span>
+        </div>
+        <div className="flex items-center gap-3">
+          {editing === "gemini" ? (
+            <>
+              <input
+                type="text"
+                placeholder="Paste Gemini API key…"
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                disabled={saving}
+                className="w-64 px-2 py-1 text-xs font-mono border border-border rounded bg-surface text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent"
+              />
+              <button
+                onClick={save}
+                disabled={saving}
+                className="px-2 py-1 text-xs font-medium rounded bg-success text-white hover:bg-success/80 disabled:opacity-50"
+              >{saving ? "Validating…" : "Save"}</button>
+              <button
+                onClick={cancelEdit}
+                disabled={saving}
+                className="px-2 py-1 text-xs font-medium rounded border border-border text-text-secondary hover:text-text-primary"
+              >Cancel</button>
+            </>
+          ) : (
+            <>
+              <span className="text-xs font-mono text-text-primary">
+                {masked(config?.geminiApiKey)}
+              </span>
+              <button
+                onClick={() => startEdit("gemini")}
+                className="px-2 py-0.5 text-xs font-medium rounded border border-border text-text-secondary hover:text-text-primary hover:bg-surface-alt transition-colors"
+              >Edit</button>
+            </>
+          )}
+        </div>
+      </div>
+      {editing === "gemini" && error && (
+        <div className="text-xs text-danger mt-1">{error}</div>
+      )}
+      {editing === "gemini" && saved && (
         <div className="text-xs text-success mt-1">✓ Key saved</div>
       )}
     </Card>

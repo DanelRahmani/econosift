@@ -13,6 +13,7 @@ import { NewsFeed } from "@/components/markets/NewsFeed";
 import { InstitutionalHolders } from "@/components/markets/InstitutionalHolders";
 import { InsiderActivity } from "@/components/markets/InsiderActivity";
 import { Watchlist } from "@/components/Watchlist";
+import { AiSummaryPanel } from "@/components/AiSummaryPanel";
 import { SnowflakeChart } from "@/components/markets/SnowflakeChart";
 import { TabSkeleton } from "@/components/markets/TabSkeleton";
 import { TreemapChart } from "@/components/markets/Treemap";
@@ -302,6 +303,12 @@ function MarketsPageInner() {
             {pricesLoading ? <Skeleton className="h-96" /> : prices && <PriceChart data={prices} events={events} />}
           </Card>
           <SnowflakeChart ticker={tickers[0]} onAxisClick={handleSnowflakeClick} />
+          <AiSummaryPanel
+            summaryType="company"
+            title="AI Analysis"
+            options={tickers.map((t) => ({ key: t, label: t }))}
+            onGenerate={(model, force, selected) => api.aiCompany(selected.join(",") || tickers[0], model, force)}
+          />
           <NewsFeed tickers={tickers} />
         </div>
       )}

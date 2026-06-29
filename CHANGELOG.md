@@ -58,6 +58,7 @@
 | Phase 32 | 2026-06-29 | Wired 3 macro tabs that were built but missing router endpoints: Labor Market Deep Dive (/macro?tab=labor), Energy Transition & Climate (/macro?tab=energy), Inequality & Development (/macro?tab=inequality). ~15 lines in macro.py — services, frontend, and WB data were already complete |
 | Phase 33 | 2026-06-29 | Currency Crisis Early Warning: upgraded from 5-signal proxy model to 6-signal KLR model. Added real reserves decline (FI.RES.TOTL.CD via WB) and FX overvaluation (BIS effective FX vs 5Y average) signals. Registered stability router in main.py (was missing). Updated frontend to show 6-KPI grid per country with Score: X/6 flags |
 | Phase 34 | 2026-06-29 | Supply Chain Vulnerability Atlas layer: created supply_chain_service.py computing composite score from food_imports + fuel_imports (both already live). Added as 13th Atlas indicator — choropleth map + color scale + rankings auto-render. IMF DOTS (Tier A) and WB partner shares (Tier B) investigated but inaccessible. IDEA_LIST: 22/22 complete 🎉 |
+| Phase 35 | 2026-06-29 | AI-Powered Summaries: Google Gemini integration for 3 on-request summaries — Company (per-ticker on Markets), Macro (per-country on Macro Overview), Dashboard (daily briefing). Prompts use Gemini's built-in knowledge (no server-side data gathering). SQLite-cached with regenerate button, model selector, clickable stock/country chips, and source attribution. Admin page Gemini key management. Nginx 360s timeout for AI endpoints. |
 
 ---
 
