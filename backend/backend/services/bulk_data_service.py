@@ -45,7 +45,7 @@ def _save_status(status: dict) -> None:
 def get_bulk_status() -> dict:
     s = _load_status()
     result = {}
-    for key in ("worldbank", "famafrench", "imf_weo", "bis", "factbook", "reinhart_rogoff"):
+    for key in ("worldbank", "famafrench", "imf_weo", "bis", "factbook", "reinhart_rogoff", "factbook_profiles"):
         entry = s.get(key, {})
         result[key] = {
             "last_ok": entry.get("last_ok"),
@@ -469,6 +469,58 @@ def _download_reinhart_rogoff() -> dict:
 
 
 # ---------------------------------------------------------------------------
+# CIA World Factbook country profiles (factbook/factbook.json)
+# ---------------------------------------------------------------------------
+
+FACTBOOK_ZIP_URL = "https://github.com/factbook/factbook.json/archive/refs/heads/master.zip"
+FACTBOOK_DIR = DATA_DIR / "factbook"
+
+
+def _download_factbook_profiles() -> dict:
+    """Download and extract CIA World Factbook country profiles from GitHub ZIP.
+
+    Extracts ~260 country JSON files from regional folders into data/bulk/factbook/.
+    """
+    try:
+        resp = httpx.get(FACTBOOK_ZIP_URL, timeout=180, follow_redirects=True)
+        resp.raise_for_status()
+
+        import zipfile as _zf, tempfile as _tf, shutil as _sh
+
+        FACTBOOK_DIR.mkdir(parents=True, exist_ok=True)
+
+        with _tf.TemporaryDirectory() as tmp:
+            zip_path = pathlib.Path(tmp) / "factbook.zip"
+            zip_path.write_bytes(resp.content)
+            with _zf.ZipFile(zip_path) as zf:
+                # Files are at factbook.json-master/{region}/{code}.json
+                # Extract all .json files, flatten into factbook/ directory
+                json_count = 0
+                for name in zf.namelist():
+                    if not name.endswith(".json"):
+                        continue
+                    # name format: factbook.json-master/europe/gm.json
+                    parts = name.split("/")
+                    if len(parts) >= 3:
+                        region = parts[1]  # e.g., "europe"
+                        filename = parts[-1]  # e.g., "gm.json"
+                        # Also keep regional subfolders for easier lookup
+                        region_dir = FACTBOOK_DIR / region
+                        region_dir.mkdir(parents=True, exist_ok=True)
+                        with zf.open(name) as src:
+                            (region_dir / filename).write_bytes(src.read())
+                        json_count += 1
+
+            if json_count == 0:
+                return {"rows": 0, "error": "no JSON files found in ZIP"}
+
+        return {"rows": json_count, "error": None}
+    except Exception as exc:
+        logger.warning("Factbook profiles download failed: %s", exc)
+        return {"rows": 0, "error": str(exc)}
+
+
+# ---------------------------------------------------------------------------
 # Master refresh
 # ---------------------------------------------------------------------------
 
@@ -558,6 +610,18 @@ def refresh_all_bulk_data() -> dict:
             }
         except Exception as exc:
             status["reinhart_rogoff"] = {**status.get("reinhart_rogoff", {}), "last_attempt": now, "error": str(exc)}
+
+        # Factbook Profiles (CIA World Factbook)
+        try:
+            fbp = _download_factbook_profiles()
+            status["factbook_profiles"] = {
+                "last_attempt": now,
+                "last_ok": now if not fbp["error"] else status.get("factbook_profiles", {}).get("last_ok"),
+                "error": fbp["error"], "rows": fbp["rows"],
+                "size_kb": _dir_size(FACTBOOK_DIR, ""),
+            }
+        except Exception as exc:
+            status["factbook_profiles"] = {**status.get("factbook_profiles", {}), "last_attempt": now, "error": str(exc)}
 
     _save_status(status)
     logger.info("Bulk data refresh: %s", {k: f"{v.get('rows',0)} rows" for k, v in status.items()})

@@ -192,29 +192,34 @@ export default function CountryDetailPage() {
         </div>
       )}
 
-      {/* Sections — 2-column on desktop */}
+      {/* Sections — Factbook full-width, REST Countries 2-column */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {profile.sections.map((section, i) => (
-          <Card key={i} className="p-5">
+      {profile.sections.map((section, i) => {
+        const isFactbook = ["Introduction", "Geography", "People and Society", "Government",
+          "Economy", "Energy", "Communications", "Transportation", "Military and Security",
+          "Transnational Issues"].includes(section.title);
+        return (
+          <Card key={i} className={`p-5 ${isFactbook ? "lg:col-span-2" : ""}`}>
             <h2 className="text-base font-semibold text-text-primary mb-3 pb-2 border-b border-border/50">
               {section.title}
             </h2>
-            <dl className="space-y-2.5">
+            <dl className={`${isFactbook ? "space-y-4" : "space-y-2.5"}`}>
               {section.fields.map((field, j) => (
                 <div key={j}>
                   {field.label && (
-                    <dt className="text-[11px] font-semibold text-text-muted uppercase tracking-wider mb-0.5">
+                    <dt className="text-[11px] font-semibold text-text-muted uppercase tracking-wider mb-1">
                       {field.label}
                     </dt>
                   )}
-                  <dd className={`text-sm text-text-primary ${!field.label ? "italic text-text-secondary" : ""}`}>
+                  <dd className={`${isFactbook ? "text-sm text-text-primary leading-relaxed whitespace-pre-line" : "text-sm text-text-primary"}`}>
                     {field.value}
                   </dd>
                 </div>
               ))}
             </dl>
           </Card>
-        ))}
+        );
+      })}
       </div>
 
       {profile.sections.length === 0 && (

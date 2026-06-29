@@ -410,6 +410,7 @@ function BulkDataSection() {
     bis: "BIS",
     factbook: "OpenFactbook",
     reinhart_rogoff: "Reinhart & Rogoff",
+    factbook_profiles: "CIA Factbook",
   };
 
   const descriptions: Record<string, string> = {
@@ -417,8 +418,9 @@ function BulkDataSection() {
     famafrench: "3-factor model: Mkt-RF, SMB, HML, RF — monthly, 1926–present",
     imf_weo: "GDP growth, inflation, unemployment, debt/GDP, current account, GDP/capita — ~190 countries with forecasts",
     bis: "CPI, policy rates, exchange rates, credit gaps, property prices, cross-border banking claims — annual/quarterly",
-    factbook: "CIA World Factbook country profiles — ~260 countries with geography, people, government, economy, energy, military sections",
+    factbook: "REST Countries JSON — ~250 countries with ISO codes, flags, languages, currencies",
     reinhart_rogoff: "Historical sovereign default dataset — 70+ countries, 1800–2019, external + domestic default flags",
+    factbook_profiles: "CIA World Factbook country profiles — ~260 countries with Introduction, Geography, People, Government, Economy, Military & more",
   };
 
   if (!bulk || !Object.keys(bulk).length) return null;

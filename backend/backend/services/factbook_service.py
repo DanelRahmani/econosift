@@ -244,6 +244,15 @@ def get_country_profile(iso2: str) -> dict | None:
     iso3 = (entry.get("cca3") or entry.get("ISO3") or "").upper()
 
     sections = _extract_sections(entry)
+
+    # Try to merge in CIA Factbook data
+    try:
+        from .factbook_profiles_service import get_factbook_profile
+        fb_sections = get_factbook_profile(iso2)
+        if fb_sections:
+            sections = fb_sections + sections  # Factbook first, REST Countries after
+    except Exception:
+        pass
     borders = entry.get("borders", []) if isinstance(entry.get("borders"), list) else []
     # Convert border cca3 codes to cca2 for frontend matching
     border_iso2s = []
