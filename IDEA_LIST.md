@@ -1,7 +1,7 @@
 # Axiom Finance — Feature Idea List
 
-> Last cleaned: 2026-06-30 — Phase 39 shipped (Cross-Asset & Factor Analytics). All 3 P3 items complete.
-> Remaining: Navigation Reshuffle Plan only.
+> Last cleaned: 2026-06-30 — Phase 40 shipped (Navigation Reshuffle). All P3 items + nav reshuffle complete.
+> Remaining: 0 ideas. IDEA_LIST is fully delivered.
 
 ---
 
@@ -40,7 +40,7 @@ Beginner-friendly toggles, narrative walkthroughs explaining metrics, academic-s
 
 ---
 
-## 4. 🧭 Navigation Reshuffle Plan
+## 4. 🧭 Navigation Reshuffle Plan ✅ DONE (Phase 40)
 
 **Updated:** 2026-06-30 — Revised after Phase 37–39 delivery. Primary bar unchanged per user direction.
 

@@ -4,11 +4,11 @@
 
 Axiom Finance is a self-hosted financial analytics platform built on FastAPI + Next.js 14, containerized via Docker Compose. It covers the full investment research stack across 24 pages:
 
-- **Dashboard** (`/dashboard`): Market breadth (advancing/declining, McClellan Oscillator, cumulative A-D line), global indices, Fear & Greed Index with sub-components, top movers
+- **Dashboard** (`/dashboard`): Market breadth (advancing/declining, McClellan Oscillator, cumulative A-D line), global indices, Fear & Greed Index with sub-components, top movers. Beginner-mode walkthrough available.
 - **Markets** (`/markets`): Price charts, technical indicators (MACD, Bollinger Bands, Ichimoku Cloud, Fibonacci, Pivot Points), risk metrics (VaR, Sharpe, Beta, GARCH), 8-model valuation engine + DCF with per-country discount rate selector + Snowflake composite score, financial ratios, options & IV analytics, news feed, 13F institutional holdings, Form 4 insider transactions. Sub-tabs: Overview, Technicals, Valuation, Ratios, News & Events, Sectors, Treemap
 - **Screener** (`/screener`): S&P 500 / Nasdaq 100 / Dow 30 universe, 20+ preset signals, overnight-warmed cache, 9 result tabs with sparkline gallery
-- **Portfolio** (`/portfolio`): Efficient frontier, Black-Litterman, Monte Carlo, Fama-French 3/5-factor attribution, Kelly criterion, risk contribution decomposition, stress testing
-- **Research** (`/research`): 5-tab quant hub — Risk Parity (ERC/inverse-vol), FX Carry (G10), Momentum (decile backtest), Realized Moments (GK variance, skew, cross-section), Econometric Lab (pooled OLS)
+- **Portfolio** (`/portfolio`): Efficient frontier, Black-Litterman, Monte Carlo, Fama-French 3/5-factor attribution, Kelly criterion, risk contribution decomposition, stress testing, scenario lab, transaction log (buy/sell tracking with cost basis and realized P&L)
+- **Research** (`/research`): 9-tab quant hub — Risk Parity (ERC/inverse-vol), FX Carry (G10), Momentum (decile backtest), Realized Moments (GK variance, skew, cross-section), Cross-Asset Correlation (stocks/bonds/commodities/FX matrix), FX-Macro Link (commodity pair lead/lag), Multi-Country Portfolio (FX-adjusted returns), Sector DuPont, Econometric Lab (pooled OLS)
 - **Macro** (`/macro`): 16-tab hub — Overview, Inflation, Growth & Employment, Housing, Commodities, FX, Leading Indicators, Financial & Funding Conditions, Positioning, Country Risk, Central Banks, Econometric Lab, Fiscal, Labor, Energy & Climate, Inequality
 - **Risk** (`/risk`): Rolling metrics (20D/60D/120D/252D), GARCH(1,1), Hurst exponent, OU mean-reversion, Engle-Granger cointegration, correlation matrix, historical stress scenarios
 - **Options** (`/options`): IV30, IV Rank/Percentile, Greeks (Δ/Γ/Θ/V/ρ), term structure, volatility smile, OI profile, max pain, Black-Scholes, CRR binomial tree, Monte Carlo

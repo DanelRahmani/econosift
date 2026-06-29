@@ -13,16 +13,16 @@ A self-hosted, Dockerised financial analytics platform covering the full investm
 | Page | Path | Description |
 |------|------|-------------|
 | **Dashboard** | `/dashboard` | Market breadth (advancing/declining, McClellan Oscillator, cumulative A-D line), global indices, Fear & Greed Index with sub-components, top gainers/losers |
-| **Markets** | `/markets` | Price charts, technical indicators (MACD, Bollinger Bands, Ichimoku Cloud, Fibonacci, Pivot Points), risk metrics (VaR, Sharpe, Beta, GARCH), 8-model valuation engine + DCF with per-country discount rate selector (live FRED risk-free rates for US, EU, UK, Japan, etc.) + Snowflake composite score, financial ratios, options & IV analytics, news feed, 13F institutional holdings, Form 4 insider transactions. Sub-tabs: Overview, Technicals, Valuation, Ratios, News & Events, Sectors, Treemap |
+| **Markets** | `/markets` | Price charts, technical indicators (MACD, Bollinger Bands, Ichimoku Cloud, Fibonacci, Pivot Points), risk metrics (VaR, Sharpe, Beta, GARCH), 8-model valuation engine + DCF with per-country discount rate selector (live FRED risk-free rates for US, EU, UK, Japan, etc.) + Snowflake composite score, financial ratios, options & IV analytics, news feed, 13F institutional holdings, Form 4 insider transactions. Sub-tabs: Overview, Technicals, Valuation, Ratios, News & Events, Sectors, Treemap, Short Interest |
 | **Screener** | `/screener` | S&P 500 / Nasdaq 100 / Dow 30 universe, 20+ preset signals (Golden Cross, Undervalued, Quality Growth, High Short Interest, etc.), overnight-warmed cache, 9 result tabs with sparkline gallery |
-| **Portfolio** | `/portfolio` | Efficient frontier, Black-Litterman model, Monte Carlo simulation, Fama-French 3/5-factor attribution, Kelly criterion position sizing, risk contribution decomposition, stress testing |
-| **Research** | `/research` | 5-tab quant hub: **Risk Parity** (ERC/inverse-vol backtest), **FX Carry** (G10 carry + backtest), **Momentum** (decile backtest), **Realized Moments** (GK variance, skew, cross-sectional tail test), **Econometric Lab** (pooled OLS with ~200-country searchable selector) |
-| **Macro** | `/macro` | 9-tab hub: **Overview** (FX rates, country comparison, regime clock with WB data for ALL countries), **Inflation**, **Growth & Employment**, **Housing**, **Commodities** (FRED primary), **FX**, **Leading Indicators**, **Financial & Funding Conditions** (EPU, SOFR, CP spreads, Fed BS), **Sentiment & Positioning** |
+| **Portfolio** | `/portfolio` | Efficient frontier, Black-Litterman model, Monte Carlo simulation, Fama-French 3/5-factor attribution, Kelly criterion position sizing, risk contribution decomposition, stress testing, scenario lab, transaction log (buy/sell tracking, cost basis, realized P&L) |
+| **Research** | `/research` | 9-tab quant hub: **Risk Parity** (ERC/inverse-vol backtest), **FX Carry** (G10 carry + backtest), **Momentum** (decile backtest), **Realized Moments** (GK variance, skew, cross-sectional tail test), **Cross-Asset Correlation** (stocks/bonds/commodities/FX matrix), **FX-Macro Link** (commodity pair lead/lag), **Multi-Country Portfolio** (FX-adjusted returns), **Sector DuPont**, **Econometric Lab** (pooled OLS) |
+| **Macro** | `/macro` | 14-tab hub: **Overview** (FX rates, country comparison, regime clock with WB data for ALL countries), **Inflation**, **Growth & Employment**, **Housing**, **Fiscal**, **Labor**, **Energy & Climate**, **Inequality**, **Business Dynamism**, **Commodities** (FRED primary), **FX**, **Leading Indicators**, **Financial & Funding Conditions**, **Sentiment & Positioning** |
 | **Risk** | `/risk` | Rolling metrics (20D/60D/120D/252D), GARCH(1,1) volatility forecasting, Hurst exponent, Ornstein-Uhlenbeck mean-reversion, Engle-Granger cointegration, correlation matrix, historical stress scenarios (2008, COVID, 2022 rates, dot-com) |
 | **Options** | `/options` | Implied volatility (IV30, IV Rank, IV Percentile), Greeks (Delta, Gamma, Theta, Vega, Rho), term structure, volatility smile, OI profile, max pain, Black-Scholes pricing, CRR binomial tree, Monte Carlo options pricing |
 | **Calendar** | `/calendar` | Economic releases (CPI, NFP, FOMC, GDP, etc.), earnings reports with EPS surprise, ex-dividend dates, IPOs, central bank meeting schedule — sourced from FRED + Finnhub |
 | **Yield** | `/yield` | US Treasury spot curve, foreign spreads, real yields & breakevens, ACM term premium |
-| **Policy** | `/policy` | Central bank policy rate divergence, G10 carry differentials |
+| **Policy** | `/policy` | Central bank policy rate divergence, G10 carry differentials, sovereign risk rankings, default probability model. Merged from `/sovereign` (Phase 23) |
 | **Sovereign** | `/sovereign` | 6-KPI traffic-light sovereign risk rankings, ~200 countries |
 | **Atlas** | `/atlas` | Choropleth world map of 6 macro indicators across ~200 countries (2000–2024), year-slider animation, regional blocs (G7, G20, Eurozone, Emerging Markets), Top-10/Bottom-10 rankings |
 | **Wiki** | `/wiki` | 🔍 Searchable financial dictionary — **410+ terms** across **26 categories**, each with a detailed 3-5 sentence explanation. Category sidebar, debounced search, expandable cards, related-term cross-linking |
@@ -36,7 +36,7 @@ A self-hosted, Dockerised financial analytics platform covering the full investm
 | **Country Profiles** | `/country/{iso2}` | CIA World Factbook data — geography, demographics, economy |
 | **Admin** | `/admin` | Backend health dashboard, cache stats, job execution history, API keys management |
 
-> **Note:** Sectors and Treemap views are embedded as sub-tabs within the Markets page at `/markets?tab=Sectors` and `/markets?tab=Treemap`.
+> **Navigation:** Primary bar (Dashboard · Markets · Screener · Portfolio · Research · Macro · Atlas) is unchanged. The More dropdown is grouped into Discover / Analyze / Markets & Data / Global / Reference sections. Beginner/Expert mode toggle is in the navbar. Sectors and Treemap views are embedded as sub-tabs within the Markets page.
 
 ### Wiki Dictionary — 26 Categories
 
