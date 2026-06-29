@@ -226,10 +226,10 @@ def get_country_profile(iso2: str) -> dict | None:
 
     # Try to merge in CIA Factbook data
     try:
-        from .factbook_profiles_service import get_factbook_profile
+        from .factbook_profiles_service import get_factbook_profile, _load_factbook_file, _extract_field, ISO2_TO_GEC as FB_ISO2
         fb_sections = get_factbook_profile(iso2)
         if fb_sections:
-            # Merge factbook Introduction into REST Introduction (keep REST fields as top, factbook narrative after)
+            # Merge factbook Introduction into REST Introduction
             fb_intro = None
             rest_intro = None
             other_fb = []
@@ -244,7 +244,6 @@ def get_country_profile(iso2: str) -> dict | None:
                     rest_intro = s
                 else:
                     other_rest.append(s)
-            # Build merged introduction: rest fields first, then factbook narrative
             if rest_intro or fb_intro:
                 merged_intro = {"title": "Introduction", "fields": []}
                 if rest_intro:
@@ -254,6 +253,19 @@ def get_country_profile(iso2: str) -> dict | None:
                 sections = [merged_intro] + other_fb + other_rest
             else:
                 sections = fb_sections + sections
+
+        # Add civil aircraft registration code to International Codes
+        gec = FB_ISO2.get(iso2)
+        if gec:
+            fb_data = _load_factbook_file(gec)
+            if fb_data:
+                transport = fb_data.get("Transportation", {})
+                ac = _extract_field(transport.get("Civil aircraft registration country code prefix"))
+                if ac:
+                    for s in sections:
+                        if s["title"] == "International Codes":
+                            s["fields"].append({"label": "Civil Aircraft Reg", "value": ac})
+                            break
     except Exception:
         pass
     borders = entry.get("borders", []) if isinstance(entry.get("borders"), list) else []

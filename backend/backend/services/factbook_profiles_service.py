@@ -171,7 +171,7 @@ def _extract_section(section_data: dict, title: str) -> list[dict]:
     return fields
 
 
-# Section ordering for display
+# Section ordering for display (Transportation removed — fields redistributed)
 SECTION_ORDER = [
     "Introduction",
     "Geography",
@@ -180,10 +180,34 @@ SECTION_ORDER = [
     "Economy",
     "Energy",
     "Communications",
-    "Transportation",
     "Military and Security",
     "Transnational Issues",
 ]
+
+
+def _redistribute_transportation(data: dict, sections: list[dict]) -> None:
+    """Move Transportation fields into Geography."""
+    transport = data.get("Transportation")
+    if not isinstance(transport, dict):
+        return
+
+    # Fields to move to Geography
+    geo_fields = []
+    for key in ("Airports", "Heliports", "Roadways", "Waterways"):
+        val = transport.get(key)
+        text = _extract_field(val)
+        if text:
+            label = key
+            geo_fields.append({"label": label, "value": text})
+
+    if geo_fields:
+        # Find or create Geography section
+        for s in sections:
+            if s["title"] == "Geography":
+                s["fields"].extend(geo_fields)
+                return
+        # No Geography section yet — create one
+        sections.append({"title": "Geography", "fields": geo_fields})
 
 
 def get_factbook_profile(iso2: str) -> list[dict] | None:
@@ -210,5 +234,8 @@ def get_factbook_profile(iso2: str) -> list[dict] | None:
                     "title": section_key,
                     "fields": fields,
                 })
+
+    # Redistribute Transportation fields into Geography
+    _redistribute_transportation(data, sections)
 
     return sections if sections else None
