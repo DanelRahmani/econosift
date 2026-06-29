@@ -1,7 +1,7 @@
 # Axiom Finance — Feature Idea List
 
-> Last cleaned: 2026-06-29 — Phase 36 shipped (Shareable URLs + Benchmark Override). 2 P2 items removed.
-> Remaining: 3 P3 ideas + Navigation Reshuffle Plan.
+> Last cleaned: 2026-06-30 — Phase 39 shipped (Cross-Asset & Factor Analytics). All 3 P3 items complete.
+> Remaining: Navigation Reshuffle Plan only.
 
 ---
 
@@ -30,7 +30,7 @@
 Add buy/sell dates, cost basis, and realized P&L tracking (currently theoretical allocations only).
 - **Data:** User input only — no external data needed.
 
-### P3 — Cross-Asset & Factor Analytics (Research-Grade)
+### P3 — Cross-Asset & Factor Analytics (Research-Grade) ✅ DONE (Phase 39)
 Multi-country portfolio builder, factor attribution, FX/commodity macro-link panels, cross-asset correlation heatmaps.
 - **Data:** All existing data — pure calculation + visualization. Significant effort.
 
@@ -42,41 +42,49 @@ Beginner-friendly toggles, narrative walkthroughs explaining metrics, academic-s
 
 ## 4. 🧭 Navigation Reshuffle Plan
 
+**Updated:** 2026-06-30 — Revised after Phase 37–39 delivery. Primary bar unchanged per user direction.
+
 ### Problem
 
-The current top-level navigation is a **flat 16-item bar** with no grouping, mixing micro (per-ticker) tools with macro (global) tools and reference pages. This creates severe cognitive load.
+The current top-level navigation has a **flat 14-item "More" dropdown** with no grouping, mixing micro tools with macro tools and reference pages. The primary bar (7 items) works well and stays unchanged.
 
-### Proposed Nav Hierarchy (5 Pillars)
+### Decision: Primary Bar Unchanged
 
-| Pillar | Items |
-|--------|-------|
-| **Discover** | Dashboard, Screener, Treemap, Calendar |
-| **Analyze** | Markets (5 streamlined tabs), Risk, Options |
-| **Build** | Portfolio, Research (5 tabs, incl. Econ Lab moved from Macro), Scenario |
-| **Macro** | Macro Overview (8 condensed tabs), Yield, Policy & Sovereign (merged), Atlas |
-| **Learn** | Wiki |
+`Dashboard` · `Markets` · `Screener` · `Portfolio` · `Research` · `Macro` · `Atlas`
 
-### Markets Tab Reductions (10 → 5)
-- **Remove**: Sectors (→ `/sectors`), Screener (→ `/screener`), Portfolio (→ `/portfolio`), Rankings (→ `/screener`), FX (→ `/macro?tab=FX`), Risk (replace with mini KPI strip in Overview)
-- **Keep**: Overview, Technicals, Valuation, Ratios, News & Events
+Treemap and Sectors stay as Markets sub-tabs (innate to stock analysis). Atlas stays primary.
 
-### Macro Tab Reductions (15 → 8)
-- **Remove/redirect**: Rates & Yields (→ `/yield`), Country Risk (→ `/policy`), Central Banks (→ `/policy`), Econometric Lab (→ `/research`), Funding (merged into Financial Conditions)
-- **Keep**: Overview, Inflation, Growth & Employment, Housing, Commodities, FX, Leading Indicators, Financial & Funding Conditions, Sentiment Signals
+### Proposed: Grouped "More" Dropdown
 
-### Pages to Promote
-- **`/scenario`** — orphaned stress lab → promoted to nav under Build pillar
-- **`/admin`** — orphaned health dashboard → optionally add under Settings/gear icon
+Restructure the 14-item flat dropdown into 5 groups with section headers:
 
-### URL Redirects (301 / next.config.js rewrites)
-12 old URLs need redirects, preserving query params where applicable (e.g., `/markets?tab=Portfolio&t=AAPL` → `/portfolio?t=AAPL`).
+```
+── Discover ──
+  Calendar
+── Analyze ──
+  Risk · Options
+── Markets & Data ──
+  Corporate Health · Dividends · Insider Trading · M&A
+── Global ──
+  Trade · Cross-Border · Stability · Countries · Yield · Policy & Sovereign
+── Reference ──
+  Wiki · Admin
+```
+
+### Changes from Current
+
+| Change | Detail |
+|--------|--------|
+| Add section headers | 5 visual group labels in the More dropdown |
+| Reorder items | Grouped logically instead of alphabetical |
+| Rename "Rates & Policy" → "Yield" | More accurate label |
+| Rename "M&A" → "Mergers & Acquisitions" | Clearer |
+| No URL changes | All existing routes preserved |
+| No tab removals | Markets/Macro tabs unchanged |
+| No redirects needed | Zero breakage |
 
 ### Implementation Order
-1. Navbar restructure (Navbar.tsx + MobileNav.tsx)
-2. Markets tab removals
-3. Macro tab removals/redirects
-4. Move Econometric Lab → /research
-5. Merge Policy + Sovereign
-6. Promote /scenario to nav
-7. Add next.config.js rewrites
-8. Test: pytest + tsc + Docker rebuild + curl each path
+1. Update `Navbar.tsx` — restructure `moreTabs` array into groups with section headers
+2. Update `MobileNav.tsx` — restructure `drawerTabs` with same grouping
+3. Test: `tsc --noEmit` + Docker rebuild + click through each link
+4. Verify: no 404s, all existing pages still accessible

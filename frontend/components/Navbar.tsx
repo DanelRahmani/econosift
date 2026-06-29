@@ -16,22 +16,52 @@ const primaryTabs = [
   { href: "/atlas", label: "Atlas" },
 ];
 
-const moreTabs = [
-  { href: "/calendar", label: "Calendar" },
-  { href: "/trade", label: "Trade" },
-  { href: "/corporate", label: "Corporate Health" },
-  { href: "/dividends", label: "Dividends" },
-  { href: "/insider", label: "Insider Trading" },
-  { href: "/mergers", label: "M&A" },
-  { href: "/country", label: "Countries" },
-  { href: "/crossborder", label: "Cross-Border" },
-  { href: "/risk", label: "Risk" },
-  { href: "/options", label: "Options" },
-  { href: "/yield", label: "Rates & Policy" },
-  { href: "/stability", label: "Stability" },
-  { href: "/wiki", label: "Wiki" },
-  { href: "/admin", label: "Admin" },
+type NavGroup = { heading: string; items: { href: string; label: string }[] };
+
+const moreGroups: NavGroup[] = [
+  {
+    heading: "Discover",
+    items: [
+      { href: "/calendar", label: "Calendar" },
+    ],
+  },
+  {
+    heading: "Analyze",
+    items: [
+      { href: "/risk", label: "Risk" },
+      { href: "/options", label: "Options" },
+    ],
+  },
+  {
+    heading: "Markets & Data",
+    items: [
+      { href: "/corporate", label: "Corporate Health" },
+      { href: "/dividends", label: "Dividends" },
+      { href: "/insider", label: "Insider Trading" },
+      { href: "/mergers", label: "Mergers & Acquisitions" },
+    ],
+  },
+  {
+    heading: "Global",
+    items: [
+      { href: "/trade", label: "Trade" },
+      { href: "/crossborder", label: "Cross-Border" },
+      { href: "/stability", label: "Stability" },
+      { href: "/country", label: "Countries" },
+      { href: "/yield", label: "Yield" },
+      { href: "/policy", label: "Policy & Sovereign" },
+    ],
+  },
+  {
+    heading: "Reference",
+    items: [
+      { href: "/wiki", label: "Wiki" },
+      { href: "/admin", label: "Admin" },
+    ],
+  },
 ];
+
+const allMoreHrefs = moreGroups.flatMap((g) => g.items.map((i) => i.href));
 
 export function Navbar() {
   const pathname = usePathname();
@@ -49,7 +79,7 @@ export function Navbar() {
     return () => document.removeEventListener("mousedown", handleClick);
   }, [menuOpen]);
 
-  const isMoreActive = moreTabs.some((t) => pathname?.startsWith(t.href));
+  const isMoreActive = allMoreHrefs.some((href) => pathname?.startsWith(href));
 
   return (
     <nav className="sticky top-0 z-50 bg-surface/80 border-b border-border backdrop-blur">
@@ -98,26 +128,33 @@ export function Navbar() {
             </button>
             {menuOpen && (
               <div
-                className="absolute top-full right-0 mt-1 w-48 bg-surface border border-border rounded-xl shadow-xl overflow-hidden z-[100]"
+                className="absolute top-full right-0 mt-1 w-56 bg-surface border border-border rounded-xl shadow-xl overflow-hidden z-[100]"
                 style={{ position: "absolute", top: "100%", right: 0, marginTop: "4px" }}
               >
-                {moreTabs.map((t) => {
-                  const active = pathname?.startsWith(t.href);
-                  return (
-                    <Link
-                      key={t.href}
-                      href={t.href}
-                      onClick={() => setMenuOpen(false)}
-                      className={`block px-4 py-2.5 text-sm transition-colors ${
-                        active
-                          ? "bg-accent/10 text-accent font-medium"
-                          : "text-text-secondary hover:bg-surface-alt hover:text-text-primary"
-                      }`}
-                    >
-                      {t.label}
-                    </Link>
-                  );
-                })}
+                {moreGroups.map((group) => (
+                  <div key={group.heading}>
+                    <div className="px-4 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-text-muted">
+                      {group.heading}
+                    </div>
+                    {group.items.map((t) => {
+                      const active = pathname?.startsWith(t.href);
+                      return (
+                        <Link
+                          key={t.href}
+                          href={t.href}
+                          onClick={() => setMenuOpen(false)}
+                          className={`block px-4 py-2 text-sm transition-colors ${
+                            active
+                              ? "bg-accent/10 text-accent font-medium"
+                              : "text-text-secondary hover:bg-surface-alt hover:text-text-primary"
+                          }`}
+                        >
+                          {t.label}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                ))}
               </div>
             )}
           </div>

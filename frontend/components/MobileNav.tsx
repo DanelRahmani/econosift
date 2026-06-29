@@ -14,23 +14,56 @@ const primaryTabs = [
   { href: "/macro", label: "Macro", icon: "M4 19V5m0 14h16M8 15l3-4 3 3 4-6" },
 ];
 
-const drawerTabs = [
-  { href: "/dashboard", label: "Dashboard" },
-  { href: "/calendar", label: "Calendar" },
-  { href: "/trade", label: "Trade" },
-  { href: "/corporate", label: "Corporate Health" },
-  { href: "/dividends", label: "Dividends" },
-  { href: "/insider", label: "Insider Trading" },
-  { href: "/mergers", label: "M&A" },
-  { href: "/country", label: "Countries" },
-  { href: "/crossborder", label: "Cross-Border" },
-  { href: "/risk", label: "Risk" },
-  { href: "/options", label: "Options" },
-  { href: "/yield", label: "Rates & Policy" },
-  { href: "/stability", label: "Stability" },
-  { href: "/atlas", label: "Atlas" },
-  { href: "/wiki", label: "Wiki" },
-  { href: "/admin", label: "Admin" },
+type DrawerGroup = { heading: string; items: { href: string; label: string }[] };
+
+const drawerGroups: DrawerGroup[] = [
+  {
+    heading: "Primary",
+    items: [
+      { href: "/dashboard", label: "Dashboard" },
+      { href: "/atlas", label: "Atlas" },
+    ],
+  },
+  {
+    heading: "Discover",
+    items: [
+      { href: "/calendar", label: "Calendar" },
+    ],
+  },
+  {
+    heading: "Analyze",
+    items: [
+      { href: "/risk", label: "Risk" },
+      { href: "/options", label: "Options" },
+    ],
+  },
+  {
+    heading: "Markets & Data",
+    items: [
+      { href: "/corporate", label: "Corporate Health" },
+      { href: "/dividends", label: "Dividends" },
+      { href: "/insider", label: "Insider Trading" },
+      { href: "/mergers", label: "Mergers & Acquisitions" },
+    ],
+  },
+  {
+    heading: "Global",
+    items: [
+      { href: "/trade", label: "Trade" },
+      { href: "/crossborder", label: "Cross-Border" },
+      { href: "/stability", label: "Stability" },
+      { href: "/country", label: "Countries" },
+      { href: "/yield", label: "Yield" },
+      { href: "/policy", label: "Policy & Sovereign" },
+    ],
+  },
+  {
+    heading: "Reference",
+    items: [
+      { href: "/wiki", label: "Wiki" },
+      { href: "/admin", label: "Admin" },
+    ],
+  },
 ];
 
 export function MobileNav() {
@@ -95,21 +128,30 @@ export function MobileNav() {
                 </svg>
               </button>
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              {drawerTabs.map((t) => {
-                const active = pathname?.startsWith(t.href);
-                return (
-                  <Link key={t.href} href={t.href} onClick={() => setDrawerOpen(false)}
-                    className={`px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                      active
-                        ? "bg-accent/10 text-accent border border-accent/30"
-                        : "text-text-secondary hover:text-text-primary hover:bg-surface-alt border border-border/50"
-                    }`}
-                  >
-                    {t.label}
-                  </Link>
-                );
-              })}
+            <div className="mb-6 space-y-4">
+              {drawerGroups.map((group) => (
+                <div key={group.heading}>
+                  <div className="text-[10px] font-semibold uppercase tracking-wider text-text-muted mb-2 px-1">
+                    {group.heading}
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {group.items.map((t) => {
+                      const active = pathname?.startsWith(t.href);
+                      return (
+                        <Link key={t.href} href={t.href} onClick={() => setDrawerOpen(false)}
+                          className={`px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                            active
+                              ? "bg-accent/10 text-accent border border-accent/30"
+                              : "text-text-secondary hover:text-text-primary hover:bg-surface-alt border border-border/50"
+                          }`}
+                        >
+                          {t.label}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
