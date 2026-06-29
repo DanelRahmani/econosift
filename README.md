@@ -1,4 +1,4 @@
-# Axiom Finance
+# Axiom Finance Alpha 0.2
 
 A self-hosted, Dockerised financial analytics platform covering the full investment research stack — from macroeconomics to options pricing, portfolio optimisation to financial term dictionary.
 
