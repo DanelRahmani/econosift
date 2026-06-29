@@ -27,14 +27,15 @@
 | P1-03 | **Atlas map rendering unreliable** | `ISSUES.md`, CLAUDE.md (Phase 24) | `react-simple-maps` rendering artifacts; world map sometimes blank or misaligned. Consider d3-geo + Canvas or react-leaflet. |
 | P1-04 | **Yahoo market cap rate-limits** | `ISSUES.md`, CLAUDE.md (Phase 3) | Large S&P 500 treemap queries hit yfinance rate limits. Needs chunked/batched fetching with backoff. |
 | P1-05 | **US-only macro data** | `ISSUES.md`, CLAUDE.md (Phase 24) | Inflation/Rates/Macro Overview country selectors exist but only US data renders. Country parameter wiring incomplete. |
-| P1-06 | **ACM term premium / 30Y breakeven N/A** | `ISSUES.md`, CLAUDE.md (Phase 18A) | FRED series (ACM, T30YIE) sometimes lag; graceful fallback works but data occasionally missing. |
-| P1-07 | **`/scenario` lab page missing from nav** | `ISSUES.md`, CLAUDE.md (Phase 18A) | Stress scenario designer deferred from Phase 18B. Backend exists, frontend doesn't. |
-| P1-08 | **Fama-French parsing truncated** | CLAUDE.md (Phase 24) | Only 12 rows captured; CSV parser truncates historical data (pre-2000 rows not parsed). |
-| P1-09 | **BIS Credit-to-GDP gaps not wired** | CLAUDE.md (Phase 24) | CSV format explored but not wired into `refresh_all_bulk_data`. |
-| P1-10 | **DCF MSFT share count wrong** | `FACT_CHECK.md`, `ACTION_PLAN.md` | `info.get("sharesOutstanding")` returns 428M (DCF) vs 7.43B (EPV) — ~17× discrepancy. Suspect type coercion or caching issue in `dcf_engine.py`. |
-| P1-11 | **Piotroski F-Score maxes at 4/9** | `FACT_CHECK.md`, `ACTION_PLAN.md` | 5 criteria need t−1 financial data. Needs multi-period financial statement fetching. |
-| P1-12 | **Beneish M-Score always null** | `FACT_CHECK.md` | All 8 variables need t and t−1 data. Same root cause as P1-11. |
-| P1-13 | **Beta null in KPIs (computed beta available in ratios)** | `FACT_CHECK.md`, `ACTION_PLAN.md` | `_kpis()` uses `g("beta")` which reads null from yfinance. `_beta_for()` in same file correctly computes it. Wire computed beta into KPI strip. |
+| P1-06 | **CountrySelector typeahead UX unreliable** | 2026-06-29 debugging session | `CountrySelector.tsx` | Backend ISO2→ISO3 conversion fixed (custom countries like Argentina/Belgium now load data). But frontend typeahead still has issues: dropdown sometimes doesn't appear after first selection, re-selection flow is fragile. Needs full rewrite or alternative UX pattern (e.g. multi-select combobox). |
+| P1-08 | **ACM term premium / 30Y breakeven N/A** | `ISSUES.md`, CLAUDE.md (Phase 18A) | FRED series (ACM, T30YIE) sometimes lag; graceful fallback works but data occasionally missing. |
+| P1-09 | **`/scenario` lab page missing from nav** | `ISSUES.md`, CLAUDE.md (Phase 18A) | Stress scenario designer deferred from Phase 18B. Backend exists, frontend doesn't. |
+| P1-10 | **Fama-French parsing truncated** | CLAUDE.md (Phase 24) | Only 12 rows captured; CSV parser truncates historical data (pre-2000 rows not parsed). |
+| P1-11 | **BIS Credit-to-GDP gaps not wired** | CLAUDE.md (Phase 24) | CSV format explored but not wired into `refresh_all_bulk_data`. |
+| P1-12 | **DCF MSFT share count wrong** | `FACT_CHECK.md`, `ACTION_PLAN.md` | `info.get("sharesOutstanding")` returns 428M (DCF) vs 7.43B (EPV) — ~17× discrepancy. Suspect type coercion or caching issue in `dcf_engine.py`. |
+| P1-13 | **Piotroski F-Score maxes at 4/9** | `FACT_CHECK.md`, `ACTION_PLAN.md` | 5 criteria need t−1 financial data. Needs multi-period financial statement fetching. |
+| P1-14 | **Beneish M-Score always null** | `FACT_CHECK.md` | All 8 variables need t and t−1 data. Same root cause as P1-13. |
+| P1-15 | **Beta null in KPIs (computed beta available in ratios)** | `FACT_CHECK.md`, `ACTION_PLAN.md` | `_kpis()` uses `g("beta")` which reads null from yfinance. `_beta_for()` in same file correctly computes it. Wire computed beta into KPI strip. |
 
 ---
 
