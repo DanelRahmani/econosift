@@ -136,7 +136,7 @@ Lorenz curve visualization per country with decade-over-decade comparison.
 
 ## 3. 🛠️ New Tools & Analytical Models
 
-### P1 — Currency Crisis Early Warning System
+### ✅ P1 — Currency Crisis Early Warning System — **DONE (Phase 33)**
 
 Composite early warning model using: foreign reserves decline rate (already in country risk),
 current account deficit (already mapped), real exchange rate overvaluation (BIS effective FX +
@@ -303,8 +303,6 @@ Beginner-friendly toggles, narrative walkthroughs explaining metrics, academic-s
 
 ## 7. 🧭 Navigation Reshuffle Plan
 
-**Status:** Not started — detailed audit in [`UX_Reshuffle.md`](./UX_Reshuffle.md) (will be deleted after this is done).
-
 ### Problem
 
 The current top-level navigation is a **flat 16-item bar** with no grouping, mixing micro (per-ticker) tools with macro (global) tools and reference pages. This creates severe cognitive load.
@@ -353,7 +351,7 @@ The current top-level navigation is a **flat 16-item bar** with no grouping, mix
 | 1 | Labor Market Deep Dive | Macro Tab | P1 | 5 WB codes + 2 FRED | Medium | ✅ DONE Phase 32 |
 | 2 | Energy Transition & Climate | Macro Tab | P1 | 6 new WB codes | Medium | ✅ DONE Phase 32 |
 | 3 | Inequality & Development | Macro Tab | P1 | 5 new WB codes | Medium | ✅ DONE Phase 32 |
-| 4 | Currency Crisis Early Warning | Tool | P1 | 1 new WB code | Medium | 🟡 Needs reserves + FX overvaluation signals |
+| 4 | Currency Crisis Early Warning | Tool | P1 | 1 new WB code | Medium | ✅ DONE Phase 33 |
 | 5 | Supply Chain → Atlas Overlay | Enhance | P1 | 2 WB codes + bilateral data | Medium | 🟢 Food/fuel import layers live; Herfindahl TBD |
 
-**Completed:** 20/22 · **Remaining:** 2 (0 P0 · 2 P1 · 0 P2)
+**Completed:** 21/22 · **Remaining:** 1 (0 P0 · 1 P1 · 0 P2)
