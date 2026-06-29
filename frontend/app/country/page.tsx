@@ -78,6 +78,7 @@ export default function CountryListPage() {
           <Link
             key={c.iso2}
             href={`/country/${c.iso2}`}
+            prefetch={false}
             className="block"
           >
             <Card className="p-4 h-full hover:border-accent/30 transition-colors cursor-pointer">
