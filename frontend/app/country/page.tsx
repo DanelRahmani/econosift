@@ -73,7 +73,7 @@ export default function CountryListPage() {
       />
 
       {/* Country Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
         {filtered.map((c) => (
           <Link
             key={c.iso2}
@@ -81,8 +81,13 @@ export default function CountryListPage() {
             prefetch={false}
             className="block"
           >
-            <Card className="p-4 h-full hover:border-accent/30 transition-colors cursor-pointer">
-              <div className="text-2xl mb-2">{c.flag || "🏳️"}</div>
+            <Card className="p-4 h-full hover:border-accent/30 transition-colors cursor-pointer text-center">
+              <img
+                src={`https://flagcdn.com/w80/${c.iso2.toLowerCase()}.png`}
+                alt={c.name}
+                className="w-12 h-auto mx-auto mb-2 rounded-sm"
+                loading="lazy"
+              />
               <div className="text-sm font-medium text-text-primary truncate">{c.name}</div>
               <div className="text-xs text-text-muted mt-0.5">{c.iso2}{c.region ? ` · ${c.region}` : ""}</div>
             </Card>
