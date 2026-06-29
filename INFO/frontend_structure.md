@@ -1,4 +1,7 @@
-# Axiom Finance — Frontend File Structure (Phases 0–19)
+# Axiom Finance — Frontend File Structure
+
+> **Last updated:** 2026-06-29 — reflects all phases through Phase 31.
+> Pages: 24 · Components: 118 · Library files: 8
 
 Root: `frontend/`
 
@@ -18,86 +21,85 @@ frontend/
 │   ├── page.tsx                # Root redirect (→ /dashboard)
 │   │
 │   ├── dashboard/page.tsx      # /dashboard — market breadth, global indices, Fear & Greed, top movers
-│   ├── markets/page.tsx        # /markets — stock analysis: price chart, tabs (Overview/Risk/
-│   │                           #   Technicals/Valuation/Ratios/Portfolio/Rankings/Sectors/Screener/FX)
-│   ├── macro/page.tsx          # /macro — 12-tab macroeconomic intelligence hub (+ Lab, Country Risk, CB)
-│   ├── screener/page.tsx       # /screener — multi-index stock screener with 20+ preset signals
-│   ├── treemap/page.tsx        # /treemap — S&P 500 / NDX / Dow squarified treemap with sector drill-down
-│   ├── calendar/page.tsx       # /calendar — earnings, macro, IPO, dividend events
+│   ├── markets/page.tsx        # /markets — stock analysis: price chart, sub-tabs (Overview/Technicals/
+│   │                           #   Valuation/Ratios/News/Rankings/Sectors/Screener/FX/Risk/Portfolio)
+│   ├── macro/page.tsx          # /macro — 16-tab hub: Overview, Inflation, Growth, Housing, Commodities,
+│   │                           #   FX, Leading, Financial, Positioning, Country Risk, CB, Lab,
+│   │                           #   Fiscal, Labor, Energy, Inequality
+│   ├── screener/page.tsx       # /screener — multi-index screener with 20+ preset signals, 9 result tabs
+│   ├── treemap/page.tsx        # /treemap — S&P 500 / NDX / Dow squarified treemap
+│   ├── calendar/page.tsx       # /calendar — earnings, macro, IPO, dividend, CB meeting events
 │   ├── risk/page.tsx           # /risk — rolling metrics, GARCH, Hurst, cointegration, stress, MC
-│   ├── options/page.tsx        # /options — IV analytics, Greeks, term structure, smile, OI profile
+│   ├── options/page.tsx        # /options — IV analytics, Greeks, term structure, smile, OI profile, MC
 │   ├── sectors/page.tsx        # /sectors — SPDR ETF returns, fundamentals, rotation clock, drill-down
 │   ├── portfolio/page.tsx      # /portfolio — performance, correlation, frontier, BL, stress
-│   ├── research/page.tsx       # /research — Risk Parity, FX Carry, Momentum, Realized Moments (4 tabs)
-│   ├── atlas/page.tsx          # /atlas — world choropleth: 6 macro indicators, year slider, regional blocs
-│   ├── yield/page.tsx          # /yield — US spot curve, TIPS real yields, breakevens, ACM term premium
-│   ├── policy/page.tsx         # /policy — central bank divergence, G10 carry, policy surprises
+│   ├── research/page.tsx       # /research — Risk Parity, FX Carry, Momentum, Realized Moments, Econ Lab
+│   ├── atlas/page.tsx          # /atlas — world choropleth: 6 indicators, year slider, regional blocs
+│   ├── yield/page.tsx          # /yield — US spot curve, TIPS, breakevens, ACM term premium
+│   ├── policy/page.tsx         # /policy — CB divergence, G10 carry, sovereign risk
 │   ├── sovereign/page.tsx      # /sovereign — 6-KPI traffic-light risk rankings, ~200 countries
-│   ├── scenario/page.tsx       # /scenario — stress scenario designer (Phase 18B, basic stub)
-│   └── admin/page.tsx          # /admin — backend health: cache stats, source health, latency, performance
+│   ├── scenario/page.tsx       # /scenario — stress scenario designer (Phase 18B stub)
+│   ├── admin/page.tsx          # /admin — backend health, cache stats, API keys management
+│   │
+│   # --- IDEA_LIST pages (Phases 25–31) ---
+│   ├── trade/page.tsx          # /trade — exports/imports %GDP, trade balances, openness indices, BIS FX
+│   ├── corporate/page.tsx      # /corporate — Altman Z, Piotroski 9-pt, Beneish M, sector Z-score aggregate
+│   ├── dividends/page.tsx      # /dividends — yield, growth, payout, aristocrats, DDM
+│   ├── insider/page.tsx        # /insider — aggregate buy/sell ratio, cluster detection, smart money index
+│   ├── mergers/page.tsx        # /mergers — M&A deals, deal values, acquisition premiums, sector heatmap
+│   ├── country/page.tsx        # /country — country detail page with factbook data
+│   │   └── [iso2]/page.tsx     # /country/{iso2} — dynamic country profile route
+│   ├── stability/page.tsx      # /stability — Currency Crisis EWS + Banking Stability (tabbed)
+│   └── crossborder/page.tsx    # /crossborder — BIS locational banking, debt securities, chord diagram
 │
-├── components/                 # Shared + feature React components
+├── components/                 # Shared + feature React components (118 files across 17 dirs + root)
 │   ├── Navbar.tsx              # Desktop top navigation bar (scroll-responsive)
-│   ├── MobileNav.tsx           # Mobile bottom tab bar (9 items, scrollable)
-│   ├── SearchBar.tsx           # Global ticker search with autocomplete + add-to-watchlist
+│   ├── MobileNav.tsx           # Mobile bottom tab bar
+│   ├── SearchBar.tsx           # Global ticker search with autocomplete
+│   ├── TickerSearch.tsx        # Ticker search with recent picks
 │   ├── ThemeProvider.tsx       # Dark/light theme context + localStorage persistence
 │   ├── ThemeToggle.tsx         # Sun/moon toggle button
-│   ├── Watchlist.tsx           # Pinned ticker watchlist with price alerts + remove
+│   ├── Watchlist.tsx           # Pinned ticker watchlist with price alerts
 │   ├── providers.tsx           # React Query client provider + theme provider wrapper
 │   ├── ui.tsx                  # Shared primitives: Card, Badge, Spinner, Skeleton, etc.
+│   ├── DataFreshnessBadge.tsx  # "Updated X ago" freshness indicator
+│   ├── Footer.tsx              # App footer
 │   │
-│   ├── dashboard/              # /dashboard page components
-│   │   ├── BreadthBar.tsx      # Market breadth: advance/decline, new highs/lows, McClellan
-│   │   ├── FearGreedGauge.tsx  # 7-signal Fear & Greed composite index (needle gauge)
-│   │   ├── GlobalIndices.tsx   # ~25 global indices table (price, change, YTD)
-│   │   └── TopMovers.tsx       # Top gainers / losers cards from screener cache
+│   ├── dashboard/              # BreadthBar, FearGreedGauge, GlobalIndices, TopMovers
+│   ├── markets/                # 26 files: PriceChart, QuoteCards, ValuationTab/Engine/ModelsGrid/KpiPanel,
+│   │                           #   DcfPanel, SnowflakeChart/Mini, AxiomGauge, TechnicalsTab, RatiosTab,
+│   │                           #   RiskMetricsTable, CorrelationMatrix, FxRatesPanel, AnalystPanel,
+│   │                           #   InstitutionalHolders, InsiderActivity, NewsFeed, SectorHeatmap,
+│   │                           #   Treemap, RankingsTab, ScreenerTab, PortfolioTab, TabSkeleton,
+│   │                           #   ShortInterestPanel
+│   ├── macro/                  # 31 files: MacroTabShell, MacroDashboard, MacroOverview, MacroChart,
+│   │                           #   CountrySelector, IndicatorSelector, CountryComparison, RegimeClock,
+│   │                           #   RegimeDetector, RegimeOverlay, YieldCurve, FxWidget, FxTab,
+│   │                           #   InflationHeatmap/InflationTab, GrowthEmployment, HousingTab,
+│   │                           #   CommoditiesTab, LeadingIndicators, FinancialConditions,
+│   │                           #   PositioningTab, SentimentTab, CentralBanksTab, CountryRiskTab,
+│   │                           #   EconLabTab, TaylorRuleWidget, FiscalTab, LaborTab, EnergyTab,
+│   │                           #   InequalityTab, BusinessTab, FundingLiquidityTab
+│   ├── options/                # IVKPIRow, IVTermStructure, IVSmile, OIProfileChart, ChainTable, MonteCarloOptions
+│   ├── risk/                   # RiskKPIRow, RollingMetricsChart, ExtendedRiskTable, CorrelationHeatmap,
+│   │                           #   OnDemandRisk, MonteCarloPanel, StressTestPanel
+│   ├── portfolio/              # 16 files: PortfolioInput, PortfolioKPIs, PerformanceChart, DrawdownChart,
+│   │                           #   HoldingsTable, CorrelationHeatmap, RiskContribution, RollingMetrics,
+│   │                           #   CAPMAttribution, KellyTable, FFAttribution, EfficientFrontier,
+│   │                           #   MonteCarlo, BlackLitterman, ScenarioTab, StressTesting
+│   ├── research/               # RiskParityTab, FxCarryTab, MomentumTab, RealizedMomentsTab, DupontTab
+│   ├── screener/               # PresetPills, ScreenerTable, ResultTabs, Sparkline
+│   ├── calendar/               # CalendarGrid, CalendarFilters, EventCard
+│   ├── sectors/                # SectorReturnsChart, SectorFundamentalsTable, SectorRotationClock, SectorIndustryDrillDown
+│   ├── atlas/                  # WorldMap, YearSlider, RegionFilter, ColorLegend, AtlasKPIs, RankingTable, IndicatorSelector
+│   ├── policy/                 # PolicyDivergenceTable
+│   ├── sovereign/              # SovereignSpreadTable
+│   ├── yield/                  # MultiCountryYieldChart
+│   ├── stability/              # CurrencyCrisisPanel, BankingStabilityPanel
+│   ├── wiki/                   # WikiSearch, WikiTermCard, WikiCategoryNav
 │   │
-│   ├── markets/                # /markets page components
-│   │   ├── PriceChart.tsx      # Line chart with period selector + normalised (base 100) toggle
-│   │   ├── QuoteCards.tsx      # KPI strip cards (price, name, change%) per ticker
-│   │   ├── TabSkeleton.tsx     # Lazy-loading suspense fallback for tabs
-│   │   ├── ValuationTab.tsx        # Valuation tab shell (lazy-loaded)
-│   │   ├── ValuationEngine.tsx     # 8-model valuation grid
-│   │   ├── ValuationModelsGrid.tsx # Individual model cards (DCF, DDM, EPV, etc.)
-│   │   ├── ValuationKpiPanel.tsx   # KPI strip: Price, Market Cap, P/E, EPS, Div Yield, 52W, Beta
-│   │   ├── DcfPanel.tsx        # Two-stage DCF detail: inputs, scenarios, sensitivity heatmap
-│   │   ├── SnowflakeChart.tsx      # 5-axis pentagon radar (Value/Growth/Performance/Health/Dividend)
-│   │   ├── SnowflakeMini.tsx   # Compact 100×100 radar for screener cards
-│   │   ├── AxiomGauge.tsx      # Composite fair-value gauge (significantly over/undervalued)
-│   │   ├── TechnicalsTab.tsx   # Technicals tab (lazy-loaded): SMA, MACD, RSI, BB, Ichimoku, Fib, Pivots
-│   │   ├── RatiosTab.tsx       # 23 financial ratios with colour-coding + guide popover
-│   │   ├── RiskMetricsTable.tsx    # VaR, Sharpe, Beta, Sortino, Volatility display
-│   │   ├── CorrelationMatrix.tsx   # Pairwise correlation heatmap
-│   │   ├── FxRatesPanel.tsx    # FX rates relative to selected base currency
-│   │   ├── AnalystPanel.tsx    # Analyst ratings + price target band + consensus history
-│   │   ├── InstitutionalHolders.tsx # Top 13F institutional holders table
-│   │   ├── InsiderActivity.tsx      # Form 4 insider buy/sell transactions table
-│   │   ├── NewsFeed.tsx        # Ticker news cards with keyword sentiment (positive/negative/neutral)
-│   │   ├── SectorHeatmap.tsx   # Intraday sector ETF performance heatmap (lazy-loaded)
-│   │   ├── Treemap.tsx         # Embedded d3-hierarchy treemap with sector colouring
-│   │   ├── RankingsTab.tsx     # Relative strength rankings (lazy-loaded)
-│   │   ├── ScreenerTab.tsx     # Inline screener with preset filters (lazy-loaded)
-│   │   └── PortfolioTab.tsx    # Quick portfolio analysis (lazy-loaded)
-│   │
-│   ├── macro/                  # /macro page components (12 sub-tabs)
-│   │   ├── MacroTabShell.tsx   # Tab shell + sub-tab routing + progressive loading
-│   │   ├── MacroDashboard.tsx  # Main macro page orchestrator
-│   │   ├── MacroOverview.tsx   # Overview sub-tab: key indicators KPI strip
-│   │   ├── MacroChart.tsx      # Generic Recharts time-series (line/area with date range picker)
-│   │   ├── CountrySelector.tsx # Multi-select country picker dropdown
-│   │   ├── IndicatorSelector.tsx   # Indicator category/series picker
-│   │   ├── CountryComparison.tsx   # Side-by-side country KPI cards
-│   │   ├── RegimeClock.tsx     # Macro regime clock visualisation (2×2 quadrant)
-│   │   ├── RegimeDetector.tsx  # Rules-engine regime badge (expansion/slowdown/stagflation/recession)
-│   │   ├── YieldCurve.tsx      # Full yield curve chart + inversion badge
-│   │   ├── FxWidget.tsx        # FX rates widget (base/target, live rate, change)
-│   │   ├── FxTab.tsx           # FX heatmap + PPP valuation sub-tab
-│   │   ├── InflationHeatmap.tsx     # Country × year CPI heatmap
-│   │   ├── InflationTab.tsx    # CPI/PCE/PPI/M2 + Quantity Theory sub-tab
-│   │   ├── GrowthEmployment.tsx     # Sahm Rule, JOLTS, industrial production, capacity utilisation
-│   │   ├── HousingTab.tsx      # Case-Shiller, housing starts, mortgage rates, NAHB
-│   │   ├── CommoditiesTab.tsx  # ~25 futures + Bitcoin table with KPIs
-│   │   ├── RatesYields.tsx     # Rates & Yields sub-tab
+│   # --- Root-level component dirs ---
+│   └── ... (new page component dirs created per-feature)
 │   │   ├── LeadingIndicators.tsx   # LEI/CLI/CFNAI/PMI + IS-LM-PC panels
 │   │   ├── FinancialConditions.tsx # NFCI/STLFSI4/Fed balance sheet
 │   │   ├── PositioningTab.tsx  # CFTC COT report — 6 key contracts, speculator positioning
@@ -183,9 +185,13 @@ frontend/
 │       ├── RiskTable.tsx       # 6-KPI traffic-light risk ranking table
 │       └── RiskGauge.tsx       # Sovereign risk gauge visualisation
 │
-└── lib/                        # Shared utilities and types
-    ├── api.ts                  # All backend API calls (typed fetch wrappers, get/post helpers)
+└── lib/                        # Shared utilities and types (8 files)
+    ├── api.ts                  # All backend API calls (typed fetch wrappers, get/post/put helpers)
     ├── types.ts                # Shared TypeScript interfaces (~800+ lines: all response types)
+    ├── format.ts               # Number/price/percentage/market-cap formatting + chart colors
+    ├── queryClient.ts          # React Query client configuration (staleTime, gcTime, retry)
     ├── ratioGuide.ts           # Per-ratio explanations + Good/Average/Caution ranges
-    └── format.ts               # Number/price/percentage/market-cap formatting + chart colors
+    ├── atlasScale.ts           # Atlas map color scaling utilities
+    ├── useKeyboardShortcuts.ts # Keyboard shortcut hooks (Ctrl+K search, number keys, arrow keys)
+    └── wikiData.ts             # Wiki/glossary data utilities
 ```

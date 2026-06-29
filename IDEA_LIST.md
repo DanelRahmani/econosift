@@ -256,6 +256,76 @@ data for gamma squeeze detection.
 
 ---
 
+## 6. 🧠 Additional Ideas (from `project_ideas.md`)
+
+Older brainstorming ideas that don't overlap with the main list. Included for reference.
+
+### P1 — AI-Powered Company Summary
+Add a "Summarize" button on Markets that calls Claude API with financial ratios, valuation signals, risk metrics → returns a plain-English analyst-style paragraph.
+- **Data:** Existing valuation/ratios/risk endpoints. Needs API key integration.
+
+### P1 — Country Comparison Cards
+Side-by-side snapshot card view for any two selected countries showing all macro indicators with traffic-light coloring.
+- **Data:** All macro indicators already mapped. Pure frontend component work.
+
+### P1 — Macro Indicator Forecasts
+Pull IMF WEO projections and overlay forecast lines on existing historical charts with dashed style.
+- **Data:** IMF WEO already downloaded via `bulk_data_service.py`. Needs frontend chart overlay.
+
+### P1 — Global Inflation Comparison Heatmap
+Year-by-year heatmap grid (countries × years) for CPI inflation, color-coded from low (blue) to high (red).
+- **Data:** CPI inflation already mapped in Atlas/macro. Pure frontend visualization.
+
+### P2 — Shareable URLs / Deep Linking
+Encode dashboard state (selected tickers, period, active tab) in URL query string for bookmarking/sharing.
+- **Data:** URL state only. Pure frontend.
+
+### P2 — Configurable Benchmark Override
+Let users manually override auto-detected benchmark (e.g., AAPL vs ^NDX instead of ^GSPC) via UI dropdown.
+- **Data:** No new data needed. Backend already supports arbitrary benchmark tickers.
+
+### P2 — Supply Chain Vulnerability → Atlas Overlay
+Import concentration (Herfindahl index), food import dependency, energy import dependency per country as new Atlas layer.
+- **Data:** World Bank `TM.VAL.FOOD.ZS.UN`, `TM.VAL.FUEL.ZS.UN`. Atlas extension is proven pattern.
+
+### P2 — Watchlist with Price Alerts
+Persistent watchlist panel where users pin tickers and set price-level/percentage-change alerts via browser Notifications API.
+- **Data:** No new data — uses existing quote endpoint + localStorage.
+
+### P3 — Portfolio Transaction Log
+Add buy/sell dates, cost basis, and realized P&L tracking (currently theoretical allocations only).
+- **Data:** User input only — no external data needed.
+
+### P3 — AI Macro Summary
+Generate automated briefing paragraphs for the Macro page using macro data + LLM API.
+- **Data:** All macro data already in pipeline.
+
+### P3 — Cross-Asset & Factor Analytics (Research-Grade)
+Multi-country portfolio builder, factor attribution, FX/commodity macro-link panels, cross-asset correlation heatmaps.
+- **Data:** All existing data — pure calculation + visualization. Significant effort.
+
+### P3 — Learning Layers
+Beginner-friendly toggles, narrative walkthroughs explaining metrics, academic-style embedded notebooks.
+- **Data:** No new data — educational UX layer.
+
+---
+
+## 7. 🧭 Navigation Reshuffle (from `UX_Reshuffle.md`)
+
+A detailed proposal to restructure the flat 16-item navbar into 5 pillars (Discover / Analyze / Build / Macro / Learn) with 11 grouped items. Also removes 6 redundant Markets sub-tabs, merges 4 Macro sub-tabs into standalone pages, and adds `/scenario` to nav.
+
+**Status:** Not started — implementation tracked in [`UX_Reshuffle.md`](./UX_Reshuffle.md).
+
+### Key Actions
+- **Navbar**: Desktop 11 items in 5 groups; Mobile 8 items + drawer for overflow
+- **Markets tabs to remove**: Sectors, Screener, Portfolio, Rankings, FX, Risk (full) — replace Risk with mini KPI strip in Overview
+- **Macro tabs to remove/redirect**: Rates & Yields → `/yield`, Country Risk → `/policy`, Central Banks → `/policy`, Econometric Lab → `/research`, Funding → merged into Financial Conditions
+- **Pages to promote**: `/scenario` (orphan → nav under Build pillar)
+- **URL redirects**: 301 / next.config.js rewrites for all changed routes
+- **Effort**: Medium — 8-step implementation order outlined in UX_Reshuffle.md
+
+---
+
 ## Summary Matrix
 
 | # | Idea | Category | Priority | New Data Needed? | Effort | Status |
