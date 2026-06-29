@@ -41,6 +41,7 @@ import type {
   FactbookCountry, FactbookProfile, CrossborderData,
   SovereignDefaultData,
   AiSummaryResponse, AiSummaryHistoryItem,
+  Transaction, PnLSummary,
 } from "./types";
 
 async function get<T>(path: string): Promise<T> {
@@ -537,6 +538,16 @@ export const api = {
 
   aiHistory: (summaryType: string, contextKey: string) =>
     get<{ items: AiSummaryHistoryItem[] }>(`/ai/history/${summaryType}/${encodeURIComponent(contextKey)}`),
+
+  // --- Phase 37: Portfolio Transaction Log ---
+  syncTransactions: (transactions: Transaction[]) =>
+    post<{ saved: number }>("/portfolio/transactions/sync", { transactions }),
+
+  fetchTransactions: () =>
+    get<{ transactions: Transaction[] }>("/portfolio/transactions"),
+
+  computePnL: (transactions: Transaction[], currentPrices: Record<string, number>) =>
+    post<PnLSummary>("/portfolio/transactions/pnl", { transactions, current_prices: currentPrices }),
 };
 
 // --- Phase 17.E: React Query ---

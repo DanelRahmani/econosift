@@ -2259,3 +2259,34 @@ export interface AiSummaryHistoryItem {
   model_used: string;
   created_at: string;
 }
+
+// --- Phase 37: Portfolio Transaction Log ---
+export interface Transaction {
+  id?: number;
+  ticker: string;
+  date: string;  // ISO date "YYYY-MM-DD"
+  type: "buy" | "sell";
+  quantity: number;
+  price: number;
+  fees: number;
+}
+
+export interface PnLItem {
+  ticker: string;
+  quantity: number;
+  cost_basis: number;
+  avg_cost: number;
+  market_value: number;
+  unrealized_pnl: number;
+  realized_pnl: number;
+  total_return_pct: number;
+}
+
+export interface PnLSummary {
+  items: PnLItem[];
+  total_cost_basis: number;
+  total_market_value: number;
+  total_unrealized_pnl: number;
+  total_realized_pnl: number;
+  total_return_pct: number;
+}

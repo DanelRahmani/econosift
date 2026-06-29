@@ -133,3 +133,22 @@ class AiSummary(Base):
     __table_args__ = (
         Index("ix_ai_summary_lookup", "summary_type", "context_key"),
     )
+
+
+class PortfolioTransaction(Base):
+    """User portfolio transactions: buy/sell dates, cost basis, fees."""
+
+    __tablename__ = "portfolio_transaction"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    ticker = Column(String, nullable=False)
+    date = Column(Date, nullable=False)
+    type = Column(String, nullable=False)  # "buy" | "sell"
+    quantity = Column(Float, nullable=False)
+    price = Column(Float, nullable=False)
+    fees = Column(Float, default=0.0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index("ix_portfolio_transaction_ticker_date", "ticker", "date"),
+    )

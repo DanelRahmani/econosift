@@ -3,11 +3,15 @@ from __future__ import annotations
 
 import asyncio
 from typing import Optional
+from datetime import date as date_type
 
 import pandas as pd
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
+from sqlalchemy.orm import Session
 
+from ..database import get_db
+from ..db_models import PortfolioTransaction
 from ..services import yfinance_service as yfs
 from ..services import portfolio as port
 from ..services.discount_rates import risk_free_rate
@@ -297,3 +301,209 @@ async def stress(req: PortfolioRequest):
         return _empty()
 
     return port.stress_test_portfolio(holdings, frame, bench)
+
+
+# ---------------------------------------------------------------------------
+# Transaction log models
+# ---------------------------------------------------------------------------
+
+class TransactionIn(BaseModel):
+    id: Optional[int] = None  # None for new, set for updates
+    ticker: str
+    date: date_type
+    type: str  # "buy" | "sell"
+    quantity: float = Field(gt=0.0)
+    price: float = Field(gt=0.0)
+    fees: float = Field(default=0.0, ge=0.0)
+
+
+class TransactionSyncRequest(BaseModel):
+    transactions: list[TransactionIn]
+
+
+class PnLRequest(BaseModel):
+    transactions: list[TransactionIn]
+    current_prices: dict[str, float] = Field(default_factory=dict)  # ticker → price
+
+
+class PnLItem(BaseModel):
+    ticker: str
+    quantity: float
+    cost_basis: float
+    avg_cost: float
+    market_value: float
+    unrealized_pnl: float
+    realized_pnl: float
+    total_return_pct: float
+
+
+class PnLResponse(BaseModel):
+    items: list[PnLItem]
+    total_cost_basis: float
+    total_market_value: float
+    total_unrealized_pnl: float
+    total_realized_pnl: float
+    total_return_pct: float
+
+
+# ---------------------------------------------------------------------------
+# Transaction endpoints
+# ---------------------------------------------------------------------------
+
+@router.post("/transactions/sync")
+def sync_transactions(req: TransactionSyncRequest, db: Session = Depends(get_db)):
+    """Save transactions to SQLite (upsert by id)."""
+    saved = 0
+    for t in req.transactions:
+        existing = None
+        if t.id is not None:
+            existing = db.query(PortfolioTransaction).filter(
+                PortfolioTransaction.id == t.id
+            ).first()
+
+        if existing:
+            existing.ticker = t.ticker.strip().upper()
+            existing.date = t.date
+            existing.type = t.type.lower()
+            existing.quantity = t.quantity
+            existing.price = t.price
+            existing.fees = t.fees
+        else:
+            row = PortfolioTransaction(
+                ticker=t.ticker.strip().upper(),
+                date=t.date,
+                type=t.type.lower(),
+                quantity=t.quantity,
+                price=t.price,
+                fees=t.fees,
+            )
+            db.add(row)
+        saved += 1
+
+    db.commit()
+    return {"saved": saved}
+
+
+@router.get("/transactions")
+def get_transactions(db: Session = Depends(get_db)):
+    """Return all saved transactions from SQLite."""
+    rows = db.query(PortfolioTransaction).order_by(
+        PortfolioTransaction.date.desc(),
+        PortfolioTransaction.created_at.desc(),
+    ).all()
+
+    return {
+        "transactions": [
+            {
+                "id": r.id,
+                "ticker": r.ticker,
+                "date": r.date.isoformat() if r.date else None,
+                "type": r.type,
+                "quantity": r.quantity,
+                "price": r.price,
+                "fees": r.fees,
+            }
+            for r in rows
+        ]
+    }
+
+
+@router.post("/transactions/pnl", response_model=PnLResponse)
+def compute_pnl(req: PnLRequest):
+    """Compute realized & unrealized P&L from transaction log + current prices."""
+    if not req.transactions:
+        return PnLResponse(
+            items=[], total_cost_basis=0, total_market_value=0,
+            total_unrealized_pnl=0, total_realized_pnl=0, total_return_pct=0
+        )
+
+    import numpy as np
+
+    # Sort by date ascending for FIFO lot matching
+    sorted_tx = sorted(req.transactions, key=lambda t: t.date)
+
+    # Separate buys and sells per ticker
+    buys: dict[str, list[dict]] = {}
+    sells: dict[str, list[dict]] = {}
+    for t in sorted_tx:
+        ticker = t.ticker.strip().upper()
+        entry = {"date": t.date, "quantity": t.quantity, "price": t.price, "fees": t.fees}
+        if t.type.lower() == "buy":
+            buys.setdefault(ticker, []).append(entry)
+        else:
+            sells.setdefault(ticker, []).append(entry)
+
+    realized_pnl_by_ticker: dict[str, float] = {}
+    remaining_qty: dict[str, float] = {}
+    cost_basis_remaining: dict[str, float] = {}
+
+    for ticker, buy_list in buys.items():
+        # FIFO lot matching
+        lots = [{"qty": b["quantity"], "price": b["price"]} for b in buy_list]
+        total_cost = 0.0
+        total_qty = 0.0
+
+        for b in buy_list:
+            total_cost += b["quantity"] * b["price"] + b["fees"]
+            total_qty += b["quantity"]
+
+        realized = 0.0
+        remaining_lots = list(lots)  # shallow copy
+
+        for sell in sells.get(ticker, []):
+            qty_to_match = sell["quantity"]
+            sell_price = sell["price"]
+
+            while qty_to_match > 0 and remaining_lots:
+                lot = remaining_lots[0]
+                match_qty = min(qty_to_match, lot["qty"])
+                realized += match_qty * (sell_price - lot["price"]) - sell["fees"] * (match_qty / sell["quantity"]) if sell["quantity"] > 0 else 0
+                lot["qty"] -= match_qty
+                qty_to_match -= match_qty
+                if lot["qty"] <= 0:
+                    remaining_lots.pop(0)
+
+        # Remaining position
+        rem_qty = sum(l["qty"] for l in remaining_lots)
+        rem_cost = sum(l["qty"] * l["price"] for l in remaining_lots)
+        remaining_qty[ticker] = rem_qty
+        cost_basis_remaining[ticker] = rem_cost
+        realized_pnl_by_ticker[ticker] = realized
+
+    # Build response
+    items: list[PnLItem] = []
+    for ticker in set(list(buys.keys()) + list(req.current_prices.keys())):
+        qty = remaining_qty.get(ticker, 0)
+        cb = cost_basis_remaining.get(ticker, 0)
+        avg_cost = cb / qty if qty > 0 else 0
+        price = req.current_prices.get(ticker, 0)
+        mv = qty * price
+        unrealized = mv - cb
+        realized = realized_pnl_by_ticker.get(ticker, 0)
+        total_ret = (unrealized + realized) / cb if cb > 0 else 0
+
+        items.append(PnLItem(
+            ticker=ticker,
+            quantity=round(qty, 6),
+            cost_basis=round(cb, 2),
+            avg_cost=round(avg_cost, 2),
+            market_value=round(mv, 2),
+            unrealized_pnl=round(unrealized, 2),
+            realized_pnl=round(realized, 2),
+            total_return_pct=round(total_ret * 100, 2),
+        ))
+
+    total_cb = sum(i.cost_basis for i in items)
+    total_mv = sum(i.market_value for i in items)
+    total_unreal = sum(i.unrealized_pnl for i in items)
+    total_real = sum(i.realized_pnl for i in items)
+    total_ret = ((total_mv + total_real - total_cb) / total_cb * 100) if total_cb > 0 else 0
+
+    return PnLResponse(
+        items=items,
+        total_cost_basis=round(total_cb, 2),
+        total_market_value=round(total_mv, 2),
+        total_unrealized_pnl=round(total_unreal, 2),
+        total_realized_pnl=round(total_real, 2),
+        total_return_pct=round(total_ret, 2),
+    )
