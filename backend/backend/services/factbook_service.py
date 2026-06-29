@@ -87,101 +87,134 @@ def _load_data() -> dict:
 
 
 def _extract_sections(entry: dict) -> list[dict]:
-    """Build structured sections from mledoze/countries entry."""
+    """Build comprehensive structured sections from mledoze/countries entry."""
     sections = []
-
-    # Introduction
-    name_data = entry.get("name", {})
-    intro_fields = []
-    if isinstance(name_data, dict):
-        if name_data.get("official"):
-            intro_fields.append({"label": "Official Name", "value": str(name_data["official"])})
-        if name_data.get("common"):
-            intro_fields.append({"label": "Common Name", "value": str(name_data["common"])})
-    intro_fields.append({"label": "Region", "value": str(entry.get("region", "") or entry.get("subregion", ""))})
-    subregion = entry.get("subregion", "")
-    if subregion:
-        intro_fields.append({"label": "Subregion", "value": str(subregion)})
+    name_data = entry.get("name", {}) if isinstance(entry.get("name"), dict) else {}
     capital = entry.get("capital", [])
-    if capital and isinstance(capital, list) and capital[0]:
-        intro_fields.append({"label": "Capital", "value": str(capital[0])})
-    if intro_fields:
-        sections.append({"title": "Introduction", "fields": intro_fields})
+    capital_str = capital[0] if isinstance(capital, list) and capital else ""
 
-    # Geography
-    geo_fields = []
+    # ── Introduction ──
+    intro = []
+    if name_data.get("official"):
+        intro.append({"label": "Official Name", "value": str(name_data["official"])})
+    if name_data.get("common"):
+        intro.append({"label": "Common Name", "value": str(name_data["common"])})
+    # Native names
+    native = name_data.get("native", {})
+    if isinstance(native, dict):
+        for lang_code, lang_name in native.items():
+            if isinstance(lang_name, dict):
+                off = lang_name.get("official", "")
+                if off and off != name_data.get("official", ""):
+                    intro.append({"label": f"Native Name ({lang_code})", "value": str(off)})
+    intro.append({"label": "Capital", "value": capital_str or "N/A"})
+    intro.append({"label": "Region", "value": str(entry.get("region", "") or "N/A")})
+    sub = entry.get("subregion", "")
+    if sub:
+        intro.append({"label": "Subregion", "value": str(sub)})
+    status = entry.get("status", "")
+    if status:
+        intro.append({"label": "Status", "value": str(status)})
+    indep = entry.get("independent")
+    if indep is not None:
+        intro.append({"label": "Independent", "value": "Yes" if indep else "No"})
+    un = entry.get("unMember")
+    if un is not None:
+        intro.append({"label": "UN Member", "value": "Yes" if un else "No"})
+    sections.append({"title": "Introduction", "fields": intro})
+
+    # ── Geography ──
+    geo = []
     area = entry.get("area")
     if area:
-        geo_fields.append({"label": "Area", "value": f"{area:,} km²"})
+        geo.append({"label": "Area", "value": f"{area:,} km² ({area * 0.3861:,.0f} sq mi)"})
     borders = entry.get("borders", [])
-    if borders:
-        geo_fields.append({"label": "Borders", "value": ", ".join(borders)})
+    if isinstance(borders, list):
+        geo.append({"label": "Borders", "value": f"{len(borders)} countries — {', '.join(borders) if borders else 'None (island)'}"})
     landlocked = entry.get("landlocked")
     if landlocked is not None:
-        geo_fields.append({"label": "Landlocked", "value": "Yes" if landlocked else "No"})
+        geo.append({"label": "Landlocked", "value": "Yes" if landlocked else "No"})
     latlng = entry.get("latlng", [])
-    if latlng and len(latlng) == 2:
-        geo_fields.append({"label": "Coordinates", "value": f"{latlng[0]:.2f}, {latlng[1]:.2f}"})
-    timezones = entry.get("timezones", [])
-    if timezones:
-        geo_fields.append({"label": "Timezones", "value": ", ".join(timezones)})
-    if geo_fields:
-        sections.append({"title": "Geography", "fields": geo_fields})
+    if isinstance(latlng, list) and len(latlng) == 2:
+        geo.append({"label": "Coordinates", "value": f"{latlng[0]:.2f}, {latlng[1]:.2f}"})
+    sections.append({"title": "Geography", "fields": geo})
 
-    # People
-    people_fields = []
-    pop = entry.get("population")
-    if pop:
-        people_fields.append({"label": "Population", "value": f"{pop:,}"})
+    # ── People & Society ──
+    people = []
     languages = entry.get("languages", {})
-    if languages:
-        lang_list = [v for v in languages.values() if v]
-        if lang_list:
-            people_fields.append({"label": "Languages", "value": ", ".join(lang_list)})
-    if people_fields:
-        sections.append({"title": "People & Society", "fields": people_fields})
+    if isinstance(languages, dict) and languages:
+        lang_list = [f"{name} ({code})" for code, name in languages.items()]
+        people.append({"label": "Languages", "value": ", ".join(lang_list)})
+    demonyms = entry.get("demonyms", {})
+    if isinstance(demonyms, dict):
+        for lang, d in demonyms.items():
+            if isinstance(d, dict):
+                m = d.get("m", "")
+                f = d.get("f", "")
+                if m or f:
+                    people.append({"label": f"Demonym ({lang})", "value": f"♂ {m} / ♀ {f}" if m and f else (m or f)})
+    if not people:
+        people.append({"label": "Note", "value": "Population data not available in this dataset"})
+    sections.append({"title": "People & Society", "fields": people})
 
-    # Government
-    gov_fields = []
-    capital_info = entry.get("capitalInfo", {})
-    if isinstance(capital_info, dict) and capital_info.get("latlng"):
-        gov_fields.append({"label": "Capital", "value": str(capital or [""])[0] if capital else ""})
+    # ── Government ──
+    gov = []
+    gov.append({"label": "Capital", "value": capital_str or "N/A"})
     currencies = entry.get("currencies", {})
-    if currencies:
-        cur_list = []
-        for code, info in currencies.items():
-            if isinstance(info, dict):
-                cur_list.append(f"{info.get('name', code)} ({info.get('symbol', code)})")
+    if isinstance(currencies, dict) and currencies:
+        cur_list = [f"{info.get('name', code)} ({info.get('symbol', code)})" if isinstance(info, dict) else str(code)
+                    for code, info in currencies.items()]
+        gov.append({"label": "Currencies", "value": ", ".join(cur_list)})
+    idd = entry.get("idd", {})
+    if isinstance(idd, dict):
+        root = idd.get("root", "")
+        suffixes = idd.get("suffixes", [])
+        if root:
+            if suffixes:
+                gov.append({"label": "Calling Code", "value": f"{root} (x{suffixes[0]}) — {len(suffixes)} area codes"})
             else:
-                cur_list.append(code)
-        if cur_list:
-            gov_fields.append({"label": "Currencies", "value": ", ".join(cur_list)})
+                gov.append({"label": "Calling Code", "value": str(root)})
     tld = entry.get("tld", [])
     if tld:
-        gov_fields.append({"label": "TLD", "value": ", ".join(tld)})
-    independent = entry.get("independent")
-    if independent is not None:
-        gov_fields.append({"label": "Independent", "value": "Yes" if independent else "No"})
-    unMember = entry.get("unMember")
-    if unMember is not None:
-        gov_fields.append({"label": "UN Member", "value": "Yes" if unMember else "No"})
-    if gov_fields:
-        sections.append({"title": "Government", "fields": gov_fields})
+        gov.append({"label": "Internet TLD", "value": ", ".join(str(t) for t in tld)})
+    sections.append({"title": "Government & Communications", "fields": gov})
 
-    # Economy
-    econ_fields = []
-    gini = entry.get("gini", {})
-    if isinstance(gini, dict):
-        for year, val in sorted(gini.items(), reverse=True):
-            econ_fields.append({"label": f"Gini ({year})", "value": str(val)})
-            break  # just latest
-    if not econ_fields:
-        # try top-level gini
-        pass
-    if econ_fields:
-        sections.append({"title": "Economy", "fields": econ_fields})
+    # ── International Codes ──
+    codes = []
+    codes.append({"label": "ISO 3166-1 Alpha-2", "value": str(entry.get("cca2", ""))})
+    codes.append({"label": "ISO 3166-1 Alpha-3", "value": str(entry.get("cca3", ""))})
+    ccn3 = entry.get("ccn3", "")
+    if ccn3:
+        codes.append({"label": "ISO 3166-1 Numeric", "value": str(ccn3)})
+    cioc = entry.get("cioc", "")
+    if cioc:
+        codes.append({"label": "IOC Code", "value": str(cioc)})
+    alt_spell = entry.get("altSpellings", [])
+    if isinstance(alt_spell, list) and alt_spell:
+        codes.append({"label": "Alternative Spellings", "value": ", ".join(str(a) for a in alt_spell[:10])})
+    sections.append({"title": "International Codes", "fields": codes})
 
-    # Additional: demonyms, car, etc. — skip for brevity
+    # ── Translations ──
+    trans = entry.get("translations", {})
+    if isinstance(trans, dict) and trans:
+        trans_fields = []
+        # Show a curated set of major languages
+        priority = ["fra", "spa", "deu", "ara", "zho", "rus", "jpn", "por", "ita", "nld", "kor", "tur", "pol", "swe", "fin"]
+        shown = set()
+        for lang in priority + sorted(trans.keys()):
+            if lang in shown:
+                continue
+            t = trans.get(lang, {})
+            if isinstance(t, dict):
+                official = t.get("official", "")
+                common = t.get("common", "")
+                label = f"{lang.upper()} — {common}" if common else lang.upper()
+                shown.add(lang)
+                trans_fields.append({"label": label, "value": official if official else str(common)})
+            if len(shown) >= 12:
+                break
+        if trans_fields:
+            sections.append({"title": "Name Translations", "fields": trans_fields})
 
     return sections
 
