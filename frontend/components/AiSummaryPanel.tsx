@@ -6,6 +6,8 @@ import { Card } from "@/components/ui";
 
 const AVAILABLE_MODELS = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-2.5-flash"];
 
+const MAX_VISIBLE_OPTIONS = 12; // show search box if more than this
+
 interface Option {
   key: string;
   label: string;
@@ -25,13 +27,31 @@ export function AiSummaryPanel({ summaryType, title, options, onGenerate }: Prop
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<AiSummaryResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Set<string>>(() => {
-    // Default: all options selected
-    if (options && options.length > 0) return new Set(options.map((o) => o.key));
+    if (options && options.length > 0) {
+      // Default: select the first few (top ~5) so users aren't overwhelmed
+      const count = Math.min(5, options.length);
+      return new Set(options.slice(0, count).map((o) => o.key));
+    }
     return new Set();
   });
 
   const hasOptions = options && options.length > 0;
+  const showSearch = hasOptions && options.length > MAX_VISIBLE_OPTIONS;
+
+  // Filter visible options by search, but always show selected ones
+  const visibleOptions = useMemo(() => {
+    if (!hasOptions) return [];
+    const q = search.toLowerCase().trim();
+    if (!q) return options;
+    return options.filter(
+      (o) =>
+        o.label.toLowerCase().includes(q) ||
+        o.key.toLowerCase().includes(q) ||
+        selected.has(o.key)
+    );
+  }, [options, search, selected, hasOptions]);
 
   function toggle(key: string) {
     setSelected((prev) => {
@@ -39,6 +59,15 @@ export function AiSummaryPanel({ summaryType, title, options, onGenerate }: Prop
       if (next.has(key)) next.delete(key); else next.add(key);
       return next;
     });
+  }
+
+  function toggleAll() {
+    if (!hasOptions) return;
+    if (selected.size === options.length) {
+      setSelected(new Set());
+    } else {
+      setSelected(new Set(options.map((o) => o.key)));
+    }
   }
 
   async function handleGenerate(force: boolean) {
@@ -76,21 +105,53 @@ export function AiSummaryPanel({ summaryType, title, options, onGenerate }: Prop
 
       {/* Clickable option chips */}
       {hasOptions && (
-        <div className="flex flex-wrap gap-1.5 mb-3">
-          {options.map((opt) => (
+        <div className="mb-3 space-y-2">
+          {/* Search + select-all row */}
+          <div className="flex items-center gap-2">
+            {showSearch && (
+              <input
+                type="text"
+                placeholder={`Search ${options.length} items…`}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                disabled={loading}
+                className="flex-1 px-2 py-1 text-xs border border-border rounded bg-surface text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent"
+              />
+            )}
             <button
-              key={opt.key}
-              onClick={() => toggle(opt.key)}
+              onClick={toggleAll}
               disabled={loading}
-              className={`px-2 py-0.5 rounded-md text-xs font-medium border transition-colors ${
-                selected.has(opt.key)
-                  ? "bg-accent/15 border-accent/40 text-accent"
-                  : "bg-surface-alt border-border text-text-muted hover:text-text-secondary"
-              }`}
+              className="px-2 py-1 rounded text-xs font-medium border border-border text-text-secondary hover:text-text-primary hover:bg-surface-alt transition-colors flex-shrink-0"
             >
-              {opt.label}
+              {selected.size === options.length ? "None" : "All"}
             </button>
-          ))}
+          </div>
+          {/* Chips */}
+          <div className="flex flex-wrap gap-1.5">
+            {visibleOptions.map((opt) => (
+              <button
+                key={opt.key}
+                onClick={() => toggle(opt.key)}
+                disabled={loading}
+                className={`px-2 py-0.5 rounded-md text-xs font-medium border transition-colors ${
+                  selected.has(opt.key)
+                    ? "bg-accent/15 border-accent/40 text-accent"
+                    : "bg-surface-alt border-border text-text-muted hover:text-text-secondary"
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+            {visibleOptions.length === 0 && (
+              <span className="text-xs text-text-muted">No matching items.</span>
+            )}
+          </div>
+          {/* Selected count */}
+          {showSearch && (
+            <div className="text-xs text-text-muted">
+              {selected.size} of {options.length} selected
+            </div>
+          )}
         </div>
       )}
 
