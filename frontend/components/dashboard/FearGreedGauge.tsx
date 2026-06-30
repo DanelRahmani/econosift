@@ -74,7 +74,7 @@ export function FearGreedGauge() {
               )}
             </div>
             <span className="w-20 shrink-0 text-right font-mono text-text-secondary">
-              {s.score === null ? "n/a" : `${s.score.toFixed(0)} · ${s.label_text}`}
+              {s.score === null ? "n/a" : `${s.score.toFixed(0)} · ${String(s.label_text ?? "")}`}
             </span>
           </div>
         ))}

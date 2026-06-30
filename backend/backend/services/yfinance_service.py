@@ -141,13 +141,15 @@ def get_market_caps(symbols: tuple[str, ...]) -> dict[str, float]:
 
     import time as _time
     result: dict[str, float] = {}
-    BATCH_SIZE = 5
+    BATCH_SIZE = 10
     syms_list = list(symbols)
-    with ThreadPoolExecutor(max_workers=5) as ex:
+    with ThreadPoolExecutor(max_workers=8) as ex:
         for i in range(0, len(syms_list), BATCH_SIZE):
             batch = syms_list[i:i + BATCH_SIZE]
+            # Progressive backoff: 0.3s base, up to 2s for later batches
+            delay = min(0.3 + (i / BATCH_SIZE) * 0.05, 2.0)
             if i > 0:
-                _time.sleep(0.6)
+                _time.sleep(delay)
             futures = {ex.submit(_fetch_one, s): s for s in batch}
             for fut in as_completed(futures):
                 try:

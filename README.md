@@ -1,4 +1,4 @@
-# Axiom Finance Alpha 0.3
+# Axiom Finance Alpha 0.4
 
 A self-hosted, Dockerised financial analytics platform covering the full investment research stack — from macroeconomics to options pricing, portfolio optimisation to financial term dictionary.
 
@@ -27,7 +27,8 @@ A self-hosted, Dockerised financial analytics platform covering the full investm
 | **Atlas** | `/atlas` | Choropleth world map of 6 macro indicators across ~200 countries (2000–2024), year-slider animation, regional blocs (G7, G20, Eurozone, Emerging Markets), Top-10/Bottom-10 rankings |
 | **Wiki** | `/wiki` | 🔍 Searchable financial dictionary — **410+ terms** across **26 categories**, each with a detailed 3-5 sentence explanation. Category sidebar, debounced search, expandable cards, related-term cross-linking |
 | **Trade** | `/trade` | Exports/imports %GDP, trade balances, openness indices, BIS effective exchange rates |
-| **Corporate Health** | `/corporate` | Altman Z-Score, Piotroski F-Score (9-point), Beneish M-Score, sector aggregate Z |
+| **Corporate Health** | `/corporate` | Altman Z-Score, Piotroski F-Score (9-point), Beneish M-Score, sector aggregate Z. Prior-year financial data via quarterly fallback for full Piotroski (8-9/9) and Beneish scoring. |
+| **Scenario Lab** | `/scenario` | Stress-test portfolios against historical crises (GFC, COVID, dot-com, 2022 rates) and custom macro shocks. Reuses backend scenario engine. |
 | **Dividends** | `/dividends` | Dividend yield, 5Y/10Y growth, payout ratio, aristocrats screener, DDM fair value |
 | **Insider** | `/insider` | Aggregate insider buy/sell ratio, cluster detection, sector sentiment, smart money index |
 | **Mergers** | `/mergers` | M&A deal tracking, deal values, acquisition premiums, sector activity heatmap |
@@ -36,7 +37,7 @@ A self-hosted, Dockerised financial analytics platform covering the full investm
 | **Country Profiles** | `/country/{iso2}` | CIA World Factbook data — geography, demographics, economy |
 | **Admin** | `/admin` | Backend health dashboard, cache stats, job execution history, API keys management |
 
-> **Navigation:** Primary bar (Dashboard · Markets · Screener · Portfolio · Research · Macro · Atlas) is unchanged. The More dropdown is grouped into Discover / Analyze / Markets & Data / Global / Reference sections. Beginner/Expert mode toggle is in the navbar. Sectors and Treemap views are embedded as sub-tabs within the Markets page.
+> **Navigation:** Primary bar (Dashboard · Markets · Screener · Portfolio · Research · Macro · Atlas) is unchanged. The More dropdown is grouped into Discover / Analyze / Markets & Data / Global / Reference sections. **Scenario Lab** is now accessible from the Analyze section of the More dropdown. Beginner/Expert mode toggle is in the navbar. Sectors and Treemap views are embedded as sub-tabs within the Markets page.
 
 ### Wiki Dictionary — 26 Categories
 

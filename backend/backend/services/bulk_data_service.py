@@ -342,6 +342,13 @@ BIS_DATASETS = {
         "iso2_filter": None,
         "label": "BIS Cross-Border Claims (LBS)",
     },
+    "bis_credit_gap": {
+        "zip_key": "credit_gap",
+        "measure_filter": ("CG_DTYPE", "C:"),  # C = credit-to-GDP gap (actual minus trend)
+        "freq": "Q",
+        "iso2_filter": None,
+        "label": "BIS Credit-to-GDP Gaps",
+    },
 }
 
 
@@ -354,6 +361,7 @@ def _download_bis_dataset(ds: dict) -> dict:
         "policy":       "https://data.bis.org/static/bulk/WS_CBPOL_csv_flat.zip",
         "fx":           "https://data.bis.org/static/bulk/WS_XRU_csv_flat.zip",
         "crossborder":  "https://data.bis.org/static/bulk/WS_LBS_csv_flat.zip",
+        "credit_gap":   "https://data.bis.org/static/bulk/WS_CREDIT_GAP_csv_flat.zip",
     }
     url = url_map.get(ds["zip_key"])
     if not url:

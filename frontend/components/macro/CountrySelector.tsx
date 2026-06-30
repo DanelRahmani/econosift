@@ -43,6 +43,7 @@ export function CountrySelector({
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const boxRef = useRef<HTMLDivElement>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { mapRef, lookup } = useCountryNames();
 
   // Resolve names for any selected iso2 that aren't in the predefined list
@@ -92,7 +93,8 @@ export function CountrySelector({
         setLoading(false);
       }
     }, 300);
-    return () => clearTimeout(t);
+    timeoutRef.current = t;
+    return () => { clearTimeout(t); timeoutRef.current = null; };
   }, [q, selected.join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Close dropdown on outside click
@@ -107,6 +109,10 @@ export function CountrySelector({
   }, []);
 
   function pick(iso2: string) {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
     if (!selected.includes(iso2) && selected.length < max) {
       onChange([...selected, iso2]);
     }

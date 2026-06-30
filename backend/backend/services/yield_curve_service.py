@@ -140,11 +140,17 @@ async def get_yield_curves() -> dict:
         for label, sid, years in _REAL_TENORS
     ]
 
-    # Breakevens
+    # Breakevens — with 30Y fallback from (DGS30 - DFII30)
     breakevens = {
         tenor: _latest(data.get(sid, []))
         for tenor, sid in _BREAKEVEN_SERIES.items()
     }
+    # T30YIE FRED series sometimes returns empty; compute from nominal - TIPS
+    if breakevens.get("30y") is None:
+        dgs30 = _latest(data.get("DGS30", []))
+        dfii30 = _latest(data.get("DFII30", []))
+        if dgs30 is not None and dfii30 is not None:
+            breakevens["30y"] = round(dgs30 - dfii30, 4)
 
     # ACM term premium
     tp_hist = [p for p in data.get("ACMTP10", []) if p.get("value") is not None]

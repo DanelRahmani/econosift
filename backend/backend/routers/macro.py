@@ -264,7 +264,24 @@ async def taylor_rule():
 async def inflation(country: str = Query("US", description="ISO2 country code (FRED data is US-only)")):
     """CPI, Core CPI, PCE, Core PCE, PPI, breakevens, Michigan survey, M2, Quantity Theory."""
     if country.upper() != "US":
-        return {"asOf": None, "kpis": {}, "history": {}, "note": "FRED data is US-only. For cross-country data use /macro/data or /macro/country-risk."}
+        # Fall back to World Bank CPI data for non-US countries
+        from ..services import macro_service
+        iso2_list = [country.upper()]
+        series = await macro_service.get_macro_data("inflation", iso2_list, 2000, date.today().year)
+        cpi_data: list[dict] = []
+        if series and series[0].get("data"):
+            cpi_data = [
+                {"date": str(d["year"]), "value": d["value"]}
+                for d in series[0]["data"]
+                if d.get("value") is not None
+            ]
+        latest_cpi = cpi_data[-1]["value"] if cpi_data else None
+        return {
+            "asOf": cpi_data[-1]["date"] if cpi_data else None,
+            "kpis": {"cpiYoY": latest_cpi},
+            "history": {"cpiYoY": cpi_data},
+            "note": "Detailed breakdowns (PCE, Core CPI, breakevens) are US-only. Showing World Bank CPI inflation.",
+        }
     from ..services.macro_expansion_service import fetch_fred_series
 
     series_ids = (
@@ -315,7 +332,28 @@ async def inflation(country: str = Query("US", description="ISO2 country code (F
 async def employment(country: str = Query("US", description="ISO2 country code (FRED data is US-only)")):
     """GDP growth, unemployment, NFP, jobless claims, JOLTS, Sahm Rule, industrial production."""
     if country.upper() != "US":
-        return {"asOf": None, "kpis": {}, "history": {}, "note": "FRED data is US-only. For cross-country data use /macro/data or /macro/country-risk."}
+        # Fall back to World Bank data for non-US countries
+        from ..services import macro_service
+        iso2_list = [country.upper()]
+        gdp_series, unemp_series = await asyncio.gather(
+            macro_service.get_macro_data("gdp_growth", iso2_list, 2000, date.today().year),
+            macro_service.get_macro_data("unemployment", iso2_list, 2000, date.today().year),
+        )
+        def _extract(s):
+            if s and s[0].get("data"):
+                return [{"date": str(d["year"]), "value": d["value"]} for d in s[0]["data"] if d.get("value") is not None]
+            return []
+        gdp_data = _extract(gdp_series)
+        unemp_data = _extract(unemp_series)
+        return {
+            "asOf": gdp_data[-1]["date"] if gdp_data else None,
+            "kpis": {
+                "gdpYoY": gdp_data[-1]["value"] if gdp_data else None,
+                "unemployment": unemp_data[-1]["value"] if unemp_data else None,
+            },
+            "history": {"gdpYoY": gdp_data, "unemployment": unemp_data},
+            "note": "NFP, JOLTS, and other high-frequency data are US-only (FRED). Showing World Bank GDP growth & unemployment.",
+        }
     from ..services.macro_expansion_service import fetch_fred_series
 
     series_ids = (

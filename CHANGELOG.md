@@ -5,7 +5,24 @@
 
 ---
 
-## Phase 0–12: Foundation (Original Roadmap)
+## Phase 36: P1 Bug Fixes (2026-06-30)
+
+| ID | Description |
+|----|-------------|
+| P1-03 | Atlas map — added error state, key prop on ComposableMap, improved geojson fetch |
+| P1-04 | Rate-limit batching — BATCH_SIZE 5→10, progressive backoff in `yfinance_service.py` |
+| P1-05 | Multi-country macro — World Bank fallback for non-US `/macro/inflation` and `/macro/employment` |
+| P1-06 | CountrySelector — `timeoutRef` cleared on `pick()` to prevent stale dropdown reopen |
+| P1-07 | Dashboard React #425 — defensive `String()` wrapping in `FearGreedGauge` and `BreadthBar` |
+| P1-08 | 30Y breakeven — `DGS30 − DFII30` fallback when `T30YIE` FRED series empty |
+| P1-09 | Scenario Lab — dedicated `/scenario` page with Suspense boundary, nav entries in Navbar + MobileNav |
+| P1-10 | Econometric Lab — error handling in `runRegression()`, surfaces failures to UI |
+| P1-11 | BIS credit gaps — `bis_credit_gap` added to `BIS_DATASETS` and download URL map |
+| P1-12 | DCF share count — `marketCap / currentPrice` cross-validation heuristic in `dcf_engine.py` + `valuation_engine.py` |
+| P1-13 | Piotroski F-Score — `_prior_val()` with quarterly fallback for prior-year data (AAPL: 8/9, was 4/9) |
+| P1-14 | Beneish M-Score — same fix as P1-13 (AAPL: −2.00, 7/8 components, was null) |
+
+All 12 P1 issues resolved. 85 DCF/valuation tests pass. TypeScript compiles clean.
 
 | Phase | Date | Description | Commit |
 |-------|------|-------------|--------|

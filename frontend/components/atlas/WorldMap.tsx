@@ -33,6 +33,7 @@ const REGION_VIEW: Record<string, { center: [number, number]; zoom: number }> = 
 export function WorldMap({ countries, year, unit, colorFor, region, members, iso3ById }: Props) {
   // Use `object` as a safe escape hatch for the parsed topojson/geojson data
   const [geojson, setGeojson] = useState<object | null>(null);
+  const [loadError, setLoadError] = useState(false);
   const [tooltip, setTooltip] = useState<{
     x: number;
     y: number;
@@ -42,15 +43,27 @@ export function WorldMap({ countries, year, unit, colorFor, region, members, iso
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    let cancelled = false;
+    setLoadError(false);
     fetch("/world-110m.json")
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
       .then((topo: unknown) => {
+        if (cancelled) return;
         // Cast through unknown to satisfy topojson-client's strict type params
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const fc = feature(topo as any, (topo as any).objects.countries);
         setGeojson(fc as object);
       })
-      .catch(() => setGeojson(null));
+      .catch(() => {
+        if (!cancelled) {
+          setLoadError(true);
+          setGeojson(null);
+        }
+      });
+    return () => { cancelled = true; };
   }, []);
 
   // Build value lookup: iso3 -> value for the current year
@@ -64,6 +77,14 @@ export function WorldMap({ countries, year, unit, colorFor, region, members, iso
 
   const view = REGION_VIEW[region] ?? REGION_VIEW.World;
 
+  if (loadError) {
+    return (
+      <div className="w-full h-[500px] flex items-center justify-center text-text-muted text-sm">
+        Failed to load world map data. Please refresh the page.
+      </div>
+    );
+  }
+
   if (!geojson) {
     return (
       <div className="w-full h-[500px] flex items-center justify-center text-text-muted animate-pulse">
@@ -75,6 +96,7 @@ export function WorldMap({ countries, year, unit, colorFor, region, members, iso
   return (
     <div ref={containerRef} className="relative w-full" style={{ height: 500 }}>
       <ComposableMap
+        key={region}
         projection="geoMercator"
         projectionConfig={{ scale: 130 }}
         width={800}

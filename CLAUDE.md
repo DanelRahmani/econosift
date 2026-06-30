@@ -2,12 +2,13 @@
 
 ## What This App Does
 
-Axiom Finance is a self-hosted financial analytics platform built on FastAPI + Next.js 14, containerized via Docker Compose. It covers the full investment research stack across 24 pages:
+Axiom Finance is a self-hosted financial analytics platform built on FastAPI + Next.js 14, containerized via Docker Compose. It covers the full investment research stack across 25 pages:
 
 - **Dashboard** (`/dashboard`): Market breadth (advancing/declining, McClellan Oscillator, cumulative A-D line), global indices, Fear & Greed Index with sub-components, top movers. Beginner-mode walkthrough available.
 - **Markets** (`/markets`): Price charts, technical indicators (MACD, Bollinger Bands, Ichimoku Cloud, Fibonacci, Pivot Points), risk metrics (VaR, Sharpe, Beta, GARCH), 8-model valuation engine + DCF with per-country discount rate selector + Snowflake composite score, financial ratios, options & IV analytics, news feed, 13F institutional holdings, Form 4 insider transactions. Sub-tabs: Overview, Technicals, Valuation, Ratios, News & Events, Sectors, Treemap
 - **Screener** (`/screener`): S&P 500 / Nasdaq 100 / Dow 30 universe, 20+ preset signals, overnight-warmed cache, 9 result tabs with sparkline gallery
 - **Portfolio** (`/portfolio`): Efficient frontier, Black-Litterman, Monte Carlo, Fama-French 3/5-factor attribution, Kelly criterion, risk contribution decomposition, stress testing, scenario lab, transaction log (buy/sell tracking with cost basis and realized P&L)
+- **Scenario Lab** (`/scenario`): Dedicated page for historical stress tests (GFC, COVID, dot-com, 2022 rates) and custom macro shock simulation. Reuses the backend scenario engine from Portfolio.
 - **Research** (`/research`): 9-tab quant hub — Risk Parity (ERC/inverse-vol), FX Carry (G10), Momentum (decile backtest), Realized Moments (GK variance, skew, cross-section), Cross-Asset Correlation (stocks/bonds/commodities/FX matrix), FX-Macro Link (commodity pair lead/lag), Multi-Country Portfolio (FX-adjusted returns), Sector DuPont, Econometric Lab (pooled OLS)
 - **Macro** (`/macro`): 16-tab hub — Overview, Inflation, Growth & Employment, Housing, Commodities, FX, Leading Indicators, Financial & Funding Conditions, Positioning, Country Risk, Central Banks, Econometric Lab, Fiscal, Labor, Energy & Climate, Inequality
 - **Risk** (`/risk`): Rolling metrics (20D/60D/120D/252D), GARCH(1,1), Hurst exponent, OU mean-reversion, Engle-Granger cointegration, correlation matrix, historical stress scenarios
@@ -60,7 +61,7 @@ See the INFO folder for detailed file-by-file breakdowns of the backend and fron
 | File | Covers |
 |------|--------|
 | [`INFO/backend_structure.md`](./INFO/backend_structure.md) | All 33 routers, 68 services, 8 source adapters, database, tests |
-| [`INFO/frontend_structure.md`](./INFO/frontend_structure.md) | All 24 pages, 118 components, 8 lib files |
+| [`INFO/frontend_structure.md`](./INFO/frontend_structure.md) | All 25 pages, 118 components, 8 lib files |
 
 Key architecture notes:
 - All external API calls are cached via `@cached` / `@async_cached` in `cache.py` (60-min TTL, cachetools TTLCache + SQLite HybridCache two-tier)

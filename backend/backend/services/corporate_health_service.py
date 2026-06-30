@@ -30,6 +30,23 @@ def _latest_val(df, row_name: str) -> float | None:
         return None
 
 
+def _prior_val(df, row_name: str) -> float | None:
+    """Get the prior-year value (t-1) from a yfinance DataFrame.
+
+    Uses .iloc[1] on the annual DataFrame (second column = prior year).
+    Returns None if only one column of data is available.
+    """
+    try:
+        if df is None or df.empty or row_name not in df.index:
+            return None
+        if df.shape[1] < 2:
+            return None
+        v = float(df.loc[row_name].iloc[1])
+        return v if not math.isnan(v) else None
+    except Exception:
+        return None
+
+
 def _safe_div(a: float | None, b: float | None) -> float | None:
     if a is None or b is None or b == 0:
         return None
@@ -101,8 +118,14 @@ def _altman_z(fin, bs, info: dict) -> dict:
 # Piotroski F-Score (9-point fundamental strength)
 # ---------------------------------------------------------------------------
 
-def _piotroski(fin, bs, cf) -> dict:
-    """Compute Piotroski F-Score with all 9 criteria."""
+def _piotroski(fin, bs, cf, fin_q=None, bs_q=None, cf_q=None) -> dict:
+    """Compute Piotroski F-Score with all 9 criteria.
+
+    Parameters
+    ----------
+    fin, bs, cf : Annual financial statement DataFrames
+    fin_q, bs_q, cf_q : Quarterly DataFrames (fallback if annual only has 1 column)
+    """
     net_income = _latest_val(fin, "Net Income")
     total_assets = _latest_val(bs, "Total Assets")
     current_assets = _latest_val(bs, "Current Assets")
@@ -117,6 +140,19 @@ def _piotroski(fin, bs, cf) -> dict:
     shares = _latest_val(bs, "Ordinary Shares Number")
     if shares is None:
         shares = _latest_val(bs, "Share Issued")
+
+    # Helper: try annual _prior_val, fall back to quarterly (4 quarters back)
+    def _prior(df_annual, df_quarterly, row_name: str) -> float | None:
+        v = _prior_val(df_annual, row_name)
+        if v is not None:
+            return v
+        if df_quarterly is not None and row_name in df_quarterly.index and df_quarterly.shape[1] >= 4:
+            try:
+                vq = float(df_quarterly.loc[row_name].iloc[3])
+                return vq if not math.isnan(vq) else None
+            except Exception:
+                pass
+        return None
 
     criteria: dict[str, bool | None] = {}
     score = 0
@@ -134,15 +170,10 @@ def _piotroski(fin, bs, cf) -> dict:
         score += 1
 
     # 3. ROA increasing (vs prior year)
-    # Use net_income / total_assets for current year
     roa = _safe_div(net_income, total_assets)
-    # Prior year
-    try:
-        ni_prior = float(fin.loc["Net Income"].iloc[1]) if "Net Income" in fin.index and fin.shape[1] > 1 else None
-        ta_prior = float(bs.loc["Total Assets"].iloc[1]) if "Total Assets" in bs.index and bs.shape[1] > 1 else None
-        roa_prior = _safe_div(ni_prior, ta_prior)
-    except Exception:
-        roa_prior = None
+    ni_prior = _prior(fin, fin_q, "Net Income")
+    ta_prior = _prior(bs, bs_q, "Total Assets")
+    roa_prior = _safe_div(ni_prior, ta_prior)
 
     c3 = roa is not None and (roa_prior is None or roa > roa_prior)
     criteria["roaIncreasing"] = c3
@@ -158,12 +189,9 @@ def _piotroski(fin, bs, cf) -> dict:
 
     # 5. Decreasing long-term debt ratio
     ltd_to_assets = _safe_div(long_term_debt, total_assets)
-    try:
-        ltd_prior = float(bs.loc["Long Term Debt"].iloc[1]) if "Long Term Debt" in bs.index and bs.shape[1] > 1 else None
-        ta_prior2 = float(bs.loc["Total Assets"].iloc[1]) if "Total Assets" in bs.index and bs.shape[1] > 1 else None
-        ltd_ratio_prior = _safe_div(ltd_prior, ta_prior2)
-    except Exception:
-        ltd_ratio_prior = None
+    ltd_prior = _prior(bs, bs_q, "Long Term Debt")
+    ta_prior2 = _prior(bs, bs_q, "Total Assets")
+    ltd_ratio_prior = _safe_div(ltd_prior, ta_prior2)
 
     c5 = ltd_to_assets is not None and (ltd_ratio_prior is None or ltd_to_assets <= ltd_ratio_prior)
     criteria["decreasingLeverage"] = c5
@@ -172,12 +200,9 @@ def _piotroski(fin, bs, cf) -> dict:
 
     # 6. Increasing current ratio
     cr = _safe_div(current_assets, current_liabilities)
-    try:
-        ca_prior = float(bs.loc["Current Assets"].iloc[1]) if "Current Assets" in bs.index and bs.shape[1] > 1 else None
-        cl_prior = float(bs.loc["Current Liabilities"].iloc[1]) if "Current Liabilities" in bs.index and bs.shape[1] > 1 else None
-        cr_prior = _safe_div(ca_prior, cl_prior)
-    except Exception:
-        cr_prior = None
+    ca_prior = _prior(bs, bs_q, "Current Assets")
+    cl_prior = _prior(bs, bs_q, "Current Liabilities")
+    cr_prior = _safe_div(ca_prior, cl_prior)
 
     c6 = cr is not None and (cr_prior is None or cr > cr_prior)
     criteria["increasingCurrentRatio"] = c6
@@ -185,12 +210,9 @@ def _piotroski(fin, bs, cf) -> dict:
         score += 1
 
     # 7. No share dilution
-    try:
-        shares_prior = float(bs.loc["Ordinary Shares Number"].iloc[1]) if "Ordinary Shares Number" in bs.index and bs.shape[1] > 1 else None
-        if shares_prior is None:
-            shares_prior = float(bs.loc["Share Issued"].iloc[1]) if "Share Issued" in bs.index and bs.shape[1] > 1 else None
-    except Exception:
-        shares_prior = None
+    shares_prior = _prior(bs, bs_q, "Ordinary Shares Number")
+    if shares_prior is None:
+        shares_prior = _prior(bs, bs_q, "Share Issued")
 
     c7 = shares is not None and (shares_prior is None or shares <= shares_prior)
     criteria["noShareDilution"] = c7
@@ -199,12 +221,9 @@ def _piotroski(fin, bs, cf) -> dict:
 
     # 8. Increasing gross margin
     gm = _safe_div(gross_profit, revenue)
-    try:
-        gp_prior = float(fin.loc["Gross Profit"].iloc[1]) if "Gross Profit" in fin.index and fin.shape[1] > 1 else None
-        rev_prior = float(fin.loc["Total Revenue"].iloc[1]) if "Total Revenue" in fin.index and fin.shape[1] > 1 else None
-        gm_prior = _safe_div(gp_prior, rev_prior)
-    except Exception:
-        gm_prior = None
+    gp_prior = _prior(fin, fin_q, "Gross Profit")
+    rev_prior = _prior(fin, fin_q, "Total Revenue")
+    gm_prior = _safe_div(gp_prior, rev_prior)
 
     c8 = gm is not None and (gm_prior is None or gm > gm_prior)
     criteria["increasingGrossMargin"] = c8
@@ -213,12 +232,9 @@ def _piotroski(fin, bs, cf) -> dict:
 
     # 9. Increasing asset turnover
     turnover = _safe_div(revenue, total_assets)
-    try:
-        rev_prior2 = float(fin.loc["Total Revenue"].iloc[1]) if "Total Revenue" in fin.index and fin.shape[1] > 1 else None
-        ta_prior3 = float(bs.loc["Total Assets"].iloc[1]) if "Total Assets" in bs.index and bs.shape[1] > 1 else None
-        turnover_prior = _safe_div(rev_prior2, ta_prior3)
-    except Exception:
-        turnover_prior = None
+    rev_prior2 = _prior(fin, fin_q, "Total Revenue")
+    ta_prior3 = _prior(bs, bs_q, "Total Assets")
+    turnover_prior = _safe_div(rev_prior2, ta_prior3)
 
     c9 = turnover is not None and (turnover_prior is None or turnover > turnover_prior)
     criteria["increasingAssetTurnover"] = c9
@@ -239,8 +255,14 @@ def _piotroski(fin, bs, cf) -> dict:
 #     + 0.115*DEPI - 0.172*SGAI + 4.679*TATA - 0.327*LVGI
 # ---------------------------------------------------------------------------
 
-def _beneish(fin, bs, cf) -> dict:
-    """Compute Beneish M-Score with 8 indexes."""
+def _beneish(fin, bs, cf, fin_q=None, bs_q=None, cf_q=None) -> dict:
+    """Compute Beneish M-Score with 8 indexes.
+
+    Parameters
+    ----------
+    fin, bs, cf : Annual financial statement DataFrames
+    fin_q, bs_q, cf_q : Quarterly DataFrames (fallback if annual only has 1 column)
+    """
     # Current year values
     revenue = _latest_val(fin, "Total Revenue")
     cogs = _latest_val(fin, "Cost Of Revenue")
@@ -262,35 +284,38 @@ def _beneish(fin, bs, cf) -> dict:
     receivables = _latest_val(bs, "Accounts Receivable")
     sga = _latest_val(fin, "Selling General And Administration")
 
-    # Prior year values
-    def _prior(df, row_name: str) -> float | None:
-        try:
-            if df is None or df.empty or row_name not in df.index or df.shape[1] < 2:
-                return None
-            v = float(df.loc[row_name].iloc[1])
-            return v if not math.isnan(v) else None
-        except Exception:
-            return None
+    # Helper: try annual _prior_val, fall back to quarterly (4 quarters back)
+    def _prior(df_annual, df_quarterly, row_name: str) -> float | None:
+        v = _prior_val(df_annual, row_name)
+        if v is not None:
+            return v
+        if df_quarterly is not None and row_name in df_quarterly.index and df_quarterly.shape[1] >= 4:
+            try:
+                vq = float(df_quarterly.loc[row_name].iloc[3])
+                return vq if not math.isnan(vq) else None
+            except Exception:
+                pass
+        return None
 
-    rev_prior = _prior(fin, "Total Revenue")
-    cogs_prior = _prior(fin, "Cost Of Revenue")
-    receivables_prior = _prior(bs, "Accounts Receivable")
-    ca_prior = _prior(bs, "Current Assets")
-    ppe_prior = _prior(bs, "Net PPE")
+    rev_prior = _prior(fin, fin_q, "Total Revenue")
+    cogs_prior = _prior(fin, fin_q, "Cost Of Revenue")
+    receivables_prior = _prior(bs, bs_q, "Accounts Receivable")
+    ca_prior = _prior(bs, bs_q, "Current Assets")
+    ppe_prior = _prior(bs, bs_q, "Net PPE")
     if ppe_prior is None:
-        ppe_prior = _prior(bs, "Property Plant and Equipment")
+        ppe_prior = _prior(bs, bs_q, "Property Plant and Equipment")
     if ppe_prior is None:
-        ppe_prior = _prior(bs, "Gross PPE")
-    ta_prior = _prior(bs, "Total Assets")
-    dep_prior = _prior(bs, "Accumulated Depreciation")
-    cl_prior = _prior(bs, "Current Liabilities")
-    ltd_prior = _prior(bs, "Long Term Debt")
-    tl_prior = _prior(bs, "Total Liabilities Net Minority Interest")
+        ppe_prior = _prior(bs, bs_q, "Gross PPE")
+    ta_prior = _prior(bs, bs_q, "Total Assets")
+    dep_prior = _prior(bs, bs_q, "Accumulated Depreciation")
+    cl_prior = _prior(bs, bs_q, "Current Liabilities")
+    ltd_prior = _prior(bs, bs_q, "Long Term Debt")
+    tl_prior = _prior(bs, bs_q, "Total Liabilities Net Minority Interest")
     if tl_prior is None:
-        tl_prior = _prior(bs, "Total Liabilities")
-    sga_prior = _prior(fin, "Selling General And Administration")
-    ni_prior = _prior(fin, "Net Income")
-    ocf_prior = _prior(cf, "Operating Cash Flow")
+        tl_prior = _prior(bs, bs_q, "Total Liabilities")
+    sga_prior = _prior(fin, fin_q, "Selling General And Administration")
+    ni_prior = _prior(fin, fin_q, "Net Income")
+    ocf_prior = _prior(cf, cf_q, "Operating Cash Flow")
 
     indexes: dict[str, float | None] = {}
 
@@ -405,6 +430,11 @@ def get_corporate_health(ticker: str) -> dict:
         bs = stock.balance_sheet
         cf = stock.cashflow
 
+        # Quarterly fallback for prior-year comparisons (if annual only has 1 column)
+        fin_q = stock.quarterly_financials if fin is not None and fin.shape[1] < 2 else None
+        bs_q = stock.quarterly_balance_sheet if bs is not None and bs.shape[1] < 2 else None
+        cf_q = stock.quarterly_cashflow if cf is not None and cf.shape[1] < 2 else None
+
         # Validate we have enough data
         if fin is None or fin.empty:
             return {"ticker": ticker, "error": "No financial statement data available for this ticker"}
@@ -421,9 +451,9 @@ def get_corporate_health(ticker: str) -> dict:
         if is_financial:
             z_data["note"] = "Altman Z-Score is not applicable to financial firms. Use with caution."
 
-        piotroski_data = _piotroski(fin, bs, cf)
+        piotroski_data = _piotroski(fin, bs, cf, fin_q, bs_q, cf_q)
 
-        beneish_data = _beneish(fin, bs, cf)
+        beneish_data = _beneish(fin, bs, cf, fin_q, bs_q, cf_q)
 
         return {
             "ticker": ticker,

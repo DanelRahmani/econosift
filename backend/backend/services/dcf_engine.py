@@ -1,6 +1,7 @@
 """Two-stage DCF valuation engine with scenario analysis and sensitivity heatmap."""
 from __future__ import annotations
 
+import logging
 import math
 from datetime import date
 
@@ -78,6 +79,27 @@ def two_stage_dcf(
     net_debt = (_clean(total_debt_raw) or 0.0) - (_clean(total_cash_raw) or 0.0)
     spot = _clean(spot_raw)
     as_of = date.today().isoformat()
+
+    # --- Validate shares outstanding ---
+    # yfinance sometimes returns sharesOutstanding in inconsistent units.
+    # Cross-check: if marketCap and currentPrice are available, compute
+    # implied shares = marketCap / price. Use this if the direct
+    # sharesOutstanding looks wrong (e.g., off by >10x for mega-caps).
+    if shares is not None and spot is not None and spot > 0:
+        market_cap = _clean(info.get("marketCap"))
+        if market_cap is not None and market_cap > 0:
+            implied_shares = market_cap / spot
+            ratio = implied_shares / shares if shares > 0 else 0
+            if ratio > 5 or ratio < 0.2:
+                # sharesOutstanding is likely in wrong units — use implied
+                import logging
+                _log = logging.getLogger(__name__)
+                _log.warning(
+                    "dcf_engine: sharesOutstanding=%s, marketCap/price implies %s "
+                    "(ratio=%.2f) — using implied shares",
+                    shares, implied_shares, ratio,
+                )
+                shares = implied_shares
 
     # --- Guard conditions ---
     def _locked(reason: str) -> dict:

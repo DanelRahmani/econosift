@@ -121,6 +121,22 @@ class _Ctx:
             or _clean(self.info.get("regularMarketPrice"))
         )
         self.shares: float | None = _clean(self.info.get("sharesOutstanding"))
+
+        # Validate shares: cross-check with marketCap / currentPrice
+        if self.shares is not None and self.spot is not None and self.spot > 0:
+            market_cap = _clean(self.info.get("marketCap"))
+            if market_cap is not None and market_cap > 0:
+                implied = market_cap / self.spot
+                ratio = implied / self.shares if self.shares > 0 else 0
+                if ratio > 5 or ratio < 0.2:
+                    import logging
+                    _log = logging.getLogger(__name__)
+                    _log.warning(
+                        "valuation_engine: sharesOutstanding=%s, marketCap/price=%s "
+                        "(ratio=%.2f) — using implied shares",
+                        self.shares, implied, ratio,
+                    )
+                    self.shares = implied
         self.currency: str = self.info.get("currency") or "USD"
         self.ticker: str = bundle.get("ticker") or ""
         self.sector: str | None = self.info.get("sector")

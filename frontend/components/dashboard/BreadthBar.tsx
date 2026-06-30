@@ -45,7 +45,7 @@ export function BreadthBar({ index = "sp500" }: { index?: string }) {
           Market Breadth · S&amp;P 500
         </h2>
         <span className="text-xs text-text-muted font-mono">
-          {data.total} stocks · {data.asOf ?? "—"}
+          {data.total} stocks · {String(data.asOf ?? "—")}
         </span>
       </div>
 

@@ -109,6 +109,8 @@ export function EconLabTab() {
     try {
       const r = await api.macroRegress(dep, cleanIndep, countries, start, end);
       setResult(r);
+    } catch (err: any) {
+      setResult({ error: err?.message || String(err), coefficients: [], residuals: [] } as any);
     } finally {
       setLoading(false);
     }
