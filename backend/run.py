@@ -23,5 +23,8 @@ if sys.stderr is None:
 
 import uvicorn
 
+# Import the FastAPI app object directly — avoids PyInstaller import-string issues.
+from backend.main import app
+
 if __name__ == "__main__":
-    uvicorn.run("backend.main:app", host="0.0.0.0", port=8000, log_config=None)
+    uvicorn.run(app, host="0.0.0.0", port=8000, log_config=None)
