@@ -1,6 +1,6 @@
 # Active Issues — Axiom Finance
 
-> **Generated:** 2026-06-30 · **Test status:** 568+ backend tests passing
+> **Generated:** 2026-06-30 · **Last audit:** 2026-06-30 · **Test status:** 568+ backend tests passing
 > Single source of truth for all known issues, consolidated from QA audits, deferred items, and the issue tracker.
 
 ---
@@ -21,12 +21,12 @@
 
 | ID | Issue | Source | Details |
 |----|-------|--------|---------|
-| P2-01 | **PageSkeleton not rolled out fully** | `ISSUES.md`, CLAUDE.md (Phase 22) | `PageSkeleton` now used in most pages (Yield, Trade, Screener, Portfolio, MacroTabShell, DuPont, TaylorRule, RollingMetrics, Inflation). Calendar, Treemap, Risk still use bare `animate-pulse`. |
+| P2-01 | **PageSkeleton not rolled out fully** | `ISSUES.md`, CLAUDE.md (Phase 22) | `PageSkeleton` now used in most pages (Yield, Trade, Screener, Portfolio, Calendar, Cross-Border, MacroTabShell, DuPont, TaylorRule, RollingMetrics, Inflation). Treemap and Risk sub-components still use bare `animate-pulse`. |
 | P2-02 | **Sub-tab scroll arrows needed** | `ISSUES.md` | Macro (9 tabs) and Markets sub-tabs overflow. Sticky position added (Phase 23) but no scroll arrows. |
 | P2-03 | **Taylor Rule 500 errors (frontend)** | `ISSUES.md` | `/taylor-rule` endpoint exists (Phase 23) but Econ Lab shows "Failed to load Taylor Rule data" — frontend wiring fix needed. |
 | P2-04 | **Mobile bottom nav cramped** | `ISSUES.md`, `UI_report.md` | 5 primary + More + Theme = 7 items. Tight on small phones. |
 | P2-05 | **No React error boundaries** | `ISSUES.md` | Any render error whites out the page. Add `<ErrorBoundary>` with retry button. |
-| P2-06 | **Data freshness badges** | `ISSUES.md` | No indication of when data was last updated. "Updated X ago" badges per panel. |
+| P2-06 | **Data freshness badges** | `ISSUES.md` | `DataFreshnessBadge.tsx` component exists but is **not imported anywhere**. Needs to be added to all pages. Quick win. |
 | P2-07 | **Keyboard shortcuts** | `ISSUES.md` | No keyboard nav. Ctrl+K search, number keys for tabs, arrow keys for periods. |
 | P2-08 | **Export PDF button** | `ISSUES.md` | Print styles exist in `globals.css` but no "Export" button on any page. |
 | P2-09 | **Fear & Greed per-signal explanation** | CLAUDE.md (Phase 19), `UI_report.md` | McClellan "Extreme Greed" at 81 while composite is 44 "Fear" — confusing without explanation. |
@@ -37,13 +37,12 @@
 | P2-14 | **Calendar event quality** | CLAUDE.md (Phase 23) | FRED entries drown out real events. Prioritize CPI/NFP/FOMC/GDP over routine releases. |
 | P2-15 | **Pattern Library** | CLAUDE.md (Phase 23) | No shared component library for KPI strips, tab bars, control bars. Every page hand-rolls these. |
 | P2-16 | **Bar chart Y-axis labels suppressed** | CLAUDE.md (Phase 25) | Recharts auto-suppresses labels for vertical BarChart with 18+ countries. `shortCountryName()` + `width={90}` partial mitigation. |
-| P2-22 | **COT/Positioning tab data unreliable** | `ISSUES.md`, CLAUDE.md (Phase 24) | CFTC source format changes frequently — downgraded from P1-02. Multiple URL fallbacks exist but data often empty. |
-| P2-17 | **BIS Credit-to-GDP gaps cold-start** | CLAUDE.md (Phase 24/25) | Now wired into `refresh_all_bulk_data` via Phase 36 (P1-11). First cold-start still takes 90-120s but subsequent refreshes use cached parquet. |
+| P2-22 | **COT/Positioning tab data unreliable** | `ISSUES.md`, CLAUDE.md (Phase 24) | CFTC source format changes frequently — downgraded from P1-02. Backend has multiple URL fallbacks (cot_service.py lines 18–89) but data often empty. |
 | P2-18 | **Browser refresh needed after redeploy** | CLAUDE.md (Phase 25) | Stale JS bundles served after `docker compose up -d`. Hard-refresh required. |
 | P2-19 | **`@async_cached` persistent cache trap** | CLAUDE.md (Phase 25) | Broken function run caches `{}` permanently in SQLite. Fix: clear both tiers (`_caches.clear()` + delete CacheEntry rows). |
-| P2-20 | **Dividend yield display inconsistency** | `FACT_CHECK.md` | `ValuationKpiPanel` uses `fmtPct(v * 100)` for dividend yield — fragile pattern. Standardize percent formatting. |
+| P2-20 | **Percent formatting inconsistency** | `FACT_CHECK.md`, audit | `fmtPct(v * 100)` used in `ValuationKpiPanel` and `ExtendedRiskTable.tsx` (line 13) — fragile double-scaling pattern. Standardize percent formatting. |
 | P2-21 | **Raw ISO timestamps shown to users** | `UI_report.md` (G-12) | Screener shows `as of 2026-06-25T14:40:30...` instead of readable format. |
-| P2-23 | **Dark mode chart consistency** | `ISSUES.md` (P3-08) | Some Recharts components have hardcoded `stroke="#333"` instead of using `chartPalette()`. |
+| P2-23 | **Dark mode chart consistency** | `ISSUES.md` (P3-08) | Some Recharts components have hardcoded `stroke="#333"` instead of using `chartPalette()`.
 
 ---
 
@@ -117,3 +116,4 @@ These items are verified as fixed in shipped phases. Listed here for reference t
 | ✅ | **P1-12**: DCF share count — marketCap/price cross-validation heuristic added | Phase 36 |
 | ✅ | **P1-13**: Piotroski F-Score — prior-year data via `_prior_val()` with quarterly fallback (AAPL: 8/9, was 4/9) | Phase 36 |
 | ✅ | **P1-14**: Beneish M-Score — same fix as P1-13 (AAPL: −2.00, 7/8 components, was null) | Phase 36 |
+| ✅ | **P2-17**: BIS Credit-to-GDP gaps — wired into `BIS_DATASETS` bulk refresh (was P1-11) | Phase 36 |
