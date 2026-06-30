@@ -1,0 +1,3 @@
+# Build dependencies for PyInstaller binary
+pyinstaller>=6.0
+pyinstaller-hooks-contrib>=2024.0

@@ -45,8 +45,10 @@ import type {
   CrossAssetCorrelation, FxMacroLinkResponse, MultiCountryPortfolio, MultiCountryHoldingInput,
 } from "./types";
 
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
 async function get<T>(path: string): Promise<T> {
-  const res = await fetch(`/api${path}`, { cache: "no-store" });
+  const res = await fetch(`${API_BASE}/api${path}`, { cache: "no-store" });
   if (!res.ok) {
     throw new Error(`API ${path} failed: ${res.status}`);
   }
@@ -54,7 +56,7 @@ async function get<T>(path: string): Promise<T> {
 }
 
 async function post<T>(path: string, body: unknown): Promise<T> {
-  const res = await fetch(`/api${path}`, {
+  const res = await fetch(`${API_BASE}/api${path}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -67,7 +69,7 @@ async function post<T>(path: string, body: unknown): Promise<T> {
 }
 
 async function put<T>(path: string, body: unknown): Promise<T> {
-  const res = await fetch(`/api${path}`, {
+  const res = await fetch(`${API_BASE}/api${path}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -569,5 +571,5 @@ export const marketComposite = (
 ): Promise<{ prices: PricePoint[]; risk: RiskMetric[]; quotes: Quote[] }> => {
   const params = new URLSearchParams({ tickers, period });
   if (benchmark) params.set('benchmark', benchmark);
-  return get(`/api/market/composite?${params}`);
+  return get(`/market/composite?${params}`);
 };

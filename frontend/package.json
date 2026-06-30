@@ -11,6 +11,11 @@
   },
   "dependencies": {
     "@tanstack/react-query": "^5.101.1",
+    "@tauri-apps/api": "^2.11.1",
+    "@tauri-apps/plugin-dialog": "^2.7.1",
+    "@tauri-apps/plugin-fs": "^2.5.1",
+    "@tauri-apps/plugin-shell": "^2.3.5",
+    "@tauri-apps/plugin-updater": "^2.10.1",
     "d3-hierarchy": "^3.1.2",
     "d3-scale": "^4.0.2",
     "d3-scale-chromatic": "^3.0.0",

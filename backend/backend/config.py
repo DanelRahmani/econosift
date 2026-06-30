@@ -1,16 +1,52 @@
 """Static configuration: countries, indicators, ISO mappings."""
 from __future__ import annotations
 
+import json
 import os
+import sys
+from pathlib import Path
 from dotenv import load_dotenv
 
 load_dotenv()
 
-FRED_API_KEY = os.getenv("FRED_API_KEY") or None
-# Optional free-tier key; features that use it degrade gracefully when absent.
-FINNHUB_API_KEY = os.getenv("FINNHUB_API_KEY") or None
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or None
-# Optional Google Gemini API key (free tier); used for AI-powered summaries.
+# ── Data directory (OS-appropriate for desktop app, configurable for Docker) ──
+
+def _default_data_dir() -> Path:
+    """Return the OS-standard app data directory for Axiom Finance.
+
+    Order of precedence:
+    1. AXIOM_DATA_DIR env var (set by Tauri shell in desktop mode)
+    2. Platform-appropriate default (e.g. %APPDATA%/AxiomFinance on Windows)
+    """
+    env_dir = os.getenv("AXIOM_DATA_DIR")
+    if env_dir:
+        return Path(env_dir)
+
+    if sys.platform == "win32":
+        base = Path(os.environ.get("APPDATA", Path.home() / "AppData" / "Roaming"))
+    elif sys.platform == "darwin":
+        base = Path.home() / "Library" / "Application Support"
+    else:
+        base = Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local" / "share"))
+    return base / "AxiomFinance"
+
+
+DATA_DIR = _default_data_dir()
+
+# ── API keys: env vars first, then settings.json ──────────────────────────
+
+_SETTINGS_PATH = DATA_DIR / "settings.json"
+if _SETTINGS_PATH.exists():
+    try:
+        _settings = json.loads(_SETTINGS_PATH.read_text(encoding="utf-8"))
+    except Exception:
+        _settings = {}
+else:
+    _settings = {}
+
+FRED_API_KEY = os.getenv("FRED_API_KEY") or _settings.get("fred_api_key") or None
+FINNHUB_API_KEY = os.getenv("FINNHUB_API_KEY") or _settings.get("finnhub_api_key") or None
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or _settings.get("gemini_api_key") or None
 
 # ISO2 -> ISO3 for sources that need 3-letter codes (DBnomics OECD/BIS etc.)
 ISO2_TO_ISO3: dict[str, str] = {

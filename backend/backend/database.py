@@ -7,7 +7,9 @@ import pathlib
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
 
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./data/axiomfinance.db")
+_DEFAULT_DB = os.getenv("AXIOM_DATA_DIR", "./data")
+_DEFAULT_DB_URL = f"sqlite:///{_DEFAULT_DB}/axiomfinance.db"
+DATABASE_URL = os.getenv("DATABASE_URL", _DEFAULT_DB_URL)
 
 # Ensure the data directory exists for SQLite paths
 if DATABASE_URL.startswith("sqlite") and DATABASE_URL != "sqlite:///:memory:":

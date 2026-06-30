@@ -1,0 +1,5 @@
+[target.'cfg(all(target_arch = "arm", target_os = "macos"))']
+rustflags = []
+
+[target.'cfg(all(target_arch = "aarch64", target_os = "macos"))']
+rustflags = []
