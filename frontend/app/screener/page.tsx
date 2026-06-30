@@ -274,7 +274,9 @@ function ScreenerPageInner() {
                 )}{" "}
                 stocks
                 {data?.asOf && (
-                  <span className="text-text-muted ml-2 text-xs">as of {data.asOf}</span>
+                  <span className="text-text-muted ml-2 text-xs">
+                    as of {new Date(data.asOf).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}
+                  </span>
                 )}
               </>
             )}

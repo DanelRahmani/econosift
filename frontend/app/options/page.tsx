@@ -162,7 +162,7 @@ function OptionsPageInner() {
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-bold">Options Analytics</h1>
-            <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-warning/20 text-warning border border-warning/30">
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-warning/20 text-warning border border-warning/30">
               ~15min delay
             </span>
           </div>
