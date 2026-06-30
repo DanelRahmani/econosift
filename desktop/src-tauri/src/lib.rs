@@ -1,7 +1,7 @@
 use std::time::Duration;
 
-use tauri::Manager;
 use tauri_plugin_shell::ShellExt;
+use tauri_plugin_dialog::DialogExt;
 
 /// Resolve the OS-standard app data directory.
 fn app_data_dir() -> std::path::PathBuf {
@@ -81,15 +81,15 @@ pub fn run() {
                     }
                     Err(e) => {
                         eprintln!("Backend startup failed: {e}");
-                        let _ = tauri_plugin_dialog::MessageDialogBuilder::new(
-                            "Startup Error",
-                            &format!(
+                        let _ = app_handle
+                            .dialog()
+                            .message(format!(
                                 "Failed to start the analysis engine: {e}\n\n\
                                  Please try restarting the application."
-                            ),
-                        )
-                        .kind(tauri_plugin_dialog::MessageDialogKind::Error)
-                        .blocking_show(Some(&app_handle));
+                            ))
+                            .title("Startup Error")
+                            .kind(tauri_plugin_dialog::MessageDialogKind::Error)
+                            .blocking_show();
                     }
                 }
             });

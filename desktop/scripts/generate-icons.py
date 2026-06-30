@@ -10,17 +10,18 @@ import zlib
 import os
 
 def create_png(width: int, height: int, r: int = 41, g: int = 98, b: int = 255) -> bytes:
-    """Create a minimal valid PNG file with a solid color."""
+    """Create a minimal valid RGBA PNG file with a solid color."""
     def chunk(chunk_type: bytes, data: bytes) -> bytes:
         c = chunk_type + data
         return struct.pack(">I", len(data)) + c + struct.pack(">I", zlib.crc32(c) & 0xFFFFFFFF)
 
     signature = b"\x89PNG\r\n\x1a\n"
-    ihdr = chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0))
+    # color_type=6 means RGBA
+    ihdr = chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 6, 0, 0, 0))
 
     raw = b""
     for _ in range(height):
-        raw += b"\x00" + bytes([r, g, b]) * width
+        raw += b"\x00" + bytes([r, g, b, 255]) * width
 
     idat = chunk(b"IDAT", zlib.compress(raw))
     iend = chunk(b"IEND", b"")
