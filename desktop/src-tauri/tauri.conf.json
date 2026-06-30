@@ -57,7 +57,7 @@
     "updater": {
       "active": true,
       "endpoints": [
-        "https://github.com/danelfarsi/axiomfinance/releases/latest/download/latest.json"
+        "https://github.com/DanelRahmani/axiomfinance/releases/latest/download/latest.json"
       ],
       "dialog": true,
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDYwNkMzMEFGM0FEOUIyMTIKUldRU3N0azZyekJzWUxQNGVIVVo3VkFzSFduSFRoQmRCZWI2WXgrdEQ1V25QaEZ6WmxVVWM2angK"

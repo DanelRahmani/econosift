@@ -5,7 +5,16 @@
 
 ---
 
-## Phase 36: P1 Bug Fixes (2026-06-30)
+## Phase 37: Tauri Desktop App (2026-06-30)
+
+- **Frontend:** Switched to `output: "export"` (static HTML); API client uses configurable base URL (`NEXT_PUBLIC_API_URL`); added `generateStaticParams` for `country/[iso2]` dynamic routes
+- **Desktop:** New `desktop/` Tauri v2 Rust project; Rust sidecar manager spawns Python backend binary, polls health check, shows error dialog on failure; placeholder icons generated
+- **Backend:** PyInstaller `build.spec` to compile Python into `axiom-backend` binary; data directory resolves via `AXIOM_DATA_DIR` env var with OS-standard fallback; settings.json read for API keys
+- **Settings UI:** New `SettingsPanel.tsx` modal for FRED/Finnhub/Gemini API keys; saves via Tauri FS plugin (Docker admin API fallback); gear icon in navbar
+- **CI/CD:** GitHub Actions matrix build on `windows-latest`, `macos-latest`, `ubuntu-latest`; pipeline: PyInstaller → Next.js static export → Tauri build → GitHub Release on tag
+- **Auto-update:** Tauri updater via GitHub Releases; signing keys generated with pubkey in `tauri.conf.json`
+
+## Phase 36 — P1 Bug Fixes (2026-06-30)
 
 | ID | Description |
 |----|-------------|
