@@ -30,12 +30,13 @@ def create_png(width: int, height: int, r: int = 41, g: int = 98, b: int = 255) 
 
 
 def create_ico(png_data: bytes) -> bytes:
-    """Create a minimal .ico file from a single PNG image."""
-    # ICO header
+    """Create a minimal .ico file from a single 256x256 RGBA PNG image."""
+    # ICO header: reserved(2) + type(2) + count(2)
     header = struct.pack("<HHH", 0, 1, 1)
-    # Directory entry
+    # Directory entry: width, height, colors, reserved, planes, bpp, size, offset
+    # Use 0 for width/height to represent 256x256 (ICO convention)
     size = len(png_data)
-    entry = struct.pack("<BBBBHHII", 32, 32, 0, 0, 1, 32, size, 22)
+    entry = struct.pack("<BBBBHHII", 0, 0, 0, 0, 1, 32, size, 22)
     return header + entry + png_data
 
 
