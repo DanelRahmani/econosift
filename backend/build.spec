@@ -10,8 +10,8 @@ Usage:
 block_cipher = None
 
 a = Analysis(
-    ['backend/main.py'],
-    pathex=[],
+    ['run.py'],
+    pathex=['.'],
     binaries=[],
     datas=[],
     hiddenimports=[
