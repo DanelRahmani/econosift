@@ -27,7 +27,7 @@ jobs:
             frontend_out: out
 
           - os: macos-latest
-            target: x86_64-apple-darwin
+            target: aarch64-apple-darwin
             binary_suffix: ""
             frontend_out: out
 
@@ -80,8 +80,15 @@ jobs:
         shell: bash
         run: |
           mkdir -p desktop/src-tauri/binaries
-          cp backend/dist/axiom-backend${{ matrix.binary_suffix }} \
-             desktop/src-tauri/binaries/axiom-backend-${{ matrix.target }}${{ matrix.binary_suffix }}
+          SRC="backend/dist/axiom-backend${{ matrix.binary_suffix }}"
+          DST="desktop/src-tauri/binaries/axiom-backend-${{ matrix.target }}${{ matrix.binary_suffix }}"
+          if [ ! -f "$SRC" ]; then
+            echo "ERROR: PyInstaller output not found at $SRC"
+            ls -la backend/dist/ || true
+            exit 1
+          fi
+          cp "$SRC" "$DST"
+          echo "Binary copied to $DST"
 
       # ── 3. Build frontend static export ───────────────────────────────
       - name: Setup Node 20
