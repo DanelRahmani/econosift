@@ -9,18 +9,16 @@ Usage:
 """
 block_cipher = None
 
+# Dynamically collect all uvicorn submodules (must be installed in current env).
+from PyInstaller.utils.hooks import collect_submodules
+_uvicorn_modules = collect_submodules('uvicorn')
+
 a = Analysis(
     ['run.py'],
     pathex=['.'],
     binaries=[],
     datas=[],
-    hiddenimports=[
-        'uvicorn',
-        'uvicorn.logging',
-        'uvicorn.loops.auto',
-        'uvicorn.loops.asyncio',
-        'uvicorn.protocols.http.auto',
-        'uvicorn.protocols.http.h11_impl',
+    hiddenimports=_uvicorn_modules + [
         'sqlalchemy.ext.declarative',
         'sqlalchemy.orm',
         'sqlalchemy.sql.default_comparator',
@@ -39,9 +37,6 @@ a = Analysis(
         'arch.univariate.distribution',
         'cachetools',
         'sqlalchemy.dialects.sqlite',
-        'uvicorn.logging',
-        'uvicorn.loops.auto',
-        'uvicorn.protocols.http.auto',
     ],
     hookspath=['./pyinstaller-hooks'],
     hooksconfig={},
