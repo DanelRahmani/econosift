@@ -43,7 +43,7 @@ a = Analysis(
     excludes=[
         'tkinter', 'matplotlib', 'PIL', 'cv2',
         'curses', 'readline', 'IPython', 'jupyter',
-        'notebook', 'test', 'unittest', 'distutils',
+        'notebook', 'test', 'unittest',
     ],
     noarchive=False,
 )
