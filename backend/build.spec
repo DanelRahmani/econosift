@@ -15,6 +15,12 @@ a = Analysis(
     binaries=[],
     datas=[],
     hiddenimports=[
+        'uvicorn',
+        'uvicorn.logging',
+        'uvicorn.loops.auto',
+        'uvicorn.loops.asyncio',
+        'uvicorn.protocols.http.auto',
+        'uvicorn.protocols.http.h11_impl',
         'sqlalchemy.ext.declarative',
         'sqlalchemy.orm',
         'sqlalchemy.sql.default_comparator',
