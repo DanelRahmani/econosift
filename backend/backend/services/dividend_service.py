@@ -45,10 +45,12 @@ def get_dividend_analysis(ticker: str) -> dict:
         name = info.get("shortName") or info.get("longName") or ticker
         sector = info.get("sector")
 
-        # Current dividend yield
+        # Current dividend yield — yfinance already returns this in percent
+        # units (e.g. 0.98 = 0.98%), matching metrics.compute_ratios and the
+        # frontend which format it directly. Do NOT multiply by 100.
         div_yield = info.get("dividendYield")
         if div_yield is not None:
-            div_yield = round(float(div_yield) * 100, 2)
+            div_yield = round(float(div_yield), 2)
 
         # Annual dividend history (sum by year)
         annual_divs: dict[int, float] = {}

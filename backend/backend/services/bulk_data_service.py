@@ -611,7 +611,9 @@ def _download_all_bulk_datasets(status: dict) -> None:
                 "last_attempt": now,
                 "last_ok": now if not imf["error"] else status.get("imf_weo", {}).get("last_ok"),
                 "error": imf["error"], "rows": imf["rows"],
-                "size_kb": _file_size(IMF_PATH),
+                # IMF WEO is stored as one parquet per indicator (imf_*.parquet),
+                # not a single imf_weo.parquet — sum them for the reported size.
+                "size_kb": _dir_size(DATA_DIR, "imf_"),
             }
         except Exception as exc:
             status["imf_weo"] = {**status.get("imf_weo", {}), "last_attempt": now, "error": str(exc)}

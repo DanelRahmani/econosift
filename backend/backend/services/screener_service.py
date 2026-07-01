@@ -13,10 +13,11 @@ Architecture
 
 dividendYield normalisation note
 ---------------------------------
-yfinance ``info["dividendYield"]`` returns a decimal fraction (e.g. 0.0156 for
-1.56%) in recent versions, matching how ``metrics.compute_ratios`` returns it.
-All preset comparisons treat it as a fraction (high_dividend threshold = 0.03 =
-3%).  We store and return it as a fraction consistently.
+yfinance ``info["dividendYield"]`` returns the yield in percent units (e.g.
+1.56 for 1.56%) in current versions, matching how ``metrics.compute_ratios``
+returns it and how the frontend formats it directly. We store and return it in
+percent units consistently, so preset comparisons use percent thresholds
+(high_dividend threshold = 3.0 = 3%).
 """
 from __future__ import annotations
 
@@ -127,8 +128,8 @@ def _passes_preset(row: dict, preset_id: str) -> bool:
         pe, pb = _v("pe"), _v("pb")
         return pe is not None and pb is not None and pe < 15 and pb < 1.5
     if p == "high_dividend":
-        # dividendYield stored as fraction; 0.03 = 3%
-        v = _v("dividendYield"); return v is not None and v > 0.03
+        # dividendYield stored in percent units; 3.0 = 3%
+        v = _v("dividendYield"); return v is not None and v > 3.0
     if p == "high_roic":
         v = _v("roic"); return v is not None and v > 0.15
     if p == "quality_growth":
