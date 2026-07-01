@@ -1,25 +1,52 @@
 """Launcher entry point for the frozen PyInstaller binary.
 
-PyInstaller freezes `main.py` as a raw script, but the app uses
-relative imports (e.g. `from .routers import market`).  This launcher
-adds the package directory to sys.path and runs uvicorn with a dotted
-import string, which makes the package structure visible at runtime.
-"""
-import sys
-import os
+PyInstaller freezes this as a raw script, but the app uses relative imports
+(e.g. `from .routers import market`). This launcher adds the package directory
+to sys.path and imports the FastAPI app object directly, which makes the package
+structure visible at runtime.
 
-# Add the directory containing this script to sys.path so that
-# `backend` is importable as a top-level package.
+When frozen with `console=False`, stdout/stderr are `None`, which crashes
+uvicorn's logging on `.isatty()`. Rather than discard output to devnull (which
+hides every startup error), we redirect stdout/stderr to a rotating log file in
+the app data directory so crashes remain diagnosable in production.
+"""
+import os
+import sys
+
+# Add the directory containing this script to sys.path so that the inner
+# `backend` package is importable as a top-level package.
 _here = os.path.dirname(os.path.abspath(__file__))
 if _here not in sys.path:
     sys.path.insert(0, _here)
 
-# When frozen with console=False, stdout/stderr are None.
-# Redirect to devnull so uvicorn's logging doesn't crash on .isatty().
-if sys.stdout is None:
-    sys.stdout = open(os.devnull, "w")
-if sys.stderr is None:
-    sys.stderr = open(os.devnull, "w")
+
+def _log_path() -> str:
+    """Resolve %APPDATA%/AxiomFinance/backend.log (matches config.py / Tauri)."""
+    data_dir = os.getenv("AXIOM_DATA_DIR")
+    if not data_dir:
+        if sys.platform == "win32":
+            base = os.environ.get(
+                "APPDATA", os.path.join(os.path.expanduser("~"), "AppData", "Roaming")
+            )
+        elif sys.platform == "darwin":
+            base = os.path.join(os.path.expanduser("~"), "Library", "Application Support")
+        else:
+            base = os.environ.get(
+                "XDG_DATA_HOME", os.path.join(os.path.expanduser("~"), ".local", "share")
+            )
+        data_dir = os.path.join(base, "AxiomFinance")
+    os.makedirs(data_dir, exist_ok=True)
+    return os.path.join(data_dir, "backend.log")
+
+
+# When frozen without a console, stdout/stderr are None. Send them to a log file
+# so uvicorn logging works and any import/startup crash is captured on disk.
+if sys.stdout is None or sys.stderr is None:
+    _log = open(_log_path(), "a", buffering=1, encoding="utf-8")
+    if sys.stdout is None:
+        sys.stdout = _log
+    if sys.stderr is None:
+        sys.stderr = _log
 
 import uvicorn
 
@@ -27,4 +54,4 @@ import uvicorn
 from backend.main import app
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000, log_config=None)
+    uvicorn.run(app, host="127.0.0.1", port=8000, log_config=None, log_level="info")

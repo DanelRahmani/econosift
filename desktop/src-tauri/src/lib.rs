@@ -1,5 +1,7 @@
 use std::time::Duration;
 
+use tauri::Manager;
+use tauri::path::BaseDirectory;
 use tauri_plugin_shell::ShellExt;
 use tauri_plugin_dialog::DialogExt;
 
@@ -48,7 +50,6 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
-        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             // Ensure app data directory exists
             let data_dir = app_data_dir();
@@ -61,21 +62,28 @@ pub fn run() {
                 data_dir.to_string_lossy().as_ref(),
             );
 
-            // Spawn the Python backend sidecar
-            let shell = app.shell();
-            let sidecar_command = shell
-                .sidecar("axiom-backend")
-                .map_err(|e| format!("Failed to create sidecar command: {e}"))
-                .unwrap();
+            // Resolve the bundled onedir backend executable from the resource dir.
+            // In `tauri dev` this resolves to src-tauri/binaries/axiom-backend/…;
+            // in a bundled build it resolves inside the app's resource directory.
+            let backend_exe = app
+                .path()
+                .resolve(
+                    "binaries/axiom-backend/axiom-backend.exe",
+                    BaseDirectory::Resource,
+                )
+                .expect("Failed to resolve backend executable path");
 
-            let (_rx, _child) = sidecar_command
+            // Spawn the Python backend as a child process.
+            let (_rx, _child) = app
+                .shell()
+                .command(backend_exe)
                 .spawn()
-                .expect("Failed to spawn backend sidecar");
+                .expect("Failed to spawn backend process");
 
             // Wait for backend to be ready (non-blocking)
             let app_handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
-                match wait_for_backend(30).await {
+                match wait_for_backend(60).await {
                     Ok(()) => {
                         println!("Backend is ready");
                     }

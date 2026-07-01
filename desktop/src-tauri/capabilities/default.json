@@ -21,9 +21,6 @@
       "allow": [
         { "path": "$APPDATA/AxiomFinance/**" }
       ]
-    },
-    "updater:default",
-    "updater:allow-check",
-    "updater:allow-download-and-install"
+    }
   ]
 }

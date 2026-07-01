@@ -12,6 +12,14 @@ node_modules/
 out/
 npm-debug.log*
 
+# PyInstaller / desktop build artifacts
+backend/build/
+backend/dist/
+backend/data/
+desktop/src-tauri/binaries/
+desktop/src-tauri/target/
+*.spec.bak
+
 # Env
 .env
 
