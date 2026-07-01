@@ -59,10 +59,12 @@ pub fn run() {
             // Resolve the bundled onedir backend executable from the resource dir.
             // In `tauri dev` this resolves to src-tauri/binaries/axiom-backend/…;
             // in a bundled build it resolves inside the app's resource directory.
+            // PyInstaller only adds the .exe suffix on Windows.
+            let exe_name = if cfg!(windows) { "axiom-backend.exe" } else { "axiom-backend" };
             let backend_exe = app
                 .path()
                 .resolve(
-                    "binaries/axiom-backend/axiom-backend.exe",
+                    format!("binaries/axiom-backend/{exe_name}"),
                     BaseDirectory::Resource,
                 )
                 .expect("Failed to resolve backend executable path");
