@@ -282,7 +282,7 @@ function ApiKeysSection() {
       </div>
       <p className="text-xs text-text-muted mb-4">
         Keys are validated before saving and written to <code className="bg-surface-alt px-1 rounded">.env</code>.
-        Recreate the Docker container for changes to take effect.
+        Restart the app for changes to take effect.
       </p>
 
       {/* FRED */}
@@ -440,18 +440,28 @@ function BulkDataSection() {
     try {
       const r = await api.bulkDataStatus();
       setBulk(r.datasets);
-    } catch { setBulk(null); }
+      return r.running;
+    } catch { setBulk(null); return false; }
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  // Poll while a download is running, so a slow/failed source is reflected
+  // instead of the button flipping back to "Refresh" after a single check.
+  useEffect(() => {
+    if (!refreshing) return;
+    const id = setInterval(async () => {
+      const running = await load();
+      if (!running) setRefreshing(false);
+    }, 2000);
+    return () => clearInterval(id);
+  }, [refreshing, load]);
 
   const doRefresh = async () => {
     setRefreshing(true);
     try {
       await api.bulkDataRefresh();
-      await load();
-    } catch { /* ignore */ }
-    finally { setRefreshing(false); }
+    } catch { setRefreshing(false); }
   };
 
   const labels: Record<string, string> = {

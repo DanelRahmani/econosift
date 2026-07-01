@@ -152,9 +152,9 @@ async def prefetch_status():
 
 @router.get("/bulk-data/status")
 async def bulk_data_status():
-    """Return download status for each bulk dataset."""
-    from ..services.bulk_data_service import get_bulk_status
-    return {"datasets": get_bulk_status()}
+    """Return download status for each bulk dataset, plus whether a refresh is running."""
+    from ..services.bulk_data_service import get_bulk_status, is_bulk_running
+    return {"datasets": get_bulk_status(), "running": is_bulk_running()}
 
 
 @router.post("/bulk-data/refresh")
