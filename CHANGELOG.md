@@ -5,6 +5,32 @@
 
 ---
 
+## Gated desktop release flow — main → PRODUCTION (2026-07-01)
+
+- `main` is now feature-development only: `build-windows.yml` no longer builds on `main`/PRs — it triggers on `PRODUCTION` pushes, `v*` tags, and manual dispatch.
+- New `promote-to-production.yml` (manual "Promote main → PRODUCTION"): merges `main` into `PRODUCTION`, pushes, then dispatches the 3-OS build (needed because a `GITHUB_TOKEN` push doesn't trigger other workflows).
+- New `TAURI_BUILD.md` documents the four contracts a `main` feature must respect to stay Tauri-packageable (`config.DATA_DIR` for all writes, static export + full `generateStaticParams`, 127.0.0.1:8000 backend + health gate, PyInstaller `collect_all`) and the release steps.
+
+## Cross-platform desktop builds — Windows · macOS · Linux (2026-07-01)
+
+`build-windows.yml` now builds on a 3-OS matrix (`windows-latest` / `macos-latest` / `ubuntu-latest`), each freezing its own PyInstaller backend and running `tauri build`:
+
+- **Windows** → NSIS `*-setup.exe`, **macOS** → `*.dmg` (Apple Silicon, unsigned), **Linux** → `*.deb`.
+- Linux `tauri.conf.json` originally also targeted **AppImage**, but it can't be bundled on GitHub's runners (`linuxdeploy` needs FUSE; `APPIMAGE_EXTRACT_AND_RUN`/`NO_STRIP` didn't clear it — likely a WebKitGTK-4.1 plugin issue). Dropped `appimage` and ship `.deb` only (tracked as P3-13).
+- CI actions bumped to Node-24-native versions; broken duplicate `build-desktop.yml` removed; path triggers widened.
+
+## Bug-fix batch — Atlas, Screener, Dividends, Country pages, Admin (2026-07-01)
+
+User-reported defects fixed (see `ACTIVE_ISSUES.md` BUG-A1…A5):
+
+- **Atlas / cache warming:** re-derive the ISO-numeric `id` (via `pycountry`) in `atlas_service._country_universe()` — a regression from the static-JSON switch (`cf2d1a0`) that made all 6 Atlas timeline endpoints 500 with `{"detail":"'id'"}` and cascaded into the Macro/Atlas panels.
+- **Dividend yield:** stop multiplying yfinance's `dividendYield` by 100 (it's already percent units) — MSFT no longer shows "98%". Screener `high_dividend` threshold corrected to `3.0`.
+- **Stock Screener:** memoise `activePresets` so the fetch effect no longer loops (flicker/reload).
+- **Country pages:** pre-generate the full ISO 3166-1 alpha-2 set so clicking any country resolves instead of falling back to `/dashboard` (static-export 404).
+- **Admin bulk data:** IMF WEO size now sums its per-indicator parquet files; the status table prints the real error message (surfaces the dead Reinhart-Rogoff source URL, tracked as P3-12) instead of a bare "⚠ Failed".
+
+---
+
 ## Desktop v1.0.0 — Working Windows Build (2026-07-01)
 
 Supersedes the original Phase 37 desktop scaffolding, which built but failed to launch (silent backend crash on missing imports). Root causes fixed:

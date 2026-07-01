@@ -146,12 +146,29 @@ _REGION_MAP: dict[str, set[str]] = {
 # Country universe (cached sync)
 # ---------------------------------------------------------------------------
 
-def _country_universe() -> list[dict]:
-    """Return list of {iso3, name, regions} for all non-aggregate WB economies.
+def _numeric_id(iso3: str) -> str | None:
+    """ISO 3166-1 numeric code for an alpha-3 code (e.g. "USA" -> "840").
 
-    Primary source is a pre-generated static JSON file shipped with the repo
-    (regenerated periodically).  Falls back to a live wbgapi call only if the
-    file is missing or corrupt — the WB economy list changes very rarely.
+    The choropleth in the frontend matches world-110m TopoJSON geographies by
+    their numeric id, so every country entry must carry one (or ``None`` when
+    no ISO numeric exists, e.g. Kosovo).
+    """
+    try:
+        import pycountry
+
+        pc = pycountry.countries.get(alpha_3=iso3)
+        return pc.numeric if pc else None
+    except Exception:
+        return None
+
+
+def _country_universe() -> list[dict]:
+    """Return list of {iso3, name, id, regions} for all non-aggregate WB economies.
+
+    ``id`` is the ISO 3166-1 numeric code used to match the frontend choropleth
+    geographies.  Primary source is a pre-generated static JSON file shipped
+    with the repo (regenerated periodically).  Falls back to a live wbgapi call
+    only if the file is missing or corrupt — the WB economy list changes rarely.
     """
     import json as _json
     import os as _os
@@ -163,6 +180,11 @@ def _country_universe() -> list[dict]:
             with open(static_path, "r", encoding="utf-8") as fh:
                 data = _json.load(fh)
             if isinstance(data, list) and len(data) > 100:
+                # The static file only stores {iso3, name, regions}; derive the
+                # numeric id here so it survives regenerations of the JSON.
+                for c in data:
+                    if "id" not in c:
+                        c["id"] = _numeric_id(c.get("iso3", ""))
                 return data
             logger.warning("country_universe.json is too short (%s entries), falling back to API", len(data) if isinstance(data, list) else type(data))
     except Exception:
@@ -185,7 +207,7 @@ def _country_universe() -> list[dict]:
                 for region_id, members in _REGION_MAP.items()
                 if iso3 in members
             ]
-            countries.append({"iso3": iso3, "name": name, "regions": regions})
+            countries.append({"iso3": iso3, "name": name, "id": _numeric_id(iso3), "regions": regions})
 
         return countries
 

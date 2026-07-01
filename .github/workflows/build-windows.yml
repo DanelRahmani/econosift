@@ -1,54 +1,72 @@
 name: Build Windows Desktop
 
-# Builds the Axiom Finance Tauri app for Windows: freezes the FastAPI backend
-# with PyInstaller (onedir), stages it into the Tauri resources, then runs
-# `tauri build` to produce the NSIS installer and uploads it as an artifact.
+# Builds the Axiom Finance Tauri app for Windows, macOS, and Linux: freezes
+# the FastAPI backend with PyInstaller (onedir), stages it into the Tauri
+# resources, then runs `tauri build` to produce an installer per OS and
+# uploads each as an artifact. PyInstaller can't cross-compile, so each OS
+# builds its own backend binary on its own GitHub-hosted runner.
 #
-# GitHub's windows-latest runners already ship Rust + the MSVC C++ Build Tools,
-# so no toolchain install is needed for those.
+# GitHub's windows-latest runners already ship Rust + the MSVC C++ Build
+# Tools; macos-latest ships Rust + Xcode tools. Linux needs WebKitGTK etc.
+# installed explicitly (see the Linux-only step below).
+#
+# macOS builds are unsigned/unnotarized (no Apple Developer account) — users
+# will see a Gatekeeper "unidentified developer" warning and need to
+# right-click → Open the first time. macOS runners are Apple Silicon
+# (arm64) only; add an x86_64-apple-darwin leg later if Intel Mac support
+# is needed.
 
 on:
   workflow_dispatch: {}          # manual "Run workflow" button (needs workflow on default branch)
   push:
     tags: ["v*"]                 # build + attach to release on version tags
-    branches: [main, PRODUCTION] # auto-build when packaging files change
+    branches: [PRODUCTION]       # release builds only — promote main -> PRODUCTION to trigger
     paths:
-      - "backend/build.spec"
-      - "backend/run.py"
-      - "backend/requirements*.txt"
+      - "backend/**"
       - "desktop/**"
       - "frontend/**"
-      - ".github/workflows/build-windows.yml"
-  pull_request:
-    paths:
-      - "backend/build.spec"
-      - "backend/run.py"
-      - "desktop/**"
       - ".github/workflows/build-windows.yml"
 
 jobs:
   build:
-    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            artifact: windows-installer
+          - os: macos-latest
+            artifact: macos-installer
+          - os: ubuntu-latest
+            artifact: linux-installer
+    runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.13"
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: "20"
 
-      - name: Set up Rust (stable-msvc)
+      - name: Set up Rust (stable)
         uses: dtolnay/rust-toolchain@stable
 
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: desktop/src-tauri
+
+      - name: Install Linux build dependencies (WebKitGTK, GTK, AppIndicator)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev \
+            librsvg2-dev build-essential libssl-dev libgtk-3-dev
 
       - name: Install backend deps
         working-directory: backend
@@ -61,11 +79,13 @@ jobs:
       - name: Stage backend into Tauri resources
         shell: pwsh
         run: |
+          $exeSuffix = if ($IsWindows) { ".exe" } else { "" }
           $stage = "desktop/src-tauri/binaries/axiom-backend"
           if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
           New-Item -ItemType Directory -Force -Path (Split-Path $stage) | Out-Null
           Copy-Item backend/dist/axiom-backend $stage -Recurse -Force
-          if (-not (Test-Path "$stage/axiom-backend.exe")) { throw "backend not staged" }
+          if (-not $IsWindows) { & chmod +x "$stage/axiom-backend$exeSuffix" }
+          if (-not (Test-Path "$stage/axiom-backend$exeSuffix")) { throw "backend not staged" }
 
       - name: Install frontend deps
         working-directory: frontend
@@ -75,19 +95,22 @@ jobs:
         working-directory: desktop
         run: npm ci
 
-      - name: Build Tauri app (frontend export + Rust + NSIS)
+      - name: Build Tauri app (frontend export + Rust + installer)
         working-directory: desktop
         run: npm run build
 
       - name: Upload installer
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
-          name: AxiomFinance-windows-installer
-          path: desktop/src-tauri/target/release/bundle/nsis/*-setup.exe
+          name: AxiomFinance-${{ matrix.artifact }}
+          path: desktop/src-tauri/target/release/bundle/**/*
           if-no-files-found: error
 
       - name: Attach installer to release (tag builds only)
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: desktop/src-tauri/target/release/bundle/nsis/*-setup.exe
+          files: |
+            desktop/src-tauri/target/release/bundle/nsis/*-setup.exe
+            desktop/src-tauri/target/release/bundle/dmg/*.dmg
+            desktop/src-tauri/target/release/bundle/deb/*.deb

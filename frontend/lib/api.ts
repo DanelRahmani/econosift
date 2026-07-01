@@ -161,7 +161,7 @@ export const api = {
     get<PrefetchStatus>(`/admin/prefetch/status`),
 
   bulkDataStatus: () =>
-    get<{ datasets: Record<string, BulkDatasetStatus> }>(`/admin/bulk-data/status`),
+    get<{ datasets: Record<string, BulkDatasetStatus>; running: boolean }>(`/admin/bulk-data/status`),
 
   bulkDataRefresh: () =>
     post<{ status: string; datasets: Record<string, { rows: number; error: string | null }> }>(`/admin/bulk-data/refresh`, {}),

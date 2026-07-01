@@ -12,15 +12,23 @@ import io
 import json
 import logging
 import pathlib
+import threading
 import zipfile
 from datetime import datetime, timezone
 
 import httpx
 import pandas as pd
 
+from ..config import DATA_DIR as _APP_DATA_DIR
+
 logger = logging.getLogger(__name__)
 
-DATA_DIR = pathlib.Path("/app/data/bulk")
+# Docker mounts persistent data at /app/data (docker-compose.yml); use it when
+# present. Otherwise (local dev, desktop app) fall back to the app's own data
+# dir instead of a path relative to this file — under the frozen desktop exe
+# that would resolve inside the read-only bundled resources, not a writable
+# location, which is why bulk downloads silently failed there.
+DATA_DIR = pathlib.Path("/app/data/bulk") if pathlib.Path("/app/data").exists() else (_APP_DATA_DIR / "bulk")
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 _STATUS_PATH = DATA_DIR / "_status.json"
@@ -40,6 +48,18 @@ def _load_status() -> dict:
 
 def _save_status(status: dict) -> None:
     _STATUS_PATH.write_text(json.dumps(status, default=str, indent=2))
+
+
+# Guards refresh_all_bulk_data() against concurrent runs (e.g. a second click
+# before the first finishes), which previously caused interleaved writes to
+# _status.json with the second run's last-write silently clobbering progress
+# from the first.
+_run_lock = threading.Lock()
+_running = False
+
+
+def is_bulk_running() -> bool:
+    return _running
 
 
 def get_bulk_status() -> dict:
@@ -533,7 +553,33 @@ def _download_factbook_profiles() -> dict:
 # ---------------------------------------------------------------------------
 
 def refresh_all_bulk_data() -> dict:
+    """Download all bulk datasets sequentially.
+
+    Guarded by a lock so a duplicate trigger (e.g. clicking Refresh again
+    before the first run finishes) is a no-op instead of starting a second,
+    concurrent run whose interleaved writes to _status.json could clobber
+    the first run's progress. Status is always saved in `finally` so a run
+    that fails outside the per-dataset try/excepts below never leaves the
+    frontend polling a stale "running" state forever.
+    """
+    global _running
+    if not _run_lock.acquire(blocking=False):
+        logger.info("Bulk data refresh already running; ignoring duplicate trigger.")
+        return _load_status()
+
+    _running = True
     status = _load_status()
+    try:
+        _download_all_bulk_datasets(status)
+    finally:
+        _save_status(status)
+        logger.info("Bulk data refresh: %s", {k: f"{v.get('rows',0)} rows" for k, v in status.items()})
+        _running = False
+        _run_lock.release()
+    return status
+
+
+def _download_all_bulk_datasets(status: dict) -> None:
     now = datetime.now(timezone.utc).isoformat()
 
     with httpx.Client(timeout=120) as client:
@@ -565,7 +611,9 @@ def refresh_all_bulk_data() -> dict:
                 "last_attempt": now,
                 "last_ok": now if not imf["error"] else status.get("imf_weo", {}).get("last_ok"),
                 "error": imf["error"], "rows": imf["rows"],
-                "size_kb": _file_size(IMF_PATH),
+                # IMF WEO is stored as one parquet per indicator (imf_*.parquet),
+                # not a single imf_weo.parquet — sum them for the reported size.
+                "size_kb": _dir_size(DATA_DIR, "imf_"),
             }
         except Exception as exc:
             status["imf_weo"] = {**status.get("imf_weo", {}), "last_attempt": now, "error": str(exc)}
@@ -630,10 +678,6 @@ def refresh_all_bulk_data() -> dict:
             }
         except Exception as exc:
             status["factbook_profiles"] = {**status.get("factbook_profiles", {}), "last_attempt": now, "error": str(exc)}
-
-    _save_status(status)
-    logger.info("Bulk data refresh: %s", {k: f"{v.get('rows',0)} rows" for k, v in status.items()})
-    return status
 
 
 def _dir_size(directory: pathlib.Path, prefix: str) -> int | None:

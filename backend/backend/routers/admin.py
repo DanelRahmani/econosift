@@ -11,7 +11,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from .. import cache
-from ..config import FRED_API_KEY, FINNHUB_API_KEY, GEMINI_API_KEY
+from ..config import DATA_DIR, FRED_API_KEY, FINNHUB_API_KEY, GEMINI_API_KEY
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -152,9 +152,9 @@ async def prefetch_status():
 
 @router.get("/bulk-data/status")
 async def bulk_data_status():
-    """Return download status for each bulk dataset."""
-    from ..services.bulk_data_service import get_bulk_status
-    return {"datasets": get_bulk_status()}
+    """Return download status for each bulk dataset, plus whether a refresh is running."""
+    from ..services.bulk_data_service import get_bulk_status, is_bulk_running
+    return {"datasets": get_bulk_status(), "running": is_bulk_running()}
 
 
 @router.post("/bulk-data/refresh")
@@ -170,14 +170,14 @@ async def bulk_data_refresh():
 # Config — view / update API keys in .env
 # ---------------------------------------------------------------------------
 
-# .env lives at the project root.  In Docker it is mounted at /app/.env;
-# locally it sits alongside docker-compose.yml.  Try /app/.env first (Docker),
-# then resolve relative to this file (local dev).
+# In Docker, .env is mounted at /app/.env (docker-compose.yml). Elsewhere
+# (local dev, desktop app) it lives at DATA_DIR/.env — must match config.py's
+# load_dotenv() target, since the old project-root-relative fallback resolved
+# to a path inside the frozen desktop exe's bundle, not the app-data dir the
+# backend actually reads from.
 _ENV_PATH = "/app/.env"
 if not os.path.isfile(_ENV_PATH):
-    _ENV_PATH = os.path.abspath(
-        os.path.join(os.path.dirname(__file__), "..", "..", "..", ".env")
-    )
+    _ENV_PATH = str(DATA_DIR / ".env")
 
 
 class _ConfigUpdate(BaseModel):

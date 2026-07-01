@@ -125,7 +125,7 @@ class AiSummary(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     summary_type = Column(String, nullable=False)   # "company" | "macro" | "dashboard"
     context_key = Column(String, nullable=False)     # ticker / "US,DE,JP" / "daily"
-    model_used = Column(String, nullable=False)      # e.g. "gemini-2.0-flash"
+    model_used = Column(String, nullable=False)      # e.g. "gemini-2.5-flash"
     summary_text = Column(String, nullable=False)
     prompt_sent = Column(String)                     # for debugging
     created_at = Column(DateTime, default=datetime.utcnow)
