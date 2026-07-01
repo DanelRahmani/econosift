@@ -56,11 +56,7 @@ pub fn run() {
             std::fs::create_dir_all(&data_dir)
                 .expect("Failed to create app data directory");
 
-            // Pass data dir to the backend via environment variable
-            std::env::set_var(
-                "AXIOM_DATA_DIR",
-                data_dir.to_string_lossy().as_ref(),
-            );
+            let data_dir_str = data_dir.to_string_lossy().to_string();
 
             // Resolve the bundled onedir backend executable from the resource dir.
             // In `tauri dev` this resolves to src-tauri/binaries/axiom-backend/…;
@@ -73,10 +69,15 @@ pub fn run() {
                 )
                 .expect("Failed to resolve backend executable path");
 
-            // Spawn the Python backend as a child process.
+            // Spawn the Python backend as a child process. Pass AXIOM_DATA_DIR
+            // explicitly on the command — the shell plugin does not inherit env
+            // vars set via std::env::set_var at runtime, so without this the
+            // backend falls back to a CWD-relative ./data and its SQLite DB /
+            // settings never land in %APPDATA%/AxiomFinance.
             let (_rx, _child) = app
                 .shell()
                 .command(backend_exe)
+                .env("AXIOM_DATA_DIR", &data_dir_str)
                 .spawn()
                 .expect("Failed to spawn backend process");
 

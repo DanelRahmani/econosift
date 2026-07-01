@@ -7,8 +7,13 @@ import pathlib
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
 
-_DEFAULT_DB = os.getenv("AXIOM_DATA_DIR", "./data")
-_DEFAULT_DB_URL = f"sqlite:///{_DEFAULT_DB}/axiomfinance.db"
+# Resolve the data dir from config (single source of truth): AXIOM_DATA_DIR if
+# set, otherwise the OS app-data dir (%APPDATA%/AxiomFinance on Windows). Do NOT
+# default to a CWD-relative "./data" — in the packaged desktop app the backend's
+# working directory is unpredictable, which would scatter the SQLite DB.
+from .config import DATA_DIR
+
+_DEFAULT_DB_URL = f"sqlite:///{DATA_DIR.as_posix()}/axiomfinance.db"
 DATABASE_URL = os.getenv("DATABASE_URL", _DEFAULT_DB_URL)
 
 # Ensure the data directory exists for SQLite paths
