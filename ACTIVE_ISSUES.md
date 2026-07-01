@@ -66,6 +66,14 @@
 
 ---
 
+## ✅ Recently Fixed (Desktop)
+
+| ID | Issue | Details |
+|----|-------|---------|
+| ✅ DESK-03 | **API keys saved in Admin never took effect, even after restart** | The Admin "save API keys" endpoint (`routers/admin.py`) wrote to a project-root-relative `.env` path (`os.path.dirname(__file__)/../../../.env`), which under the frozen desktop exe resolves inside the PyInstaller bundle, not `%APPDATA%/AxiomFinance`. Meanwhile `config.py`'s `load_dotenv()` searched the CWD, an unrelated and unpredictable directory in the frozen app. The two never pointed at the same file, so keys were written to disk (as the user could see) but never read back, even on restart. Fixed: both now target `config.DATA_DIR/.env` — the same app-data directory the DB and settings already use. |
+
+---
+
 ## ✅ Recently Fixed
 
 These items are verified as fixed in shipped phases. Listed here for reference to avoid re-reporting.

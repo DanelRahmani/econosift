@@ -33,6 +33,12 @@ def _default_data_dir() -> Path:
 
 DATA_DIR = _default_data_dir()
 
+# The Admin panel's "save API keys" endpoint (routers/admin.py) writes to
+# DATA_DIR/.env — load it explicitly (override=True so it wins over any repo
+# .env) since the frozen desktop exe's CWD is unpredictable and the plain
+# load_dotenv() above won't reliably find it.
+load_dotenv(DATA_DIR / ".env", override=True)
+
 # ── API keys: env vars first, then settings.json ──────────────────────────
 
 _SETTINGS_PATH = DATA_DIR / "settings.json"
