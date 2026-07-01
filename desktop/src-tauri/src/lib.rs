@@ -1,9 +1,14 @@
+use std::sync::Mutex;
 use std::time::Duration;
 
 use tauri::Manager;
 use tauri::path::BaseDirectory;
+use tauri_plugin_shell::process::CommandChild;
 use tauri_plugin_shell::ShellExt;
 use tauri_plugin_dialog::DialogExt;
+
+/// Holds the spawned backend child process so it can be killed on app exit.
+struct BackendProcess(Mutex<Option<CommandChild>>);
 
 /// Resolve the OS-standard app data directory.
 fn app_data_dir() -> std::path::PathBuf {
@@ -37,19 +42,12 @@ fn get_app_data_dir() -> String {
     app_data_dir().to_string_lossy().to_string()
 }
 
-#[tauri::command]
-fn get_settings_path() -> String {
-    app_data_dir()
-        .join("settings.json")
-        .to_string_lossy()
-        .to_string()
-}
-
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
+        .manage(BackendProcess(Mutex::new(None)))
         .setup(|app| {
             // Ensure app data directory exists
             let data_dir = app_data_dir();
@@ -74,12 +72,17 @@ pub fn run() {
             // vars set via std::env::set_var at runtime, so without this the
             // backend falls back to a CWD-relative ./data and its SQLite DB /
             // settings never land in %APPDATA%/AxiomFinance.
-            let (_rx, _child) = app
+            let (_rx, child) = app
                 .shell()
                 .command(backend_exe)
                 .env("AXIOM_DATA_DIR", &data_dir_str)
                 .spawn()
                 .expect("Failed to spawn backend process");
+
+            // Stash the child so it can be killed on exit — dropping a
+            // CommandChild does NOT terminate the underlying OS process, which
+            // is why axiom-backend.exe used to keep running after the app closed.
+            *app.state::<BackendProcess>().0.lock().unwrap() = Some(child);
 
             // Wait for backend to be ready (non-blocking)
             let app_handle = app.handle().clone();
@@ -105,7 +108,20 @@ pub fn run() {
 
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![get_app_data_dir, get_settings_path])
-        .run(tauri::generate_context!())
-        .expect("error while running Axiom Finance");
+        .invoke_handler(tauri::generate_handler![get_app_data_dir])
+        .build(tauri::generate_context!())
+        .expect("error while building Axiom Finance")
+        .run(|app_handle, event| {
+            // Kill the spawned backend on normal app exit (window close / quit).
+            // Force-killing axiom-finance.exe itself still orphans the backend —
+            // that requires OS-level process-group/job-object handling, which is
+            // a separate, larger fix (see ACTIVE_ISSUES.md DESK-02).
+            if let tauri::RunEvent::ExitRequested { .. } = event {
+                if let Some(state) = app_handle.try_state::<BackendProcess>() {
+                    if let Some(child) = state.0.lock().unwrap().take() {
+                        let _ = child.kill();
+                    }
+                }
+            }
+        });
 }
