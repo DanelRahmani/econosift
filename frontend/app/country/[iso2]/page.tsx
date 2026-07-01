@@ -1,11 +1,12 @@
 import CountryDetailClient from "./CountryDetailClient";
+import { ISO2_CODES } from "@/lib/iso2Codes";
 
-// Pre-generate pages for common country codes (required by static export).
+// Pre-generate a page for every ISO country code (required by static export).
+// Only pre-generated routes get an .html file; anything else 404s and the
+// static server falls back to index.html, which redirects to /dashboard — so
+// clicking a non-listed country previously bounced the user to the dashboard.
 export function generateStaticParams() {
-  return [
-    "US", "CA", "MX", "BR", "DE", "FR", "GB", "IT", "ES", "NL",
-    "SE", "NO", "DK", "PL", "CH", "JP", "CN", "KR", "IN", "AU",
-  ].map((iso2) => ({ iso2 }));
+  return ISO2_CODES.map((iso2) => ({ iso2 }));
 }
 
 export default function CountryDetailPage({ params }: { params: { iso2: string } }) {

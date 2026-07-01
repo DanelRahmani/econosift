@@ -523,7 +523,7 @@ function BulkDataSection() {
                 <td className="py-2 px-3 text-right font-mono text-xs text-text-muted">{ds.last_ok ? new Date(ds.last_ok).toLocaleDateString() : "never"}</td>
                 <td className="py-2 px-3 font-mono text-xs">
                   {ds.error
-                    ? <span className="text-danger" title={ds.error}>⚠ Failed</span>
+                    ? <span className="text-danger break-words whitespace-normal" title={ds.error}>⚠ {ds.error}</span>
                     : ds.rows
                       ? <span className="text-success">✓ OK</span>
                       : <span className="text-text-muted">No data</span>

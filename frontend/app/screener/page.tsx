@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, Suspense } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, Suspense } from "react";
 import { api } from "@/lib/api";
 import type { PresetDef, ScreenerCacheRow, ScreenerUniverseResponse, SnowflakeBatchResponse } from "@/lib/types";
 import { Card, Skeleton, PageSkeleton } from "@/components/ui";
@@ -116,8 +116,12 @@ function ScreenerPageInner() {
   const index = (INDEX_OPTS.map((o) => o.key) as readonly string[]).includes(urlState.index)
     ? (urlState.index as IndexKey)
     : "sp500";
-  const activePresets = new Set<string>(
-    urlState.presets ? urlState.presets.split(",").filter(Boolean) : [],
+  // Memoise so the Set keeps a stable reference across renders — otherwise the
+  // data-fetch effect below (which lists it as a dependency) re-runs on every
+  // render, causing the results to flicker/reload in an infinite loop.
+  const activePresets = useMemo(
+    () => new Set<string>(urlState.presets ? urlState.presets.split(",").filter(Boolean) : []),
+    [urlState.presets],
   );
   const [viewMode, setViewMode] = useState<"table" | "charts">("table");
 
