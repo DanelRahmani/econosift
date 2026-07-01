@@ -54,6 +54,7 @@
 | P3-09 | **OECD SDMX integration** | CLAUDE.md (Phase 24) | API too complex for bulk download; deferred. |
 | P3-10 | **Econometric Lab enhancements** | CLAUDE.md (Phase 18A) | Additional regression diagnostics (fixed effects, lag selection). |
 | P3-11 | **Taylor Rule calculator revival** | CLAUDE.md (Phase 18A) | Phase 18B stub removed in Phase 19E. If revived, use `fetch_fred_series()` from `macro_expansion_service.py`. |
+| P3-12 | **Reinhart-Rogoff bulk source URL is dead (404)** | Admin bulk data | `RR_URL` in `bulk_data_service.py` points at `raw.githubusercontent.com/danielmarcelin/reinhart-rogoff-data/main/RR_Defaults.csv`, which now returns 404 (both `main` and `master`). The download always fails; the admin panel now surfaces the real error text instead of a bare "⚠ Failed". Needs a replacement data source (a stable public mirror of the R&R sovereign-default dataset) — a data-sourcing task, not a code bug. |
 
 ---
 
@@ -73,6 +74,18 @@
 | ✅ DESK-03 | **API keys saved in Admin never took effect, even after restart** | The Admin "save API keys" endpoint (`routers/admin.py`) wrote to a project-root-relative `.env` path (`os.path.dirname(__file__)/../../../.env`), which under the frozen desktop exe resolves inside the PyInstaller bundle, not `%APPDATA%/AxiomFinance`. Meanwhile `config.py`'s `load_dotenv()` searched the CWD, an unrelated and unpredictable directory in the frozen app. The two never pointed at the same file, so keys were written to disk (as the user could see) but never read back, even on restart. Fixed: both now target `config.DATA_DIR/.env` — the same app-data directory the DB and settings already use. |
 | ✅ DESK-04 | **`axiom-backend.exe` kept running after closing `axiom-finance.exe` normally** | `lib.rs` spawned the backend child process but discarded the handle (`let (_rx, _child) = ...`) — dropping a `CommandChild` doesn't terminate the OS process it represents, so it kept running after the window closed. Fixed: the child is now stored in managed app state and killed on `RunEvent::ExitRequested`. Force-kill of the parent still orphans the backend (see DESK-02). |
 | ✅ DESK-05 | **Bulk data downloads (Admin panel) silently failed on desktop** | `bulk_data_service.py` hardcoded its storage dir to `/app/data/bulk` (the Docker volume mount path), which on Windows resolves to `C:\app\data\bulk` — typically not writable without admin rights, causing every download to fail. Also had no guard against a second "Refresh" click starting a concurrent run (interleaved writes could corrupt `_status.json`), and only saved status once at the very end, so a crash mid-run silently discarded all progress with no visible error. Fixed: falls back to `config.DATA_DIR/bulk` when `/app/data` isn't present (preserves existing Docker behavior via `/app/data`), added a lock to make concurrent triggers a no-op, and status is now always saved in `finally`. The Admin page also now polls status while a refresh is running instead of checking once. |
+
+---
+
+## ✅ Recently Fixed (App bugs)
+
+| ID | Issue | Details |
+|----|-------|---------|
+| ✅ BUG-A1 | **Atlas / cache warming: all 6 timeline endpoints 500 with `{"detail":"'id'"}`** | `atlas_service._country_universe()` returned country dicts without the ISO-numeric `id` field after commit `cf2d1a0` switched it to a static JSON that only stores `{iso3, name, regions}`. `get_timeline()` reads `country["id"]` → `KeyError: 'id'` → HTTP 500, breaking GDP growth, inflation, unemployment, debt/GDP, current account and GDP-per-capita warming (and the Atlas map / Macro panels downstream). Fixed: re-derive the numeric `id` via `pycountry` (matching the pre-regression behaviour) when loading the static JSON and in the wbgapi fallback. |
+| ✅ BUG-A2 | **Dividend yield shown ~100× too high (MSFT "98%")** | `dividend_service.py` multiplied yfinance's `dividendYield` by 100, but current yfinance returns it already in percent units (0.98 = 0.98%) — as `metrics.compute_ratios`, the frontend RatiosTab and the dividends page all assume. Fixed: removed the `× 100`. Also corrected the screener `high_dividend` preset threshold (`0.03` → `3.0`) which assumed the old fraction convention. |
+| ✅ BUG-A3 | **Stock Screener flickered / reloaded in an infinite loop** | `activePresets` was rebuilt as a `new Set(...)` on every render and used in the data-fetch `useEffect` dependency array, so the effect re-ran every render → fetch → setState → re-render → fetch… Fixed: memoised the Set on `urlState.presets`. |
+| ✅ BUG-A4 | **Clicking a country sent the user to the Dashboard** | The site is a static export; `/country/[iso2]` only pre-generated 20 hardcoded countries, so any other code 404s and the static server falls back to `index.html` → root redirect to `/dashboard`. Fixed: `generateStaticParams` now emits the full ISO 3166-1 alpha-2 set (`lib/iso2Codes.ts`). |
+| ✅ BUG-A5 | **Admin: IMF WEO showed no size; bulk-data failures showed only "⚠ Failed"** | IMF WEO is stored as per-indicator `imf_*.parquet` files, but the size lookup pointed at a non-existent single `imf_weo.parquet`. Fixed to sum the directory (`_dir_size(DATA_DIR, "imf_")`). The bulk-data table now prints the actual error message instead of hiding it in a hover tooltip (surfaces the R&R 404 — see P3-12). |
 
 ---
 

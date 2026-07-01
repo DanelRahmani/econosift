@@ -5,6 +5,18 @@
 
 ---
 
+## Bug-fix batch — Atlas, Screener, Dividends, Country pages, Admin (2026-07-01)
+
+User-reported defects fixed (see `ACTIVE_ISSUES.md` BUG-A1…A5):
+
+- **Atlas / cache warming:** re-derive the ISO-numeric `id` (via `pycountry`) in `atlas_service._country_universe()` — a regression from the static-JSON switch (`cf2d1a0`) that made all 6 Atlas timeline endpoints 500 with `{"detail":"'id'"}` and cascaded into the Macro/Atlas panels.
+- **Dividend yield:** stop multiplying yfinance's `dividendYield` by 100 (it's already percent units) — MSFT no longer shows "98%". Screener `high_dividend` threshold corrected to `3.0`.
+- **Stock Screener:** memoise `activePresets` so the fetch effect no longer loops (flicker/reload).
+- **Country pages:** pre-generate the full ISO 3166-1 alpha-2 set so clicking any country resolves instead of falling back to `/dashboard` (static-export 404).
+- **Admin bulk data:** IMF WEO size now sums its per-indicator parquet files; the status table prints the real error message (surfaces the dead Reinhart-Rogoff source URL, tracked as P3-12) instead of a bare "⚠ Failed".
+
+---
+
 ## Desktop v1.0.0 — Working Windows Build (2026-07-01)
 
 Supersedes the original Phase 37 desktop scaffolding, which built but failed to launch (silent backend crash on missing imports). Root causes fixed:
