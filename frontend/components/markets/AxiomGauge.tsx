@@ -1,17 +1,9 @@
 "use client";
 
-import { Card } from "@/components/ui";
+import { Card, SemiGauge, chartPalette } from "@/components/ui";
+import { useTheme } from "@/components/ThemeProvider";
 import { fmtPrice, fmtPct, currencySymbol } from "@/lib/format";
 import type { AxiomFairValue } from "@/lib/types";
-
-// ── colour palette (matches app: success #16a34a, danger #c4394a, warning #d97706) ──
-const SEGMENT_COLORS = [
-  "#c4394a", // Significantly Overvalued  (leftmost, -90° → -54°)
-  "#e57373", // Overvalued
-  "#d97706", // Fairly Valued             (center, -18° → +18°)
-  "#86c87a", // Undervalued
-  "#16a34a", // Significantly Undervalued (rightmost, +54° → +90°)
-] as const;
 
 const VERDICT_COLORS: Record<string, string> = {
   "Significantly Undervalued": "#16a34a",
@@ -22,72 +14,11 @@ const VERDICT_COLORS: Record<string, string> = {
   "Insufficient Data": "#8a6770",
 };
 
-// ── SVG arc helpers ──────────────────────────────────────────────────────────
-const CX = 120;
-const CY = 115;
-const R = 90;
-const STROKE = 22;
-
-/** Convert polar angle (degrees, 0=right, CCW+) to SVG cartesian */
-function polar(angleDeg: number, r = R): [number, number] {
-  const rad = (angleDeg * Math.PI) / 180;
-  return [CX + r * Math.cos(rad), CY - r * Math.sin(rad)];
-}
-
-/**
- * Build an SVG arc path for a ring segment.
- * Angles are in standard math convention (0=right, CCW positive).
- * The gauge arc runs from -180° (left) to 0° (right), i.e. a bottom-open
- * semicircle. We divide it into 5 equal 36° segments.
- */
-function arcPath(startDeg: number, endDeg: number): string {
-  const [x1, y1] = polar(startDeg);
-  const [x2, y2] = polar(endDeg);
-  // large-arc flag: 1 if arc > 180°
-  const large = endDeg - startDeg > 180 ? 1 : 0;
-  // Always draw counter-clockwise (sweep=0 in SVG coords where y is flipped)
-  return `M ${x1} ${y1} A ${R} ${R} 0 ${large} 0 ${x2} ${y2}`;
-}
-
-// Five 36° segments, left→right: -180° → -144° → -108° → -72° → -36° → 0°
-// In our convention: starts at 180° (left) and ends at 0° (right) going CCW
-// SVG arc: sweep-flag=0 means CCW
-const SEGMENTS = [
-  { start: 180, end: 144 }, // Significantly Overvalued
-  { start: 144, end: 108 }, // Overvalued
-  { start: 108, end: 72 },  // Fairly Valued
-  { start: 72, end: 36 },   // Undervalued
-  { start: 36, end: 0 },    // Significantly Undervalued
-];
-
-/**
- * Map upsidePct to a gauge angle in [0°, 180°].
- * upsidePct=0  → center (90°), clamped to [-50%, +50%].
- * upsidePct>0 (undervalued) → right half (0°–90°)
- * upsidePct<0 (overvalued)  → left half (90°–180°)
- *
- * Returns a standard-math angle (0=right, CCW+) for use with polar().
- */
-function upsideToDeg(upsidePct: number | null): number {
-  if (upsidePct === null) return 90; // center
+/** Map upsidePct (clamped to ±50%) to a 0–100 gauge value: 0 = overvalued end, 100 = undervalued end. */
+function upsideToGaugeValue(upsidePct: number | null): number {
+  if (upsidePct === null) return 50;
   const clamped = Math.max(-0.5, Math.min(0.5, upsidePct));
-  // Map [-0.5, 0.5] → [180°, 0°]  (left to right)
-  return 90 - clamped * 180;
-}
-
-/** Needle tip and base coords */
-function needlePoints(angleDeg: number): { tip: [number, number]; left: [number, number]; right: [number, number] } {
-  const tip = polar(angleDeg, R - STROKE / 2 - 4);
-  const perpAngle = angleDeg + 90;
-  const baseR = 10;
-  const base: [number, number] = [CX, CY];
-  const left = polar(perpAngle, baseR);
-  const right = polar(perpAngle - 180, baseR);
-  return {
-    tip,
-    left: [CX + (left[0] - CX) * 0.25, CY + (left[1] - CY) * 0.25],
-    right: [CX + (right[0] - CX) * 0.25, CY + (right[1] - CY) * 0.25],
-  };
+  return (clamped + 0.5) * 100;
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
@@ -100,14 +31,14 @@ export function AxiomGauge({
   spotPrice: number | null;
   currency: string;
 }) {
+  const { theme } = useTheme();
   const sym = currencySymbol(currency);
   const verdictColor = VERDICT_COLORS[axiom.verdict] ?? "#8a6770";
   const isInsufficient =
     axiom.verdict === "Insufficient Data" || axiom.value === null;
 
-  // Needle angle
-  const needleAngle = isInsufficient ? 90 : upsideToDeg(axiom.upsidePct);
-  const needle = needlePoints(needleAngle);
+  const gaugeValue = isInsufficient ? 50 : upsideToGaugeValue(axiom.upsidePct);
+  const gaugeColor = isInsufficient ? "#8a6770" : verdictColor;
 
   // Upside% sign colour
   const upsideColor =
@@ -126,78 +57,21 @@ export function AxiomGauge({
 
   return (
     <Card className="flex flex-col items-center gap-4 p-5">
-      {/* ── Gauge SVG ── */}
-      <svg
-        width="240"
-        height="130"
-        viewBox="0 0 240 130"
-        aria-label={`Axiom Fair Value gauge: ${axiom.verdict}`}
-        role="img"
-      >
-        {/* Background track */}
-        <path
-          d={arcPath(180, 0)}
-          fill="none"
-          stroke="#32171c"
-          strokeWidth={STROKE}
-          strokeLinecap="butt"
-        />
-
-        {/* Coloured segments */}
-        {SEGMENTS.map((seg, i) => (
-          <path
-            key={i}
-            d={arcPath(seg.start, seg.end)}
-            fill="none"
-            stroke={isInsufficient ? "#4a3035" : SEGMENT_COLORS[i]}
-            strokeWidth={STROKE}
-            strokeLinecap="butt"
-            opacity={isInsufficient ? 0.4 : 1}
-          />
-        ))}
-
-        {/* Segment divider ticks */}
-        {[144, 108, 72, 36].map((deg) => {
-          const inner = polar(deg, R - STROKE / 2 - 1);
-          const outer = polar(deg, R + STROKE / 2 + 1);
-          return (
-            <line
-              key={deg}
-              x1={inner[0]}
-              y1={inner[1]}
-              x2={outer[0]}
-              y2={outer[1]}
-              stroke="#0f0608"
-              strokeWidth={2}
-            />
-          );
-        })}
-
-        {/* Needle */}
-        {!isInsufficient && (
-          <>
-            <polygon
-              points={`${needle.tip[0]},${needle.tip[1]} ${needle.left[0]},${needle.left[1]} ${needle.right[0]},${needle.right[1]}`}
-              fill="#f5eeef"
-              stroke="#0f0608"
-              strokeWidth={0.5}
-            />
-            {/* Needle pivot */}
-            <circle cx={CX} cy={CY} r={5} fill="#f5eeef" stroke="#0f0608" strokeWidth={1} />
-          </>
-        )}
-
-        {/* Labels: SO / SU */}
-        <text x={10} y={122} fontSize={9} fill="#e57373" textAnchor="start" fontFamily="Inter,system-ui,sans-serif">
-          SO
-        </text>
-        <text x={230} y={122} fontSize={9} fill="#86c87a" textAnchor="end" fontFamily="Inter,system-ui,sans-serif">
-          SU
-        </text>
-        <text x={CX} y={122} fontSize={9} fill="#d97706" textAnchor="middle" fontFamily="Inter,system-ui,sans-serif">
-          FV
-        </text>
-      </svg>
+      {/* ── Gauge ── */}
+      <div className="w-full flex flex-col items-center">
+        <SemiGauge
+          value={gaugeValue}
+          color={gaugeColor}
+          trackColor={chartPalette(theme).grid}
+          size={220}
+        >
+          <div className="flex items-center justify-between px-2 text-[10px] font-medium">
+            <span className="text-danger">Overvalued</span>
+            <span className="text-warning">Fair Value</span>
+            <span className="text-success">Undervalued</span>
+          </div>
+        </SemiGauge>
+      </div>
 
       {/* ── Center readout ── */}
       <div className="text-center space-y-1 -mt-2">

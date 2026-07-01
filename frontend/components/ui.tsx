@@ -1,5 +1,6 @@
 "use client";
 import { useRef, useState, useEffect, type ReactNode } from "react";
+import { RadialBarChart, RadialBar, PolarAngleAxis, ResponsiveContainer } from "recharts";
 
 export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
   return <div className={`card ${className}`}>{children}</div>;
@@ -157,4 +158,58 @@ export function chartTooltipStyle(theme: "light" | "dark" = "dark") {
     },
     labelStyle: { color: p.axis },
   };
+}
+
+// ── Semicircular gauge ───────────────────────────────────────────────────────
+// A single smooth 0–100 progress arc with a rounded cap and background track,
+// built on Recharts' RadialBarChart (already a dependency). Replaces the old
+// hand-drawn multi-segment-arc-plus-needle SVGs, whose banded colors and
+// needle pivot text tended to collide. Pass `children` for the centered
+// readout (big number / label) — absolutely positioned under the arc since
+// Recharts lays out only the SVG, not HTML overlays.
+export function SemiGauge({
+  value,
+  color,
+  trackColor,
+  size = 200,
+  strokeWidth = 16,
+  children,
+}: {
+  value: number; // 0–100
+  color: string;
+  trackColor: string;
+  size?: number;
+  strokeWidth?: number;
+  children?: ReactNode;
+}) {
+  const clamped = Math.max(0, Math.min(100, value));
+  const height = size / 2 + strokeWidth / 2 + 4;
+
+  return (
+    <div className="relative mx-auto" style={{ width: size, height }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <RadialBarChart
+          cx="50%"
+          cy="100%"
+          innerRadius={size / 2 - strokeWidth}
+          outerRadius={size / 2}
+          barSize={strokeWidth}
+          startAngle={180}
+          endAngle={0}
+          data={[{ value: clamped, fill: color }]}
+        >
+          <PolarAngleAxis type="number" domain={[0, 100]} tick={false} axisLine={false} />
+          <RadialBar
+            dataKey="value"
+            cornerRadius={strokeWidth / 2}
+            background={{ fill: trackColor }}
+            isAnimationActive={false}
+          />
+        </RadialBarChart>
+      </ResponsiveContainer>
+      <div className="absolute inset-x-0 bottom-0 pb-1 pointer-events-none">
+        {children}
+      </div>
+    </div>
+  );
 }

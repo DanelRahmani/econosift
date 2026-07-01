@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { AreaChart, Area, ResponsiveContainer, YAxis, Tooltip } from "recharts";
 import { api } from "@/lib/api";
 import type { FearGreedResponse } from "@/lib/types";
-import { Card, Skeleton, chartTooltipStyle } from "@/components/ui";
+import { Card, Skeleton, chartTooltipStyle, chartPalette, SemiGauge } from "@/components/ui";
 import { useTheme } from "@/components/ThemeProvider";
 import { MetricTooltip } from "@/components/MetricTooltip";
 
@@ -43,7 +43,7 @@ export function FearGreedGauge() {
       </div>
 
       <div className="flex flex-col items-center">
-        <Gauge value={value} label={data.label ?? ""} />
+        <Gauge value={value} label={data.label ?? ""} theme={theme} />
       </div>
 
       {data.history.length > 1 && (
@@ -83,58 +83,14 @@ export function FearGreedGauge() {
   );
 }
 
-// SVG gauge geometry — bottom-open semicircle.
-const CX = 110, CY = 105, R = 88, STROKE = 14;
-
-function polar(angleDeg: number, r = R): [number, number] {
-  const rad = (angleDeg * Math.PI) / 180;
-  return [CX + r * Math.cos(rad), CY - r * Math.sin(rad)];
-}
-function arcPath(startDeg: number, endDeg: number): string {
-  const [x1, y1] = polar(startDeg);
-  const [x2, y2] = polar(endDeg);
-  return `M ${x1} ${y1} A ${R} ${R} 0 0 0 ${x2} ${y2}`;
-}
-
-function Gauge({ value, label }: { value: number; label: string }) {
-  const angle = 180 - (value / 100) * 180;
-  const [nx, ny] = polar(angle, R - STROKE / 2);
-
+function Gauge({ value, label, theme }: { value: number; label: string; theme: "light" | "dark" }) {
   return (
-    <svg viewBox="0 0 220 130" className="w-full max-w-xs">
-      {/* Coloured bands: red (fear) → amber (neutral) → green (greed) */}
-      <path d={arcPath(180, 120)} fill="none" stroke="#c4394a" strokeWidth={STROKE} strokeLinecap="butt" />
-      <path d={arcPath(120, 60)} fill="none" stroke="#ca8a04" strokeWidth={STROKE} />
-      <path d={arcPath(60, 0)} fill="none" stroke="#16a34a" strokeWidth={STROKE} strokeLinecap="butt" />
-
-      {/* Tick marks: 0, 25, 50, 75, 100 */}
-      {[0, 25, 50, 75, 100].map((v) => {
-        const a = 180 - (v / 100) * 180;
-        const [tx, ty] = polar(a, R + 14);
-        const [ix, iy] = polar(a, R - STROKE / 2 - 4);
-        const [ox, oy] = polar(a, R + 4);
-        return (
-          <g key={v}>
-            <line x1={ix} y1={iy} x2={ox} y2={oy} stroke="currentColor" strokeWidth={1} className="text-text-muted" opacity={0.5} />
-            <text x={tx} y={ty} textAnchor="middle" dominantBaseline="middle" fill="currentColor" fontSize="9" className="text-text-muted" opacity={0.7}>
-              {v}
-            </text>
-          </g>
-        );
-      })}
-
-      {/* Needle */}
-      <line x1={CX} y1={CY} x2={nx} y2={ny} stroke="currentColor" strokeWidth={2} className="text-text-primary" pointerEvents="none" strokeLinecap="round" />
-      <circle cx={CX} cy={CY} r={5} className="fill-text-primary" />
-
-      {/* Value — below the needle pivot */}
-      <text x={CX} y={CY + 3} textAnchor="middle" className="fill-text-primary" fontSize="30" fontWeight="700">
-        {value.toFixed(0)}
-      </text>
-      <text x={CX} y={CY - 3} textAnchor="middle" fill={scoreColor(value)} fontSize="11" fontWeight="600">
-        {label}
-      </text>
-    </svg>
+    <SemiGauge value={value} color={scoreColor(value)} trackColor={chartPalette(theme).grid} size={200}>
+      <div className="flex flex-col items-center">
+        <span className="text-3xl font-bold text-text-primary leading-none">{value.toFixed(0)}</span>
+        <span className="text-xs font-semibold mt-1" style={{ color: scoreColor(value) }}>{label}</span>
+      </div>
+    </SemiGauge>
   );
 }
 
