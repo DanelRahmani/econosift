@@ -1,0 +1,93 @@
+name: Build Windows Desktop
+
+# Builds the Axiom Finance Tauri app for Windows: freezes the FastAPI backend
+# with PyInstaller (onedir), stages it into the Tauri resources, then runs
+# `tauri build` to produce the NSIS installer and uploads it as an artifact.
+#
+# GitHub's windows-latest runners already ship Rust + the MSVC C++ Build Tools,
+# so no toolchain install is needed for those.
+
+on:
+  workflow_dispatch: {}          # manual "Run workflow" button (needs workflow on default branch)
+  push:
+    tags: ["v*"]                 # build + attach to release on version tags
+    branches: [main, PRODUCTION] # auto-build when packaging files change
+    paths:
+      - "backend/build.spec"
+      - "backend/run.py"
+      - "backend/requirements*.txt"
+      - "desktop/**"
+      - "frontend/**"
+      - ".github/workflows/build-windows.yml"
+  pull_request:
+    paths:
+      - "backend/build.spec"
+      - "backend/run.py"
+      - "desktop/**"
+      - ".github/workflows/build-windows.yml"
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Set up Rust (stable-msvc)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop/src-tauri
+
+      - name: Install backend deps
+        working-directory: backend
+        run: pip install -r requirements.txt -r requirements-build.txt
+
+      - name: Freeze backend (PyInstaller onedir)
+        working-directory: backend
+        run: pyinstaller build.spec --noconfirm
+
+      - name: Stage backend into Tauri resources
+        shell: pwsh
+        run: |
+          $stage = "desktop/src-tauri/binaries/axiom-backend"
+          if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
+          New-Item -ItemType Directory -Force -Path (Split-Path $stage) | Out-Null
+          Copy-Item backend/dist/axiom-backend $stage -Recurse -Force
+          if (-not (Test-Path "$stage/axiom-backend.exe")) { throw "backend not staged" }
+
+      - name: Install frontend deps
+        working-directory: frontend
+        run: npm ci
+
+      - name: Install desktop (Tauri CLI) deps
+        working-directory: desktop
+        run: npm ci
+
+      - name: Build Tauri app (frontend export + Rust + NSIS)
+        working-directory: desktop
+        run: npm run build
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: AxiomFinance-windows-installer
+          path: desktop/src-tauri/target/release/bundle/nsis/*-setup.exe
+          if-no-files-found: error
+
+      - name: Attach installer to release (tag builds only)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: desktop/src-tauri/target/release/bundle/nsis/*-setup.exe
