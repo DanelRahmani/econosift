@@ -36,8 +36,20 @@ Full plan: `.claude/plans/snappy-yawning-sprout.md` (local, not committed).
 | Toolchain (Python deps, Rust, VS C++ Build Tools) | ✅ Done | Rust 1.96.1 stable-msvc; MSVC 14.44 `cl.exe` |
 | B. Frontend static export | ✅ Done | `npm install` + `npm run build` → `frontend/out/` (25 pages) |
 | C. Tauri wiring (resources, lib.rs spawn, capabilities) | ✅ Done | sidecar → resources; updater disabled |
-| D. Full `tauri build` + installer test | 🔄 In progress | Rust compile running |
-| E. Finalize (console=False, README, commit) | ⏳ Pending | |
+| D. Full `tauri build` + installer | ✅ Built | NSIS installer produced (166 MB), pushed via Git LFS to `releases/` |
+| D. Installer smoke-test (install + run) | ⏳ Pending | not yet installed/run end-to-end |
+| E. Finalize (console=False, README, commit) | ⏳ Pending | current installer is the debug build (console=True) |
+
+### Build output (Phase D)
+
+- `desktop/src-tauri/target/release/axiom-finance.exe` (Rust build, 6m02s)
+- Installer: `Axiom Finance_1.0.0_x64-setup.exe` (166 MB) →
+  committed as `releases/AxiomFinance-1.0.0-x64-setup.exe` via **Git LFS**
+  (exceeds GitHub's 100 MB raw-file limit).
+
+> ⚠️ The committed installer is the **debug build** (`console=True`) — a console
+> window will appear on launch. Phase E rebuilds it windowless. It has **not** yet
+> been installed + run end-to-end.
 
 ### Phase A verification (passed)
 
