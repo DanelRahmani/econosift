@@ -103,14 +103,6 @@ jobs:
 
       - name: Build Tauri app (frontend export + Rust + installer)
         working-directory: desktop
-        env:
-          # linuxdeploy (used to bundle the AppImage) is itself an AppImage, and
-          # GitHub's Linux runners have no FUSE — so mounting it fails with
-          # "failed to run linuxdeploy". Tell it to extract-and-run instead, and
-          # skip binary stripping which also breaks under the plugin. Both are
-          # ignored on Windows/macOS.
-          NO_STRIP: "true"
-          APPIMAGE_EXTRACT_AND_RUN: "1"
         run: npm run build
 
       - name: Upload installer
@@ -128,4 +120,3 @@ jobs:
             desktop/src-tauri/target/release/bundle/nsis/*-setup.exe
             desktop/src-tauri/target/release/bundle/dmg/*.dmg
             desktop/src-tauri/target/release/bundle/deb/*.deb
-            desktop/src-tauri/target/release/bundle/appimage/*.AppImage
