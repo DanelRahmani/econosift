@@ -19,18 +19,18 @@ router = APIRouter(prefix="/api/ai", tags=["ai"])
 
 class CompanyRequest(BaseModel):
     ticker: str
-    model: str = "gemini-2.0-flash"
+    model: str = "gemini-2.5-flash"
     force_regenerate: bool = False
 
 
 class MacroRequest(BaseModel):
     countries: list[str]
-    model: str = "gemini-2.0-flash"
+    model: str = "gemini-2.5-flash"
     force_regenerate: bool = False
 
 
 class DashboardRequest(BaseModel):
-    model: str = "gemini-2.0-flash"
+    model: str = "gemini-2.5-flash"
     force_regenerate: bool = False
 
 

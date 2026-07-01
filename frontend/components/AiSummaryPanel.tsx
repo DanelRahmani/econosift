@@ -4,7 +4,7 @@ import { useState, useMemo } from "react";
 import type { AiSummaryResponse } from "@/lib/types";
 import { Card } from "@/components/ui";
 
-const AVAILABLE_MODELS = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-2.5-flash"];
+const AVAILABLE_MODELS = ["gemini-2.5-flash", "gemini-3-flash-preview", "gemini-3.1-flash-lite", "gemini-3.5-flash"];
 
 const MAX_VISIBLE_OPTIONS = 12; // show search box if more than this
 
@@ -24,7 +24,7 @@ interface Props {
 }
 
 export function AiSummaryPanel({ summaryType, title, options, searchPlaceholder, onGenerate }: Props) {
-  const [model, setModel] = useState("gemini-2.0-flash");
+  const [model, setModel] = useState("gemini-2.5-flash");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<AiSummaryResponse | null>(null);
   const [error, setError] = useState<string | null>(null);

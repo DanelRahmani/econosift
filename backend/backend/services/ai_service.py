@@ -16,9 +16,10 @@ import httpx
 from ..config import GEMINI_API_KEY
 
 AVAILABLE_MODELS = [
-    "gemini-2.0-flash",
-    "gemini-1.5-flash",
     "gemini-2.5-flash",
+    "gemini-3-flash-preview",
+    "gemini-3.1-flash-lite",
+    "gemini-3.5-flash",
 ]
 
 GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
@@ -35,7 +36,7 @@ SYSTEM_PROMPT = (
 )
 
 
-async def generate_summary(prompt: str, model: str = "gemini-2.0-flash") -> str:
+async def generate_summary(prompt: str, model: str = "gemini-2.5-flash") -> str:
     """Call the Gemini REST API and return the generated text."""
     if not GEMINI_API_KEY:
         return "Error: Gemini API key not configured. Add your key on the Admin page."
