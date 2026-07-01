@@ -5,6 +5,14 @@
 
 ---
 
+## Cross-platform desktop builds — Windows · macOS · Linux (2026-07-01)
+
+`build-windows.yml` now builds on a 3-OS matrix (`windows-latest` / `macos-latest` / `ubuntu-latest`), each freezing its own PyInstaller backend and running `tauri build`:
+
+- **Windows** → NSIS `*-setup.exe`, **macOS** → `*.dmg` (Apple Silicon, unsigned), **Linux** → `*.deb`.
+- Linux `tauri.conf.json` originally also targeted **AppImage**, but it can't be bundled on GitHub's runners (`linuxdeploy` needs FUSE; `APPIMAGE_EXTRACT_AND_RUN`/`NO_STRIP` didn't clear it — likely a WebKitGTK-4.1 plugin issue). Dropped `appimage` and ship `.deb` only (tracked as P3-13).
+- CI actions bumped to Node-24-native versions; broken duplicate `build-desktop.yml` removed; path triggers widened.
+
 ## Bug-fix batch — Atlas, Screener, Dividends, Country pages, Admin (2026-07-01)
 
 User-reported defects fixed (see `ACTIVE_ISSUES.md` BUG-A1…A5):

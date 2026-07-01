@@ -97,18 +97,24 @@ docker compose down     # stop everything
 
 ---
 
-## 🖥️ Windows Desktop App (v1.0.0)
+## 🖥️ Desktop App (v1.0.0) — Windows · macOS · Linux
 
-Axiom Finance also ships as a **native Windows desktop app** — no Docker required. A [Tauri](https://tauri.app/) v2 shell hosts the static Next.js frontend and spawns the FastAPI backend (frozen with PyInstaller) as a local child process on `127.0.0.1:8000`. App data (SQLite DB, settings) lives in `%APPDATA%/AxiomFinance`.
+Axiom Finance also ships as a **native desktop app** — no Docker required. A [Tauri](https://tauri.app/) v2 shell hosts the static Next.js frontend and spawns the FastAPI backend (frozen with PyInstaller) as a local child process on `127.0.0.1:8000`. App data (SQLite DB, settings, `.env` API keys) lives in the OS app-data dir (`%APPDATA%/AxiomFinance` on Windows, `~/Library/Application Support/AxiomFinance` on macOS, `~/.local/share/AxiomFinance` on Linux).
 
-- **Install:** download the NSIS installer from `releases/AxiomFinance-1.0.0-x64-setup.exe` (tracked via Git LFS) and run it. Launch from the Start Menu — a splash screen appears while the analysis engine warms up, then the dashboard loads live data.
-- **Build from source:**
+| OS | Installer | Notes |
+|----|-----------|-------|
+| **Windows** | NSIS `*-setup.exe` | Published via Git LFS at `releases/AxiomFinance-1.0.0-x64-setup.exe`. |
+| **macOS** | `*.dmg` (Apple Silicon) | Unsigned/unnotarized — first launch needs right-click → **Open** to bypass Gatekeeper. |
+| **Linux** | `*.deb` (Debian/Ubuntu, amd64) | AppImage is not shipped — it can't be bundled on GitHub's runners (see `ACTIVE_ISSUES.md` P3-13). |
+
+- **Install:** download the installer for your OS (from the CI artifacts / release) and run it. A splash screen appears while the analysis engine warms up, then the dashboard loads live data. Add optional FRED / Finnhub / Gemini API keys from the in-app **Admin** page — no rebuild needed, just restart.
+- **Build from source (Windows):**
   ```powershell
   # one-time: Python venv + deps, Rust (stable-msvc), VS C++ Build Tools, Node
   powershell -ExecutionPolicy Bypass -File desktop\build-windows.ps1
   ```
   Produces `desktop/src-tauri/target/release/bundle/nsis/Axiom Finance_<ver>_x64-setup.exe`.
-- **CI:** `.github/workflows/build-windows.yml` builds the installer on `windows-latest` (freeze → stage → `tauri build`) and uploads it as an artifact.
+- **CI:** `.github/workflows/build-windows.yml` builds all three installers on a `windows-latest` / `macos-latest` / `ubuntu-latest` matrix (freeze → stage → `tauri build`) and uploads each as an artifact. PyInstaller can't cross-compile, so each OS freezes its own backend on its own runner.
 
 See [`desktop/README.md`](./desktop/README.md) for architecture and build details.
 
