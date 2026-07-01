@@ -1,0 +1,45 @@
+name: Promote main → PRODUCTION
+
+# Gated release: run this manually (Actions ▸ "Promote main → PRODUCTION" ▸ Run)
+# when you want to cut a new desktop build. It merges the current `main` into
+# `PRODUCTION` and pushes, then kicks off build-windows.yml against PRODUCTION,
+# which produces the Windows / macOS / Linux installers.
+#
+# Why the explicit dispatch at the end: a push made with the default
+# GITHUB_TOKEN does NOT trigger other workflows' `on: push` (GitHub blocks that
+# to avoid recursion), so we can't rely on the PRODUCTION push alone to start
+# the build — we trigger it ourselves.
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: write   # push to PRODUCTION
+  actions: write    # dispatch the build workflow
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PRODUCTION (full history)
+        uses: actions/checkout@v5
+        with:
+          ref: PRODUCTION
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Merge main into PRODUCTION
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          # Prefer a clean fast-forward; fall back to a merge commit if PRODUCTION
+          # has diverged. A merge conflict fails the job — resolve it locally and
+          # push PRODUCTION by hand that one time.
+          git merge --ff-only origin/main || git merge --no-edit origin/main
+          git push origin HEAD:PRODUCTION
+
+      - name: Trigger the desktop build on PRODUCTION
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh workflow run build-windows.yml --ref PRODUCTION

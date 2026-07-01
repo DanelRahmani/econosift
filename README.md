@@ -115,8 +115,9 @@ Axiom Finance also ships as a **native desktop app** — no Docker required. A [
   ```
   Produces `desktop/src-tauri/target/release/bundle/nsis/Axiom Finance_<ver>_x64-setup.exe`.
 - **CI:** `.github/workflows/build-windows.yml` builds all three installers on a `windows-latest` / `macos-latest` / `ubuntu-latest` matrix (freeze → stage → `tauri build`) and uploads each as an artifact. PyInstaller can't cross-compile, so each OS freezes its own backend on its own runner.
+- **Releasing:** `main` is feature development (no installers). Cut a desktop build with **Actions ▸ "Promote main → PRODUCTION"**, which merges `main` into `PRODUCTION` and triggers the 3-OS build. See [`TAURI_BUILD.md`](./TAURI_BUILD.md) for the full flow and the contracts a `main` feature must respect to stay packageable.
 
-See [`desktop/README.md`](./desktop/README.md) for architecture and build details.
+See [`desktop/README.md`](./desktop/README.md) for architecture and build details, and [`TAURI_BUILD.md`](./TAURI_BUILD.md) for the desktop release process.
 
 ---
 

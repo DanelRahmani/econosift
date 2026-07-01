@@ -20,13 +20,7 @@ on:
   workflow_dispatch: {}          # manual "Run workflow" button (needs workflow on default branch)
   push:
     tags: ["v*"]                 # build + attach to release on version tags
-    branches: [main, PRODUCTION] # auto-build when app or packaging source changes
-    paths:
-      - "backend/**"
-      - "desktop/**"
-      - "frontend/**"
-      - ".github/workflows/build-windows.yml"
-  pull_request:
+    branches: [PRODUCTION]       # release builds only — promote main -> PRODUCTION to trigger
     paths:
       - "backend/**"
       - "desktop/**"
