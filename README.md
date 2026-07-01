@@ -97,6 +97,23 @@ docker compose down     # stop everything
 
 ---
 
+## 🖥️ Windows Desktop App (v1.0.0)
+
+Axiom Finance also ships as a **native Windows desktop app** — no Docker required. A [Tauri](https://tauri.app/) v2 shell hosts the static Next.js frontend and spawns the FastAPI backend (frozen with PyInstaller) as a local child process on `127.0.0.1:8000`. App data (SQLite DB, settings) lives in `%APPDATA%/AxiomFinance`.
+
+- **Install:** download the NSIS installer from `releases/AxiomFinance-1.0.0-x64-setup.exe` (tracked via Git LFS) and run it. Launch from the Start Menu — a splash screen appears while the analysis engine warms up, then the dashboard loads live data.
+- **Build from source:**
+  ```powershell
+  # one-time: Python venv + deps, Rust (stable-msvc), VS C++ Build Tools, Node
+  powershell -ExecutionPolicy Bypass -File desktop\build-windows.ps1
+  ```
+  Produces `desktop/src-tauri/target/release/bundle/nsis/Axiom Finance_<ver>_x64-setup.exe`.
+- **CI:** `.github/workflows/build-windows.yml` builds the installer on `windows-latest` (freeze → stage → `tauri build`) and uploads it as an artifact.
+
+See [`desktop/README.md`](./desktop/README.md) for architecture and build details.
+
+---
+
 ## 📡 API Endpoints
 
 The backend serves under `/api` (proxied by Nginx). Key endpoint groups:

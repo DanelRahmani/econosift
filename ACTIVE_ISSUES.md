@@ -57,6 +57,15 @@
 
 ---
 
+## 🖥️ Desktop (Tauri / Windows) — v1.0.0
+
+| ID | Issue | Severity | Details |
+|----|-------|----------|---------|
+| DESK-01 | **`backend.log` not written under `console=False`** | P2 | The frozen backend runs windowless (`build.spec` `console=False`); `run.py` should redirect diagnostics to `%APPDATA%/AxiomFinance/backend.log` when `stdout is None`, but the file is not being created. Functionally harmless (nothing is crashing), but the crash-diagnostic safety net is inactive. Fix: verify the `stdout is None` branch in `run.py` actually opens the log file (frozen `console=False` may leave a non-None but broken stdout). |
+| DESK-02 | **Backend orphaned on force-kill of the app** | P2 | Force-killing `axiom-finance.exe` (`Stop-Process -Force` / Task Manager "End task") leaves the child `axiom-backend.exe` running on port 8000. A normal window close lets Tauri reap the child. Fix: add an explicit child-kill on Tauri's `RunEvent::ExitRequested` / window-destroyed event so hard kills don't orphan the backend. |
+
+---
+
 ## ✅ Recently Fixed
 
 These items are verified as fixed in shipped phases. Listed here for reference to avoid re-reporting.

@@ -5,6 +5,20 @@
 
 ---
 
+## Desktop v1.0.0 — Working Windows Build (2026-07-01)
+
+Supersedes the original Phase 37 desktop scaffolding, which built but failed to launch (silent backend crash on missing imports). Root causes fixed:
+
+- **Backend freeze:** rewrote `backend/build.spec` to PyInstaller **onedir** with `collect_all()` over the whole dependency stack (numpy/scipy/pandas/pyarrow/arch/statsmodels/yfinance/… + certifi, pycountry, financedatabase, edgar data) — captures the lazy/dynamic imports and data files the hand-listed `hiddenimports` missed.
+- **Tauri wiring:** dropped the sidecar/updater approach; the backend folder is bundled via `bundle.resources` and spawned from `src-tauri/src/lib.rs` using a resource-resolved path, with `AXIOM_DATA_DIR` passed on the command.
+- **Data dir:** `database.py` now resolves the SQLite path from `config.DATA_DIR` (`%APPDATA%/AxiomFinance`) instead of a CWD-relative `./data`, so the DB no longer scatters based on launch directory.
+- **Cold-start race:** health-gate splash in `providers.tsx` polls `/api/health` before mounting; React Query retry bumped.
+- **Windows-only, local build**, production windowless (`console=False`). NSIS installer (165 MB) published via **Git LFS** under `releases/`; GitHub Actions `build-windows.yml` builds on `windows-latest`.
+- **Verified:** clean install launched from a neutral CWD serves live data (`/api/health`, `/api/search` → 200); DB + WAL/SHM land in `%APPDATA%/AxiomFinance` with no stray copies.
+- **Known caveats:** DESK-01 (`backend.log` not written under `console=False`), DESK-02 (backend orphaned on force-kill) — tracked in `ACTIVE_ISSUES.md`.
+
+Commit `441f938`.
+
 ## Phase 37: Tauri Desktop App (2026-06-30)
 
 - **Frontend:** Switched to `output: "export"` (static HTML); API client uses configurable base URL (`NEXT_PUBLIC_API_URL`); added `generateStaticParams` for `country/[iso2]` dynamic routes

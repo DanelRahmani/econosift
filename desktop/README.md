@@ -48,5 +48,9 @@ The script runs the three stages (freeze backend → stage into resources →
 - Build artifacts (`backend/dist`, `backend/build`, `src-tauri/binaries`,
   `src-tauri/target`) are gitignored. The published installer is tracked via
   **Git LFS** under `releases/`.
-- Backend is built windowless (`console=False`); crash diagnostics go to
-  `%APPDATA%/AxiomFinance/backend.log`.
+- Backend is built windowless (`console=False`). Crash diagnostics are *meant*
+  to go to `%APPDATA%/AxiomFinance/backend.log`, but that file is currently not
+  being written under `console=False` (see **DESK-01** in `ACTIVE_ISSUES.md`).
+- **Known caveats:** DESK-01 (no `backend.log`) and DESK-02 (backend orphaned if
+  the app is force-killed rather than closed normally) — tracked in
+  `ACTIVE_ISSUES.md`.
