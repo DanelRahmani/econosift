@@ -106,3 +106,64 @@ specifically written against the onedir layout, and has been green since.
 
 Given `build-windows.yml` already does this correctly and is actively
 maintained, deleting `build-desktop.yml` is the simpler and lower-risk fix.
+
+## Cross-platform expansion (macOS + Linux)
+
+Today the desktop app is Windows-only *by construction*, not just missing CI
+config — a few things need code changes, not just workflow changes:
+
+1. **`desktop/src-tauri/src/lib.rs` hardcodes the Windows binary path:**
+   ```rust
+   let backend_exe = app.path().resolve(
+       "binaries/axiom-backend/axiom-backend.exe",   // .exe hardcoded
+       BaseDirectory::Resource,
+   )
+   ```
+   Needs an OS-conditional exe name (`cfg!(windows)` → `"axiom-backend.exe"`,
+   else `"axiom-backend"`). On macOS/Linux the copied PyInstaller output also
+   needs `chmod +x` — the executable bit doesn't reliably survive artifact
+   staging/copy steps.
+
+2. **`desktop/src-tauri/tauri.conf.json` locks `bundle.targets` to `["nsis"]`**
+   — a Windows-only installer format. macOS needs `dmg`/`app`, Linux needs
+   `deb`/`appimage` (or `rpm`). Either set `"targets": "all"` and let Tauri's
+   CLI pick the right bundler for the host OS, or pass `--bundles <list>`
+   explicitly per platform in the `tauri build` CI step.
+
+3. **PyInstaller can't cross-compile** — each OS's binary must be built on
+   that OS. The CI matrix needs `macos-latest` (Apple Silicon; add
+   `macos-13` too if Intel Mac support matters) and `ubuntu-latest` runners,
+   each running its own `pip install` → `pyinstaller build.spec` → stage →
+   `tauri build`. `build.spec` itself has no OS branches and should work
+   unchanged — the compiled deps (numpy/scipy/pyarrow/etc.) already resolve
+   to OS-specific wheels via pip.
+
+4. **`ubuntu-latest` is missing Tauri's Linux build dependencies** — WebKitGTK
+   and friends aren't preinstalled. Needs a step before `tauri build`:
+   ```yaml
+   - run: sudo apt-get update && sudo apt-get install -y \
+       libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev \
+       build-essential libssl-dev libgtk-3-dev
+   ```
+
+5. **The copy/stage step is shell-specific.** `build-windows.yml` uses
+   `shell: pwsh`, which is actually preinstalled on all GitHub-hosted runners
+   (Windows/macOS/Linux), so the same block can be reused across the matrix
+   once the exe suffix is made conditional
+   (`$exeSuffix = if ($IsWindows) { ".exe" } else { "" }`).
+
+6. **Bundle output paths differ per bundler**, so upload/release-attach globs
+   need per-OS handling: `target/release/bundle/nsis/*-setup.exe` (Windows)
+   vs `target/release/bundle/dmg/*.dmg` (macOS) vs
+   `target/release/bundle/deb/*.deb` + `target/release/bundle/appimage/*.AppImage`
+   (Linux) — or just glob `target/release/bundle/**` and upload everything.
+
+7. **macOS code signing** isn't required to build, but an unsigned/unnotarized
+   `.app`/`.dmg` will be Gatekeeper-blocked for end users ("unidentified
+   developer"). Not a CI failure, but affects distribution — needs an Apple
+   Developer cert + notarization step to ship cleanly.
+
+Not affected: `backend/run.py` already resolves the app-data directory
+per-OS (`sys.platform` branches for win32/darwin/else), so no backend changes
+are needed for cross-platform support — only the Tauri/Rust side and the CI
+workflow are currently Windows-only.
