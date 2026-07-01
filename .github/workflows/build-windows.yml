@@ -11,19 +11,17 @@ on:
   workflow_dispatch: {}          # manual "Run workflow" button (needs workflow on default branch)
   push:
     tags: ["v*"]                 # build + attach to release on version tags
-    branches: [main, PRODUCTION] # auto-build when packaging files change
+    branches: [main, PRODUCTION] # auto-build when app or packaging source changes
     paths:
-      - "backend/build.spec"
-      - "backend/run.py"
-      - "backend/requirements*.txt"
+      - "backend/**"
       - "desktop/**"
       - "frontend/**"
       - ".github/workflows/build-windows.yml"
   pull_request:
     paths:
-      - "backend/build.spec"
-      - "backend/run.py"
+      - "backend/**"
       - "desktop/**"
+      - "frontend/**"
       - ".github/workflows/build-windows.yml"
 
 jobs:
