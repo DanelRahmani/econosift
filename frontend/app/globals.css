@@ -74,6 +74,29 @@ h1, h2, h3, .font-display {
   }
 }
 
+/* ── Charts (Recharts) — theme tooltips & axes so they're readable in dark
+   mode. Recharts' default tooltip is hard-coded white, which is unreadable on
+   the dark surface; drive everything from the same CSS variables as the app. */
+.recharts-default-tooltip {
+  background: rgb(var(--surface)) !important;
+  border: 1px solid rgb(var(--border)) !important;
+  border-radius: 0.5rem !important;
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.25) !important;
+  color: rgb(var(--foreground)) !important;
+}
+.recharts-default-tooltip .recharts-tooltip-label,
+.recharts-default-tooltip .recharts-tooltip-item,
+.recharts-default-tooltip .recharts-tooltip-item-name,
+.recharts-default-tooltip .recharts-tooltip-item-value {
+  color: rgb(var(--foreground)) !important;
+}
+.recharts-cartesian-axis-tick-value {
+  fill: rgb(var(--text-secondary));
+}
+.recharts-legend-item-text {
+  color: rgb(var(--text-secondary)) !important;
+}
+
 /* ── Print / PDF export ──────────────────────────────────────────────────── */
 @media print {
   /* Hide interactive chrome */

@@ -257,7 +257,7 @@ export function HousingTab() {
             >
               <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
               <XAxis type="number" tickFormatter={(v) => `${v}%`} tick={{ fontSize: 11 }} />
-              <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={90} tickFormatter={shortCountryName} />
+              <YAxis type="category" interval={0} dataKey="name" tick={{ fontSize: 11 }} width={90} tickFormatter={shortCountryName} />
               <Tooltip formatter={(v: number) => [`${v?.toFixed(2)}%`, "YoY Change"]} />
               <Bar dataKey="yoy" radius={[0, 4, 4, 0]}>
                 {(globalHousing.countries.map((c) => (

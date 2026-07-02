@@ -27,7 +27,7 @@ Axiom Finance is a self-hosted financial analytics platform built on FastAPI + N
 - **Cross-Border** (`/crossborder`): BIS locational banking statistics, international debt securities, global financial interconnectedness
 - **Country Profiles** (`/country/{iso2}`): CIA World Factbook data per country — geography, demographics, economy
 - **AI Summaries** (on-request): AI-powered company analysis with clickable ticker pills (select any combination on Markets), macro summary with searchable 20-country pill selector on Macro Overview, and daily market briefing on Dashboard. Uses Google Gemini free-tier API (2048 max output tokens) with model selector, SQLite caching, and source attribution for all summaries.
-- **Admin** (`/admin`): Backend health dashboard, cache stats, API keys management (FRED/Finnhub/Gemini validation)
+- **Admin** (`/admin`): Backend health dashboard, cache stats, API keys management (FRED/Finnhub/Gemini validation), "Clear cache & re-warm" recovery action, and an **Appearance** theme maker (custom Primary/Accent brand colours over the light/dark base themes)
 
 No paid APIs required. Optional free FRED API key & FINNHUB API key for richer US data, and free Gemini API key for AI summaries.
 
@@ -68,7 +68,7 @@ See the INFO folder for detailed file-by-file breakdowns of the backend and fron
 | [`INFO/frontend_structure.md`](./INFO/frontend_structure.md) | All 25 pages, 118 components, 8 lib files |
 
 Key architecture notes:
-- All external API calls are cached via `@cached` / `@async_cached` in `cache.py` (60-min TTL, cachetools TTLCache + SQLite HybridCache two-tier)
+- All external API calls are cached via `@cached` / `@async_cached` in `cache.py` (60-min TTL enforced on **both** tiers, cachetools TTLCache + SQLite HybridCache). Empty/failed results are **never** cached (`skip_if` guard, default = empty-container check), so a transient source failure can't poison the cache; `cache.clear_all()` flushes both tiers (exposed as `POST /admin/cache/clear`)
 - 🟡/🔴 endpoints in `risk.py` and `options.py` are intentionally uncached (compute-on-demand)
 - Middleware: `middleware.py` (DeduplicationMiddleware stub)
 - Database: `database.py` (SQLAlchemy engine, SessionLocal), `db_models.py` (DailyPrice, DailyQuote, DailyMacro, DailyFX, CacheEntry, JobExecution)

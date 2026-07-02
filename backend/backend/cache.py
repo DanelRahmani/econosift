@@ -14,6 +14,9 @@ _CACHE_MAXSIZE = 2048
 
 _caches: dict[str, TTLCache] = {}
 _locks: dict[str, asyncio.Lock] = {}
+# Registry of live HybridCache instances so clear_all() can flush their
+# private in-memory tier (the decorators keep two memory layers + the DB).
+_hybrid_caches: list["HybridCache"] = []
 
 
 def _get_cache(name: str) -> TTLCache:
@@ -49,11 +52,28 @@ def _make_key(args, kwargs) -> tuple:
     return args + tuple(sorted(kwargs.items()))
 
 
-def cached(name: str | None = None):
+def _is_empty_result(result) -> bool:
+    """Default predicate: treat None and empty containers as 'no data'.
+
+    Empty/failed results must never be cached — otherwise a transient source
+    failure (or a fetch made before API keys were entered) poisons the cache
+    permanently, since the persistent tier survives restarts.
+    """
+    if result is None:
+        return True
+    if isinstance(result, (dict, list, tuple, set, str)) and len(result) == 0:
+        return True
+    return False
+
+
+def cached(name: str | None = None, skip_if=None):
     """Cache a *synchronous* function's result for 60 minutes.
 
     Two-tier: in-memory TTLCache (fast) → SQLite CacheEntry (persistent).
     Survives container restarts via the database tier.
+
+    ``skip_if`` is a predicate ``result -> bool``; when it returns True the
+    result is returned but NOT cached (defaults to :func:`_is_empty_result`).
     """
     import json as _json
 
@@ -61,6 +81,7 @@ def cached(name: str | None = None):
         cache_name = name or func.__qualname__
         _get_cache(cache_name)  # ensure the in-memory cache exists
         persistent = HybridCache(cache_name, ttl_sec=_CACHE_TTL, maxsize=_CACHE_MAXSIZE)
+        is_empty = skip_if or _is_empty_result
 
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
@@ -80,6 +101,8 @@ def cached(name: str | None = None):
 
             _record(cache_name, False)
             result = func(*args, **kwargs)
+            if is_empty(result):
+                return result  # don't cache empty/failed results
             cache[raw_key] = result
             persistent.set(str_key, result)  # persist to DB
             return result
@@ -89,11 +112,14 @@ def cached(name: str | None = None):
     return decorator
 
 
-def async_cached(name: str | None = None):
+def async_cached(name: str | None = None, skip_if=None):
     """Cache an *async* function's result for 60 minutes.
 
     Two-tier: in-memory TTLCache (fast) → SQLite CacheEntry (persistent).
     Survives container restarts via the database tier.
+
+    ``skip_if`` is a predicate ``result -> bool``; when it returns True the
+    result is returned but NOT cached (defaults to :func:`_is_empty_result`).
     """
     import json as _json
 
@@ -102,6 +128,7 @@ def async_cached(name: str | None = None):
         _get_cache(cache_name)  # ensure the in-memory cache exists
         lock = _locks.setdefault(cache_name, asyncio.Lock())
         persistent = HybridCache(cache_name, ttl_sec=_CACHE_TTL, maxsize=_CACHE_MAXSIZE)
+        is_empty = skip_if or _is_empty_result
 
         @functools.wraps(func)
         async def wrapper(*args, **kwargs):
@@ -126,6 +153,8 @@ def async_cached(name: str | None = None):
 
                 _record(cache_name, False)
                 result = await func(*args, **kwargs)
+                if is_empty(result):
+                    return result  # don't cache empty/failed results
                 cache[raw_key] = result
                 persistent.set(str_key, result)  # persist to DB
                 return result
@@ -146,6 +175,7 @@ class HybridCache:
         self._name = name
         self._ttl_sec = ttl_sec
         self._hit_miss = {"hits_mem": 0, "hits_db": 0, "misses": 0}
+        _hybrid_caches.append(self)
 
     def _get_from_db(self, key: str):
         """Return deserialized value from SQLite, or None on miss/failure."""
@@ -155,9 +185,20 @@ class HybridCache:
             db = SessionLocal()
             try:
                 row = db.get(CacheEntry, (self._name, key))
-                if row is not None:
-                    return json.loads(row.value_json)
-                return None
+                if row is None:
+                    return None
+                # Enforce TTL on the persistent tier too. Without this, a stale
+                # (or empty/poisoned) row is served forever, since the in-memory
+                # TTLCache expiry never applied to the DB. Expired rows are
+                # deleted so the next call re-fetches fresh data.
+                created = getattr(row, "created_at", None)
+                if created is not None:
+                    age = (datetime.utcnow() - created).total_seconds()
+                    if age > self._ttl_sec:
+                        db.delete(row)
+                        db.commit()
+                        return None
+                return json.loads(row.value_json)
             finally:
                 db.close()
         except Exception:
@@ -264,3 +305,38 @@ class HybridCache:
             "memory_size": len(self._memory),
             "ttl_sec": self._ttl_sec,
         }
+
+
+def clear_all(name: str | None = None) -> dict:
+    """Flush cached data from both memory tiers and the SQLite tier.
+
+    Pass ``name`` to flush a single cache; ``None`` flushes everything. Used by
+    the Admin "Clear cache & re-warm" action to purge poisoned/empty entries.
+    Returns ``{"entries": <db rows deleted>, "memory_caches": <caches cleared>}``.
+    """
+    mem_cleared = 0
+    for cname, c in list(_caches.items()):
+        if name is None or cname == name:
+            c.clear()
+            mem_cleared += 1
+    for hc in list(_hybrid_caches):
+        if name is None or hc._name == name:
+            hc._memory.clear()
+
+    entries = 0
+    try:
+        from backend.database import SessionLocal
+        from backend.db_models import CacheEntry
+        db = SessionLocal()
+        try:
+            q = db.query(CacheEntry)
+            if name is not None:
+                q = q.filter(CacheEntry.cache_name == name)
+            entries = q.delete(synchronize_session=False)
+            db.commit()
+        finally:
+            db.close()
+    except Exception:
+        pass
+
+    return {"entries": entries, "memory_caches": mem_cleared}

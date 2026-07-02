@@ -65,7 +65,7 @@ def is_bulk_running() -> bool:
 def get_bulk_status() -> dict:
     s = _load_status()
     result = {}
-    for key in ("worldbank", "famafrench", "imf_weo", "bis", "factbook", "reinhart_rogoff", "factbook_profiles"):
+    for key in ("worldbank", "famafrench", "imf_weo", "bis", "factbook", "factbook_profiles"):
         entry = s.get(key, {})
         result[key] = {
             "last_ok": entry.get("last_ok"),
@@ -476,24 +476,12 @@ def _download_factbook() -> dict:
 # ---------------------------------------------------------------------------
 # Reinhart & Rogoff — Historical Sovereign Default Dataset
 # ---------------------------------------------------------------------------
-
-RR_URL = "https://raw.githubusercontent.com/danielmarcelin/reinhart-rogoff-data/main/RR_Defaults.csv"
-RR_PATH = DATA_DIR / "rr_defaults.parquet"
-
-
-def _download_reinhart_rogoff() -> dict:
-    """Download Reinhart & Rogoff sovereign default CSV and store as parquet."""
-    try:
-        resp = httpx.get(RR_URL, timeout=60)
-        resp.raise_for_status()
-        df = pd.read_csv(io.StringIO(resp.text))
-        if df.empty:
-            return {"rows": 0, "error": "empty CSV"}
-        df.to_parquet(RR_PATH, index=False)
-        return {"rows": len(df), "error": None}
-    except Exception as exc:
-        logger.warning("Reinhart-Rogoff download failed: %s", exc)
-        return {"rows": 0, "error": str(exc)}
+#
+# The sovereign-default model (sovereign_default_service.py) ships with the
+# Reinhart & Rogoff training data BUNDLED in-code, so there is no runtime
+# download. A previous bulk download pointed at a personal GitHub CSV that no
+# longer exists (404) and whose parquet output was never read by anything —
+# it has been removed to stop the noisy 404 on every bulk refresh (P3-12).
 
 
 # ---------------------------------------------------------------------------
@@ -655,17 +643,8 @@ def _download_all_bulk_datasets(status: dict) -> None:
         except Exception as exc:
             status["factbook"] = {**status.get("factbook", {}), "last_attempt": now, "error": str(exc)}
 
-        # Reinhart & Rogoff
-        try:
-            rr = _download_reinhart_rogoff()
-            status["reinhart_rogoff"] = {
-                "last_attempt": now,
-                "last_ok": now if not rr["error"] else status.get("reinhart_rogoff", {}).get("last_ok"),
-                "error": rr["error"], "rows": rr["rows"],
-                "size_kb": _file_size(RR_PATH),
-            }
-        except Exception as exc:
-            status["reinhart_rogoff"] = {**status.get("reinhart_rogoff", {}), "last_attempt": now, "error": str(exc)}
+        # Reinhart & Rogoff data is bundled in sovereign_default_service — no
+        # download step (see note above).
 
         # Factbook Profiles (CIA World Factbook)
         try:

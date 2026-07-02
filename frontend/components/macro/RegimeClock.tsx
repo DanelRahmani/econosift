@@ -365,50 +365,52 @@ export function RegimeClock({
                 strokeOpacity={0.5}
               />
 
-              {/* quadrant labels — centered in each quadrant */}
+              {/* quadrant labels — pinned to each quadrant's chart corner so
+                  they never overlap each other or the data cluster near the
+                  threshold crossing. */}
               <ReferenceLine
-                x={(thresholds.gdp + xDomain[1]) / 2}
-                y={(yDomain[0] + thresholds.cpi) / 2}
+                x={xDomain[1]}
+                y={yDomain[0]}
                 stroke="none"
                 label={{
                   value: "Goldilocks",
-                  position: "center",
+                  position: "insideBottomRight",
                   fontSize: 9,
                   fill: QUADRANT_FILL.Goldilocks,
                   opacity: 0.8,
                 }}
               />
               <ReferenceLine
-                x={(thresholds.gdp + xDomain[1]) / 2}
-                y={(thresholds.cpi + yDomain[1]) / 2}
+                x={xDomain[1]}
+                y={yDomain[1]}
                 stroke="none"
                 label={{
                   value: "Overheating",
-                  position: "center",
+                  position: "insideTopRight",
                   fontSize: 9,
                   fill: QUADRANT_FILL.Overheating,
                   opacity: 0.8,
                 }}
               />
               <ReferenceLine
-                x={(xDomain[0] + thresholds.gdp) / 2}
-                y={(yDomain[0] + thresholds.cpi) / 2}
+                x={xDomain[0]}
+                y={yDomain[0]}
                 stroke="none"
                 label={{
                   value: "Slowdown",
-                  position: "center",
+                  position: "insideBottomLeft",
                   fontSize: 9,
                   fill: QUADRANT_FILL.Slowdown,
                   opacity: 0.8,
                 }}
               />
               <ReferenceLine
-                x={(xDomain[0] + thresholds.gdp) / 2}
-                y={(thresholds.cpi + yDomain[1]) / 2}
+                x={xDomain[0]}
+                y={yDomain[1]}
                 stroke="none"
                 label={{
                   value: "Stagflation",
-                  position: "center",
+                  position: "insideTopLeft",
                   fontSize: 9,
                   fill: QUADRANT_FILL.Stagflation,
                   opacity: 0.8,

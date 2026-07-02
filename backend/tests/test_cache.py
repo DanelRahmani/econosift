@@ -264,3 +264,120 @@ def test_existing_cached_decorator_different_args():
 
     assert double(3) == 6
     assert double(4) == 8
+
+
+# ---------------------------------------------------------------------------
+# Empty/failed results must NOT be cached (poison-prevention)
+# ---------------------------------------------------------------------------
+
+def test_empty_result_is_not_cached():
+    """An empty dict result must be recomputed every call, never cached."""
+    from backend import cache as cache_mod
+
+    calls = {"n": 0}
+
+    @cache_mod.cached("test_empty_skip")
+    def fn():
+        calls["n"] += 1
+        return {}
+
+    with patch.object(cache_mod.HybridCache, "_set_in_db"), \
+         patch.object(cache_mod.HybridCache, "_get_from_db", return_value=None):
+        assert fn() == {}
+        assert fn() == {}
+
+    assert calls["n"] == 2  # recomputed each time — not cached
+
+
+def test_nonempty_result_is_cached():
+    from backend import cache as cache_mod
+
+    calls = {"n": 0}
+
+    @cache_mod.cached("test_nonempty_cache")
+    def fn():
+        calls["n"] += 1
+        return {"a": 1}
+
+    with patch.object(cache_mod.HybridCache, "_set_in_db"), \
+         patch.object(cache_mod.HybridCache, "_get_from_db", return_value=None):
+        assert fn() == {"a": 1}
+        assert fn() == {"a": 1}
+
+    assert calls["n"] == 1  # cached after first compute
+
+
+def test_custom_skip_if_predicate():
+    """A custom skip_if can flag domain-specific 'empty' payloads."""
+    from backend import cache as cache_mod
+
+    calls = {"n": 0}
+
+    @cache_mod.cached("test_custom_skip", skip_if=lambda r: r.get("available") is False)
+    def fn():
+        calls["n"] += 1
+        return {"available": False, "reason": "no data"}
+
+    with patch.object(cache_mod.HybridCache, "_set_in_db"), \
+         patch.object(cache_mod.HybridCache, "_get_from_db", return_value=None):
+        fn()
+        fn()
+
+    assert calls["n"] == 2  # unavailable payloads never cached
+
+
+# ---------------------------------------------------------------------------
+# DB tier enforces TTL (previously served forever, poisoning the cache)
+# ---------------------------------------------------------------------------
+
+def test_db_tier_expires_stale_entry():
+    from datetime import datetime, timedelta
+    from backend.cache import HybridCache
+
+    c = HybridCache("test_ttl_expire", ttl_sec=60)
+    row = MagicMock()
+    row.created_at = datetime.utcnow() - timedelta(seconds=120)  # older than ttl
+    row.value_json = json.dumps({"x": 1})
+    db = MagicMock()
+    db.get.return_value = row
+
+    with patch("backend.database.SessionLocal", return_value=db):
+        result = c._get_from_db("k")
+
+    assert result is None            # expired → miss
+    db.delete.assert_called_once_with(row)
+    db.commit.assert_called()
+
+
+def test_db_tier_serves_fresh_entry():
+    from datetime import datetime, timedelta
+    from backend.cache import HybridCache
+
+    c = HybridCache("test_ttl_fresh", ttl_sec=60)
+    row = MagicMock()
+    row.created_at = datetime.utcnow() - timedelta(seconds=5)  # within ttl
+    row.value_json = json.dumps({"x": 2})
+    db = MagicMock()
+    db.get.return_value = row
+
+    with patch("backend.database.SessionLocal", return_value=db):
+        result = c._get_from_db("k")
+
+    assert result == {"x": 2}
+    db.delete.assert_not_called()
+
+
+def test_clear_all_flushes_memory_tiers():
+    from backend import cache as cache_mod
+
+    c = cache_mod._get_cache("test_clear_mem")
+    c["k"] = 1
+    hc = cache_mod.HybridCache("test_clear_hc")
+    hc._memory["x"] = 2
+
+    db = MagicMock()
+    with patch("backend.database.SessionLocal", return_value=db):
+        cache_mod.clear_all()
+
+    assert len(c) == 0
+    assert len(hc._memory) == 0

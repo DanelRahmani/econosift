@@ -2226,6 +2226,10 @@ export interface WikiTermsResponse {
 }
 
 export interface MacroRegimeData {
+  // false when the underlying FRED series couldn't be fetched — the rest of
+  // the fields are then absent and `reason` explains why.
+  available?: boolean;
+  reason?: string;
   regime: "Goldilocks" | "Reflationary" | "Stagflation" | "Deflationary";
   quadrant: 1 | 2 | 3 | 4;
   growth_z: number | null;

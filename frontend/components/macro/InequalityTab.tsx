@@ -84,7 +84,7 @@ export function InequalityTab() {
             >
               <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
               <XAxis type="number" tickFormatter={(v) => `${v}`} tick={{ fontSize: 11 }} />
-              <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={90} tickFormatter={shortCountryName} />
+              <YAxis type="category" interval={0} dataKey="name" tick={{ fontSize: 11 }} width={90} tickFormatter={shortCountryName} />
               <Tooltip formatter={(v: number) => [`${v?.toFixed(1)}`, "Gini"]} />
               <ReferenceLine x={30} stroke="#10b981" strokeDasharray="4 4" />
               <ReferenceLine x={45} stroke="#f59e0b" strokeDasharray="4 4" />
@@ -115,7 +115,7 @@ export function InequalityTab() {
             >
               <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
               <XAxis type="number" tickFormatter={(v) => `${v}%`} tick={{ fontSize: 11 }} />
-              <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={90} tickFormatter={shortCountryName} />
+              <YAxis type="category" interval={0} dataKey="name" tick={{ fontSize: 11 }} width={90} tickFormatter={shortCountryName} />
               <Tooltip formatter={(v: number) => [`${v?.toFixed(1)}%`, "Top 10%"]} />
               <ReferenceLine x={25} stroke="#10b981" strokeDasharray="4 4" />
               <ReferenceLine x={35} stroke="#f59e0b" strokeDasharray="4 4" />
@@ -146,7 +146,7 @@ export function InequalityTab() {
             >
               <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
               <XAxis type="number" tickFormatter={(v) => `${v}%`} tick={{ fontSize: 11 }} />
-              <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={90} tickFormatter={shortCountryName} />
+              <YAxis type="category" interval={0} dataKey="name" tick={{ fontSize: 11 }} width={90} tickFormatter={shortCountryName} />
               <Tooltip formatter={(v: number) => [`${v?.toFixed(1)}%`, "Poverty $2.15"]} />
               <ReferenceLine x={5} stroke="#10b981" strokeDasharray="4 4" />
               <ReferenceLine x={20} stroke="#f59e0b" strokeDasharray="4 4" />

@@ -89,7 +89,7 @@ export function BusinessTab() {
             >
               <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
               <XAxis type="number" tick={{ fontSize: 11 }} />
-              <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={90} tickFormatter={shortCountryName} />
+              <YAxis type="category" interval={0} dataKey="name" tick={{ fontSize: 11 }} width={90} tickFormatter={shortCountryName} />
               <Tooltip formatter={(v: number) => [`${v?.toFixed(2)}`, "Density"]} />
               <ReferenceLine x={2} stroke="#ef4444" strokeDasharray="4 4" />
               <ReferenceLine x={5} stroke="#10b981" strokeDasharray="4 4" />
@@ -118,7 +118,7 @@ export function BusinessTab() {
             >
               <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
               <XAxis type="number" tickFormatter={(v) => `${v}d`} tick={{ fontSize: 11 }} />
-              <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={90} tickFormatter={shortCountryName} />
+              <YAxis type="category" interval={0} dataKey="name" tick={{ fontSize: 11 }} width={90} tickFormatter={shortCountryName} />
               <Tooltip formatter={(v: number) => [`${v?.toFixed(1)} days`, "Startup Time"]} />
               <ReferenceLine x={5} stroke="#10b981" strokeDasharray="4 4" />
               <ReferenceLine x={20} stroke="#ef4444" strokeDasharray="4 4" />

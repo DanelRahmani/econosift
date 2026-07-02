@@ -220,12 +220,15 @@ async def test_snapshot_fields(monkeypatch):
 # get_indicators / get_regions
 # ---------------------------------------------------------------------------
 
-def test_get_indicators_returns_six():
+def test_get_indicators_returns_full_catalogue():
     from backend.services import atlas_service
 
     result = atlas_service.get_indicators()
     assert "indicators" in result
-    assert len(result["indicators"]) == 6
+    # Should expose the whole INDICATORS catalogue (grows over time — don't
+    # hard-code a count).
+    assert len(result["indicators"]) == len(atlas_service.INDICATORS)
+    assert len(result["indicators"]) >= 6
 
 
 def test_get_indicators_valid_good_directions():
@@ -240,11 +243,13 @@ def test_get_indicators_ids():
     from backend.services import atlas_service
 
     ids = {i["id"] for i in atlas_service.get_indicators()["indicators"]}
-    expected = {
+    # The six core World Bank / IMF indicators must always be present (others
+    # were added in later phases).
+    core = {
         "gdp_growth", "inflation", "unemployment",
         "debt_gdp", "current_account", "gdp_per_capita",
     }
-    assert ids == expected
+    assert core.issubset(ids)
 
 
 def test_get_regions_returns_four():
@@ -317,11 +322,13 @@ def client_with_patches(monkeypatch):
 
 
 def test_router_indicators(client_with_patches):
+    from backend.services import atlas_service
+
     resp = client_with_patches.get("/api/atlas/indicators")
     assert resp.status_code == 200
     data = resp.json()
     assert "indicators" in data
-    assert len(data["indicators"]) == 6
+    assert len(data["indicators"]) == len(atlas_service.INDICATORS)
 
 
 def test_router_regions(client_with_patches):

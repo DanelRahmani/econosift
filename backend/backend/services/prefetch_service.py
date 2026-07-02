@@ -204,6 +204,27 @@ async def _prefetch_one(client: httpx.AsyncClient, label: str, method: str, path
         _prefetch_state["current"] = None
 
 
+def _ensure_bulk_data() -> None:
+    """Start a background bulk-data download if the World Bank parquet files are
+    missing, so Atlas and other bulk-backed views have local data to read.
+
+    Best-effort and non-blocking — the live API fallback covers the gap while
+    the download runs. No-op if bulk data already exists or a run is in flight.
+    """
+    try:
+        from .bulk_data_service import (
+            DATA_DIR as _BULK_DIR,
+            is_bulk_running,
+            refresh_all_bulk_data,
+        )
+        if is_bulk_running() or any(_BULK_DIR.glob("wb_*.parquet")):
+            return
+        logger.info("Prefetch: no World Bank bulk data found — starting background download")
+        asyncio.create_task(asyncio.to_thread(refresh_all_bulk_data))
+    except Exception as exc:
+        logger.warning("Prefetch: bulk-data kickoff failed: %s", exc)
+
+
 async def run_prefetch() -> dict:
     """Run all prefetch tasks with staggered spacing. Returns immediately."""
     if _prefetch_state["running"]:
@@ -229,6 +250,7 @@ async def run_prefetch() -> dict:
 
     async def _runner():
         try:
+            _ensure_bulk_data()  # kick a background bulk download if none present
             async with httpx.AsyncClient() as client:
                 for idx, (label, method, path, params) in enumerate(tasks):
                     await _prefetch_one(client, label, method, path, params)

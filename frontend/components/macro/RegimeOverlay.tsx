@@ -22,6 +22,17 @@ export function RegimeOverlay() {
 
   if (!data) return null;
 
+  // Backend couldn't compute a regime (e.g. FRED series unavailable) — show a
+  // clear reason instead of a broken card with "undefined" fields.
+  if (data.available === false || data.regime == null) {
+    return (
+      <div className="p-4 border border-border rounded-lg mb-6 bg-surface-alt text-text-secondary text-sm">
+        <span className="font-semibold text-text-primary">Macro Regime unavailable.</span>{" "}
+        {data.reason ?? "Underlying macro data could not be loaded."}
+      </div>
+    );
+  }
+
   const palette = QUADRANT_STYLES[data.quadrant] ?? "bg-surface-alt border-border text-text-primary";
   const cpiYoy = data.metrics?.cpi_yoy;
 

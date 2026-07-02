@@ -5,6 +5,7 @@ import { useEffect, useState, useCallback } from "react";
 import { api } from "@/lib/api";
 import type { HealthResponse, PrefetchStatus, BulkDatasetStatus, ConfigResponse } from "@/lib/types";
 import { Card, Skeleton } from "@/components/ui";
+import { useTheme, DEFAULT_COLORS, type ThemeColors } from "@/components/ThemeProvider";
 
 function fmtUptime(sec: number): string {
   const h = Math.floor(sec / 3600);
@@ -30,6 +31,8 @@ export default function AdminPage() {
     }
   }
 
+  const [clearing, setClearing] = useState(false);
+
   const startPrefetch = useCallback(async () => {
     setPfRunning(true);
     try {
@@ -39,6 +42,19 @@ export default function AdminPage() {
       setPfRunning(false);
     }
   }, []);
+
+  // Flush poisoned/stale cache entries, then re-warm from live sources.
+  const clearAndWarm = useCallback(async () => {
+    setClearing(true);
+    try {
+      await api.clearCache();
+      await startPrefetch();
+    } catch {
+      /* surfaced via health refresh */
+    } finally {
+      setClearing(false);
+    }
+  }, [startPrefetch]);
 
   // Poll prefetch status while running
   useEffect(() => {
@@ -75,6 +91,16 @@ export default function AdminPage() {
                 : "border-accent/40 bg-accent text-white hover:bg-accent-light"
             }`}
           >{pfRunning ? "Prefetching…" : "Warm Cache"}</button>
+          <button
+            onClick={clearAndWarm}
+            disabled={pfRunning || clearing}
+            title="Delete all cached data (including empty/stale entries) and re-warm from live sources"
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
+              pfRunning || clearing
+                ? "border-border bg-surface-alt text-text-muted cursor-wait"
+                : "border-warning/40 text-warning hover:bg-warning/10"
+            }`}
+          >{clearing ? "Clearing…" : "Clear cache & re-warm"}</button>
           <button
             onClick={load}
             className="px-3 py-1.5 rounded-lg text-sm font-medium border border-border text-text-secondary hover:text-text-primary hover:bg-surface-alt transition-colors"
@@ -132,6 +158,9 @@ export default function AdminPage() {
 
           {/* API Keys */}
           <ApiKeysSection />
+
+          {/* Appearance / custom theme */}
+          <AppearanceSection />
 
           <Card>
             <h2 className="text-sm font-semibold mb-4 text-text-secondary">Cache Performance by Source</h2>
@@ -209,6 +238,125 @@ function DbStat({ label, value }: { label: string; value: string }) {
       <div className="text-xs text-text-muted mb-0.5">{label}</div>
       <div className="text-sm font-mono text-text-primary">{value}</div>
     </div>
+  );
+}
+
+const HEX_RE = /^#([0-9a-fA-F]{6})$/;
+
+function AppearanceSection() {
+  const { theme, toggle, colors, setColors, resetColors } = useTheme();
+  const [draft, setDraft] = useState<ThemeColors>(colors ?? DEFAULT_COLORS);
+  const [saved, setSaved] = useState(false);
+
+  // Keep the draft in sync when colours load from storage after mount.
+  useEffect(() => {
+    setDraft(colors ?? DEFAULT_COLORS);
+  }, [colors]);
+
+  const valid = HEX_RE.test(draft.primary) && HEX_RE.test(draft.accent);
+
+  function save() {
+    if (!valid) return;
+    setColors(draft);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 1500);
+  }
+
+  function reset() {
+    resetColors();
+    setDraft(DEFAULT_COLORS);
+  }
+
+  const Picker = ({ label, hint, value, onChange }: {
+    label: string; hint: string; value: string; onChange: (v: string) => void;
+  }) => (
+    <div className="flex items-center gap-3">
+      <input
+        type="color"
+        value={HEX_RE.test(value) ? value : "#000000"}
+        onChange={(e) => onChange(e.target.value)}
+        className="h-10 w-12 rounded-lg border border-border bg-transparent cursor-pointer"
+        aria-label={label}
+      />
+      <div className="flex-1">
+        <div className="text-sm text-text-primary">{label}</div>
+        <div className="text-xs text-text-muted">{hint}</div>
+      </div>
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        spellCheck={false}
+        className={`w-28 font-mono text-sm rounded-lg border px-2 py-1.5 bg-surface text-text-primary focus:outline-none ${
+          HEX_RE.test(value) ? "border-border focus:border-accent" : "border-danger"
+        }`}
+      />
+    </div>
+  );
+
+  return (
+    <Card>
+      <div className="flex items-center justify-between mb-1">
+        <h2 className="text-sm font-semibold text-text-secondary">Appearance</h2>
+        {/* Light / Dark base theme */}
+        <div className="flex rounded-lg border border-border overflow-hidden text-xs">
+          <button
+            onClick={() => { if (theme !== "light") toggle(); }}
+            className={`px-3 py-1.5 ${theme === "light" ? "bg-accent text-white" : "text-text-secondary hover:bg-surface-alt"}`}
+          >Light</button>
+          <button
+            onClick={() => { if (theme !== "dark") toggle(); }}
+            className={`px-3 py-1.5 ${theme === "dark" ? "bg-accent text-white" : "text-text-secondary hover:bg-surface-alt"}`}
+          >Dark</button>
+        </div>
+      </div>
+      <p className="text-xs text-text-muted mb-4">
+        Light and dark are the built-in themes. Optionally pick your own brand colours — they apply on top of either theme and are saved on this device.
+      </p>
+
+      <div className="space-y-3 max-w-md">
+        <Picker
+          label="Primary colour"
+          hint="Buttons, active nav, key accents"
+          value={draft.primary}
+          onChange={(v) => setDraft((d) => ({ ...d, primary: v }))}
+        />
+        <Picker
+          label="Accent colour"
+          hint="Hovers, highlights, lighter accents"
+          value={draft.accent}
+          onChange={(v) => setDraft((d) => ({ ...d, accent: v }))}
+        />
+      </div>
+
+      {/* Live preview */}
+      <div className="mt-4 flex items-center gap-3">
+        <span className="text-xs text-text-muted">Preview:</span>
+        <span
+          className="px-3 py-1.5 rounded-lg text-white text-sm font-medium"
+          style={{ backgroundColor: HEX_RE.test(draft.primary) ? draft.primary : undefined }}
+        >Primary</span>
+        <span
+          className="px-3 py-1.5 rounded-lg text-white text-sm font-medium"
+          style={{ backgroundColor: HEX_RE.test(draft.accent) ? draft.accent : undefined }}
+        >Accent</span>
+      </div>
+
+      <div className="mt-4 flex items-center gap-2">
+        <button
+          onClick={save}
+          disabled={!valid}
+          className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
+            valid ? "border-accent/40 bg-accent text-white hover:bg-accent-light" : "border-border text-text-muted cursor-not-allowed"
+          }`}
+        >{saved ? "Saved ✓" : "Apply & save"}</button>
+        <button
+          onClick={reset}
+          className="px-3 py-1.5 rounded-lg text-sm font-medium border border-border text-text-secondary hover:text-text-primary hover:bg-surface-alt transition-colors"
+        >Reset to default</button>
+        {!valid && <span className="text-xs text-danger">Enter valid 6-digit hex colours (e.g. #6b0f1a).</span>}
+      </div>
+    </Card>
   );
 }
 
@@ -470,7 +618,6 @@ function BulkDataSection() {
     imf_weo: "IMF WEO",
     bis: "BIS",
     factbook: "OpenFactbook",
-    reinhart_rogoff: "Reinhart & Rogoff",
     factbook_profiles: "CIA Factbook",
   };
 
@@ -480,7 +627,6 @@ function BulkDataSection() {
     imf_weo: "GDP growth, inflation, unemployment, debt/GDP, current account, GDP/capita — ~190 countries with forecasts",
     bis: "CPI, policy rates, exchange rates, credit gaps, property prices, cross-border banking claims — annual/quarterly",
     factbook: "REST Countries JSON — ~250 countries with ISO codes, flags, languages, currencies",
-    reinhart_rogoff: "Historical sovereign default dataset — 70+ countries, 1800–2019, external + domestic default flags",
     factbook_profiles: "CIA World Factbook country profiles — ~260 countries with Introduction, Geography, People, Government, Economy, Military & more",
   };
 

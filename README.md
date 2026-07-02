@@ -35,7 +35,7 @@ A self-hosted, Dockerised financial analytics platform covering the full investm
 | **Stability** | `/stability` | Currency Crisis Early Warning (KLR), Banking Stability (NPL, Z-scores, BIS credit gaps) |
 | **Cross-Border** | `/crossborder` | BIS locational banking statistics, international debt securities |
 | **Country Profiles** | `/country/{iso2}` | CIA World Factbook data — geography, demographics, economy |
-| **Admin** | `/admin` | Backend health dashboard, cache stats, job execution history, API keys management |
+| **Admin** | `/admin` | Backend health dashboard, cache stats, job execution history, API keys management, "Clear cache & re-warm" recovery, and an **Appearance** panel for custom brand colours (theme maker) |
 
 > **Navigation:** Primary bar (Dashboard · Markets · Screener · Portfolio · Research · Macro · Atlas) is unchanged. The More dropdown is grouped into Discover / Analyze / Markets & Data / Global / Reference sections. **Scenario Lab** is now accessible from the Analyze section of the More dropdown. Beginner/Expert mode toggle is in the navbar. Sectors and Treemap views are embedded as sub-tabs within the Markets page.
 
@@ -56,7 +56,9 @@ Axiom Finance includes a built-in light/dark theme toggle (persisted to `localSt
 | Accent | Deep maroon (`#6b0f1a`) | Crimson (`#c4394a`) |
 | Text | Charcoal (`rgb(15,15,20)`) | Near-white (`rgb(242,242,247)`) |
 
-The maroon/crimson accent is the Axiom brand signature — it provides a distinctive pop against the neutral grey backgrounds in both themes. All chart palettes, borders, and secondary text tokens automatically adapt when toggling themes.
+The maroon/crimson accent is the Axiom brand signature — it provides a distinctive pop against the neutral grey backgrounds in both themes. All chart palettes, tooltips, borders, and secondary text tokens are driven by CSS variables, so they automatically adapt when toggling themes (Recharts tooltips/axes/legends included, for readability in dark mode).
+
+**Custom theme maker.** Beyond the light/dark base themes, **Admin → Appearance** lets you pick your own **Primary** and **Accent** brand colours. They override the `--primary` / `--primary-light` CSS variables on top of either theme, are saved per-device to `localStorage`, and are re-applied before first paint (no flash). "Reset to default" restores the Axiom maroon/crimson.
 
 ---
 
@@ -281,6 +283,7 @@ The backend serves under `/api` (proxied by Nginx). Key endpoint groups:
 | `GET /api/admin/prefetch/status` | Prefetch progress with completion % |
 | `GET /api/admin/bulk-data/status` | Bulk data download status (World Bank, IMF, Fama-French, BIS) |
 | `POST /api/admin/bulk-data/refresh` | Trigger bulk data refresh (runs in background) |
+| `POST /api/admin/cache/clear` | Flush cached data (memory + SQLite); optional `?name=` targets one cache — used by "Clear cache & re-warm" |
 | `GET /api/health` | Health check |
 
 ---
@@ -294,7 +297,7 @@ axiomfinance/
 │   ├── requirements.txt
 │   └── backend/
 │       ├── main.py              # FastAPI entrypoint, router registration
-│       ├── cache.py             # @cached / @async_cached decorators, HybridCache
+│       ├── cache.py             # @cached / @async_cached (skip empties, TTL-enforced), HybridCache, clear_all
 │       ├── database.py          # SQLAlchemy engine + session
 │       ├── db_models.py         # ORM models (DailyPrice, DailyQuote, etc.)
 │       ├── models.py            # Pydantic models

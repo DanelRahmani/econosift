@@ -84,7 +84,7 @@ export function FiscalTab() {
             >
               <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
               <XAxis type="number" tickFormatter={(v) => `${v}%`} tick={{ fontSize: 11 }} />
-              <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={90} tickFormatter={shortCountryName} />
+              <YAxis type="category" interval={0} dataKey="name" tick={{ fontSize: 11 }} width={90} tickFormatter={shortCountryName} />
               <Tooltip formatter={(v: number) => [`${v?.toFixed(1)}%`, "Debt/GDP"]} />
               <ReferenceLine x={60} stroke="#f59e0b" strokeDasharray="4 4" />
               <ReferenceLine x={90} stroke="#ef4444" strokeDasharray="4 4" />
@@ -113,7 +113,7 @@ export function FiscalTab() {
             >
               <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
               <XAxis type="number" tickFormatter={(v) => `${v}%`} tick={{ fontSize: 11 }} />
-              <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={90} tickFormatter={shortCountryName} />
+              <YAxis type="category" interval={0} dataKey="name" tick={{ fontSize: 11 }} width={90} tickFormatter={shortCountryName} />
               <Tooltip formatter={(v: number) => [`${v?.toFixed(1)}%`, "Fiscal Balance"]} />
               <ReferenceLine x={0} stroke="rgba(255,255,255,0.3)" />
               <ReferenceLine x={-3} stroke="#f59e0b" strokeDasharray="4 4" label="Maastricht" />
@@ -143,7 +143,7 @@ export function FiscalTab() {
             >
               <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
               <XAxis type="number" tickFormatter={(v) => `${v}%`} tick={{ fontSize: 11 }} />
-              <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={90} tickFormatter={shortCountryName} />
+              <YAxis type="category" interval={0} dataKey="name" tick={{ fontSize: 11 }} width={90} tickFormatter={shortCountryName} />
               <Tooltip formatter={(v: number) => [`${v?.toFixed(1)}%`, "Tax Revenue"]} />
               <ReferenceLine x={15} stroke="#f59e0b" strokeDasharray="4 4" />
               <ReferenceLine x={25} stroke="#10b981" strokeDasharray="4 4" />

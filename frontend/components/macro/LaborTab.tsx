@@ -84,7 +84,7 @@ export function LaborTab() {
             >
               <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
               <XAxis type="number" tickFormatter={(v) => `${v}%`} tick={{ fontSize: 11 }} />
-              <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={90} tickFormatter={shortCountryName} />
+              <YAxis type="category" interval={0} dataKey="name" tick={{ fontSize: 11 }} width={90} tickFormatter={shortCountryName} />
               <Tooltip formatter={(v: number) => [`${v?.toFixed(1)}%`, "LFPR"]} />
               <ReferenceLine x={65} stroke="#10b981" strokeDasharray="4 4" />
               <ReferenceLine x={55} stroke="#f59e0b" strokeDasharray="4 4" />
@@ -113,7 +113,7 @@ export function LaborTab() {
             >
               <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
               <XAxis type="number" tickFormatter={(v) => `${v}%`} tick={{ fontSize: 11 }} />
-              <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={90} tickFormatter={shortCountryName} />
+              <YAxis type="category" interval={0} dataKey="name" tick={{ fontSize: 11 }} width={90} tickFormatter={shortCountryName} />
               <Tooltip formatter={(v: number) => [`${v?.toFixed(1)}%`, "Youth Unemp"]} />
               <ReferenceLine x={10} stroke="#10b981" strokeDasharray="4 4" />
               <ReferenceLine x={20} stroke="#f59e0b" strokeDasharray="4 4" />
@@ -142,7 +142,7 @@ export function LaborTab() {
             >
               <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
               <XAxis type="number" tickFormatter={(v) => `${v}%`} tick={{ fontSize: 11 }} />
-              <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={90} tickFormatter={shortCountryName} />
+              <YAxis type="category" interval={0} dataKey="name" tick={{ fontSize: 11 }} width={90} tickFormatter={shortCountryName} />
               <Tooltip formatter={(v: number) => [`${v?.toFixed(1)}%`, "Emp/Pop"]} />
               <ReferenceLine x={60} stroke="#10b981" strokeDasharray="4 4" />
               <ReferenceLine x={50} stroke="#f59e0b" strokeDasharray="4 4" />
@@ -171,7 +171,7 @@ export function LaborTab() {
             >
               <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
               <XAxis type="number" tickFormatter={(v) => `${v}%`} tick={{ fontSize: 11 }} />
-              <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={90} tickFormatter={shortCountryName} />
+              <YAxis type="category" interval={0} dataKey="name" tick={{ fontSize: 11 }} width={90} tickFormatter={shortCountryName} />
               <Tooltip formatter={(v: number) => [`${v?.toFixed(1)}%`, "Vulnerable Emp"]} />
               <ReferenceLine x={10} stroke="#10b981" strokeDasharray="4 4" />
               <ReferenceLine x={30} stroke="#f59e0b" strokeDasharray="4 4" />

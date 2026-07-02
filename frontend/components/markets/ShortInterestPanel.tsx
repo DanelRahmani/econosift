@@ -152,7 +152,7 @@ export function ShortInterestPanel() {
             >
               <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
               <XAxis type="number" tickFormatter={(v) => `${v}%`} tick={{ fontSize: 11 }} />
-              <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={90} />
+              <YAxis type="category" interval={0} dataKey="name" tick={{ fontSize: 11 }} width={90} />
               <Tooltip formatter={(v: number) => [`${v?.toFixed(1)}%`, "Avg Short Float"]} />
               <Bar dataKey="value" radius={[0, 4, 4, 0]}>
                 {sectorSummary.map((s) => (

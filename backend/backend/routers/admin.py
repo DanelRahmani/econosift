@@ -167,6 +167,21 @@ async def bulk_data_refresh():
 
 
 # ---------------------------------------------------------------------------
+# Cache — flush poisoned/stale entries so data re-fetches fresh
+# ---------------------------------------------------------------------------
+
+@router.post("/cache/clear")
+async def clear_cache(name: str | None = None):
+    """Flush cached data (memory + SQLite). Optional ``name`` targets one cache.
+
+    Use after fixing API keys or when a transient source failure left empty
+    entries cached. Follow with POST /admin/prefetch to re-warm.
+    """
+    cleared = cache.clear_all(name)
+    return {"status": "cleared", "cleared": cleared}
+
+
+# ---------------------------------------------------------------------------
 # Config — view / update API keys in .env
 # ---------------------------------------------------------------------------
 
@@ -348,6 +363,13 @@ async def update_config(body: _ConfigUpdate):
 
     if updated_any:
         _write_env(content)
+        # Purge cached data so any empty/poisoned entries written before the key
+        # was valid are dropped and re-fetched (a restart is still required for
+        # the import-bound config.FRED_API_KEY to pick up the new value).
+        try:
+            cache.clear_all()
+        except Exception:
+            pass
 
     return {
         "fredApiKey": _mask_key(body.fredApiKey if body.fredApiKey is not None else FRED_API_KEY),

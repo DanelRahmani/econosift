@@ -74,7 +74,7 @@ export function BankingStabilityPanel() {
             >
               <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
               <XAxis type="number" tickFormatter={(v) => `${v}%`} tick={{ fontSize: 11 }} />
-              <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={95} tickFormatter={shortCountryName} />
+              <YAxis type="category" interval={0} dataKey="name" tick={{ fontSize: 11 }} width={95} tickFormatter={shortCountryName} />
               <Tooltip formatter={(v: number) => [`${v?.toFixed(1)}%`, "NPL Ratio"]} />
               <ReferenceLine x={5} stroke="#10b981" strokeDasharray="4 4" />
               <ReferenceLine x={10} stroke="#ef4444" strokeDasharray="4 4" />
@@ -103,7 +103,7 @@ export function BankingStabilityPanel() {
               >
                 <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
                 <XAxis type="number" tickFormatter={(v) => `${v}%`} tick={{ fontSize: 10 }} />
-                <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={95} tickFormatter={shortCountryName} />
+                <YAxis type="category" interval={0} dataKey="name" tick={{ fontSize: 10 }} width={95} tickFormatter={shortCountryName} />
                 <Tooltip formatter={(v: number) => [`${v?.toFixed(1)}%`, "Capital/Assets"]} />
                 <ReferenceLine x={8} stroke="#10b981" strokeDasharray="4 4" />
                 <ReferenceLine x={6} stroke="#f59e0b" strokeDasharray="4 4" />
@@ -126,7 +126,7 @@ export function BankingStabilityPanel() {
               >
                 <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
                 <XAxis type="number" tickFormatter={(v) => `${v}`} tick={{ fontSize: 10 }} />
-                <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={95} tickFormatter={shortCountryName} />
+                <YAxis type="category" interval={0} dataKey="name" tick={{ fontSize: 10 }} width={95} tickFormatter={shortCountryName} />
                 <Tooltip formatter={(v: number) => [`${v?.toFixed(1)}`, "Z-Score"]} />
                 <ReferenceLine x={20} stroke="#10b981" strokeDasharray="4 4" />
                 <ReferenceLine x={10} stroke="#f59e0b" strokeDasharray="4 4" />

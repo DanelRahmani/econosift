@@ -5,6 +5,15 @@
 
 ---
 
+## Cache poisoning fix + macro/Atlas data resilience + theming (2026-07-02)
+
+- **Cache poisoning fixed (root cause of missing Atlas GDP + blank macro tabs):** the SQLite cache tier ignored TTL and served empty/failed payloads forever. `HybridCache._get_from_db` now enforces `ttl_sec` (expired rows deleted → re-fetch), and `cached`/`async_cached` never persist empty results (new `skip_if` guard, defaults to an empty-container check). Existing poisoned entries self-heal on next run.
+- **Atlas hardened:** `atlas_service` WB fetch is now bulk-first (parquet) with a live `wbgapi` fallback; `get_timeline` skips caching all-null results; prefetch kicks a background bulk download if none is present.
+- **Admin:** new `POST /admin/cache/clear` + "Clear cache & re-warm" button; saving API keys now purges caches. `macro_regime` returns an explicit `available:false` (with reason) instead of fabricating a "Deflationary" regime on missing FRED data; `RegimeOverlay` shows a clear degraded state.
+- **UI fixes:** country-name labels on all horizontal bar charts now render in full (`interval={0}` on the category axis — Housing, Fiscal, Labor, Energy, Inequality, Business, Financial Conditions, Banking Stability, Short Interest); Recharts tooltips/axes/legends themed via CSS variables so they're readable in dark mode.
+- **Custom theme maker:** Admin → Appearance lets users pick Primary + Accent brand colours on top of the light/dark base themes, applied via CSS variables, persisted in localStorage, and applied pre-paint (no flash). `ThemeProvider` extended with `colors`/`setColors`/`resetColors`.
+- **P3-12 resolved:** removed the dead Reinhart-Rogoff bulk download (404); the sovereign model already uses bundled R&R data.
+
 ## Gated desktop release flow — main → PRODUCTION (2026-07-01)
 
 - `main` is now feature-development only: `build-windows.yml` no longer builds on `main`/PRs — it triggers on `PRODUCTION` pushes, `v*` tags, and manual dispatch.

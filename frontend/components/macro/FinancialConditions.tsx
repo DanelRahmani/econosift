@@ -353,7 +353,7 @@ export function FinancialConditions() {
             >
               <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
               <XAxis type="number" tickFormatter={(v) => `${v}pp`} tick={{ fontSize: 11 }} />
-              <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} />
+              <YAxis type="category" interval={0} dataKey="name" tick={{ fontSize: 11 }} />
               <Tooltip formatter={(v: number) => [`${v?.toFixed(2)} pp`, "Credit-to-GDP Gap"]} />
               <ReferenceLine x={10} stroke="#ef4444" strokeDasharray="4 4" label="BIS threshold" />
               <ReferenceLine x={2} stroke="#f59e0b" strokeDasharray="4 4" />

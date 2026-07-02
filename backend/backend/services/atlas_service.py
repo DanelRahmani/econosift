@@ -250,15 +250,46 @@ def _wb_fetch_sync(series_id: str, start: int, end: int) -> dict[str, dict[int, 
     return out
 
 
+def _wb_bulk_sync(indicator: str, start: int, end: int) -> dict[str, dict[int, float]]:
+    """Read the locally-downloaded World Bank parquet -> {iso3: {year: value}}.
+
+    Returns ``{}`` when the bulk file for this indicator isn't present (only the
+    core indicators in ``bulk_data_service.WB_INDICATORS`` are downloaded), so
+    the caller falls back to a live wbgapi call.
+    """
+    from .bulk_data_service import load_worldbank
+
+    iso3_list = [c["iso3"] for c in _country_universe()]
+    df = load_worldbank(indicator, iso3_list, start, end)
+    out: dict[str, dict[int, float]] = {}
+    if df is None or df.empty:
+        return out
+    for _, row in df.iterrows():
+        try:
+            iso3 = str(row["iso3"])
+            out.setdefault(iso3, {})[int(row["year"])] = float(row["value"])
+        except (ValueError, TypeError, KeyError):
+            continue
+    return out
+
+
 @async_cached("atlas_wb_timeline")
 async def _wb_timeline(indicator: str, start: int, end: int) -> dict[str, dict[int, float]]:
     series_id = _WB_CODES.get(indicator)
     if not series_id:
         return {}
+    # Bulk-first (fast + offline-resilient), then live wbgapi fallback — mirrors
+    # the pattern in sources/source_worldbank.fetch().
+    try:
+        bulk = await asyncio.to_thread(_wb_bulk_sync, indicator, start, end)
+        if bulk:
+            return bulk
+    except Exception:
+        logger.exception("atlas _wb_timeline bulk read failed for %s", indicator)
     try:
         return await asyncio.to_thread(_wb_fetch_sync, series_id, start, end)
     except Exception:
-        logger.exception("atlas _wb_timeline failed for %s", indicator)
+        logger.exception("atlas _wb_timeline live fetch failed for %s", indicator)
         return {}
 
 
@@ -317,7 +348,21 @@ async def _imf_timeline(indicator: str, start: int, end: int) -> dict[str, dict[
 # Public API
 # ---------------------------------------------------------------------------
 
-@async_cached("atlas_timeline")
+def _timeline_all_null(result) -> bool:
+    """Empty if no country carries a single non-null value (don't cache it)."""
+    if not isinstance(result, dict):
+        return True
+    countries = result.get("countries") or []
+    if not countries:
+        return True
+    for c in countries:
+        for v in (c.get("values") or {}).values():
+            if v is not None:
+                return False
+    return True
+
+
+@async_cached("atlas_timeline", skip_if=_timeline_all_null)
 async def get_timeline(indicator: str, start: int = 2000, end: int = 2024) -> dict:
     """Return full timeline for all countries for the given indicator."""
     if indicator not in _INDICATOR_IDS:

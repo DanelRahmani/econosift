@@ -59,7 +59,12 @@ def _cpi_yoy(pts: list[dict]) -> float | None:
     return None
 
 
-@async_cached("macro_regime")
+def _regime_unavailable(result) -> bool:
+    """Don't cache a regime we couldn't actually compute from live data."""
+    return isinstance(result, dict) and result.get("available") is False
+
+
+@async_cached("macro_regime", skip_if=_regime_unavailable)
 async def get_macro_regime() -> dict:
     data = await mes.fetch_fred_series(_SERIES, _START)
     lei   = data.get("USALOLITONOSTSAM", [])
@@ -67,6 +72,15 @@ async def get_macro_regime() -> dict:
     ff    = data.get("FEDFUNDS", [])
     dgs10 = data.get("DGS10", [])
     dgs2  = data.get("DGS2", [])
+
+    # If the core growth/inflation series didn't come back, don't fabricate a
+    # regime (an empty fetch would otherwise classify as "Deflationary" with
+    # null metrics). Surface it so the UI can show a real reason.
+    if not cpi and not lei:
+        return {
+            "available": False,
+            "reason": "FRED macro series unavailable — check the FRED API key in Admin, then use “Clear cache & re-warm”.",
+        }
 
     lei_cur = _latest(lei)
     lei_3m  = _val_n_months_ago(lei, 3)
@@ -94,6 +108,7 @@ async def get_macro_regime() -> dict:
     spread = round(d10 - d2, 4) if d10 and d2 else None
 
     return {
+        "available": True,
         "regime": regime,
         "quadrant": _REGIME_QUADRANT[regime],
         "growth_z": round(growth_z, 2) if growth_z is not None else None,

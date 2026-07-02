@@ -166,6 +166,9 @@ export const api = {
   bulkDataRefresh: () =>
     post<{ status: string; datasets: Record<string, { rows: number; error: string | null }> }>(`/admin/bulk-data/refresh`, {}),
 
+  clearCache: () =>
+    post<{ status: string; cleared: { entries: number; memory_caches: number } }>(`/admin/cache/clear`, {}),
+
   config: () =>
     get<ConfigResponse>(`/admin/config`),
 

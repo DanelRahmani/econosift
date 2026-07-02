@@ -65,7 +65,7 @@ export function InflationTab() {
   if (error || !data) {
     return (
       <div className="text-text-secondary text-sm py-8 text-center">
-        Inflation data unavailable — backend endpoint not yet implemented.
+        Inflation data unavailable — check the FRED API key in Admin, then use “Clear cache &amp; re-warm”.
       </div>
     );
   }
