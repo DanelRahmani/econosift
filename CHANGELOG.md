@@ -5,6 +5,11 @@
 
 ---
 
+## Phase 38a — Event-loop hygiene: threadpool offloading + cache single-flight (2026-07-02)
+
+- **Event-loop blocking fixed:** sync yfinance/pandas/SQLite work in `async def` routes now runs via `asyncio.to_thread` — `research.py` (all 6 sync quant endpoints), `sector.py` (all 4), `portfolio.py` (11 heavy `port.*` computations incl. frontier/Monte Carlo/Black-Litterman/Fama-French download), `ai.py` (SQLite lookups + `_save` retry loop that could `time.sleep` up to ~15s on the loop). One slow upstream call no longer stalls every concurrent request. `macro.py`/`atlas.py` audited — already clean (async services or pure in-memory).
+- **Sync `cached()` single-flight:** per-cache `threading.Lock` with double-checked locking (mirrors `async_cached`) — cold-cache thundering herd against rate-limited APIs eliminated.
+
 ## Phase 37 — Fix-it sprint: COT data, error boundaries, UI consistency, desktop logging (2026-07-02)
 
 - **P2-22 COT/Positioning fixed:** CFTC Socrata API primary source with exact contract codes + parse-validated source waterfall (headerless `deafut.txt` no longer accepted as "success"); failure envelopes never cached (`skip_if`); PositioningTab empty/stale states. 8 new tests. **P2-19 closed** (verified fixed in the prior cache-poisoning commit).

@@ -7,6 +7,8 @@ Three quantitative-research tools backed by existing data infrastructure:
 """
 from __future__ import annotations
 
+import asyncio
+
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
@@ -43,10 +45,10 @@ async def post_risk_parity(req: RiskParityRequest):
         raise HTTPException(status_code=400, detail="at least 2 tickers required")
     try:
         if req.backtest:
-            return rp.risk_parity_backtest(tickers, req.period, req.mode)
+            return await asyncio.to_thread(rp.risk_parity_backtest, tickers, req.period, req.mode)
         if req.mode == "invvol":
-            return rp.inverse_vol_weights(tickers, req.period)
-        return rp.erc_weights(tickers, req.period)
+            return await asyncio.to_thread(rp.inverse_vol_weights, tickers, req.period)
+        return await asyncio.to_thread(rp.erc_weights, tickers, req.period)
     except Exception as exc:  # pragma: no cover - defensive
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
@@ -58,8 +60,8 @@ async def get_carry(
 ):
     try:
         if backtest:
-            return carry_service.get_carry_backtest(period)
-        return carry_service.get_carry_table(period)
+            return await asyncio.to_thread(carry_service.get_carry_backtest, period)
+        return await asyncio.to_thread(carry_service.get_carry_table, period)
     except Exception as exc:  # pragma: no cover - defensive
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
@@ -70,7 +72,7 @@ async def get_momentum(
     signal: str = Query("12m1m", pattern="^(1m|3m|6m|12m1m)$"),
 ):
     try:
-        return momentum_service.get_momentum(universe, signal)
+        return await asyncio.to_thread(momentum_service.get_momentum, universe, signal)
     except Exception as exc:  # pragma: no cover - defensive
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
@@ -81,7 +83,7 @@ async def get_moments(
     period: str = Query("3y", pattern=r"^(1y|2y|3y|5y|10y|max)$"),
 ):
     try:
-        return realized_moments_service.get_moments(ticker.strip().upper(), period)
+        return await asyncio.to_thread(realized_moments_service.get_moments, ticker.strip().upper(), period)
     except Exception as exc:  # pragma: no cover - defensive
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
@@ -92,7 +94,7 @@ async def get_moments_crosssection(
     window: int = Query(21, ge=5, le=126),
 ):
     try:
-        return realized_moments_service.get_crosssection(universe, window)
+        return await asyncio.to_thread(realized_moments_service.get_crosssection, universe, window)
     except Exception as exc:  # pragma: no cover - defensive
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
@@ -101,7 +103,7 @@ async def get_moments_crosssection(
 async def get_dupont():
     """Sector DuPont decomposition — median margin / turnover / leverage / ROE per GICS sector."""
     try:
-        return dupont_service.get_sector_dupont()
+        return await asyncio.to_thread(dupont_service.get_sector_dupont)
     except Exception as exc:  # pragma: no cover - defensive
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 

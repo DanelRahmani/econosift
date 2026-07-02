@@ -107,11 +107,11 @@ async def analyze(req: PortfolioRequest):
     frame.index = pd.to_datetime(frame.index)
     bench_series = frame[bench] if bench in frame.columns else None
 
-    result = port.analyze(frame, holdings, bench_series, req.risk_free)
+    result = await asyncio.to_thread(port.analyze, frame, holdings, bench_series, req.risk_free)
     result["benchmark"] = bench
 
     # Add benchmark comparison series (base-100 ^GSPC / AGG)
-    result["benchmarkSeries"] = port.benchmark_series(frame, req.period)
+    result["benchmarkSeries"] = await asyncio.to_thread(port.benchmark_series, frame, req.period)
 
     return result
 
@@ -165,7 +165,7 @@ async def correlation(req: PortfolioRequest):
     if frame is None:
         return _empty()
 
-    return port.correlation_matrix(holdings, frame)
+    return await asyncio.to_thread(port.correlation_matrix, holdings, frame)
 
 
 @router.post("/risk-contribution")
@@ -179,7 +179,7 @@ async def risk_contribution(req: PortfolioRequest):
     if frame is None:
         return _empty()
 
-    return port.risk_contribution(holdings, frame)
+    return await asyncio.to_thread(port.risk_contribution, holdings, frame)
 
 
 @router.post("/capm")
@@ -195,7 +195,7 @@ async def capm(req: PortfolioRequest):
     if frame is None:
         return _empty()
 
-    return port.capm_attribution(holdings, frame, bench, req.risk_free)
+    return await asyncio.to_thread(port.capm_attribution, holdings, frame, bench, req.risk_free)
 
 
 @router.post("/rolling")
@@ -211,7 +211,7 @@ async def rolling(req: RollingRequest):
     if frame is None:
         return _empty()
 
-    return port.rolling_portfolio_metrics(holdings, frame, bench, req.risk_free, req.window)
+    return await asyncio.to_thread(port.rolling_portfolio_metrics, holdings, frame, bench, req.risk_free, req.window)
 
 
 @router.post("/kelly")
@@ -225,7 +225,7 @@ async def kelly(req: PortfolioRequest):
     if frame is None:
         return _empty()
 
-    return port.kelly_criterion(holdings, frame)
+    return await asyncio.to_thread(port.kelly_criterion, holdings, frame)
 
 
 @router.post("/ff")
@@ -239,7 +239,7 @@ async def fama_french(req: FFRequest):
     if frame is None:
         return _empty()
 
-    return port.ff_attribution_portfolio(holdings, frame, req.model, req.risk_free)
+    return await asyncio.to_thread(port.ff_attribution_portfolio, holdings, frame, req.model, req.risk_free)
 
 
 @router.post("/frontier")
@@ -253,7 +253,7 @@ async def frontier(req: PortfolioRequest):
     if frame is None:
         return _empty()
 
-    return port.efficient_frontier(holdings, frame)
+    return await asyncio.to_thread(port.efficient_frontier, holdings, frame)
 
 
 @router.post("/montecarlo")
@@ -267,7 +267,7 @@ async def montecarlo(req: PortfolioRequest):
     if frame is None:
         return _empty()
 
-    return port.monte_carlo_weights(holdings, frame)
+    return await asyncio.to_thread(port.monte_carlo_weights, holdings, frame)
 
 
 @router.post("/blacklitterman")
@@ -283,7 +283,7 @@ async def black_litterman(req: BLRequest):
 
     views = [{"ticker": v.ticker.strip().upper(), "expectedReturn": v.expectedReturn}
              for v in req.views]
-    return port.black_litterman(holdings, frame, views, req.risk_free)
+    return await asyncio.to_thread(port.black_litterman, holdings, frame, views, req.risk_free)
 
 
 @router.post("/stress")
@@ -300,7 +300,7 @@ async def stress(req: PortfolioRequest):
     if frame is None:
         return _empty()
 
-    return port.stress_test_portfolio(holdings, frame, bench)
+    return await asyncio.to_thread(port.stress_test_portfolio, holdings, frame, bench)
 
 
 # ---------------------------------------------------------------------------

@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import functools
 import json
+import threading
 import time
 from datetime import datetime, timezone
 from cachetools import TTLCache
@@ -19,6 +20,7 @@ def _utcnow() -> datetime:
 
 _caches: dict[str, TTLCache] = {}
 _locks: dict[str, asyncio.Lock] = {}
+_sync_locks: dict[str, threading.Lock] = {}
 # Registry of live HybridCache instances so clear_all() can flush their
 # private in-memory tier (the decorators keep two memory layers + the DB).
 _hybrid_caches: list["HybridCache"] = []
@@ -85,6 +87,7 @@ def cached(name: str | None = None, skip_if=None):
     def decorator(func):
         cache_name = name or func.__qualname__
         _get_cache(cache_name)  # ensure the in-memory cache exists
+        lock = _sync_locks.setdefault(cache_name, threading.Lock())
         persistent = HybridCache(cache_name, ttl_sec=_CACHE_TTL, maxsize=_CACHE_MAXSIZE)
         is_empty = skip_if or _is_empty_result
 
@@ -96,21 +99,28 @@ def cached(name: str | None = None, skip_if=None):
                 _record(cache_name, True)
                 return cache[raw_key]
 
-            # Tier 2: SQLite (survives restarts)
-            str_key = _json.dumps(raw_key, default=str, sort_keys=True)
-            db_val = persistent.get(str_key)
-            if db_val is not None:
-                _record(cache_name, True)
-                cache[raw_key] = db_val  # promote to memory
-                return db_val
+            # Single-flight: on a cold cache, concurrent callers would each hit
+            # the upstream source (thundering herd against rate-limited APIs).
+            with lock:
+                if raw_key in cache:
+                    _record(cache_name, True)
+                    return cache[raw_key]
 
-            _record(cache_name, False)
-            result = func(*args, **kwargs)
-            if is_empty(result):
-                return result  # don't cache empty/failed results
-            cache[raw_key] = result
-            persistent.set(str_key, result)  # persist to DB
-            return result
+                # Tier 2: SQLite (survives restarts)
+                str_key = _json.dumps(raw_key, default=str, sort_keys=True)
+                db_val = persistent.get(str_key)
+                if db_val is not None:
+                    _record(cache_name, True)
+                    cache[raw_key] = db_val  # promote to memory
+                    return db_val
+
+                _record(cache_name, False)
+                result = func(*args, **kwargs)
+                if is_empty(result):
+                    return result  # don't cache empty/failed results
+                cache[raw_key] = result
+                persistent.set(str_key, result)  # persist to DB
+                return result
 
         return wrapper
 

@@ -6,6 +6,7 @@ This eliminates yfinance rate-limit bottlenecks entirely.
 
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -56,6 +57,12 @@ def _lookup(session, summary_type: str, context_key: str) -> AiSummary | None:
         .order_by(AiSummary.created_at.desc())
         .first()
     )
+
+
+def _cached_lookup(summary_type: str, context_key: str) -> AiSummary | None:
+    """Session-owning lookup, safe to run in a worker thread."""
+    with SessionLocal() as session:
+        return _lookup(session, summary_type, context_key)
 
 
 def _save(summary_type: str, context_key: str, model: str, prompt: str, text: str) -> None:
@@ -110,16 +117,15 @@ async def ai_company(body: CompanyRequest):
     if not ticker:
         raise HTTPException(status_code=400, detail="Ticker is required.")
 
-    with SessionLocal() as session:
-        if not body.force_regenerate:
-            cached = _lookup(session, "company", ticker)
-            if cached and cached.summary_text and not cached.summary_text.startswith("Error:"):
-                return _response("company", ticker, cached.model_used, cached.summary_text, True)
+    if not body.force_regenerate:
+        cached = await asyncio.to_thread(_cached_lookup, "company", ticker)
+        if cached and cached.summary_text and not cached.summary_text.startswith("Error:"):
+            return _response("company", ticker, cached.model_used, cached.summary_text, True)
 
-        prompt = ai_service.build_company_prompt(ticker)
-        result = await ai_service.generate_summary(prompt, body.model)
-        _save("company", ticker, body.model, prompt, result)
-        return _response("company", ticker, body.model, result, False)
+    prompt = ai_service.build_company_prompt(ticker)
+    result = await ai_service.generate_summary(prompt, body.model)
+    await asyncio.to_thread(_save, "company", ticker, body.model, prompt, result)
+    return _response("company", ticker, body.model, result, False)
 
 
 @router.post("/macro")
@@ -130,44 +136,45 @@ async def ai_macro(body: MacroRequest):
     iso_list = [c.strip().upper() for c in body.countries]
     context_key = ",".join(sorted(iso_list))
 
-    with SessionLocal() as session:
-        if not body.force_regenerate:
-            cached = _lookup(session, "macro", context_key)
-            if cached and cached.summary_text and not cached.summary_text.startswith("Error:"):
-                return _response("macro", context_key, cached.model_used, cached.summary_text, True)
+    if not body.force_regenerate:
+        cached = await asyncio.to_thread(_cached_lookup, "macro", context_key)
+        if cached and cached.summary_text and not cached.summary_text.startswith("Error:"):
+            return _response("macro", context_key, cached.model_used, cached.summary_text, True)
 
-        prompt = ai_service.build_macro_prompt(iso_list)
-        result = await ai_service.generate_summary(prompt, body.model)
-        _save("macro", context_key, body.model, prompt, result)
-        return _response("macro", context_key, body.model, result, False)
+    prompt = ai_service.build_macro_prompt(iso_list)
+    result = await ai_service.generate_summary(prompt, body.model)
+    await asyncio.to_thread(_save, "macro", context_key, body.model, prompt, result)
+    return _response("macro", context_key, body.model, result, False)
 
 
 @router.post("/dashboard")
 async def ai_dashboard(body: DashboardRequest):
-    with SessionLocal() as session:
-        if not body.force_regenerate:
-            cached = _lookup(session, "dashboard", "daily")
-            if cached and cached.summary_text and not cached.summary_text.startswith("Error:"):
-                return _response("dashboard", "daily", cached.model_used, cached.summary_text, True)
+    if not body.force_regenerate:
+        cached = await asyncio.to_thread(_cached_lookup, "dashboard", "daily")
+        if cached and cached.summary_text and not cached.summary_text.startswith("Error:"):
+            return _response("dashboard", "daily", cached.model_used, cached.summary_text, True)
 
-        prompt = ai_service.build_dashboard_prompt()
-        result = await ai_service.generate_summary(prompt, body.model)
-        _save("dashboard", "daily", body.model, prompt, result)
-        return _response("dashboard", "daily", body.model, result, False)
+    prompt = ai_service.build_dashboard_prompt()
+    result = await ai_service.generate_summary(prompt, body.model)
+    await asyncio.to_thread(_save, "dashboard", "daily", body.model, prompt, result)
+    return _response("dashboard", "daily", body.model, result, False)
 
 
 @router.get("/history/{summary_type}/{context_key}")
 async def ai_history(summary_type: str, context_key: str):
-    with SessionLocal() as session:
-        rows = (
-            session.query(AiSummary)
-            .filter(AiSummary.summary_type == summary_type, AiSummary.context_key == context_key)
-            .order_by(AiSummary.created_at.desc())
-            .limit(20)
-            .all()
-        )
-        items = [
-            AiHistoryItem(id=r.id or 0, summary_text=r.summary_text, model_used=r.model_used, created_at=r.created_at.isoformat() if r.created_at else "")
-            for r in rows
-        ]
-        return {"items": [i.model_dump() for i in items]}
+    def _fetch() -> list[AiHistoryItem]:
+        with SessionLocal() as session:
+            rows = (
+                session.query(AiSummary)
+                .filter(AiSummary.summary_type == summary_type, AiSummary.context_key == context_key)
+                .order_by(AiSummary.created_at.desc())
+                .limit(20)
+                .all()
+            )
+            return [
+                AiHistoryItem(id=r.id or 0, summary_text=r.summary_text, model_used=r.model_used, created_at=r.created_at.isoformat() if r.created_at else "")
+                for r in rows
+            ]
+
+    items = await asyncio.to_thread(_fetch)
+    return {"items": [i.model_dump() for i in items]}
