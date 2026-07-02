@@ -5,7 +5,9 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from '@/lib/queryClient';
 import { LearningProvider } from '@/lib/learningContext';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+// Relative by default (Docker/web hit /api via nginx); the Tauri desktop build
+// sets NEXT_PUBLIC_API_URL=http://localhost:8000 in .env.production.
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
 
 /**
  * Desktop startup gate.

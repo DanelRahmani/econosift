@@ -45,7 +45,9 @@ import type {
   CrossAssetCorrelation, FxMacroLinkResponse, MultiCountryPortfolio, MultiCountryHoldingInput,
 } from "./types";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+// Relative by default (Docker/web hit /api via nginx); the Tauri desktop build
+// sets NEXT_PUBLIC_API_URL=http://localhost:8000 in .env.production.
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
 async function get<T>(path: string): Promise<T> {
   const res = await fetch(`${API_BASE}/api${path}`, { cache: "no-store" });

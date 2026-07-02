@@ -12,6 +12,9 @@ COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 # next.config.js defaults to the desktop static export; Docker needs standalone
 ENV NEXT_OUTPUT_MODE=standalone
+# Blank out the desktop API base from .env.production (already-set env vars win
+# over .env files) so the Docker bundle uses relative /api URLs via nginx
+ENV NEXT_PUBLIC_API_URL=""
 RUN npm run build
 
 # ---- runner ----
