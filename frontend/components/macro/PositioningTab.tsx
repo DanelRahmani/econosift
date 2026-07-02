@@ -65,7 +65,7 @@ export function PositioningTab() {
     );
   }
 
-  if (error || !data || data.error) {
+  if (error || !data || data.error || data.contracts.length === 0) {
     return (
       <div className="space-y-4">
         <Card className="p-6 text-center">
@@ -74,7 +74,7 @@ export function PositioningTab() {
           </h3>
           <p className="text-text-secondary text-sm">
             {data?.error ??
-              "COT data unavailable — backend endpoint not yet implemented."}
+              "COT data unavailable — the CFTC source returned no parseable contracts. It will be retried automatically."}
           </p>
           <p className="text-xs text-text-secondary mt-2">
             Source: CFTC Disaggregated Reports (published weekly)
@@ -83,6 +83,12 @@ export function PositioningTab() {
       </div>
     );
   }
+
+  // COT is published weekly; flag the data as stale if it is >2 weeks old.
+  const asOfAgeDays = data.asOf
+    ? Math.floor((Date.now() - new Date(data.asOf).getTime()) / 86_400_000)
+    : null;
+  const isStale = asOfAgeDays != null && asOfAgeDays > 14;
 
   return (
     <div className="space-y-6">
@@ -94,6 +100,12 @@ export function PositioningTab() {
           Weekly CFTC data. Large speculator net positioning for key futures
           contracts. Source: {data.source}
           {data.asOf ? ` · as of ${data.asOf}` : ""}
+          {isStale && (
+            <span className="text-warning">
+              {" "}
+              · stale — no update in {asOfAgeDays} days
+            </span>
+          )}
         </p>
       </div>
 

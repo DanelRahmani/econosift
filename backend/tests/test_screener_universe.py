@@ -123,9 +123,9 @@ class TestPassesPreset:
 
     def test_high_dividend(self):
         from backend.services.screener_service import _passes_preset
-        # dividendYield stored as fraction; 0.04 = 4% → passes
-        assert _passes_preset(self._row(dividendYield=0.04), "high_dividend") is True
-        assert _passes_preset(self._row(dividendYield=0.02), "high_dividend") is False
+        # dividendYield stored in percent units (BUG-A2); 4.0 = 4% → passes
+        assert _passes_preset(self._row(dividendYield=4.0), "high_dividend") is True
+        assert _passes_preset(self._row(dividendYield=2.0), "high_dividend") is False
 
     def test_high_roic(self):
         from backend.services.screener_service import _passes_preset

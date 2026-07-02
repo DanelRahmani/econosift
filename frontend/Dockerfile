@@ -10,6 +10,8 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
+# next.config.js defaults to the desktop static export; Docker needs standalone
+ENV NEXT_OUTPUT_MODE=standalone
 RUN npm run build
 
 # ---- runner ----

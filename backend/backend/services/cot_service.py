@@ -6,7 +6,6 @@ import io
 import logging
 import zipfile
 from datetime import date
-from io import StringIO
 
 import pandas as pd
 import requests
@@ -15,14 +14,23 @@ from ..cache import async_cached
 
 log = logging.getLogger(__name__)
 
-COT_URLS = [
-    "https://www.cftc.gov/dea/newcot/deafut.txt",  # live weekly futures-only
-    "https://www.cftc.gov/files/dea/history/fut_fin_xls_2026.zip",
-    "https://www.cftc.gov/dcom/files/dcotnoc.zip",  # legacy format
-]
+# Primary source: CFTC's Socrata open-data API (stable JSON schema).
+# Legacy futures-only report, one row per contract per week.
+SOCRATA_URL = "https://publicreporting.cftc.gov/resource/6dca-aqww.json"
+
+
+def _legacy_urls() -> list[str]:
+    """Fallback: legacy annual futures-only archives (current + prior year,
+    so early-January requests still work before the new file exists)."""
+    year = date.today().year
+    return [
+        f"https://www.cftc.gov/files/dea/history/deacot{year}.zip",
+        f"https://www.cftc.gov/files/dea/history/deacot{year - 1}.zip",
+    ]
+
 
 COT_CONTRACTS = [
-    {"name": "S&P 500 E-mini", "code": "13874+"},
+    {"name": "S&P 500 E-mini", "code": "13874A"},
     {"name": "Nasdaq-100 E-mini", "code": "209742"},
     {"name": "EUR/USD", "code": "099741"},
     {"name": "Gold", "code": "088691"},
@@ -57,38 +65,68 @@ def _pick_col(df: pd.DataFrame, candidates: list[str]) -> str | None:
     return None
 
 
-def _download_cot_sync() -> pd.DataFrame:
-    """Try multiple URLs for COT data, returning the first successful parse."""
-    last_err = None
-    for url in COT_URLS:
-        try:
-            resp = requests.get(url, timeout=60)
-            resp.raise_for_status()
-            if url.endswith(".zip"):
-                zf = zipfile.ZipFile(io.BytesIO(resp.content))
-                csv_name = next(
-                    (n for n in zf.namelist() if n.lower().endswith((".txt", ".csv"))),
-                    None,
-                )
-                if csv_name is None:
-                    raise ValueError(f"No CSV/TXT in ZIP: {zf.namelist()}")
-                df = pd.read_csv(zf.open(csv_name), skipinitialspace=True, low_memory=False)
-            else:
-                # Plain text file
-                df = pd.read_csv(io.StringIO(resp.text), skipinitialspace=True, low_memory=False)
-            # Strip string columns
-            for col in df.select_dtypes(include="object").columns:
-                try:
-                    df[col] = df[col].str.strip()
-                except Exception:
-                    pass
-            if not df.empty:
-                return df
-        except Exception as exc:
-            last_err = exc
-            log.debug("COT URL %s failed: %s", url, exc)
+def _fetch_socrata_sync() -> pd.DataFrame:
+    """Fetch ~2y of weekly rows per contract from the Socrata API."""
+    frames = []
+    for contract in COT_CONTRACTS:
+        code = contract["code"].replace("+", "").strip()
+        params = {
+            "$where": f"cftc_contract_market_code='{code}'",
+            "$order": "report_date_as_yyyy_mm_dd DESC",
+            "$limit": "300",
+        }
+        resp = requests.get(SOCRATA_URL, params=params, timeout=60)
+        resp.raise_for_status()
+        records = resp.json()
+        if records:
+            frames.append(pd.DataFrame.from_records(records))
+    if not frames:
+        raise ValueError("Socrata returned no rows for any contract")
+    return pd.concat(frames, ignore_index=True)
+
+
+def _fetch_zip_sync(url: str) -> pd.DataFrame:
+    """Fetch and read a legacy annual archive (zip containing one txt/csv)."""
+    resp = requests.get(url, timeout=60)
+    resp.raise_for_status()
+    zf = zipfile.ZipFile(io.BytesIO(resp.content))
+    csv_name = next(
+        (n for n in zf.namelist() if n.lower().endswith((".txt", ".csv"))),
+        None,
+    )
+    if csv_name is None:
+        raise ValueError(f"No CSV/TXT in ZIP: {zf.namelist()}")
+    df = pd.read_csv(zf.open(csv_name), skipinitialspace=True, low_memory=False)
+    for col in df.columns:
+        # is_string_dtype covers object (pandas 2.x) and str (pandas 3+) dtypes
+        if not pd.api.types.is_string_dtype(df[col]):
             continue
-    raise ValueError(f"All COT URLs failed. Last error: {last_err}")
+        try:
+            df[col] = df[col].str.strip()
+        except Exception:
+            pass
+    return df
+
+
+def _download_and_parse_sync() -> list[dict]:
+    """Source waterfall. A source only counts as successful if it parses into
+    at least one contract with history — an HTTP 200 with unusable columns
+    (e.g. a headerless file) must fall through to the next source."""
+    errors: list[str] = []
+    sources = [("Socrata API", _fetch_socrata_sync)]
+    for url in _legacy_urls():
+        sources.append((url, lambda u=url: _fetch_zip_sync(u)))
+
+    for label, fetch in sources:
+        try:
+            contracts = _parse_cot(fetch())
+            if any(c["history"] for c in contracts):
+                return contracts
+            errors.append(f"{label}: parsed no contracts")
+        except Exception as exc:
+            errors.append(f"{label}: {exc}")
+            log.debug("COT source %s failed: %s", label, exc)
+    raise ValueError("All COT sources failed: " + " | ".join(errors))
 
 
 def _parse_cot(df: pd.DataFrame) -> list[dict]:
@@ -126,6 +164,12 @@ def _parse_cot(df: pd.DataFrame) -> list[dict]:
             })
             continue
 
+        # A prefix can match several sub-codes (e.g. 13874A / 13874+); keep
+        # the variant with the most rows so the series isn't interleaved.
+        if sub[code_col].nunique() > 1:
+            top_code = sub[code_col].astype(str).value_counts().idxmax()
+            sub = sub[sub[code_col].astype(str) == top_code]
+
         sub = sub.sort_values("_date")
         sub["_long"] = pd.to_numeric(sub[long_col], errors="coerce").fillna(0)
         sub["_short"] = pd.to_numeric(sub[short_col], errors="coerce").fillna(0)
@@ -136,11 +180,12 @@ def _parse_cot(df: pd.DataFrame) -> list[dict]:
         else:
             sub["_oi"] = 0
 
-        # 2-year weekly history (last 104 rows)
+        # 2-year weekly history (last 104 rows). NB: itertuples() renames
+        # underscore-prefixed columns, so iterate the Series directly.
         hist_sub = sub.tail(104)
         history = [
-            {"date": str(r._date.date()), "net_spec": int(r._net)}
-            for r in hist_sub.itertuples()
+            {"date": str(d.date()), "net_spec": int(n)}
+            for d, n in zip(hist_sub["_date"], hist_sub["_net"])
         ]
 
         # Latest values
@@ -168,22 +213,28 @@ def _parse_cot(df: pd.DataFrame) -> list[dict]:
     return contracts_out
 
 
-@async_cached("cot_data")
+def _cot_failed(result) -> bool:
+    """skip_if predicate: never cache a failure envelope — it is a non-empty
+    dict, so the default empty-container check would let it poison the cache."""
+    return (not isinstance(result, dict)
+            or bool(result.get("error"))
+            or not result.get("contracts"))
+
+
+@async_cached("cot_data", skip_if=_cot_failed)
 async def get_cot_data() -> dict:
     """Download and parse CFTC COT data for 6 key futures contracts."""
     try:
-        df = await asyncio.to_thread(_download_cot_sync)
-        contracts = await asyncio.to_thread(_parse_cot, df)
+        contracts = await asyncio.to_thread(_download_and_parse_sync)
         # Determine asOf from last date in data
         as_of = str(date.today())
-        if contracts:
-            latest_dates = [
-                c["history"][-1]["date"]
-                for c in contracts
-                if c.get("history")
-            ]
-            if latest_dates:
-                as_of = max(latest_dates)
+        latest_dates = [
+            c["history"][-1]["date"]
+            for c in contracts
+            if c.get("history")
+        ]
+        if latest_dates:
+            as_of = max(latest_dates)
         return {
             "asOf": as_of,
             "contracts": contracts,

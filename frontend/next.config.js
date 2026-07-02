@@ -1,6 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: "export",
+  // Default "export" serves the Tauri desktop build (static files); the Docker
+  // image sets NEXT_OUTPUT_MODE=standalone to restore the Node server + redirects.
+  output: process.env.NEXT_OUTPUT_MODE === "standalone" ? "standalone" : "export",
   reactStrictMode: true,
   images: { unoptimized: true },
   async redirects() {

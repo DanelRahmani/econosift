@@ -18,6 +18,21 @@ if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
 
+@pytest.fixture(autouse=True)
+def _fresh_caches():
+    """Reset both cache tiers before each test.
+
+    The @cached/@async_cached decorators share module-level TTLCaches and a
+    persistent SQLite tier; without this reset, values cached by one test leak
+    into later ones (empty-data tests receive earlier real results) and even
+    across pytest runs via the SQLite volume.
+    """
+    from backend import cache as cache_mod
+
+    cache_mod.clear_all()
+    yield
+
+
 @pytest.fixture(scope="session")
 def client() -> TestClient:
     from backend.main import app

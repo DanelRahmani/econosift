@@ -32,10 +32,8 @@
 | P2-15 | **Pattern Library** | CLAUDE.md (Phase 23) | No shared component library for KPI strips, tab bars, control bars. Every page hand-rolls these. |
 | P2-16 | **Bar chart Y-axis labels suppressed** | CLAUDE.md (Phase 25) | Recharts auto-suppresses labels for vertical BarChart with 18+ countries. `shortCountryName()` + `width={90}` partial mitigation. |
 | P2-18 | **Browser refresh needed after redeploy** | CLAUDE.md (Phase 25) | Stale JS bundles served after `docker compose up -d`. Hard-refresh required. |
-| P2-19 | **`@async_cached` persistent cache trap** | CLAUDE.md (Phase 25) | Broken function run caches `{}` permanently in SQLite. Fix: clear both tiers (`_caches.clear()` + delete CacheEntry rows). |
 | P2-20 | **Percent formatting inconsistency** | `FACT_CHECK.md`, audit | `fmtPct(v * 100)` used in `ValuationKpiPanel` and `ExtendedRiskTable.tsx` (line 13) — fragile double-scaling pattern. Standardize percent formatting. |
 | P2-21 | **Raw ISO timestamps shown to users** | `UI_report.md` (G-12) | Screener shows `as of 2026-06-25T14:40:30...` instead of readable format. |
-| P2-22 | **COT/Positioning tab data unreliable** | `ISSUES.md`, CLAUDE.md (Phase 24) | CFTC source format changes frequently — downgraded from P1-02. Backend has multiple URL fallbacks (cot_service.py lines 18–89) but data often empty.
 
 ---
 
@@ -45,7 +43,6 @@
 |----|---------|--------|-----------|
 | P3-01 | **Price alerts** | `ISSUES.md` | Set target prices, RSI thresholds, earnings dates — in-app notifications. No notification system exists. |
 | P3-02 | **Compare mode on Markets** | `ISSUES.md` | Side-by-side metric comparison (P/E, EV/EBITDA, Beta) for selected tickers. |
-| P3-03 | **Mobile PWA** | `ISSUES.md` | One `manifest.json` + service worker from installable app with offline cache. |
 | P3-04 | **Portfolio transaction log** | `ISSUES.md` | Add buy/sell dates, cost basis, realized P&L. Currently theoretical allocations only. |
 | P3-05 | **Custom screener formulas** | `ISSUES.md` | Let users type `pe < 15 && roe > 0.15` instead of only presets. |
 | P3-06 | **`datetime.utcnow()` deprecation** | `ISSUES.md`, CLAUDE.md (Phase 18A) | `policy_service.py`, `admin.py`, tests use deprecated `datetime.utcnow()`. Switch to `datetime.now(datetime.UTC)`. |
@@ -82,6 +79,8 @@
 
 | ID | Issue | Details |
 |----|-------|---------|
+| ✅ P2-22 | **COT/Positioning tab data unreliable** | Root cause: CFTC's `deafut.txt` returns HTTP 200 but has **no header row**, so pandas used the first data row as column names; the old success check (`not df.empty`) accepted the garbage, parsing silently yielded nothing, and the fallback URLs were never tried (one was 404-dead). Fixed in `cot_service.py`: CFTC's Socrata JSON API (`publicreporting.cftc.gov/resource/6dca-aqww.json`, exact `cftc_contract_market_code` match — S&P E-mini is `13874A`; the old `13874+` prefix also matched E-mini S&P *sector* futures) is now the primary source with parse-validation before any source is accepted, year-aware `deacot{YYYY}.zip` legacy fallbacks, and `skip_if` on `@async_cached` so failure envelopes are never cached for 60 min. Also fixed a latent `itertuples()` underscore-rename crash in history building. `PositioningTab.tsx` now shows the unavailable card on empty `contracts` and a stale-data warning past 14 days. Covered by `backend/tests/test_cot_service.py` (8 tests) and live-verified (all 6 contracts, 104-week history). |
+| ✅ P2-19 | **`@async_cached` persistent cache trap** | Verified fixed in commit `6b9e2a5`: `skip_if` (default = empty-container check) guards writes to **both** tiers in both `@cached` and `@async_cached`; the SQLite tier now enforces TTL on read; `cache.clear_all()` flushes both tiers and is wired at `POST /api/admin/cache/clear`. Covered by `backend/tests/test_cache.py`. Residual gap (non-empty *error envelopes* bypassing the default check) closed for COT in the P2-22 fix via a custom `skip_if` — other services returning `{"error": ...}` envelopes should adopt the same pattern when touched. |
 | ✅ BUG-A1 | **Atlas / cache warming: all 6 timeline endpoints 500 with `{"detail":"'id'"}`** | `atlas_service._country_universe()` returned country dicts without the ISO-numeric `id` field after commit `cf2d1a0` switched it to a static JSON that only stores `{iso3, name, regions}`. `get_timeline()` reads `country["id"]` → `KeyError: 'id'` → HTTP 500, breaking GDP growth, inflation, unemployment, debt/GDP, current account and GDP-per-capita warming (and the Atlas map / Macro panels downstream). Fixed: re-derive the numeric `id` via `pycountry` (matching the pre-regression behaviour) when loading the static JSON and in the wbgapi fallback. |
 | ✅ BUG-A2 | **Dividend yield shown ~100× too high (MSFT "98%")** | `dividend_service.py` multiplied yfinance's `dividendYield` by 100, but current yfinance returns it already in percent units (0.98 = 0.98%) — as `metrics.compute_ratios`, the frontend RatiosTab and the dividends page all assume. Fixed: removed the `× 100`. Also corrected the screener `high_dividend` preset threshold (`0.03` → `3.0`) which assumed the old fraction convention. |
 | ✅ BUG-A3 | **Stock Screener flickered / reloaded in an infinite loop** | `activePresets` was rebuilt as a `new Set(...)` on every render and used in the data-fetch `useEffect` dependency array, so the effect re-ran every render → fetch → setState → re-render → fetch… Fixed: memoised the Set on `urlState.presets`. |
