@@ -1137,6 +1137,18 @@ async def funding_liquidity():
     from ..services.funding_service import get_funding_liquidity
     return await get_funding_liquidity()
 
+@router.get("/net-liquidity")
+async def net_liquidity():
+    """Fed plumbing: net liquidity (WALCL − RRP − TGA), reserves, SPX overlay."""
+    from ..services.liquidity_service import get_net_liquidity
+    return await get_net_liquidity()
+
+@router.get("/recession-probability")
+async def recession_probability():
+    """NY-Fed-style 12-month-ahead probit on the 10y–3m spread + Sahm rule."""
+    from ..services.recession_service import get_recession_probability
+    return await get_recession_probability()
+
 @router.get("/sentiment")
 async def macro_sentiment():
     """Macro Sentiment Signals via Finnhub news."""

@@ -5,6 +5,11 @@
 
 ---
 
+## Phase 38b-F1 — Fed Plumbing & Net Liquidity Tracker (2026-07-03)
+
+- **New `/api/macro/net-liquidity` endpoint** (`liquidity_service.py`): net liquidity = WALCL − RRP − TGA on the weekly H.4.1 Wednesday grid, plus bank reserves and an S&P 500 overlay. All FRED series normalised to $tn with empirically verified unit scales (WALCL/WTREGEN/WRESBAL in millions, RRPONTSYD in billions — the live curl gate caught an initial wrong assumption here). Pure compute function unit-tested (5 tests: arithmetic/units, missing-RRP→0, empty-WALCL, ffill, W-WED resample).
+- **Macro → Financial & Funding Conditions tab extended:** 5-KPI row (Net Liquidity, 4-wk Δ, RRP, TGA, Reserves), Net-Liquidity-vs-SPX dual-axis chart, components chart, 26-week detail table with WoW Δ — above the existing M2/SOFR/CP-spread charts.
+
 ## Phase 38a — Event-loop hygiene: threadpool offloading + cache single-flight (2026-07-02)
 
 - **Event-loop blocking fixed:** sync yfinance/pandas/SQLite work in `async def` routes now runs via `asyncio.to_thread` — `research.py` (all 6 sync quant endpoints), `sector.py` (all 4), `portfolio.py` (11 heavy `port.*` computations incl. frontier/Monte Carlo/Black-Litterman/Fama-French download), `ai.py` (SQLite lookups + `_save` retry loop that could `time.sleep` up to ~15s on the loop). One slow upstream call no longer stalls every concurrent request. `macro.py`/`atlas.py` audited — already clean (async services or pure in-memory).

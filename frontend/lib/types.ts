@@ -1035,6 +1035,111 @@ export interface FinancialConditionsData {
   };
 }
 
+// Fed plumbing / net liquidity (Phase 38b)
+export interface NetLiquidityData {
+  asOf?: string;
+  error?: string;
+  kpis?: {
+    netLiquidity: number | null;
+    netLiquidity4wChange: number | null;
+    rrp: number | null;
+    tga: number | null;
+    reserves: number | null;
+  };
+  history?: {
+    netLiquidity: MacroTimeSeries[];
+    fedBalanceSheet: MacroTimeSeries[];
+    rrp: MacroTimeSeries[];
+    tga: MacroTimeSeries[];
+    reserves: MacroTimeSeries[];
+    spx: MacroTimeSeries[];
+  };
+}
+
+// Recession probability model (Phase 38b)
+export interface RecessionProbabilityData {
+  asOf?: string;
+  error?: string;
+  kpis?: {
+    prob12m: number | null;
+    sahm: number | null;
+    spreadPct: number | null;
+    monthsInverted: number;
+    smoothedProb: number | null;
+  };
+  history?: {
+    probability: MacroTimeSeries[];
+    spread: MacroTimeSeries[];
+    sahm: MacroTimeSeries[];
+    smoothedProb: MacroTimeSeries[];
+  };
+  recessions?: { start: string; end: string }[];
+  model?: { alpha: number | null; beta: number | null; nObs: number };
+}
+
+// Earnings quality / Sloan accruals (Phase 38b)
+export interface EarningsQualityRow {
+  ticker: string;
+  sector: string | null;
+  accrualRatio: number | null;
+  cashConversion: number | null;
+  noaGrowth: number | null;
+  qualityScore: number | null;
+  flag: boolean;
+}
+export interface EarningsQualityData {
+  asOf?: string;
+  universe?: string;
+  error?: string;
+  kpis?: {
+    medianAccrual: number | null;
+    medianCashConversion: number | null;
+    pctFlagged: number | null;
+    n: number;
+  };
+  rows?: EarningsQualityRow[];
+}
+
+// Event study lab (Phase 38b)
+export interface EventStudyData {
+  ticker?: string;
+  eventType?: string;
+  nEvents?: number;
+  error?: string;
+  kpis?: {
+    meanCar: number | null;
+    medianCar: number | null;
+    hitRate: number | null;
+    tStat: number | null;
+  };
+  carPath?: { day: number; avgCar: number }[];
+  events?: { date: string; car: number; eventDayReturn: number | null }[];
+  window?: number;
+  estWindow?: number;
+}
+
+// Factor regime monitor (Phase 38b)
+export interface FactorRegimeFactor {
+  factor: string;
+  ret1m: number | null;
+  ret3m: number | null;
+  ret12m: number | null;
+  momRank: number | null;
+}
+export interface FactorRegimeData {
+  asOf?: string;
+  error?: string;
+  kpis?: {
+    leadingFactor: string | null;
+    mkt3m: number | null;
+    hml12m: number | null;
+    smb12m: number | null;
+    regime: string | null;
+  };
+  factors?: FactorRegimeFactor[];
+  cumulative?: Record<string, number | string | null>[];
+}
+
 // BIS Credit-to-GDP Gaps (Phase 25)
 export interface CreditGapCountry {
   iso2: string;

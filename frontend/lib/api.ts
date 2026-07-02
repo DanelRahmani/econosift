@@ -36,6 +36,7 @@ import type {
   BulkDatasetStatus,
   ConfigResponse, ConfigUpdateRequest,
   GlobalHousingData, CreditGapsData, FiscalData, TradeData, LaborData, EnergyData,
+  NetLiquidityData, RecessionProbabilityData, EarningsQualityData, EventStudyData, FactorRegimeData,
   CurrencyCrisisData, BankingStabilityData, InequalityData,
   BusinessData, ShortInterestData, MAData,
   FactbookCountry, FactbookProfile, CrossborderData,
@@ -520,6 +521,13 @@ export const api = {
 
   // --- Phase 18B: Scenario Lab ---
   macroFunding: () => get<any>("/macro/funding"),
+  macroNetLiquidity: () => get<NetLiquidityData>("/macro/net-liquidity"),
+  macroRecessionProbability: () => get<RecessionProbabilityData>("/macro/recession-probability"),
+  corporateEarningsQuality: (universe: string) =>
+    get<EarningsQualityData>(`/corporate/earnings-quality?universe=${encodeURIComponent(universe)}`),
+  researchEventStudy: (p: { ticker: string; eventType: string; window: number }) =>
+    post<EventStudyData>("/research/event-study", p),
+  researchFactorRegime: () => get<FactorRegimeData>("/research/factor-regime"),
   scenarioHistorical: () => get<any>("/scenario/historical"),
   scenarioStress: (holdings: Holding[]) => post<any>("/scenario/historical/stress", { holdings }),
   scenarioCustom: (holdings: Holding[], shocks: Record<string, number>) =>
