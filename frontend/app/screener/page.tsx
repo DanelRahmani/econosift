@@ -12,6 +12,7 @@ import { ScreenerTable } from "@/components/screener/ScreenerTable";
 import { Sparkline } from "@/components/screener/Sparkline";
 import { fmtNum, fmtPct, fmtLarge } from "@/lib/format";
 import { SnowflakeMini } from "@/components/markets/SnowflakeMini";
+import { DataFreshnessBadge } from "@/components/DataFreshnessBadge";
 
 // ─── Constants ────────────────────────────────────────────────────────────
 
@@ -277,13 +278,9 @@ function ScreenerPageInner() {
                   <span className="text-text-muted"> of {data.screened}</span>
                 )}{" "}
                 stocks
-                {data?.asOf && (
-                  <span className="text-text-muted ml-2 text-xs">
-                    as of {new Date(data.asOf).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}
-                  </span>
-                )}
               </>
             )}
+            {data?.asOf && <DataFreshnessBadge asOf={data.asOf} className="ml-2" />}
           </div>
 
           {/* View mode toggle */}

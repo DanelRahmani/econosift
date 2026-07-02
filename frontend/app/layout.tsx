@@ -5,6 +5,7 @@ import { MobileNav } from "@/components/MobileNav";
 import { Footer } from "@/components/Footer";
 import { ThemeProvider, themeInitScript } from "@/components/ThemeProvider";
 import { Providers } from "@/components/providers";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 export const metadata: Metadata = {
   title: "Axiom Finance",
@@ -21,7 +22,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Providers>
           <ThemeProvider>
             <Navbar />
-            <main className="max-w-7xl mx-auto px-4 py-6 pb-20 md:pb-6">{children}</main>
+            <main className="max-w-7xl mx-auto px-4 py-6 pb-20 md:pb-6">
+              <ErrorBoundary>{children}</ErrorBoundary>
+            </main>
             <Footer />
             <MobileNav />
           </ThemeProvider>
