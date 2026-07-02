@@ -52,6 +52,7 @@
 
 | ID | Issue | Severity | Details |
 |----|-------|----------|---------|
+| DESK-01-V | **Verify the DESK-01 fix in a real desktop build** | P3 | The `run.py` frozen-mode log redirect (see ✅ DESK-01 below) is verified by code-read and a simulated-frozen run only — Phase 37 shipped no desktop build. On the next `build-windows.yml` run (the gated main→PRODUCTION release flow, not triggered automatically), launch the installed app and confirm `%APPDATA%/AxiomFinance/backend.log` is created and receives uvicorn startup lines. |
 | DESK-02 | **Backend still orphaned if the app is force-killed** | P3 | Force-killing `axiom-finance.exe` (`Stop-Process -Force` / Task Manager "End task") leaves the child `axiom-backend.exe` running on port 8000 — dropping a `CommandChild` handle doesn't send a kill signal, only a normal exit does. Normal window close is now fixed (see ✅ Recently Fixed below): `lib.rs` kills the child on `RunEvent::ExitRequested`. The force-kill case is unfixable from inside the app itself; it needs an OS-level parent-death mechanism (Windows Job Object with `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`) to have the OS kill the child automatically when the parent dies, regardless of how. Lower priority — force-kill is a rare user action, not the normal quit path. |
 
 ---
