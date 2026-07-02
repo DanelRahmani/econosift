@@ -5,6 +5,15 @@
 
 ---
 
+## Phase 37 — Fix-it sprint: COT data, error boundaries, UI consistency, desktop logging (2026-07-02)
+
+- **P2-22 COT/Positioning fixed:** CFTC Socrata API primary source with exact contract codes + parse-validated source waterfall (headerless `deafut.txt` no longer accepted as "success"); failure envelopes never cached (`skip_if`); PositioningTab empty/stale states. 8 new tests. **P2-19 closed** (verified fixed in the prior cache-poisoning commit).
+- **Docker frontend build repaired:** unbuildable since Phase 36 (`output:"export"` vs standalone Dockerfile) — output mode now env-driven (`NEXT_OUTPUT_MODE`).
+- **P2-05/P2-06/P2-21:** global `ErrorBoundary` + `app/error.tsx` (crashes show a retry card, nav survives); `DataFreshnessBadge` live on Screener; raw-timestamp audit.
+- **P2-04/P2-11/P2-12/P2-13:** mobile nav decongested (toggles → More drawer); shared `TabButton`/`ToggleChip` in `ui.tsx` replacing ~9 hand-rolled tab bars; Options delay badge + compute-tier labels normalized.
+- **DESK-01:** frozen backend now writes `%APPDATA%/AxiomFinance/backend.log` (redirect keyed on `sys.frozen`; Tauri pipes stdout so the old `is None` check never fired). **P3-06:** all `datetime.utcnow()` migrated (naive-UTC helper where DB rows are naive).
+- **Test suite isolation:** autouse fixture resets both cache tiers per test — the persistent SQLite tier was cross-polluting ~20 tests.
+
 ## Cache poisoning fix + macro/Atlas data resilience + theming (2026-07-02)
 
 - **Cache poisoning fixed (root cause of missing Atlas GDP + blank macro tabs):** the SQLite cache tier ignored TTL and served empty/failed payloads forever. `HybridCache._get_from_db` now enforces `ttl_sec` (expired rows deleted → re-fetch), and `cached`/`async_cached` never persist empty results (new `skip_if` guard, defaults to an empty-container check). Existing poisoned entries self-heal on next run.
