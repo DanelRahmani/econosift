@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, Suspense } from "react";
 import { api } from "@/lib/api";
-import { PageSkeleton } from "@/components/ui";
+import { PageSkeleton, TabButton } from "@/components/ui";
 import { useUrlState } from "@/lib/useUrlState";
 import type { Holding, PortfolioAnalysis, CorrelationData, RiskContribData, CAPMData } from "@/lib/types";
 // RiskContribData is RiskContribItem[] (flat list), CorrelationData has matrix as number[][]
@@ -205,17 +205,9 @@ function PortfolioPageInner() {
       {/* Tabs */}
       <div className="flex gap-1 border-b border-border overflow-x-auto pb-0.5 sticky top-14 z-20 bg-background/95 backdrop-blur">
         {TABS.map((t) => (
-          <button
-            key={t}
-            onClick={() => setUrlState({ tab: t })}
-            className={`px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors ${
-              tab === t
-                ? "border-b-2 border-accent text-accent"
-                : "text-text-secondary hover:text-text-primary"
-            }`}
-          >
+          <TabButton key={t} active={tab === t} onClick={() => setUrlState({ tab: t })}>
             {t}
-          </button>
+          </TabButton>
         ))}
       </div>
 

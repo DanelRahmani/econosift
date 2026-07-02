@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState, useCallback } from "react";
 import { api } from "@/lib/api";
 import { useTheme } from "@/components/ThemeProvider";
-import { Skeleton } from "@/components/ui";
+import { Skeleton, TabButton } from "@/components/ui";
 import { SearchBar } from "@/components/SearchBar";
 import { useUrlState } from "@/lib/useUrlState";
 import { RiskKPIRow } from "@/components/risk/RiskKPIRow";
@@ -231,17 +231,9 @@ function RiskPageInner() {
       {/* Tabs */}
       <div className="flex gap-1 border-b border-border overflow-x-auto pb-0.5 sticky top-14 z-20 bg-background/95 backdrop-blur">
         {TABS.map((t) => (
-          <button
-            key={t}
-            onClick={() => setUrlState({ tab: t })}
-            className={`px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors ${
-              tab === t
-                ? "border-b-2 border-accent text-accent"
-                : "text-text-secondary hover:text-text-primary"
-            }`}
-          >
+          <TabButton key={t} active={tab === t} onClick={() => setUrlState({ tab: t })}>
             {t}
-          </button>
+          </TabButton>
         ))}
       </div>
 

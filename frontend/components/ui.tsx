@@ -104,6 +104,57 @@ export function ScrollableTabBar({ children, className = "" }: { children: React
   );
 }
 
+// ── Shared tab / toggle primitives ──────────────────────────────────────────
+
+export function TabButton({
+  active,
+  onClick,
+  children,
+  className = "",
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
+        active ? "border-accent text-accent" : "border-transparent text-text-secondary hover:text-text-primary"
+      } ${className}`}
+    >
+      {children}
+    </button>
+  );
+}
+
+export function ToggleChip({
+  active,
+  onClick,
+  children,
+  className = "",
+  title,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: ReactNode;
+  className?: string;
+  title?: string;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      className={`px-2 py-0.5 rounded text-xs font-mono transition-colors border ${
+        active ? "bg-accent/20 text-accent border-accent/40" : "text-text-muted border-border hover:text-text-primary"
+      } ${className}`}
+    >
+      {children}
+    </button>
+  );
+}
+
 // ── Export PDF button ───────────────────────────────────────────────────────
 export function ExportPdfButton({ className = "" }: { className?: string }) {
   return (

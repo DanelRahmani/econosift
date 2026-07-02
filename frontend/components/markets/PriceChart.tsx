@@ -6,7 +6,7 @@ import {
 } from "recharts";
 import type { PricesResponse, EventsResponse } from "@/lib/types";
 import { CHART_COLORS } from "@/lib/format";
-import { chartTooltipStyle, chartPalette } from "@/components/ui";
+import { chartTooltipStyle, chartPalette, ToggleChip } from "@/components/ui";
 import { useTheme } from "@/components/ThemeProvider";
 
 const SMA_WINDOWS = [20, 50, 200];
@@ -110,29 +110,14 @@ export function PriceChart({ data, events = [], isLoading }: { data: PricesRespo
       <div className="flex flex-wrap items-center gap-2 mb-3">
         <span className="text-xs text-text-muted">SMA:</span>
         {SMA_WINDOWS.map((w) => (
-          <button
-            key={w}
-            onClick={() => toggleSma(w)}
-            className={`px-2 py-0.5 rounded text-xs font-mono transition-colors border ${
-              activeSmas.includes(w)
-                ? "bg-accent/20 text-accent border-accent/40"
-                : "text-text-muted border-border hover:text-text-primary"
-            }`}
-          >
+          <ToggleChip key={w} active={activeSmas.includes(w)} onClick={() => toggleSma(w)}>
             {w}
-          </button>
+          </ToggleChip>
         ))}
         {hasMarkers && (
-          <button
-            onClick={() => setShowEvents((v) => !v)}
-            className={`ml-2 px-2 py-0.5 rounded text-xs font-medium transition-colors border ${
-              showEvents
-                ? "bg-accent/20 text-accent border-accent/40"
-                : "text-text-muted border-border hover:text-text-primary"
-            }`}
-          >
+          <ToggleChip active={showEvents} onClick={() => setShowEvents((v) => !v)} className="ml-2 font-medium">
             Events
-          </button>
+          </ToggleChip>
         )}
       </div>
 

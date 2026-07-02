@@ -6,6 +6,7 @@ import { useUrlState } from "@/lib/useUrlState";
 import { PolicyDivergenceTable } from "@/components/policy/PolicyDivergenceTable";
 import { SovereignSpreadTable } from "@/components/sovereign/SovereignSpreadTable";
 import { CentralBanksTab } from "@/components/macro/CentralBanksTab";
+import { TabButton } from "@/components/ui";
 
 // ─── Shared KPI card ────────────────────────────────────────────────
 function KpiCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
@@ -299,17 +300,9 @@ function PolicyPageInner() {
       {/* Tab bar */}
       <div className="flex gap-0 border-b border-border">
         {TABS.map((t) => (
-          <button
-            key={t.id}
-            onClick={() => setUrlState({ tab: t.id })}
-            className={`px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
-              tab === t.id
-                ? "border-accent text-accent"
-                : "border-transparent text-text-secondary hover:text-text-primary"
-            }`}
-          >
+          <TabButton key={t.id} active={tab === t.id} onClick={() => setUrlState({ tab: t.id })}>
             {t.label}
-          </button>
+          </TabButton>
         ))}
       </div>
 

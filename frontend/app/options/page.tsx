@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState, useCallback } from "react";
 import { api } from "@/lib/api";
 import { useTheme } from "@/components/ThemeProvider";
-import { Skeleton } from "@/components/ui";
+import { Skeleton, TabButton } from "@/components/ui";
 import { SearchBar } from "@/components/SearchBar";
 import { useUrlState } from "@/lib/useUrlState";
 import { IVKPIRow } from "@/components/options/IVKPIRow";
@@ -162,7 +162,7 @@ function OptionsPageInner() {
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-bold">Options Analytics</h1>
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-warning/20 text-warning border border-warning/30">
+            <span className="px-2 py-0.5 rounded-md text-xs font-semibold bg-warning/20 text-warning">
               ~15min delay
             </span>
           </div>
@@ -216,20 +216,9 @@ function OptionsPageInner() {
       {/* Tabs */}
       <div className="flex gap-1 border-b border-border overflow-x-auto pb-0.5">
         {TABS.map((t) => (
-          <button
-            key={t}
-            onClick={() => setUrlState({ tab: t })}
-            className={`px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors ${
-              tab === t
-                ? "border-b-2 border-accent text-accent"
-                : "text-text-secondary hover:text-text-primary"
-            }`}
-          >
-            {t}
-            {t === "Monte Carlo" && (
-              <span className="ml-1.5 text-[10px] text-danger font-bold">🔴</span>
-            )}
-          </button>
+          <TabButton key={t} active={tab === t} onClick={() => setUrlState({ tab: t })}>
+            {t === "Monte Carlo" ? <>🔴 {t}</> : t}
+          </TabButton>
         ))}
       </div>
 

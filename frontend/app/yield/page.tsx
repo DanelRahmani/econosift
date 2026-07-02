@@ -5,7 +5,7 @@ import { api } from "@/lib/api";
 import { useUrlState } from "@/lib/useUrlState";
 import type { RatesData, GlobalYieldCountry } from "@/lib/types";
 import { MultiCountryYieldChart } from "@/components/yield/MultiCountryYieldChart";
-import { Card as UiCard, PageSkeleton } from "@/components/ui";
+import { Card as UiCard, PageSkeleton, TabButton } from "@/components/ui";
 import { CHART_COLORS } from "@/lib/format";
 import { PolicyDivergenceTable } from "@/components/policy/PolicyDivergenceTable";
 import { SovereignSpreadTable } from "@/components/sovereign/SovereignSpreadTable";
@@ -338,15 +338,9 @@ function YieldPageInner() {
       {/* Tabs */}
       <div className="flex gap-2 border-b border-border overflow-x-auto no-scrollbar">
         {TABS.map((t) => (
-          <button
-            key={t}
-            onClick={() => setUrlState({ tab: t })}
-            className={`px-4 py-2 text-sm whitespace-nowrap border-b-2 -mb-px transition-colors ${
-              tab === t ? "border-accent text-accent" : "border-transparent text-muted hover:text-foreground"
-            }`}
-          >
+          <TabButton key={t} active={tab === t} onClick={() => setUrlState({ tab: t })}>
             {t}
-          </button>
+          </TabButton>
         ))}
       </div>
 

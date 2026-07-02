@@ -3,7 +3,7 @@ import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { Suspense } from "react";
 import dynamic from "next/dynamic";
 import { RegimeOverlay } from "./RegimeOverlay";
-import { ScrollableTabBar, PageSkeleton } from "@/components/ui";
+import { ScrollableTabBar, PageSkeleton, TabButton } from "@/components/ui";
 
 const TABS = [
   { id: "overview", label: "Overview" },
@@ -103,17 +103,9 @@ function MacroTabShellInner() {
       {/* Tab bar */}
       <ScrollableTabBar className="border-b border-border mb-6 sticky top-14 z-20 bg-background/95 backdrop-blur">
         {TABS.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setTab(tab.id)}
-            className={`px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
-              activeTab === tab.id
-                ? "border-accent text-accent"
-                : "border-transparent text-text-secondary hover:text-text-primary"
-            }`}
-          >
+          <TabButton key={tab.id} active={activeTab === tab.id} onClick={() => setTab(tab.id)}>
             {tab.label}
-          </button>
+          </TabButton>
         ))}
       </ScrollableTabBar>
       {/* Active tab content */}
