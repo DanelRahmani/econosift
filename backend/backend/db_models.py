@@ -1,7 +1,7 @@
 """SQLAlchemy ORM models for Axiom Finance persistence layer."""
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import (
     BigInteger,
@@ -16,6 +16,15 @@ from sqlalchemy import (
 )
 
 from .database import Base
+
+
+def _utcnow() -> datetime:
+    """Naive UTC now, for DateTime column defaults.
+
+    Existing rows are naive (written via the pre-3.12 `datetime.utcnow()`
+    convention); staying naive keeps them directly comparable.
+    """
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 class DailyPrice(Base):
@@ -54,7 +63,7 @@ class DailyQuote(Base):
     high52 = Column(Float)
     low52 = Column(Float)
     avg_vol_20d = Column(Float)
-    updated_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=_utcnow)
 
 
 class DailyMacro(Base):
@@ -110,7 +119,7 @@ class CacheEntry(Base):
     cache_name = Column(String, nullable=False)
     key = Column(String, nullable=False)
     value_json = Column(String)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=_utcnow)
 
     __table_args__ = (
         PrimaryKeyConstraint("cache_name", "key"),
@@ -128,7 +137,7 @@ class AiSummary(Base):
     model_used = Column(String, nullable=False)      # e.g. "gemini-2.5-flash"
     summary_text = Column(String, nullable=False)
     prompt_sent = Column(String)                     # for debugging
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=_utcnow)
 
     __table_args__ = (
         Index("ix_ai_summary_lookup", "summary_type", "context_key"),
@@ -147,7 +156,7 @@ class PortfolioTransaction(Base):
     quantity = Column(Float, nullable=False)
     price = Column(Float, nullable=False)
     fees = Column(Float, default=0.0)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=_utcnow)
 
     __table_args__ = (
         Index("ix_portfolio_transaction_ticker_date", "ticker", "date"),

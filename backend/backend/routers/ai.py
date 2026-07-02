@@ -6,7 +6,7 @@ This eliminates yfinance rate-limit bottlenecks entirely.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
@@ -15,6 +15,11 @@ from ..db_models import AiSummary
 from ..services import ai_service
 
 router = APIRouter(prefix="/api/ai", tags=["ai"])
+
+
+def _utcnow() -> datetime:
+    """Naive UTC now — matches AiSummary.created_at, which is stored naive."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 class CompanyRequest(BaseModel):
@@ -59,7 +64,7 @@ def _save(summary_type: str, context_key: str, model: str, prompt: str, text: st
 
     db_url = os.getenv("DATABASE_URL", "sqlite:///./data/axiomfinance.db")
     db_path = db_url.replace("sqlite:///", "")
-    now = datetime.utcnow().isoformat()
+    now = _utcnow().isoformat()
 
     for attempt in range(5):
         try:
@@ -91,7 +96,7 @@ def _response(summary_type: str, context_key: str, model: str, text: str, cached
         "context_key": context_key,
         "summary_text": text,
         "model_used": model,
-        "created_at": datetime.utcnow().isoformat(),
+        "created_at": _utcnow().isoformat(),
         "cached": cached,
     }
 

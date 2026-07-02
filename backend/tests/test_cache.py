@@ -331,12 +331,13 @@ def test_custom_skip_if_predicate():
 # ---------------------------------------------------------------------------
 
 def test_db_tier_expires_stale_entry():
-    from datetime import datetime, timedelta
+    from datetime import datetime, timedelta, timezone
     from backend.cache import HybridCache
 
     c = HybridCache("test_ttl_expire", ttl_sec=60)
     row = MagicMock()
-    row.created_at = datetime.utcnow() - timedelta(seconds=120)  # older than ttl
+    # Naive UTC — matches production convention (created_at is stored naive).
+    row.created_at = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(seconds=120)  # older than ttl
     row.value_json = json.dumps({"x": 1})
     db = MagicMock()
     db.get.return_value = row
@@ -350,12 +351,13 @@ def test_db_tier_expires_stale_entry():
 
 
 def test_db_tier_serves_fresh_entry():
-    from datetime import datetime, timedelta
+    from datetime import datetime, timedelta, timezone
     from backend.cache import HybridCache
 
     c = HybridCache("test_ttl_fresh", ttl_sec=60)
     row = MagicMock()
-    row.created_at = datetime.utcnow() - timedelta(seconds=5)  # within ttl
+    # Naive UTC — matches production convention (created_at is stored naive).
+    row.created_at = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(seconds=5)  # within ttl
     row.value_json = json.dumps({"x": 2})
     db = MagicMock()
     db.get.return_value = row

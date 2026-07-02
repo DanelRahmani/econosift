@@ -5,12 +5,17 @@ import asyncio
 import functools
 import json
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from cachetools import TTLCache
 
 # 60-minute cache for external API responses.
 _CACHE_TTL = 60 * 60
 _CACHE_MAXSIZE = 2048
+
+def _utcnow() -> datetime:
+    """Naive UTC now — matches CacheEntry.created_at, which is stored naive."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
 
 _caches: dict[str, TTLCache] = {}
 _locks: dict[str, asyncio.Lock] = {}
@@ -193,7 +198,7 @@ class HybridCache:
                 # deleted so the next call re-fetches fresh data.
                 created = getattr(row, "created_at", None)
                 if created is not None:
-                    age = (datetime.utcnow() - created).total_seconds()
+                    age = (_utcnow() - created).total_seconds()
                     if age > self._ttl_sec:
                         db.delete(row)
                         db.commit()
@@ -215,7 +220,7 @@ class HybridCache:
                     cache_name=self._name,
                     key=key,
                     value_json=json.dumps(value, default=str),
-                    created_at=datetime.utcnow(),
+                    created_at=_utcnow(),
                 )
                 db.merge(entry)
                 db.commit()

@@ -55,7 +55,7 @@ def test_log_job_success(in_memory_session):
     with Session() as session:
         session.add(JobExecution(
             job_id=job_id, job_name="test", status="running",
-            started_at=datetime.utcnow(),
+            started_at=datetime.now(timezone.utc).replace(tzinfo=None),
         ))
         session.commit()
 
@@ -78,7 +78,7 @@ def test_log_job_failure(in_memory_session):
     with Session() as session:
         session.add(JobExecution(
             job_id=job_id, job_name="test", status="running",
-            started_at=datetime.utcnow(),
+            started_at=datetime.now(timezone.utc).replace(tzinfo=None),
         ))
         session.commit()
 

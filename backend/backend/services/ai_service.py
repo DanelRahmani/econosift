@@ -105,8 +105,8 @@ def build_macro_prompt(countries: list[str]) -> str:
 
 def build_dashboard_prompt() -> str:
     """Simple prompt - Gemini summarises today's market conditions."""
-    from datetime import datetime
-    today = datetime.utcnow().strftime("%B %d, %Y")
+    from datetime import datetime, timezone
+    today = datetime.now(timezone.utc).strftime("%B %d, %Y")
     return (
         f"Give a daily market briefing for {today}. "
         f"Cover: major US index performance (S&P 500, Nasdaq, Dow), "

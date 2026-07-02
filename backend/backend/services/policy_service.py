@@ -4,7 +4,7 @@ Phase 18A Task 3.
 """
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from ..cache import async_cached
 from . import macro_expansion_service as mes
@@ -44,7 +44,8 @@ def _pick_series(data: dict, candidates: tuple[str, ...]) -> list[dict]:
     Iterates all candidates and picks the one whose last data point is most
     recent. Falls back to the freshest available if every candidate is stale.
     """
-    cutoff = datetime.utcnow() - timedelta(days=_MAX_STALE_DAYS)
+    # Naive UTC: compared against naive datetimes parsed via strptime below.
+    cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=_MAX_STALE_DAYS)
     best_pts: list[dict] = []
     best_date = datetime(2000, 1, 1)
 

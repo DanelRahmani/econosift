@@ -41,11 +41,16 @@ def _log_path() -> str:
 
 # When frozen without a console, stdout/stderr are None. Send them to a log file
 # so uvicorn logging works and any import/startup crash is captured on disk.
-if sys.stdout is None or sys.stderr is None:
+# When frozen *with* piped streams (the Tauri desktop shell pipes the child's
+# stdout/stderr but discards them on the Rust side), redirect unconditionally —
+# `sys.stdout is None` never fires in that case, so relying on it alone silently
+# drops all output. Non-frozen runs keep the original None-only check.
+_frozen = getattr(sys, "frozen", False)
+if _frozen or sys.stdout is None or sys.stderr is None:
     _log = open(_log_path(), "a", buffering=1, encoding="utf-8")
-    if sys.stdout is None:
+    if _frozen or sys.stdout is None:
         sys.stdout = _log
-    if sys.stderr is None:
+    if _frozen or sys.stderr is None:
         sys.stderr = _log
 
 import uvicorn

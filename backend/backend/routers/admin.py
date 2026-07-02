@@ -4,7 +4,7 @@ from __future__ import annotations
 import os
 import re
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import httpx
 from fastapi import APIRouter, HTTPException
@@ -76,7 +76,8 @@ async def performance():
     try:
         from ..database import SessionLocal
         from ..db_models import JobExecution
-        cutoff = datetime.utcnow() - timedelta(hours=24)
+        # Naive UTC: JobExecution.started_at is stored naive (see services/jobs.py).
+        cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=24)
         with SessionLocal() as session:
             jobs = (
                 session.query(JobExecution)
