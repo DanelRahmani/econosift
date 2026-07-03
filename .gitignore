@@ -40,3 +40,6 @@ Thumbs.db
 
 # Tauri signing keys (private key must never be committed)
 .tauri/
+
+# Playwright MCP session artifacts (transient browser logs/snapshots)
+.playwright-mcp/
