@@ -10,6 +10,8 @@ import { EconLabTab } from "@/components/macro/EconLabTab";
 import { CrossAssetCorrelation } from "@/components/research/CrossAssetCorrelation";
 import { FxMacroLink } from "@/components/research/FxMacroLink";
 import { MultiCountryPortfolio } from "@/components/research/MultiCountryPortfolio";
+import { EventStudyTab } from "@/components/research/EventStudyTab";
+import { FactorRegimeTab } from "@/components/research/FactorRegimeTab";
 import { useUrlState } from "@/lib/useUrlState";
 
 const TABS = [
@@ -22,6 +24,8 @@ const TABS = [
   { key: "multicountry", label: "Multi-Country" },
   { key: "dupont", label: "Sector DuPont" },
   { key: "econlab", label: "Econometric Lab" },
+  { key: "eventstudy", label: "Event Study" },
+  { key: "factorregime", label: "Factor Regime" },
 ] as const;
 type TabKey = (typeof TABS)[number]["key"];
 
@@ -68,6 +72,8 @@ function ResearchPageInner() {
       {tab === "multicountry" && <MultiCountryPortfolio />}
       {tab === "dupont" && <DupontTab />}
       {tab === "econlab" && <EconLabTab />}
+      {tab === "eventstudy" && <EventStudyTab />}
+      {tab === "factorregime" && <FactorRegimeTab />}
     </main>
   );
 }

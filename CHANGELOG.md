@@ -5,10 +5,14 @@
 
 ---
 
-## Phase 38b-F1 — Fed Plumbing & Net Liquidity Tracker (2026-07-03)
+## Phase 38b — Five analyst features: net liquidity, recession model, earnings quality, event study, factor regime (2026-07-03)
 
-- **New `/api/macro/net-liquidity` endpoint** (`liquidity_service.py`): net liquidity = WALCL − RRP − TGA on the weekly H.4.1 Wednesday grid, plus bank reserves and an S&P 500 overlay. All FRED series normalised to $tn with empirically verified unit scales (WALCL/WTREGEN/WRESBAL in millions, RRPONTSYD in billions — the live curl gate caught an initial wrong assumption here). Pure compute function unit-tested (5 tests: arithmetic/units, missing-RRP→0, empty-WALCL, ffill, W-WED resample).
-- **Macro → Financial & Funding Conditions tab extended:** 5-KPI row (Net Liquidity, 4-wk Δ, RRP, TGA, Reserves), Net-Liquidity-vs-SPX dual-axis chart, components chart, 26-week detail table with WoW Δ — above the existing M2/SOFR/CP-spread charts.
+- **F1 Fed Plumbing & Net Liquidity** (`liquidity_service.py`, `/api/macro/net-liquidity`, Funding & Liquidity tab): net liquidity = WALCL − RRP − TGA on the weekly H.4.1 Wednesday grid + bank reserves + SPX overlay. FRED unit scales verified against live magnitudes (WALCL/WTREGEN/WRESBAL millions, RRPONTSYD billions — the live curl gate caught a wrong initial assumption). 5-KPI row, dual-axis SPX chart, components chart, 26-week WoW table. 5 pure-compute tests.
+- **F5 Recession Probability** (`recession_service.py`, `/api/macro/recession-probability`, Leading Indicators tab): NY-Fed-style 12-month-ahead probit on the 10y–3m spread fit by scipy MLE (no statsmodels dep), plus Sahm rule, FRED smoothed probability cross-check, months-inverted counter, NBER episode shading. 9 tests.
+- **F3 Earnings Quality & Accruals** (`corporate_health_service.py` additions, `/api/corporate/earnings-quality?universe=`, Corporate page): Sloan balance-sheet accruals, CFO/NI cash conversion, NOA growth, composite 0–100 quality score, worst-decile flagging over dow/ndx/sp500 — completes the forensic triad (Altman/Piotroski/Beneish) with earnings persistence. 7 tests.
+- **F2 Event Study Lab** (`event_study_service.py`, `POST /api/research/event-study`, Research tab #10, 🟡 tier): market-model CAR/AAR around earnings dates (yfinance) or FOMC decisions (bundled public Fed calendar 2015–2025), OLS estimation window, mean/median CAR, hit rate, t-stat, day-relative CAR path chart + per-event table. 4 tests on a zero-noise synthetic fixture.
+- **F4 Factor Regime Monitor** (`fama_french.py` additions, `/api/research/factor-regime`, Research tab #11): monthly F-F 5-factor + momentum via pandas-datareader, trailing 1/3/12-mo compounded returns, factor-momentum ranks, regime label (Risk-On/Off × style leader), cumulative growth-of-$1 chart. 8 tests.
+- Backend work parallelised across four subagents on disjoint files; orchestrator wired shared files (`api.ts`, `types.ts`, `macro.py`, `research.py`, page registrations) and ran the Docker/pytest/tsc/curl gate.
 
 ## Phase 38a — Event-loop hygiene: threadpool offloading + cache single-flight (2026-07-02)
 

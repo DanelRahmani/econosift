@@ -6,6 +6,7 @@ import type { CorporateHealthResponse } from "@/lib/types";
 import { Card, PageSkeleton } from "@/components/ui";
 import { TickerSearch } from "@/components/TickerSearch";
 import { useUrlState } from "@/lib/useUrlState";
+import { EarningsQuality } from "@/components/corporate/EarningsQuality";
 
 function KpiCard({ label, value, sub, color }: {
   label: string; value: string; sub?: string; color?: string;
@@ -278,6 +279,9 @@ function CorporatePageInner() {
           <p className="text-xs">Uses yfinance data — balance sheet, income statement, and cash flow.</p>
         </div>
       )}
+
+      {/* Earnings Quality & Accruals (Sloan) */}
+      <EarningsQuality />
     </div>
   );
 }

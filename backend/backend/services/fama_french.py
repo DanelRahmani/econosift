@@ -326,3 +326,184 @@ def factor_regression(
         "period": period,
         "asOf": as_of,
     }
+
+
+# ---------------------------------------------------------------------------
+# Factor Regime & Style Rotation Monitor
+# ---------------------------------------------------------------------------
+# The daily-CSV loader above (`load_ff_factors`) has no monthly cadence and no
+# momentum factor, so this section pulls the monthly 5-factor + momentum
+# datasets straight from pandas-datareader's `famafrench` reader instead,
+# reusing the module's existing `@cached` pattern for the download.
+
+_REGIME_STYLE_LABELS = {
+    "SMB": "Size-led",
+    "HML": "Value-led",
+    "RMW": "Quality-led",
+    "CMA": "Defensive-led",
+    "Mom": "Momentum-led",
+}
+
+
+@cached("ff_monthly_factors")
+def load_ff_monthly_factors() -> pd.DataFrame | None:
+    """Download monthly Fama-French 5-factor + momentum data.
+
+    Uses `pandas_datareader.data.DataReader(..., "famafrench")` for the
+    "F-F_Research_Data_5_Factors_2x3" and "F-F_Momentum_Factor" datasets
+    (monthly cadence, not covered by the daily CSV loader above).
+
+    Returns
+    -------
+    pd.DataFrame | None
+        Monthly-indexed DataFrame with columns Mkt-RF, SMB, HML, RMW, CMA, RF,
+        Mom, values still in **percent** (not yet converted to decimal), or
+        None if the download fails.
+    """
+    import pandas_datareader.data as web
+
+    try:
+        five = web.DataReader(
+            "F-F_Research_Data_5_Factors_2x3", "famafrench",
+            start=datetime(2000, 1, 1),
+        )
+        five_monthly = five[0].copy()
+        mom = web.DataReader(
+            "F-F_Momentum_Factor", "famafrench",
+            start=datetime(2000, 1, 1),
+        )
+        mom_monthly = mom[0].copy()
+    except Exception:
+        return None
+
+    five_monthly.columns = [c.strip() for c in five_monthly.columns]
+    mom_monthly.columns = [c.strip() for c in mom_monthly.columns]
+
+    mom_col = next((c for c in mom_monthly.columns if c.lower().startswith("mom")), None)
+    if mom_col is None:
+        return None
+    mom_monthly = mom_monthly.rename(columns={mom_col: "Mom"})
+
+    merged = five_monthly.join(mom_monthly[["Mom"]], how="inner")
+    if merged.empty:
+        return None
+    return merged
+
+
+def _fmt_month(idx, full: bool = False) -> str:
+    ts = idx.to_timestamp() if hasattr(idx, "to_timestamp") else pd.Timestamp(idx)
+    return ts.strftime("%Y-%m-%d") if full else ts.strftime("%Y-%m")
+
+
+def _compound_return(series: pd.Series, months: int) -> float | None:
+    """Trailing `months`-month compounded return from a decimal monthly series."""
+    clean = series.dropna()
+    if len(clean) < months:
+        return None
+    window = clean.iloc[-months:]
+    return float(np.prod(1.0 + window.values) - 1.0)
+
+
+def _compute_factor_regime(monthly: "pd.DataFrame") -> dict:
+    """Pure computation of the factor regime snapshot from decimal monthly returns.
+
+    Parameters
+    ----------
+    monthly : pd.DataFrame
+        Monthly factor returns as DECIMAL fractions (already converted from
+        percent), columns = factor names (e.g. Mkt-RF, SMB, HML, RMW, CMA, Mom).
+
+    Returns
+    -------
+    dict matching the GET /api/research/factor-regime response shape, or {}
+    if there is no usable data.
+    """
+    if monthly is None or monthly.empty:
+        return {}
+
+    monthly = monthly.sort_index().dropna(how="all")
+    if monthly.empty:
+        return {}
+
+    factor_cols = [c for c in monthly.columns if c != "RF"]
+    if not factor_cols:
+        return {}
+
+    ret1m: dict[str, float | None] = {}
+    ret3m: dict[str, float | None] = {}
+    ret12m: dict[str, float | None] = {}
+    for col in factor_cols:
+        series = monthly[col]
+        ret1m[col] = _compound_return(series, 1)
+        ret3m[col] = _compound_return(series, 3)
+        ret12m[col] = _compound_return(series, 12)
+
+    # momRank: rank of 12m return among factors, 1 = best (highest).
+    valid_12m = {k: v for k, v in ret12m.items() if v is not None}
+    ranked = sorted(valid_12m.items(), key=lambda kv: kv[1], reverse=True)
+    mom_rank = {factor: i + 1 for i, (factor, _) in enumerate(ranked)}
+
+    factors_out = [
+        {
+            "factor": col,
+            "ret1m": ret1m[col],
+            "ret3m": ret3m[col],
+            "ret12m": ret12m[col],
+            "momRank": mom_rank.get(col),
+        }
+        for col in factor_cols
+    ]
+
+    # ---- KPIs --------------------------------------------------------------
+    valid_3m = {k: v for k, v in ret3m.items() if v is not None}
+    leading_factor = max(valid_3m, key=valid_3m.get) if valid_3m else None
+    mkt3m = ret3m.get("Mkt-RF")
+    hml12m = ret12m.get("HML")
+    smb12m = ret12m.get("SMB")
+
+    style_candidates = {
+        k: v for k, v in ret3m.items() if k in _REGIME_STYLE_LABELS and v is not None
+    }
+    regime = None
+    if mkt3m is not None and style_candidates:
+        risk_label = "Risk-On" if mkt3m > 0 else "Risk-Off"
+        best_style = max(style_candidates, key=style_candidates.get)
+        regime = f"{risk_label} — {_REGIME_STYLE_LABELS[best_style]}"
+
+    kpis = {
+        "leadingFactor": leading_factor,
+        "mkt3m": mkt3m,
+        "hml12m": hml12m,
+        "smb12m": smb12m,
+        "regime": regime,
+    }
+
+    # ---- Cumulative growth of $1, last 10 years (120 months) ---------------
+    cum_df = (1.0 + monthly[factor_cols].fillna(0.0)).cumprod()
+    tail = cum_df.tail(120)
+    cumulative = []
+    for idx, row in tail.iterrows():
+        entry = {"date": _fmt_month(idx)}
+        for col in factor_cols:
+            entry[col] = float(row[col])
+        cumulative.append(entry)
+
+    return {
+        "asOf": _fmt_month(monthly.index[-1], full=True),
+        "kpis": kpis,
+        "factors": factors_out,
+        "cumulative": cumulative,
+    }
+
+
+def get_factor_regime() -> dict:
+    """Entrypoint: fetch monthly 5-factor + momentum data and compute the
+    current factor regime / style rotation snapshot.
+
+    Returns {} on any download or data failure (never fabricates data).
+    """
+    raw = load_ff_monthly_factors()
+    if raw is None or raw.empty:
+        return {}
+    monthly = raw.drop(columns=["RF"], errors="ignore").astype(float) / 100.0
+    return _compute_factor_regime(monthly)

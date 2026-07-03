@@ -7,10 +7,13 @@ from __future__ import annotations
 
 import logging
 import math
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import date
 
 import yfinance as yf
 
 from ..cache import cached
+from . import constituents
 
 logger = logging.getLogger(__name__)
 
@@ -469,3 +472,258 @@ def get_corporate_health(ticker: str) -> dict:
     except Exception as exc:
         logger.warning("corporate_health failed for %s: %s", ticker, exc)
         return {"ticker": ticker, "error": str(exc)}
+
+
+# ---------------------------------------------------------------------------
+# Earnings Quality & Accruals Monitor (Sloan 1996 accruals anomaly)
+# ---------------------------------------------------------------------------
+
+def _percentile(sorted_vals: list[float], pct: float) -> float | None:
+    """Linear-interpolation percentile (matches numpy's default) over a
+    pre-sorted ascending list."""
+    if not sorted_vals:
+        return None
+    if len(sorted_vals) == 1:
+        return sorted_vals[0]
+    idx = pct * (len(sorted_vals) - 1)
+    lo = int(math.floor(idx))
+    hi = int(math.ceil(idx))
+    if lo == hi:
+        return sorted_vals[lo]
+    frac = idx - lo
+    return sorted_vals[lo] + (sorted_vals[hi] - sorted_vals[lo]) * frac
+
+
+def _median(vals: list[float]) -> float | None:
+    if not vals:
+        return None
+    s = sorted(vals)
+    n = len(s)
+    mid = n // 2
+    if n % 2 == 1:
+        return s[mid]
+    return (s[mid - 1] + s[mid]) / 2.0
+
+
+def compute_earnings_quality(rows: list[dict]) -> dict:
+    """Pure computation of the Sloan (1996) accruals anomaly over a universe.
+
+    ``rows`` is a list of already-extracted per-ticker raw inputs::
+
+        {ticker, netIncome, operatingCashFlow, totalAssets, prevTotalAssets,
+         cash, prevCash, totalLiabilities, prevTotalLiabilities,
+         totalDebt, prevTotalDebt, sector}
+
+    Any field may be ``None`` — every derived metric degrades to ``None``
+    rather than raising or fabricating a value.
+
+    Metrics per ticker
+    -------------------
+    - ``accrualRatio`` (Sloan accrual proxy) =
+      (netIncome − operatingCashFlow) / average total assets, where average
+      total assets is the mean of the current and prior total assets (or
+      just the current value if the prior year is unavailable).
+    - ``cashConversion`` = operatingCashFlow / netIncome, only when
+      netIncome > 0 (undefined/None otherwise).
+    - ``noaGrowth`` = YoY growth of Net Operating Assets, where
+      NOA = (totalAssets − cash) − (totalLiabilities − totalDebt); cash and
+      totalDebt default to 0 when missing, but a missing totalAssets or
+      totalLiabilities (current or prior) makes NOA/noaGrowth None.
+    - ``qualityScore`` (0–100, higher = better quality; None if
+      accrualRatio can't be computed):
+        1. start at 50
+        2. += 25 * (1 − min(|accrualRatio| / 0.15, 1))  — smaller |accruals| is better
+        3. += up to 15, scaled linearly from cashConversion=1 (0 bonus) to
+           cashConversion>=1.5 (full 15 bonus); no bonus below 1
+        4. += 10 flat if noaGrowth is not None and noaGrowth < 0.20
+        5. clamp to [0, 100]
+    - ``flag`` = True when accrualRatio falls in the worst (highest) decile
+      of accrualRatio across the universe (90th percentile threshold,
+      linear interpolation).
+
+    Returns ``{}`` for an empty/failed universe (cache `skip_if` guard).
+    """
+    if not rows:
+        return {}
+
+    computed: list[dict] = []
+    for r in rows:
+        ticker = r.get("ticker")
+        net_income = r.get("netIncome")
+        operating_cf = r.get("operatingCashFlow")
+        total_assets = r.get("totalAssets")
+        prev_total_assets = r.get("prevTotalAssets")
+        cash = r.get("cash")
+        prev_cash = r.get("prevCash")
+        total_liabilities = r.get("totalLiabilities")
+        prev_total_liabilities = r.get("prevTotalLiabilities")
+        total_debt = r.get("totalDebt")
+        prev_total_debt = r.get("prevTotalDebt")
+        sector = r.get("sector")
+
+        # Average total assets (denominator for the accrual ratio)
+        if total_assets is not None and prev_total_assets is not None:
+            avg_assets = (total_assets + prev_total_assets) / 2.0
+        elif total_assets is not None:
+            avg_assets = total_assets
+        else:
+            avg_assets = None
+
+        accrual_ratio = None
+        if (net_income is not None and operating_cf is not None
+                and avg_assets is not None and avg_assets != 0):
+            accrual_ratio = (net_income - operating_cf) / avg_assets
+
+        cash_conversion = None
+        if net_income is not None and net_income > 0 and operating_cf is not None:
+            cash_conversion = operating_cf / net_income
+
+        # Net Operating Assets — cash/debt default to 0 when missing.
+        cash_now = cash if cash is not None else 0.0
+        debt_now = total_debt if total_debt is not None else 0.0
+        cash_prior = prev_cash if prev_cash is not None else 0.0
+        debt_prior = prev_total_debt if prev_total_debt is not None else 0.0
+
+        noa = None
+        if total_assets is not None and total_liabilities is not None:
+            noa = (total_assets - cash_now) - (total_liabilities - debt_now)
+
+        prev_noa = None
+        if prev_total_assets is not None and prev_total_liabilities is not None:
+            prev_noa = (prev_total_assets - cash_prior) - (prev_total_liabilities - debt_prior)
+
+        noa_growth = None
+        if noa is not None and prev_noa is not None and prev_noa != 0:
+            noa_growth = (noa - prev_noa) / abs(prev_noa)
+
+        computed.append({
+            "ticker": ticker,
+            "sector": sector,
+            "accrualRatio": accrual_ratio,
+            "cashConversion": cash_conversion,
+            "noaGrowth": noa_growth,
+        })
+
+    n = len(computed)
+    accrual_vals = sorted(c["accrualRatio"] for c in computed if c["accrualRatio"] is not None)
+    decile_threshold = _percentile(accrual_vals, 0.9)
+
+    for c in computed:
+        accrual_ratio = c["accrualRatio"]
+        cash_conversion = c["cashConversion"]
+        noa_growth = c["noaGrowth"]
+
+        if accrual_ratio is None:
+            c["qualityScore"] = None
+            c["flag"] = False
+            continue
+
+        score = 50.0
+        score += 25.0 * (1.0 - min(abs(accrual_ratio) / 0.15, 1.0))
+        if cash_conversion is not None and cash_conversion >= 1.0:
+            score += min(max(cash_conversion - 1.0, 0.0) / 0.5, 1.0) * 15.0
+        if noa_growth is not None and noa_growth < 0.20:
+            score += 10.0
+        score = max(0.0, min(100.0, score))
+
+        c["qualityScore"] = round(score, 2)
+        c["flag"] = decile_threshold is not None and accrual_ratio >= decile_threshold
+
+    # Round the metric fields after decile/score computation.
+    for c in computed:
+        for key in ("accrualRatio", "cashConversion", "noaGrowth"):
+            if c[key] is not None:
+                c[key] = round(c[key], 6)
+
+    accrual_list = [c["accrualRatio"] for c in computed if c["accrualRatio"] is not None]
+    cc_list = [c["cashConversion"] for c in computed if c["cashConversion"] is not None]
+    flagged_count = sum(1 for c in computed if c["flag"])
+
+    computed.sort(key=lambda c: (c["qualityScore"] is None, -(c["qualityScore"] or 0.0)))
+
+    return {
+        "asOf": date.today().isoformat(),
+        "kpis": {
+            "medianAccrual": round(_median(accrual_list), 6) if accrual_list else None,
+            "medianCashConversion": round(_median(cc_list), 6) if cc_list else None,
+            "pctFlagged": round(100.0 * flagged_count / n, 2) if n else None,
+            "n": n,
+        },
+        "rows": computed,
+    }
+
+
+def _fetch_eq_inputs(ticker: str, sector: str | None) -> dict | None:
+    """Fetch raw earnings-quality inputs for a single ticker from yfinance."""
+    try:
+        stock = yf.Ticker(ticker)
+        fin = stock.financials
+        bs = stock.balance_sheet
+        cf = stock.cashflow
+        if fin is None or fin.empty or bs is None or bs.empty or cf is None or cf.empty:
+            return None
+
+        cash = _latest_val(bs, "Cash And Cash Equivalents")
+        if cash is None:
+            cash = _latest_val(bs, "Cash Cash Equivalents And Short Term Investments")
+        prev_cash = _prior_val(bs, "Cash And Cash Equivalents")
+        if prev_cash is None:
+            prev_cash = _prior_val(bs, "Cash Cash Equivalents And Short Term Investments")
+
+        total_liabilities = _latest_val(bs, "Total Liabilities Net Minority Interest")
+        if total_liabilities is None:
+            total_liabilities = _latest_val(bs, "Total Liabilities")
+        prev_total_liabilities = _prior_val(bs, "Total Liabilities Net Minority Interest")
+        if prev_total_liabilities is None:
+            prev_total_liabilities = _prior_val(bs, "Total Liabilities")
+
+        return {
+            "ticker": ticker,
+            "netIncome": _latest_val(fin, "Net Income"),
+            "operatingCashFlow": _latest_val(cf, "Operating Cash Flow"),
+            "totalAssets": _latest_val(bs, "Total Assets"),
+            "prevTotalAssets": _prior_val(bs, "Total Assets"),
+            "cash": cash,
+            "prevCash": prev_cash,
+            "totalLiabilities": total_liabilities,
+            "prevTotalLiabilities": prev_total_liabilities,
+            "totalDebt": _latest_val(bs, "Total Debt"),
+            "prevTotalDebt": _prior_val(bs, "Total Debt"),
+            "sector": sector,
+        }
+    except Exception:
+        logger.debug("earnings quality fetch failed for %s", ticker, exc_info=True)
+        return None
+
+
+@cached("earnings_quality")
+def get_earnings_quality(universe: str = "dow") -> dict:
+    """Fetch + compute the Earnings Quality & Accruals Monitor for a universe.
+
+    ``universe`` is one of "dow" | "ndx" | "sp500" (see ``constituents.py``).
+    Returns ``{}`` when the universe can't be resolved or no ticker yields
+    usable statement data (never fabricated).
+    """
+    members = constituents.get_constituents(universe)
+    if not members:
+        return {}
+
+    rows: list[dict] = []
+    with ThreadPoolExecutor(max_workers=20) as ex:
+        futures = {
+            ex.submit(_fetch_eq_inputs, m["symbol"], m.get("sector")): m["symbol"]
+            for m in members
+        }
+        for fut in as_completed(futures):
+            try:
+                row = fut.result()
+                if row is not None:
+                    rows.append(row)
+            except Exception:
+                logger.debug("earnings quality worker failed", exc_info=True)
+
+    result = compute_earnings_quality(rows)
+    if not result:
+        return {}
+    result["universe"] = universe
+    return result

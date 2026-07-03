@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import type { LeadingData, MacroTimeSeries } from "@/lib/types";
 import { Card } from "@/components/ui";
+import { RecessionProbability } from "@/components/macro/RecessionProbability";
 import {
   LineChart,
   Line,
@@ -143,6 +144,9 @@ export function LeadingIndicators() {
 
   return (
     <div className="space-y-6">
+      {/* Recession Probability Model */}
+      <RecessionProbability />
+
       {/* Base Year Selector */}
       <div className="flex items-center gap-3">
         <span className="text-xs text-text-secondary">IS-LM-PC Base Year:</span>

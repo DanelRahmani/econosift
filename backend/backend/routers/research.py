@@ -18,6 +18,8 @@ from ..services import momentum_service
 from ..services import realized_moments_service
 from ..services import dupont_service
 from ..services import cross_asset_service
+from ..services import event_study_service
+from ..services import fama_french as ff_service
 
 router = APIRouter(prefix="/api/research", tags=["research"])
 
@@ -124,6 +126,35 @@ class MultiCountryHolding(BaseModel):
 class MultiCountryRequest(BaseModel):
     holdings: list[MultiCountryHolding]
     period: str = Field(default="3y", pattern="^(1y|2y|3y|5y|max)$")
+
+
+# ── Phase 38b: Event Study Lab + Factor Regime ────────────────────────
+
+class EventStudyRequest(BaseModel):
+    ticker: str = Field(..., min_length=1, max_length=12)
+    eventType: str = Field(default="earnings", pattern="^(earnings|fomc)$")
+    window: int = Field(default=5, ge=1, le=10)
+
+
+@router.post("/event-study")
+async def post_event_study(req: EventStudyRequest):
+    """CAR/AAR event study around earnings or FOMC dates (market model)."""
+    try:
+        return await asyncio.to_thread(
+            event_study_service.run_event_study,
+            req.ticker.strip().upper(), req.eventType, req.window,
+        )
+    except Exception as exc:  # pragma: no cover - defensive
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@router.get("/factor-regime")
+async def get_factor_regime():
+    """Fama-French factor regime: trailing returns, style leadership, cumulative growth."""
+    try:
+        return await asyncio.to_thread(ff_service.get_factor_regime)
+    except Exception as exc:  # pragma: no cover - defensive
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 @router.post("/cross-asset-correlation")
