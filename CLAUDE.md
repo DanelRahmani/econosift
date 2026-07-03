@@ -97,7 +97,10 @@ Key architecture notes:
 - **Never scrape HTML** (no BeautifulSoup/Selenium) — use MediaWiki API +
   wikitextparser, direct CSV/Excel/ZIP downloads. **Never fabricate data**; on a
   source failure, log + serve cached, then surface it.
-- **Commit + push to `main` after each phase**, message focused on the "why".
+- **Branch workflow: develop on `DEV`, merge to `main` via pull request.**
+  Commit + push to `DEV` after each phase (message focused on the "why"), then
+  open a PR `DEV` → `main` when the work is verified. Never push directly to
+  `main`.
 - Optional: dispatch labelled sub-agents (Frontend/Backend/Math = sonnet,
   Data = haiku) for parallel work on disjoint file sets; the orchestrator wires
   shared files (`main.py`, `api.ts`, `types.ts`, pages, routers).
@@ -176,8 +179,18 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 ### Git & GitHub
 - Commit to GitHub regularly — after every meaningful unit of work (a feature, a fix, a refactor). Don't batch unrelated changes into one commit.
 - Use clear, descriptive commit messages focused on the "why", not just the "what".
-- Push to `main` after each commit unless told otherwise.
+- Work happens on the `DEV` branch: push to `DEV` after each commit, then open a pull request `DEV` → `main` once the work is verified (pytest + tsc + Docker gate). `main` only moves via merged PRs.
 
 ### Skills
 - Automatically invoke available skills whenever they are relevant to the task at hand — do not wait to be asked.
 - Examples: use `/senior-frontend` or `/senior-backend` when implementing features, `/api-design-reviewer` when adding routes, `/financial-analyst` when working on finance-related features, `/ui-ux-pro-max` for UI work, `/security-review` before pushing sensitive changes, `/spec-driven-workflow` for planning larger features.
+
+## graphify
+
+This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
+
+Rules:
+- For codebase questions, first run `graphify query "<question>"` when graphify-out/graph.json exists. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
+- If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
+- Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
+- After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).
