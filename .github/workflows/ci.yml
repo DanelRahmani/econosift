@@ -73,3 +73,61 @@ jobs:
       - name: Typecheck
         working-directory: frontend
         run: npx tsc --noEmit
+
+  e2e:
+    name: Playwright smoke
+    runs-on: ubuntu-latest
+    # Slower than the other jobs: it builds and boots the whole stack. Kept
+    # separate so a type error is reported in seconds rather than minutes.
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Create an empty .env
+        # docker-compose declares `env_file: .env` and bind-mounts it, but .env
+        # is gitignored so it does not exist on a runner. Compose would fail
+        # outright, and the bind mount would silently create a directory.
+        run: touch .env
+
+      - name: Start the stack
+        # No API keys in CI, so every source degrades to an empty result. The
+        # pages must still render their shell and panels — which is exactly the
+        # regression these tests exist to catch.
+        run: |
+          docker compose up -d --wait --build
+          docker compose ps
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Install Chromium
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+
+      - name: Run smoke tests
+        working-directory: frontend
+        env:
+          PLAYWRIGHT_BASE_URL: http://localhost
+        run: npx playwright test
+
+      - name: Backend logs on failure
+        if: failure()
+        run: docker compose logs --tail=200 backend
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: frontend/playwright-report/
+          retention-days: 7
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v

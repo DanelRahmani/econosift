@@ -230,9 +230,9 @@
     "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
   },
   "backend/backend/services/advanced_risk.py": {
-    "mtime": 1782320434.1284182,
-    "ast_hash": "b08edb3019c4e995eb91d2ceeccd2223",
-    "semantic_hash": "b08edb3019c4e995eb91d2ceeccd2223"
+    "mtime": 1787423736.5373206,
+    "ast_hash": "f04e4a9ae5acb211ea8e037430b287bc",
+    "semantic_hash": ""
   },
   "backend/backend/services/ai_service.py": {
     "mtime": 1783013194.9301987,
@@ -555,9 +555,9 @@
     "semantic_hash": "176979e48fe3cf2a1bd39f8ff6ea966b"
   },
   "backend/backend/services/technicals_service.py": {
-    "mtime": 1782375493.3071535,
-    "ast_hash": "ff15c7f95f17dac44ba61fc63e81bd21",
-    "semantic_hash": "ff15c7f95f17dac44ba61fc63e81bd21"
+    "mtime": 1787423976.8288918,
+    "ast_hash": "b46573453e2d19acc6f1a48926559ad9",
+    "semantic_hash": ""
   },
   "backend/backend/services/trade_service.py": {
     "mtime": 1782769197.3624134,
@@ -2237,6 +2237,31 @@
   "frontend/components/yield/CurveNoiseTab.tsx": {
     "mtime": 1787412070.7878172,
     "ast_hash": "b1b18cea54b233fdeae839c5d88e77c8",
+    "semantic_hash": ""
+  },
+  ".github/workflows/ci.yml": {
+    "mtime": 1787420566.9372754,
+    "ast_hash": "2d64e6670a4eb411392441d9ae655396",
+    "semantic_hash": ""
+  },
+  "backend/tests/test_options_engine.py": {
+    "mtime": 1787420837.1471512,
+    "ast_hash": "a9e2fa0759a70641479d8e42751c4b0c",
+    "semantic_hash": ""
+  },
+  "backend/tests/test_portfolio_engine.py": {
+    "mtime": 1787423056.9658985,
+    "ast_hash": "0d2db885f6385c88b3aeaf236b13bf29",
+    "semantic_hash": ""
+  },
+  "backend/tests/test_advanced_risk.py": {
+    "mtime": 1787423874.3933592,
+    "ast_hash": "c24a5f48815b452fe66bb6bf5180004f",
+    "semantic_hash": ""
+  },
+  "backend/tests/test_technicals_service.py": {
+    "mtime": 1787423935.2323258,
+    "ast_hash": "e1accdd3badd0b877661988565ef489d",
     "semantic_hash": ""
   }
 }

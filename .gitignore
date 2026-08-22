@@ -47,3 +47,7 @@ Thumbs.db
 # graphify derived artifacts: AST cache regenerates free; dated dirs are local backups
 graphify-out/cache/ast/
 graphify-out/20*/
+
+# Playwright
+frontend/test-results/
+frontend/playwright-report/
