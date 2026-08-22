@@ -14,7 +14,7 @@ Adds the indicators with the strongest out-of-sample evidence in the literature 
 - **Treasury curve-fit noise** (`treasury_noise_service.py`, `/api/yield/noise`, new Yield → Curve Noise tab): daily Nelson-Siegel RMSE across the CMT tenors, an HPW-style (2013) arbitrage-capital gauge. Verified against history and **documented as limited**: it reaches ~20bps in 2008 vs ~7bps in calm 2017 but stays ~10bps in March 2020, because CMT is already an official smoothed curve and cannot show on-the-run dislocation. Shipped with that caveat surfaced in the UI. 9 tests.
 - **5y5y forward breakeven** (`T5YIFR`) added to `yield_curve_service` as a separate field (a forward, not a spot tenor) and charted on Yield → Real & Breakeven.
 - **Bug fix:** `credit_market.py` requested `BAMLC0A4CBBBOAS`, which does not exist on FRED — the BBB spread KPI had been silently `null`. Corrected to `BAMLC0A4CBBB`.
-- Credit conditions mounted as a sibling of `FinancialConditions` in `MacroTabShell` rather than a child, so it is not gated behind that tab's ~120s cold fetch.
+- Credit conditions mounted as a sibling of `FinancialConditions` in `MacroTabShell` rather than a child, so the two panels fetch independently and neither blanks the other while loading.
 
 ## Phase 38b — Five analyst features: net liquidity, recession model, earnings quality, event study, factor regime (2026-07-03)
 

@@ -43,7 +43,8 @@ backend/
 │   │   ├── insider.py          # /api/insider/aggregate — cluster buying, sector sentiment, smart money index
 │   │   ├── macro.py            # /api/macro/* — 16+ sub-tab endpoints: overview, rates, inflation, employment,
 │   │   │                       #   housing, commodities, fx, leading, financial-conditions, positioning,
-│   │   │                       #   country-risk, central-banks, lab, fiscal, labor, energy, inequality
+│   │   │                       #   country-risk, central-banks, lab, fiscal, labor, energy, inequality,
+│   │                       #   credit-conditions, oil-shocks
 │   │   ├── market.py           # /api/market/* — prices, quote, risk, sectors, events, news
 │   │   ├── market_data.py      # /api/market/13f, /api/market/form4 — EDGAR filings
 │   │   ├── mergers.py          # /api/mergers/* — M&A deal tracking, sector activity heatmap
@@ -65,9 +66,9 @@ backend/
 │   │   ├── treemap.py          # /api/treemap — S&P 500 / NDX / Dow squarified treemap
 │   │   ├── valuation.py        # /api/valuation/full|dcf|factors — 8-model + CAPM + Axiom Fair Value
 │   │   ├── wiki.py             # /api/wiki/categories|terms|term — 410-term financial dictionary
-│   │   └── yield_curve.py      # /api/yield/curve — US spot curve, TIPS, breakevens, ACM term premium
+│   │   └── yield_curve.py      # /api/yield/curves|noise — spot curve, TIPS, breakevens, ACM term premium, curve-fit noise
 │   │
-│   ├── services/               # Business logic — called by routers (68 services)
+│   ├── services/               # Business logic — called by routers (78 services)
 │   │   ├── __init__.py
 │   │   │
 │   │   # --- Market data & pricing ---
@@ -144,7 +145,10 @@ backend/
 │   │   │
 │   │   # --- Macro-Financial Intelligence (Phase 18A) ---
 │   │   ├── credit_market.py         # IG/HY OAS, BBB spread, funding stress, TED
-│   │   ├── yield_curve_service.py   # Full US spot curve, interpolation, TIPS/breakevens
+│   │   ├── credit_conditions_service.py # SOFR-IORB reserve scarcity, SLOOS, excess bond premium, NFCI/ANFCI
+│   │   ├── yield_curve_service.py   # Full US spot curve, interpolation, TIPS/breakevens, 5y5y forward
+│   │   ├── treasury_noise_service.py # Nelson-Siegel curve-fit noise across CMT tenors (HPW-style)
+│   │   ├── oil_shock_service.py     # Demand vs. oil-specific decomposition of real WTI returns
 │   │   ├── policy_service.py        # CB divergence score, G10 carry differentials
 │   │   ├── sovereign_risk_service.py # 6-KPI traffic-light sovereign rankings, ~200 countries
 │   │   │
@@ -222,6 +226,9 @@ backend/
 │   ├── test_country_risk_service.py     # Sovereign risk KPI scoring
 │   ├── test_centralbanks_service.py     # CB policy rate history + Fed balance sheet
 │   ├── test_credit_market.py   # Credit market pulse indicators
+│   ├── test_credit_conditions_service.py # SOFR-IORB splice, EBP CSV parsing, cache-skip guards
+│   ├── test_oil_shock_service.py       # Demand/supply decomposition on synthetic fixtures
+│   ├── test_treasury_noise_service.py  # Nelson-Siegel fit + noise on known curves
 │   ├── test_policy_service.py  # Policy divergence + carry differentials
 │   ├── test_yield_curve_service.py     # Spot curve + TIPS + breakevens
 │   ├── test_sovereign_risk_service.py  # Sovereign risk rankings

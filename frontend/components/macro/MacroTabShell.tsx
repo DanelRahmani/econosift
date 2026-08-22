@@ -82,8 +82,8 @@ function TabContent({ activeTab }: { activeTab: string }) {
     case "commodities": return <CommoditiesTabLazy />;
     case "fx":          return <FxTabLazy />;
     case "leading":     return <LeadingIndicatorsLazy />;
-    // Credit conditions is a sibling, not a child, so its fast FRED fetch is not
-    // gated behind the much slower financial-conditions endpoint.
+    // Credit conditions is a sibling, not a child, so the two panels fetch
+    // independently and neither blanks the other while it loads.
     case "financial":   return (
       <div className="space-y-6">
         <CreditConditionsLazy />

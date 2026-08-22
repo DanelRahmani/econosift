@@ -14,7 +14,7 @@ Axiom Finance is a self-hosted financial analytics platform built on FastAPI + N
 - **Risk** (`/risk`): Rolling metrics (20D/60D/120D/252D), GARCH(1,1), Hurst exponent, OU mean-reversion, Engle-Granger cointegration, correlation matrix, historical stress scenarios
 - **Options** (`/options`): IV30, IV Rank/Percentile, Greeks (Δ/Γ/Θ/V/ρ), term structure, volatility smile, OI profile, max pain, Black-Scholes, CRR binomial tree, Monte Carlo
 - **Calendar** (`/calendar`): Economic releases, earnings with EPS surprise, ex-dividend dates, IPOs, central bank meetings
-- **Yield** (`/yield`): US Treasury spot curve, TIPS real yields, breakevens, ACM term premium, multi-country yield comparison
+- **Yield** (`/yield`): US Treasury spot curve, TIPS real yields, breakevens (incl. 5y5y forward), ACM term premium, Nelson-Siegel curve-fit noise, multi-country yield comparison
 - **Policy & Sovereign** (`/policy`, `/sovereign`): CB divergence score, G10 carry differentials, sovereign risk rankings, 6-KPI traffic-light
 - **Atlas** (`/atlas`): Choropleth world map of 6 macro indicators across ~200 countries (2000–2024), year-slider animation, regional blocs (G7/G20/Eurozone/EM), Top/Bottom-10 rankings
 - **Wiki** (`/wiki`): Searchable financial dictionary — 410+ terms across 26 categories, each with a detailed explanation. Category sidebar, debounced search, expandable term cards, related-term cross-linking
@@ -64,7 +64,7 @@ See the INFO folder for detailed file-by-file breakdowns of the backend and fron
 
 | File | Covers |
 |------|--------|
-| [`INFO/backend_structure.md`](./INFO/backend_structure.md) | All 33 routers, 68 services, 8 source adapters, database, tests |
+| [`INFO/backend_structure.md`](./INFO/backend_structure.md) | All 33 routers, 78 services, 8 source adapters, database, tests |
 | [`INFO/frontend_structure.md`](./INFO/frontend_structure.md) | All 25 pages, 118 components, 8 lib files |
 
 Key architecture notes:

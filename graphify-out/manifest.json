@@ -1270,8 +1270,8 @@
     "semantic_hash": "f8ecfd3fbc29cae5ae4acddfd7af2790"
   },
   "frontend/components/macro/MacroTabShell.tsx": {
-    "mtime": 1787411832.5705488,
-    "ast_hash": "662726348b2394b92cbedb4146c8aa1d",
+    "mtime": 1787414042.2676473,
+    "ast_hash": "442bae32ef206eaf6caf4a867ed8514a",
     "semantic_hash": ""
   },
   "frontend/components/macro/PositioningTab.tsx": {
@@ -1955,13 +1955,13 @@
     "semantic_hash": "7281672a8dc09b1a85fc0da617c32d8b"
   },
   "CHANGELOG.md": {
-    "mtime": 1787412158.8139033,
-    "ast_hash": "348d9ab21845a9ca3dd41535362453f3",
+    "mtime": 1787414049.962988,
+    "ast_hash": "a1b6c9efd9b318be899963460f9fd996",
     "semantic_hash": ""
   },
   "CLAUDE.md": {
-    "mtime": 1783059595.4577632,
-    "ast_hash": "ee75c05f3d828986a21cbd782530bff7",
+    "mtime": 1787414133.0364995,
+    "ast_hash": "3df4e7ba9abd2492af8aa08dce8396b8",
     "semantic_hash": ""
   },
   "FIN_TERMS.md": {
@@ -1975,14 +1975,14 @@
     "semantic_hash": "aafb992d6c49aec0d31a79dfefed4e63"
   },
   "INFO/backend_structure.md": {
-    "mtime": 1782747205.6613183,
-    "ast_hash": "bd1359ff1cee992268950155a31ea184",
-    "semantic_hash": "bd1359ff1cee992268950155a31ea184"
+    "mtime": 1787414119.6830757,
+    "ast_hash": "443be6bad8ecee476ca071c3884925a7",
+    "semantic_hash": ""
   },
   "INFO/frontend_structure.md": {
-    "mtime": 1782746220.421059,
-    "ast_hash": "e4c926d81fc8436a37c552e2b288fa60",
-    "semantic_hash": "e4c926d81fc8436a37c552e2b288fa60"
+    "mtime": 1787414133.034487,
+    "ast_hash": "e7e7e6edf815e78631c96f9bd65c32e4",
+    "semantic_hash": ""
   },
   "INFO/tech_stack.md": {
     "mtime": 1782747205.6613183,
