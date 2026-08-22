@@ -340,5 +340,11 @@
   "338": "test_discount_rates.py",
   "339": "simulate_custom_shock",
   "340": "get_historical_episodes",
-  "341": "test_custom_skip_if_predicate"
+  "341": "test_custom_skip_if_predicate",
+  "342": "corporate.py",
+  "343": "TestGracefulDegradation",
+  "344": "TestRIMModel",
+  "345": "treemap.py",
+  "346": "_single_dcf",
+  "347": "DatetimeIndex"
 }
