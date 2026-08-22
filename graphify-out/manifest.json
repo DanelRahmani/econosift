@@ -1795,9 +1795,9 @@
     "semantic_hash": "a82debdd08c800eb78df66c2d5da7363"
   },
   "frontend/playwright.config.ts": {
-    "mtime": 1782303820.0474846,
-    "ast_hash": "a1ccb292b85105d2bee9b06957f4d247",
-    "semantic_hash": "a1ccb292b85105d2bee9b06957f4d247"
+    "mtime": 1787424245.3146937,
+    "ast_hash": "6dc61c7c5178f51487c50d6867744c8b",
+    "semantic_hash": ""
   },
   "frontend/postcss.config.js": {
     "mtime": 1782211724.1768916,
@@ -2240,8 +2240,8 @@
     "semantic_hash": ""
   },
   ".github/workflows/ci.yml": {
-    "mtime": 1787420566.9372754,
-    "ast_hash": "2d64e6670a4eb411392441d9ae655396",
+    "mtime": 1787425375.3096166,
+    "ast_hash": "c0c1b58a929ea97f524fe9094c9fd82e",
     "semantic_hash": ""
   },
   "backend/tests/test_options_engine.py": {
@@ -2262,6 +2262,16 @@
   "backend/tests/test_technicals_service.py": {
     "mtime": 1787423935.2323258,
     "ast_hash": "e1accdd3badd0b877661988565ef489d",
+    "semantic_hash": ""
+  },
+  "frontend/tests/e2e/smoke.spec.ts": {
+    "mtime": 1787425189.4985194,
+    "ast_hash": "e77d7335678e07381c3754de2822ac41",
+    "semantic_hash": ""
+  },
+  "frontend/tests/e2e/tabs.spec.ts": {
+    "mtime": 1787424291.2562509,
+    "ast_hash": "72152dece63cb45a3f0d1bc776079759",
     "semantic_hash": ""
   }
 }

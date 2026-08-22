@@ -1,16 +1,16 @@
 # Graph Report - axiomfinance  (2026-08-22)
 
 ## Corpus Check
-- 429 files · ~386,246 words
+- 431 files · ~387,366 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 4773 nodes · 8633 edges · 318 communities (204 shown, 114 thin omitted)
+- 4778 nodes · 8636 edges · 324 communities (201 shown, 123 thin omitted)
 - Extraction: 95% EXTRACTED · 5% INFERRED · 0% AMBIGUOUS · INFERRED: 443 edges (avg confidence: 0.75)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `a99f7895`
+- Built from commit: `fa88f76c`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -320,6 +320,10 @@
 - [[_COMMUNITY_black_litterman|black_litterman]]
 - [[_COMMUNITY_fama_french|fama_french]]
 - [[_COMMUNITY_Any|Any]]
+- [[_COMMUNITY_smoke.spec.ts|smoke.spec.ts]]
+- [[_COMMUNITY_simulate_custom_shock|simulate_custom_shock]]
+- [[_COMMUNITY_analyze|analyze]]
+- [[_COMMUNITY_get_historical_episodes|get_historical_episodes]]
 
 ## God Nodes (most connected - your core abstractions)
 1. `api` - 101 edges
@@ -355,31 +359,31 @@
 - **Project Governance Documentation** — claude_md_project_guide, active_issues, changelog, release_plan, idea_list [INFERRED 0.85]
 - **Tauri Application Icon Set** — desktop_src_tauri_icons_icon, desktop_src_tauri_icons_128x128, desktop_src_tauri_icons_128x128_2x, desktop_src_tauri_icons_32x32, desktop_src_tauri_icons_64x64, desktop_src_tauri_icons_square107, desktop_src_tauri_icons_square142, desktop_src_tauri_icons_square150, desktop_src_tauri_icons_square284, desktop_src_tauri_icons_square30, desktop_src_tauri_icons_square310, desktop_src_tauri_icons_square44, desktop_src_tauri_icons_square71, desktop_src_tauri_icons_square89, desktop_src_tauri_icons_storelogo [EXTRACTED 1.00]
 
-## Communities (318 total, 114 thin omitted)
+## Communities (324 total, 123 thin omitted)
 
 ### Community 0 - "Backend Python Requirements"
-Cohesion: 0.04
-Nodes (51): AiSummaryPanel(), AVAILABLE_MODELS, Option, Props, BreadthBar(), pct(), tone(), trendUp() (+43 more)
+Cohesion: 0.06
+Nodes (33): CountryComparison(), LABELS, Tone, TONE_BG, CountrySelector(), useCountryNames(), WbResult, CURRENT_YEAR (+25 more)
 
 ### Community 1 - "Axiom Finance Branding/Logo"
-Cohesion: 0.04
-Nodes (67): computeDTE(), OptionsPageInner(), Tab, TABS, SparkCard(), MoverTr(), formatValue(), CountryRate (+59 more)
+Cohesion: 0.05
+Nodes (43): computeDTE(), OptionsPageInner(), Tab, TABS, BreadthBar(), pct(), tone(), trendUp() (+35 more)
 
 ### Community 2 - "Cross-Platform 3-OS Build Matrix"
 Cohesion: 0.04
 Nodes (27): Tests for options_engine — Phase 40 (task A2).  Every assertion here is anchored, Delta is dC/dS — verify against a central difference on the price., Vega is reported per 1% IV, so it equals dC/dsigma * 0.01., Time decay works against the holder of an at-the-money option., A price above the S bound is unattainable, so there is no root., An American call on a non-dividend underlying is never exercised early     (Mert, Early exercise is an extra right, so it can never reduce value., Deep in the money with positive rates, early exercise has real value. (+19 more)
 
 ### Community 3 - "Changelog"
-Cohesion: 0.13
-Nodes (13): DEFAULT_HOLDINGS, Period, PERIODS, Tab, TABS, DrawdownChart(), Props, HoldingsTable() (+5 more)
+Cohesion: 0.12
+Nodes (15): DEFAULT_HOLDINGS, Period, PERIODS, Tab, TABS, CAPMAttribution(), Props, CorrelationHeatmap() (+7 more)
 
 ### Community 4 - "25 Pages + 118 Components Frontend"
-Cohesion: 0.33
-Nodes (4): mergeByDate(), MergedPoint, PerformanceChart(), Props
+Cohesion: 0.16
+Nodes (10): DrawdownChart(), Props, HoldingsTable(), Props, mergeByDate(), MergedPoint, PerformanceChart(), Props (+2 more)
 
 ### Community 5 - "No Paid APIs Required"
 Cohesion: 0.06
-Nodes (53): _default_data_dir(), Path, Static configuration: countries, indicators, ISO mappings., Return the OS-standard app data directory for Axiom Finance.      Order of pre, DataPoint, make_series(), Shared lightweight data shapes., SeriesResult (+45 more)
+Nodes (56): _default_data_dir(), Path, Static configuration: countries, indicators, ISO mappings., Return the OS-standard app data directory for Axiom Finance.      Order of pre, DataPoint, make_series(), Shared lightweight data shapes., SeriesResult (+48 more)
 
 ### Community 6 - "PyInstaller Onedir Freezing"
 Cohesion: 0.15
@@ -391,23 +395,23 @@ Nodes (20): DESCRIPTIONS, LABELS, MetricInfoRow(), PCT_DIRECT_KEYS, PCT_KEYS, Ra
 
 ### Community 8 - "Active Issues Tracker"
 Cohesion: 0.02
-Nodes (154): AdminPage(), AppearanceSection(), fmtUptime(), CrossborderPage(), fmtUsd(), FinancialConditions(), nfciColor(), FundingLiquidityTab() (+146 more)
+Nodes (147): AdminPage(), AppearanceSection(), fmtUptime(), CrossborderPage(), fmtUsd(), FinancialConditions(), nfciColor(), QUADRANT_STYLES (+139 more)
 
 ### Community 9 - "CalendarFilterState"
-Cohesion: 0.05
-Nodes (35): Axiom Finance FastAPI application entrypoint., Global Macro Atlas router — Phase 13., _current_week(), get_calendar(), _norm_index(), Economic Calendar router — Phase 4.  GET /api/calendar?index=dow&start=YYYY-MM, Return (Monday, Sunday) of the current ISO week as 'YYYY-MM-DD' strings., Return aggregated economic calendar (macro, earnings, dividends, IPOs). (+27 more)
+Cohesion: 0.10
+Nodes (16): lifespan(), Axiom Finance FastAPI application entrypoint., dividend_analysis(), Dividend Analysis router — Phase 27., Dividend yield, growth rates, payout ratio, sustainability, and DDM fair value., insider_aggregate(), Insider Trading Aggregator router — Phase 27.  🟡 Compute tier — triggers aggre, 🟡 Aggregate Form 4 insider transactions across S&P 500.          First run is (+8 more)
 
 ### Community 10 - "ColDef"
 Cohesion: 0.04
-Nodes (98): FearGreedGauge(), Gauge(), scoreColor(), CB_COLORS, CB_FULL_NAMES, CB_NAMES, CentralBanksTab(), TIME_SPANS (+90 more)
+Nodes (77): FearGreedGauge(), Gauge(), scoreColor(), CB_COLORS, CB_FULL_NAMES, CB_NAMES, CentralBanksTab(), TIME_SPANS (+69 more)
 
 ### Community 11 - "Feature Idea List"
-Cohesion: 0.04
-Nodes (55): ResearchPageInner(), resolveTab(), TabKey, TABS, ASSET_PRESETS, CrossAssetCorrelation(), PERIODS, DupontTab() (+47 more)
+Cohesion: 0.03
+Nodes (56): ResearchPageInner(), resolveTab(), TabKey, TABS, EconLabTab(), ASSET_PRESETS, CrossAssetCorrelation(), PERIODS (+48 more)
 
 ### Community 12 - "Task 10 Brief"
-Cohesion: 0.05
-Nodes (36): business_dynamism(), credit_conditions(), energy_climate(), fiscal_sustainability(), forecast(), inequality(), labor_market(), macro_sentiment() (+28 more)
+Cohesion: 0.03
+Nodes (77): commodities(), _download_gscpi_sync(), employment(), financial_conditions(), forecast(), funding_liquidity(), fx_heatmap(), fx_ppp() (+69 more)
 
 ### Community 13 - "Task 11 Brief"
 Cohesion: 0.07
@@ -418,20 +422,20 @@ Cohesion: 0.09
 Nodes (25): AtlasKPIs(), Props, ColorLegend(), Props, IndicatorSelector(), Props, Props, RankingTable() (+17 more)
 
 ### Community 15 - "Task 3 Brief"
-Cohesion: 0.06
-Nodes (36): breadth(), constituents_endpoint(), movers(), _norm_index(), Dashboard endpoints: breadth, global indices, Fear & Greed, top movers.  All a, Index membership (yfinance-ready symbols); cached weekly. Reused by the     tre, _clip(), fear_greed() (+28 more)
+Cohesion: 0.07
+Nodes (30): _clip(), fear_greed(), _highs_lows(), _hy_spread(), _label(), _percentile_score(), _put_call(), Series (+22 more)
 
 ### Community 16 - "Task 4 Brief"
 Cohesion: 0.07
 Nodes (33): ALL_CATEGORIES, CalendarPageInner(), defaultFilters(), fmtWeekRange(), getSunday(), getWeekMonday(), INDEX_OPTS, IndexKey (+25 more)
 
 ### Community 18 - "Task 6 Brief"
-Cohesion: 0.06
-Nodes (38): cached(), clear_all(), datetime, Shared TTL caching helpers for external data calls., Naive UTC now — matches CacheEntry.created_at, which is stored naive., Flush cached data from both memory tiers and the SQLite tier.      Pass ``name, Per-cache hit/miss counts and current size, for /api/admin/health., Cache a *synchronous* function's result for 60 minutes.      Two-tier: in-memo (+30 more)
+Cohesion: 0.05
+Nodes (51): cached(), clear_all(), datetime, Shared TTL caching helpers for external data calls., Naive UTC now — matches CacheEntry.created_at, which is stored naive., Flush cached data from both memory tiers and the SQLite tier.      Pass ``name, Per-cache hit/miss counts and current size, for /api/admin/health., Cache a *synchronous* function's result for 60 minutes.      Two-tier: in-memo (+43 more)
 
 ### Community 19 - "Task 7 Brief"
-Cohesion: 0.03
-Nodes (56): CorporatePageInner(), fmtNum(), DividendsPageInner(), BENCHMARKS, MarketsPageInner(), PERIODS, RatiosTab, SEC_PERIODS (+48 more)
+Cohesion: 0.04
+Nodes (54): BENCHMARKS, PERIODS, RatiosTab, SEC_PERIODS, ShortInterestPanel, Tab, TABS, TechnicalsTab (+46 more)
 
 ### Community 20 - "Task 8 Brief"
 Cohesion: 0.12
@@ -447,11 +451,11 @@ Nodes (39): _ar1_return_prices(), _ou_levels(), Series, Tests for advanced_risk 
 
 ### Community 23 - "Backend Build Requirements"
 Cohesion: 0.15
-Nodes (11): MetricTooltip(), Props, KPICardProps, PortfolioKPIs(), Props, WalkthroughBanner(), METRIC_EXPLANATIONS, MetricEntry (+3 more)
+Nodes (12): MetricTooltip(), Props, KPICardProps, PortfolioKPIs(), Props, WalkthroughBanner(), useLearning(), METRIC_EXPLANATIONS (+4 more)
 
 ### Community 25 - "App Icon Square142x142"
 Cohesion: 0.10
-Nodes (36): load_ff_factors(), Download and parse daily Ken French factor data.      Parameters     --------, analyze(), benchmark_series(), black_litterman(), capm_attribution(), _clean(), correlation_matrix() (+28 more)
+Nodes (34): load_ff_factors(), _ols(), ndarray, Download and parse daily Ken French factor data.      Parameters     --------, Run OLS via numpy.linalg.lstsq and return coefficients + diagnostics.      Par, analyze(), benchmark_series(), black_litterman() (+26 more)
 
 ### Community 26 - "App Icon Square150x150"
 Cohesion: 0.08
@@ -466,28 +470,28 @@ Cohesion: 0.09
 Nodes (18): _close_frame(), DataFrame, Tests for technicals_service pure helpers — Phase 40 (task A4).  `get_technicals, With no down closes there is no average loss, so RSI pins at the top., Alternating equal gains and losses gives balanced averages., RSI-14 needs 14 periods; earlier rows must be NaN, not fabricated., No gains and no losses is undefined, not zero or fifty., High == low == close means no range, so every level is that price. (+10 more)
 
 ### Community 31 - "App Icon Square71x71"
-Cohesion: 0.05
-Nodes (37): Markets Screenertab Handleexport, Screener Screenertable Handleexport, BENCHMARKS, Period, PERIODS, RiskPageInner(), Tab, TABS (+29 more)
+Cohesion: 0.07
+Nodes (26): BENCHMARKS, Period, PERIODS, Tab, TABS, Window, WINDOWS, CorrelationHeatmap() (+18 more)
 
 ### Community 32 - "App Icon Square89x89"
-Cohesion: 0.05
-Nodes (39): _cell(), _clean_symbol(), _fetch_wikitext(), get_constituents(), _header_index(), _parse_constituents(), Index constituent lists (S&P 500 / Nasdaq-100 / Dow 30).  Source of truth is W, Find the GICS Sub-Industry column (contains both 'sub' and 'industry'). (+31 more)
+Cohesion: 0.09
+Nodes (19): DataFrame, Series, Compute per-column return% over the requested period.      * ``1d``  → last cl, Build the treemap payload for a given index and period.      Returns::, _return_pct(), treemap(), _bdays(), _clear_caches() (+11 more)
 
 ### Community 33 - "CountryDetailPage"
-Cohesion: 0.07
-Nodes (19): _make_factor_df(), _make_price_series_from_factors(), _make_yf_download_patch(), patch_ff3(), DataFrame, Series, Offline unit tests for the Fama-French attribution service.  All tests are ful, Return a function that fakes yf.download returning a Close-column DataFrame. (+11 more)
+Cohesion: 0.06
+Nodes (24): _parse_ff_csv(), Parse a Ken French daily CSV file from raw bytes.      These CSVs have a text, _make_factor_df(), _make_price_series_from_factors(), _make_yf_download_patch(), patch_ff3(), DataFrame, Series (+16 more)
 
 ### Community 35 - "RootLayout"
 Cohesion: 0.47
 Nodes (6): Cross-Platform 3-OS Build Matrix, Gated Release Flow (main → PRODUCTION), GitHub Actions CI/CD Pipeline, Tauri Desktop Packaging, Windows Desktop CI Build, Promote Main to PRODUCTION Workflow
 
 ### Community 37 - "Home"
-Cohesion: 0.36
-Nodes (7): get_fiscal_data(), _latest(), Fiscal Sustainability service — Phase 25.  Computes fiscal KPIs across major e, Convert {year: value} to [{date, value}] for frontend., Fetch fiscal KPIs for major economies and compute debt sustainability., _signal(), _to_timeseries()
+Cohesion: 0.27
+Nodes (9): fiscal_sustainability(), Fiscal sustainability dashboard: debt/GDP, fiscal balance, tax revenue,     r-g, get_fiscal_data(), _latest(), Fiscal Sustainability service — Phase 25.  Computes fiscal KPIs across major e, Convert {year: value} to [{date, value}] for frontend., Fetch fiscal KPIs for major economies and compute debt sustainability., _signal() (+1 more)
 
 ### Community 38 - "ResearchPage"
-Cohesion: 0.13
-Nodes (15): metadata, Footer(), LearningToggle(), Props, DrawerGroup, drawerGroups, MobileNav(), primaryTabs (+7 more)
+Cohesion: 0.09
+Nodes (17): metadata, ErrorBoundary, Props, State, Footer(), LearningToggle(), Props, DrawerGroup (+9 more)
 
 ### Community 39 - "SovereignRedirect"
 Cohesion: 0.07
@@ -510,8 +514,8 @@ Cohesion: 0.06
 Nodes (19): dcf(), Two-stage DCF valuation with scenario table and sensitivity heatmap., Two-stage DCF valuation returning base result, scenarios, and sensitivity heatma, two_stage_dcf(), _make_bundle(), Offline unit tests for the two-stage DCF engine., Bear intrinsic < Base < Bull (directionally)., All locked cases must return intrinsicValue=None and locked=True without raising (+11 more)
 
 ### Community 44 - "CategoryFilter"
-Cohesion: 0.05
-Nodes (35): classify(), Props, RegimeDetector(), RegimeInfo, BlackLitterman(), Props, EfficientFrontier(), Props (+27 more)
+Cohesion: 0.08
+Nodes (22): BlackLitterman(), Props, EfficientFrontier(), Props, FFAttribution(), Props, KellyTable(), Props (+14 more)
 
 ### Community 45 - "ImpactFilter"
 Cohesion: 0.05
@@ -526,44 +530,44 @@ Cohesion: 0.07
 Nodes (27): _build_panel(), _make_fetch(), _make_sr(), Offline tests for econ_lab_service (Phase 15 Econometric Lab).  wb.fetch is monk, Coefficient for inflation (x1) should be ≈ 3.0., Coefficient for unemployment (x2) should be ≈ -1.0., R² should be very high given the low noise DGP., With 300 obs the main regressors should be *** significant. (+19 more)
 
 ### Community 52 - "MacroDashboard"
-Cohesion: 0.09
-Nodes (43): Any, cointegration_test(), _expected_rs(), extended_metrics(), garch_fit(), hurst_exponent(), monte_carlo_var(), ou_fit() (+35 more)
+Cohesion: 0.12
+Nodes (31): cointegration_test(), extended_metrics(), ou_fit(), DataFrame, Series, Advanced rolling risk metrics, tail-risk models, and stress testing., Rolling parametric VaR at given confidence (e.g. 0.95)., Compute extended risk metrics over the full return history.     All returns are (+23 more)
 
 ### Community 53 - "RegimeOverlay"
 Cohesion: 0.05
 Nodes (41): dependencies, d3-hierarchy, d3-scale, d3-scale-chromatic, d3-shape, next, react, react-dom (+33 more)
 
 ### Community 54 - "RiskMetricsTable"
-Cohesion: 0.08
-Nodes (32): iso2_to_iso3(), Convert an ISO2 country code to ISO3.      Uses the static mapping first (20 p, banking(), currency_crisis(), Financial Stability router — Phase 28. Currency crisis early warning + banking, Currency crisis early warning system: KLR composite model     with traffic-ligh, Banking stability dashboard: NPL ratios, capital adequacy,     bank Z-scores, d, _banking_signal() (+24 more)
+Cohesion: 0.07
+Nodes (37): iso2_to_iso3(), Convert an ISO2 country code to ISO3.      Uses the static mapping first (20 p, energy_climate(), labor_market(), Trade flows dashboard: exports/GDP, imports/GDP, trade balance,     trade openn, Labor market deep dive: LFPR, youth unemployment, employment/population     rat, Energy transition & climate dashboard: CO2/capita, renewable share,     energy, trade_flows() (+29 more)
 
 ### Community 55 - "SnowflakeMini"
-Cohesion: 0.12
-Nodes (36): DailyFX, JobExecution, Audit log for background scheduler jobs., FX spot rates per currency pair/date., constituent_symbols(), Convenience: just the yfinance-ready ticker symbols for an index., _get_all_tracked_tickers(), _get_session() (+28 more)
+Cohesion: 0.14
+Nodes (32): _get_all_tracked_tickers(), _get_session(), log_job_failure(), log_job_start(), log_job_success(), _now_utc(), datetime, Background scheduler jobs for Axiom Finance.  APScheduler-based daily jobs tha (+24 more)
 
 ### Community 56 - "TabSkeleton"
-Cohesion: 0.05
-Nodes (25): TABS, KpiCard(), signalColor(), KpiCard(), signalColor(), KpiCard(), signalColor(), KpiCard() (+17 more)
+Cohesion: 0.03
+Nodes (48): TABS, TabKey, TABS, TopMovers(), KpiCard(), signalColor(), KpiCard(), signalColor() (+40 more)
 
 ### Community 57 - "MetricTooltip"
-Cohesion: 0.09
-Nodes (30): Base, init_db(), SQLAlchemy engine, session factory, and init_db for Axiom Finance., Create all tables if they don't exist. Idempotent (CREATE TABLE IF NOT EXISTS)., CacheEntry, DailyMacro, DailyPrice, DailyQuote (+22 more)
+Cohesion: 0.12
+Nodes (20): Base, SQLAlchemy engine, session factory, and init_db for Axiom Finance., CacheEntry, DailyFX, DailyMacro, DailyQuote, JobExecution, PortfolioTransaction (+12 more)
 
 ### Community 58 - "Providers"
-Cohesion: 0.16
-Nodes (26): load_sector_multiples(), Load Damodaran sector EV/EBITDA multiples (cached)., _clean(), _axiom_fair_value(), _capm_implied(), _Ctx, _fetch_aaa_yield(), _get_aaa_yield() (+18 more)
+Cohesion: 0.15
+Nodes (25): load_sector_multiples(), Load Damodaran sector EV/EBITDA multiples (cached)., _axiom_fair_value(), _capm_implied(), _Ctx, _fetch_aaa_yield(), _get_aaa_yield(), _locked_model() (+17 more)
 
 ### Community 59 - "CorrelationHeatmap"
-Cohesion: 0.15
-Nodes (19): get_db(), FastAPI dependency that yields a DB session and closes it afterwards., AiHistoryItem, BLView, compute_pnl(), get_transactions(), PnLItem, PnLRequest (+11 more)
+Cohesion: 0.16
+Nodes (18): get_db(), FastAPI dependency that yields a DB session and closes it afterwards., BLView, compute_pnl(), get_transactions(), PnLItem, PnLRequest, PnLResponse (+10 more)
 
 ### Community 60 - "PresetPills"
 Cohesion: 0.14
 Nodes (11): INDEX_OPTS, IndexKey, DataFreshnessBadge(), DOT_COLORS, RESULT_TABS, ResultTabs(), ResultTabsProps, Sparkline() (+3 more)
 
 ### Community 61 - "ResultTab"
-Cohesion: 0.11
-Nodes (38): _axis_dividend(), _axis_growth(), _axis_health(), _axis_performance(), _axis_value(), _cagr_score(), _col_values(), compute_snowflake() (+30 more)
+Cohesion: 0.10
+Nodes (40): _axis_dividend(), _axis_growth(), _axis_health(), _axis_performance(), _axis_value(), _cagr_score(), _col_values(), compute_snowflake() (+32 more)
 
 ### Community 63 - "Sparkline"
 Cohesion: 0.29
@@ -594,8 +598,8 @@ Cohesion: 0.33
 Nodes (5): Commits, Concerns, Files Created, Task 8 Report: Frontend Page — /yield, TypeScript Check
 
 ### Community 73 - "WalkthroughBanner"
-Cohesion: 0.14
-Nodes (19): benchmark_for(), _df_to_dict(), get_events(), get_info(), get_market_caps(), get_news(), get_quote(), get_volume_frame() (+11 more)
+Cohesion: 0.12
+Nodes (20): _cell(), _clean_symbol(), _fetch_wikitext(), get_constituents(), _header_index(), _parse_constituents(), Index constituent lists (S&P 500 / Nasdaq-100 / Dow 30).  Source of truth is W, Find the GICS Sub-Industry column (contains both 'sub' and 'industry'). (+12 more)
 
 ### Community 74 - "MultiCountryYieldChart"
 Cohesion: 0.10
@@ -603,15 +607,15 @@ Nodes (16): _FakeTicker, _FakeYF, _make_ticker(), patch_ticker(), DataFrame, Uni
 
 ### Community 75 - "AtlasBin"
 Cohesion: 0.15
-Nodes (22): _dir_size(), _download_all_bulk_datasets(), _download_bis_dataset(), _download_factbook(), _download_factbook_profiles(), _download_famafrench(), _download_imf(), _download_worldbank() (+14 more)
+Nodes (23): _dir_size(), _download_all_bulk_datasets(), _download_bis_dataset(), _download_factbook(), _download_factbook_profiles(), _download_famafrench(), _download_imf(), _download_worldbank() (+15 more)
 
 ### Community 76 - "AtlasScale"
-Cohesion: 0.05
-Nodes (50): AsyncClient, bulk_data_refresh(), bulk_data_status(), clear_cache(), _ConfigUpdate, get_config(), _mask_key(), performance() (+42 more)
+Cohesion: 0.10
+Nodes (24): bulk_data_refresh(), clear_cache(), _ConfigUpdate, get_config(), _mask_key(), performance(), Backend health dashboard: cache stats and data-source availability., Trigger a bulk data download in the background. Returns immediately. (+16 more)
 
 ### Community 77 - "buildAtlasScale"
-Cohesion: 0.08
-Nodes (31): credit_gaps(), housing_global(), BIS credit-to-GDP gaps for major economies.      Returns latest gap (% of GDP), BIS residential property prices for major economies (real, 2010=100).      Ret, _convert_fx(), _fetch_bis_zip(), get_cpi(), get_credit_gap() (+23 more)
+Cohesion: 0.09
+Nodes (32): credit_gaps(), housing_global(), BIS credit-to-GDP gaps for major economies.      Returns latest gap (% of GDP), BIS residential property prices for major economies (real, 2010=100).      Ret, _convert_fx(), _fetch_bis_zip(), get_cpi(), get_credit_gap() (+24 more)
 
 ### Community 78 - "GoodDirection"
 Cohesion: 0.09
@@ -622,16 +626,16 @@ Cohesion: 0.08
 Nodes (31): _clean(), fx_rates(), _pct_change(), Series, Return a finite float or None., Percent change of last value vs n bars ago; guarded., Return FX panel: current rate + changes + sparkline for 16 pairs vs base., _sparkline() (+23 more)
 
 ### Community 80 - "exportToCsv"
-Cohesion: 0.12
-Nodes (31): analyze(), benchmarks(), capm(), correlation(), drawdown(), _empty(), frontier(), Holding (+23 more)
+Cohesion: 0.11
+Nodes (35): benchmarks(), black_litterman(), BLRequest, capm(), correlation(), drawdown(), _empty(), fama_french() (+27 more)
 
 ### Community 81 - "fmtLarge"
 Cohesion: 0.06
 Nodes (30): app, security, windows, build, beforeBuildCommand, beforeDevCommand, devUrl, frontendDist (+22 more)
 
 ### Community 82 - "fmtNum"
-Cohesion: 0.11
-Nodes (23): _country_universe(), get_snapshot(), get_timeline(), _imf_fetch_sync(), _imf_timeline(), _numeric_id(), Global Macro Atlas service — Phase 13.  Serves country-level macro indicators, ISO 3166-1 numeric code for an alpha-3 code (e.g. "USA" -> "840").      The ch (+15 more)
+Cohesion: 0.10
+Nodes (26): Search the full World Bank country universe (~200 economies) by name or code., search_countries(), _country_universe(), get_snapshot(), get_timeline(), _imf_fetch_sync(), _imf_timeline(), _numeric_id() (+18 more)
 
 ### Community 83 - "fmtPct"
 Cohesion: 0.07
@@ -642,24 +646,24 @@ Cohesion: 0.13
 Nodes (13): cost_of_equity(), erp_for_country(), Total ERP for *country* as a decimal (e.g. 0.0446 for US)., CAPM: ke = rf + β × ERP_country. Uses β=1.0 if None., Compute WACC and its components from a yfinance bundle.      Returns     ----, wacc(), _make_bundle(), patch_rf() (+5 more)
 
 ### Community 85 - "fmtPctFromFraction"
-Cohesion: 0.12
-Nodes (23): country_profile(), Get a single country profile with structured sections., _build_region_map(), _extract_field(), _extract_section(), get_factbook_profile(), _load_factbook_file(), Factbook Profiles service — CIA World Factbook country data.  Loads individual (+15 more)
+Cohesion: 0.10
+Nodes (27): country_profile(), Get a single country profile with structured sections., _build_region_map(), _extract_field(), _extract_section(), get_factbook_profile(), _load_factbook_file(), Factbook Profiles service — CIA World Factbook country data.  Loads individual (+19 more)
 
 ### Community 86 - "fmtPrice"
 Cohesion: 0.10
 Nodes (24): _clean_cot_cache(), FakeResp, _legacy_zip_bytes(), _make_fake_get(), Tests for the CFTC COT service source waterfall (P2-22).  All network access i, deafut.txt has no header row → first data row becomes column names →     no req, Socrata snake_case columns must fuzzy-match the candidate lists., When Socrata works, the legacy zips must never be requested. (+16 more)
 
 ### Community 87 - "formatAsOf"
-Cohesion: 0.19
-Nodes (14): _append_rsi_manual(), _empty_response(), _fib_levels(), _find_col(), get_technicals(), _pivot_classic(), DataFrame, Series (+6 more)
+Cohesion: 0.12
+Nodes (22): Any, garch_fit(), monte_carlo_var(), Rolling pairwise correlation matrix, sampled every `step` days.     Returns a li, GARCH(1,1) via arch library. Returns omega, alpha, beta,     1-step-ahead foreca, GBM Monte Carlo VaR.     Draws `sims` random daily returns from a normal distrib, rolling_correlation_matrix(), _append_rsi_manual() (+14 more)
 
 ### Community 88 - "shortCountryName"
-Cohesion: 0.13
-Nodes (14): cash_conversion_cycle(), Cash Conversion Cycle = DSO + DIO – DPO (in days).      DSO = Accounts Receiva, Return-on-Invested-Capital.      NOPAT  ≈ EBIT × (1 – effective_tax_rate), roic(), _make_bundle(), Offline unit tests for the extended fundamentals service.  All tests use synth, ROIC = NOPAT / Invested Capital with known numbers., Missing effectiveTaxRate should fall back to 21 %. (+6 more)
+Cohesion: 0.06
+Nodes (32): cash_conversion_cycle(), dupont(), _g(), ohlson_o(), Any, _ratio(), Extended fundamentals service: ROIC, DuPont, Piotroski F-Score, Beneish M-Score, 3-Factor and 5-Factor DuPont decomposition.      3-Factor:  ROE = Net Margin × (+24 more)
 
 ### Community 89 - "LearningProvider"
-Cohesion: 0.19
-Nodes (15): BeneishBadge(), DUPONT_3_LABELS, DUPONT_5_LABELS, fmtDecPct(), fmtWacc(), formatDupontValue(), nil(), OhlsonBadge() (+7 more)
+Cohesion: 0.04
+Nodes (83): Markets Screenertab Handleexport, Screener Screenertable Handleexport, SparkCard(), MoverTr(), formatValue(), AnalystPanel(), CONSENSUS_COLORS, CONSENSUS_LABELS (+75 more)
 
 ### Community 90 - "useLearning"
 Cohesion: 0.10
@@ -678,8 +682,8 @@ Cohesion: 0.10
 Nodes (19): _clean_tickers(), cross_asset_correlation(), CrossAssetRequest, EventStudyRequest, fx_macro_link(), get_dupont(), get_factor_regime(), multi_country_portfolio() (+11 more)
 
 ### Community 94 - "RatioGuide"
-Cohesion: 0.10
-Nodes (25): altman_z(), compute_ratios(), dcf_target(), log_returns(), Series, Quantitative finance calculations: risk, CAPM/DCF, ratios, Z-score., Altman Z-Score for public manufacturing firms., Build the full ratios payload from a yfinance info/statements bundle. (+17 more)
+Cohesion: 0.06
+Nodes (40): Two-stage DCF valuation engine with scenario analysis and sensitivity heatmap., Compute per-share intrinsic value for one parameter set. Returns None if invalid, _single_dcf(), _data_path(), _fetch_dgs10(), load_erp(), Path, Shared discount-rate helpers: risk-free rate, ERP, WACC for valuation models. (+32 more)
 
 ### Community 95 - "ratioRanges"
 Cohesion: 0.09
@@ -694,12 +698,12 @@ Cohesion: 0.14
 Nodes (22): _compute_recession(), _extract_recessions(), _fit_probit(), _latest(), _monthly_mean(), Pure computation over already-fetched FRED points; unit-testable., [{date, value}] (any frequency) -> monthly-mean [{date: YYYY-MM, value}]., MLE probit fit: P(y=1) = Phi(alpha + beta*spread). (None, None) if degenerate. (+14 more)
 
 ### Community 98 - "Tone"
-Cohesion: 0.15
-Nodes (15): AnyRow, FIB_COLORS, fmt(), Overlay, OVERLAY_LABELS, Period, PERIODS, rsiBadge() (+7 more)
+Cohesion: 0.10
+Nodes (23): AsyncClient, bulk_data_status(), prefetch_start(), prefetch_status(), Start a staggered background prefetch of all slow-changing data sources., Return the current progress of the background prefetch job., Return download status for each bulk dataset, plus whether a refresh is running., is_bulk_running() (+15 more)
 
 ### Community 99 - "AiSummaryHistoryItem"
 Cohesion: 0.09
-Nodes (23): _beta_for(), capm_dcf(), factors(), full(), _kpis(), CAPM + DCF valuation., Live country risk-free rates from FRED (cached nightly)., Full valuation bundle (compute tier: runs on page load).      Combines the 8-m (+15 more)
+Nodes (28): _beta_for(), capm_dcf(), factors(), full(), _kpis(), CAPM + DCF valuation., Live country risk-free rates from FRED (cached nightly)., Full valuation bundle (compute tier: runs on page load).      Combines the 8-m (+20 more)
 
 ### Community 100 - "AiSummaryResponse"
 Cohesion: 0.13
@@ -710,8 +714,8 @@ Cohesion: 0.13
 Nodes (19): _benchmarks_for(), events(), fx_rates_endpoint(), news(), _parse_tickers(), _pct_change(), prices(), Series (+11 more)
 
 ### Community 102 - "AtlasCountry"
-Cohesion: 0.15
-Nodes (12): _benchmarks_for(), correlation(), _correlation_sync(), extended_metrics(), _extended_sync(), _parse_tickers(), Risk & Rolling Metrics endpoints — Phase 6., rolling_metrics() (+4 more)
+Cohesion: 0.12
+Nodes (16): _benchmarks_for(), correlation(), _correlation_sync(), extended_metrics(), _extended_sync(), _parse_tickers(), Risk & Rolling Metrics endpoints — Phase 6., rolling_metrics() (+8 more)
 
 ### Community 103 - "AtlasIndicator"
 Cohesion: 0.14
@@ -722,8 +726,8 @@ Cohesion: 0.10
 Nodes (20): compilerOptions, allowJs, baseUrl, esModuleInterop, incremental, isolatedModules, jsx, lib (+12 more)
 
 ### Community 105 - "AtlasSnapshotCountry"
-Cohesion: 0.19
-Nodes (18): AiSummary, AI-generated summaries cached with type + context key., ai_company(), ai_dashboard(), ai_macro(), _cached_lookup(), CompanyRequest, DashboardRequest (+10 more)
+Cohesion: 0.18
+Nodes (19): AiSummary, AI-generated summaries cached with type + context key., ai_company(), ai_dashboard(), ai_macro(), AiHistoryItem, _cached_lookup(), CompanyRequest (+11 more)
 
 ### Community 106 - "AtlasSnapshotResponse"
 Cohesion: 0.14
@@ -742,8 +746,8 @@ Cohesion: 0.11
 Nodes (16): Tests for HybridCache and the existing @cached decorator., Ensure the existing @cached decorator is not broken., Different args should each compute independently., An empty dict result must be recomputed every call, never cached., A custom skip_if can flag domain-specific 'empty' payloads., test_custom_skip_if_predicate(), test_db_tier_expires_stale_entry(), test_empty_result_is_not_cached() (+8 more)
 
 ### Community 110 - "BacktestPoint"
-Cohesion: 0.14
-Nodes (23): _compound_return(), _compute_factor_regime(), _fmt_month(), get_factor_regime(), load_ff_monthly_factors(), DataFrame, Series, Fama-French 3-factor and 5-factor attribution service.  Downloads daily Ken Fr (+15 more)
+Cohesion: 0.20
+Nodes (17): _compound_return(), _compute_factor_regime(), _fmt_month(), Series, Trailing `months`-month compounded return from a decimal monthly series., Pure computation of the factor regime snapshot from decimal monthly returns., _constant_monthly_df(), DataFrame (+9 more)
 
 ### Community 111 - "BankingStabilityData"
 Cohesion: 0.21
@@ -770,24 +774,24 @@ Cohesion: 0.19
 Nodes (15): macro_regime(), 4-quadrant macro regime classifier: growth × inflation with asset allocation sig, _cpi_yoy(), _cpi_yoy_history(), get_macro_regime(), _latest(), _ma3m(), Macro regime classifier — 4-quadrant growth/inflation model with asset allocatio (+7 more)
 
 ### Community 117 - "BreadthResponse"
-Cohesion: 0.20
-Nodes (12): earnings_calendar(), economic_calendar(), _get(), ipo_calendar(), Thin Finnhub API client for Phase 4 Economic Calendar (and future phases).  Al, Low-level GET helper.  Returns parsed JSON or None on any failure., Fetch macro economic calendar events from Finnhub.      Returns a list of even, Fetch IPO calendar from Finnhub.      Returns a list of IPO dicts or [] if una (+4 more)
+Cohesion: 0.17
+Nodes (13): Economic Calendar service — Phase 4.  Aggregates four event streams into a uni, earnings_calendar(), economic_calendar(), _get(), ipo_calendar(), Thin Finnhub API client for Phase 4 Economic Calendar (and future phases).  Al, Low-level GET helper.  Returns parsed JSON or None on any failure., Fetch macro economic calendar events from Finnhub.      Returns a list of even (+5 more)
 
 ### Community 118 - "BulkDatasetStatus"
-Cohesion: 0.05
-Nodes (20): _make_bundle(), patch_network(), Offline unit tests for valuation_engine.py (no network calls)., Block all network calls in discount_rates and valuation_engine., Graham Number = sqrt(22.5 * eps * bvps) — verify numerically., When growth=0.50 (50%), growth_whole capped at 20., forwardEPS / costOfEquity — verify numerically., With no dividends + financials sector, fewer models are available → weights reno (+12 more)
+Cohesion: 0.18
+Nodes (3): TestDDMModel, TestEPVModel, TestEvEbitdaModel
 
 ### Community 119 - "BusinessCountry"
-Cohesion: 0.15
-Nodes (17): _download_gscpi_sync(), employment(), financial_conditions(), housing(), inflation(), _latest(), leading(), Compute rolling 12-month YoY % change from a monthly series. (+9 more)
+Cohesion: 0.17
+Nodes (7): _make_bundle(), forwardEPS / costOfEquity — verify numerically., With no dividends + financials sector, fewer models are available → weights reno, Very low spot price → should be 'Significantly Undervalued'., Full synthetic bundle with all fields required for every model., TestAxiomFairValue, TestCAPMImplied
 
 ### Community 120 - "BusinessCountryKpis"
 Cohesion: 0.12
 Nodes (15): Tests for Phase 17.D API Optimization Layer., GET /api/market/composite without tickers returns 422., GET /api/market/composite with blank tickers value returns 422., GET /api/admin/performance returns 200 with expected top-level keys., jobs_last_24h must be a list (possibly empty or containing an error entry)., DeduplicationMiddleware must not break the /api/health endpoint., Existing /api/market/13f endpoint still works (422 = missing param, not broken)., GET /api/market/composite returns 200 or 422/500 (not 404). (+7 more)
 
 ### Community 121 - "BusinessData"
-Cohesion: 0.05
-Nodes (15): _FakeTicker, _make_earnings_df(), DataFrame, Fully offline unit tests for Phase 4 calendar_service.  All external calls (yf, Build a minimal earnings_dates DataFrame like yfinance returns., Minimal yf.Ticker stand-in., TestBeatMiss, TestCalendarTopLevel (+7 more)
+Cohesion: 0.12
+Nodes (5): Fully offline unit tests for Phase 4 calendar_service.  All external calls (yf, TestCalendarTopLevel, TestCbMeetingsMerge, TestFinnhubEconomicCalendar, TestIpoEvents
 
 ### Community 122 - "CacheStat"
 Cohesion: 0.12
@@ -806,28 +810,28 @@ Cohesion: 0.05
 Nodes (33): Bug-fix batch — Atlas, Screener, Dividends, Country pages, Admin (2026-07-01), Cache poisoning fix + macro/Atlas data resilience + theming (2026-07-02), Changelog — Axiom Finance, Cross-platform desktop builds — Windows · macOS · Linux (2026-07-01), Desktop v1.0.0 — Working Windows Build (2026-07-01), Gated desktop release flow — main → PRODUCTION (2026-07-01), Legend, Phase 13–24: Expansion (+25 more)
 
 ### Community 126 - "CarryRow"
-Cohesion: 0.33
-Nodes (6): Short interest data from Finnhub: % of float short, days to cover,     squeeze s, short_interest(), _compute_squeeze_score(), get_short_interest(), Fetch short interest data.      If ticker is provided, returns data for that s, Heuristic squeeze score: higher = more squeeze potential.
+Cohesion: 0.15
+Nodes (13): form4_insiders(), holders_13f(), market_composite(), EDGAR data router: 13F institutional holders and Form 4 insider transactions., Top 13F institutional holders from the most recent quarterly filing., Recent Form 4 insider buy/sell transactions (last 90 days)., Return prices + quotes in a single request.     A single OHLCV fetch is shared s, Short interest data from Finnhub: % of float short, days to cover,     squeeze s (+5 more)
 
 ### Community 127 - "CarryTable"
-Cohesion: 0.21
-Nodes (10): get_centralbanks(), _load_meetings(), _next_meeting(), _pick_series(), Central Banks policy rate history + meeting countdown — Phase 16., _to_float(), Tests for centralbanks_service — Phase 16., test_next_meeting_future() (+2 more)
+Cohesion: 0.32
+Nodes (5): _next_meeting(), Tests for centralbanks_service — Phase 16., test_next_meeting_future(), test_next_meeting_picks_closest(), test_next_meeting_skips_past()
 
 ### Community 128 - "CbCurrent"
 Cohesion: 0.18
 Nodes (12): sovereign_risk(), _fetch_wb_sync(), get_country_risk(), _latest(), Country Risk sovereign panel — Phase 16.  6-KPI traffic-light dashboard per co, _signal(), get_sovereign_risk(), _market_score() (+4 more)
 
 ### Community 129 - "CentralBanksData"
-Cohesion: 0.12
-Nodes (22): _all_ticker_events(), calendar(), dividend_events(), earnings_events(), _event(), _fetch_ticker_events(), ipo_events(), _load_cb_meetings() (+14 more)
+Cohesion: 0.18
+Nodes (12): _all_ticker_events(), calendar(), dividend_events(), earnings_events(), _load_cb_meetings(), macro_events(), Fan-out _fetch_ticker_events over all index constituents (max 10 threads)., Return earnings events for all index constituents in [start, end]. (+4 more)
 
 ### Community 130 - "CointegrationResult"
 Cohesion: 0.29
 Nodes (4): todayStr(), TransactionLog(), PnLSummary, Transaction
 
 ### Community 131 - "CommoditiesData"
-Cohesion: 0.18
-Nodes (10): _data_path(), _fetch_dgs10(), load_erp(), Path, Shared discount-rate helpers: risk-free rate, ERP, WACC for valuation models., Effective tax rate as a decimal., Synchronously fetch the latest DGS10 from FRED via fredapi or pandas_datareader., Load Damodaran ERP data — live Excel download with static JSON fallback. (+2 more)
+Cohesion: 0.43
+Nodes (3): Effective tax rate as a decimal., tax_rate_for(), TestTaxRateFor
 
 ### Community 132 - "CommodityRow"
 Cohesion: 0.26
@@ -854,8 +858,8 @@ Cohesion: 0.31
 Nodes (5): _compute_technicals(), DataFrame, Compute all price/volume-derived technical fields for one symbol.      Returns, DataFrame, TestComputeTechnicals
 
 ### Community 138 - "CorrelationResponse"
-Cohesion: 0.07
-Nodes (25): async_cached(), Cache an *async* function's result for 60 minutes.      Two-tier: in-memory TT, get_business_data(), _latest(), _load_doing_business(), Business Dynamism service — Phase 30.  Computes business formation KPIs across, Convert {year: value} to [{date, value}] for frontend., Load historical Doing Business scores from static JSON. (+17 more)
+Cohesion: 0.09
+Nodes (21): async_cached(), Cache an *async* function's result for 60 minutes.      Two-tier: in-memory TT, net_liquidity(), Fed plumbing: net liquidity (WALCL − RRP − TGA), reserves, SPX overlay., get_centralbanks(), _load_meetings(), _pick_series(), Central Banks policy rate history + meeting countdown — Phase 16. (+13 more)
 
 ### Community 139 - "CorrelationSnapshot"
 Cohesion: 0.24
@@ -866,24 +870,24 @@ Cohesion: 0.18
 Nodes (11): build_company_prompt(), build_dashboard_prompt(), build_macro_prompt(), _extract_error(), generate_summary(), Response, AI-powered summary service using Google Gemini (free tier).  All summaries are, Simple prompt - Gemini summarises today's market conditions. (+3 more)
 
 ### Community 141 - "CotData"
-Cohesion: 0.18
-Nodes (9): dupont(), _g(), Any, 3-Factor and 5-Factor DuPont decomposition.      3-Factor:  ROE = Net Margin ×, Return the first non-None value from *d* matching any of *keys*., Net Margin × Asset Turnover × Equity Multiplier should equal ROE., 5-factor ROE should be the product of its five components., Both decompositions should produce the same ROE (same underlying data). (+1 more)
+Cohesion: 0.21
+Nodes (13): init_db(), Create all tables if they don't exist. Idempotent (CREATE TABLE IF NOT EXISTS)., DailyPrice, OHLCV price history per symbol/date., backfill_batch(), get_all_tickers(), main(), Get deduplicated list of S&P 500 + NDX 100 + Dow 30 tickers. (+5 more)
 
 ### Community 142 - "Country"
 Cohesion: 0.16
 Nodes (7): _bdays(), _make_close(), _make_vol(), _patch_screener(), DatetimeIndex, Offline unit tests for Phase 5 screener service.  All external calls are monke, Prevent warm_all() from running during tests and provide stub data.
 
 ### Community 143 - "CountryRiskData"
-Cohesion: 0.12
-Nodes (11): GlobalYieldsTab(), TABS, YieldPageInner(), CurveNoiseTab(), fmt(), MultiCountryYieldChart(), Props, GlobalYieldCountry (+3 more)
+Cohesion: 0.05
+Nodes (30): CorporatePageInner(), fmtNum(), DividendsPageInner(), MarketsPageInner(), PortfolioPageInner(), RiskPageInner(), ScreenerPageInner(), GlobalYieldsTab() (+22 more)
 
 ### Community 144 - "CountryRiskEntry"
-Cohesion: 0.23
-Nodes (13): _build_risk_contrib_rows(), _clean(), _erc_optimize(), _inv_vol_w(), ndarray, Risk Parity service — Phase 14.  Provides three functions:   - inverse_vol_weigh, Build riskContrib list with pctContrib normalised to sum 1., Convert to Python float; map NaN/inf/None → None. (+5 more)
+Cohesion: 0.21
+Nodes (12): _build_risk_contrib_rows(), _clean(), _erc_optimize(), _inv_vol_w(), ndarray, Build riskContrib list with pctContrib normalised to sum 1., Convert to Python float; map NaN/inf/None → None., Risk contribution vector RC_i = w_i * (cov @ w)_i (un-normalised). (+4 more)
 
 ### Community 148 - "CreditPulseData"
-Cohesion: 0.19
-Nodes (15): _clean(), _fetch_ebp_sync(), get_credit_conditions(), _is_empty(), _latest(), Credit & funding conditions — Phase 39.  Four high-evidence indicators that the, Never cache a payload that carries no usable indicator., Reserve scarcity, lending standards, excess bond premium, NFCI/ANFCI. (+7 more)
+Cohesion: 0.16
+Nodes (17): credit_conditions(), SOFR-IORB reserve scarcity, SLOOS lending standards, excess bond premium, NFCI/A, _clean(), _fetch_ebp_sync(), get_credit_conditions(), _is_empty(), _latest(), Credit & funding conditions — Phase 39.  Four high-evidence indicators that the (+9 more)
 
 ### Community 149 - "CrossAssetCorrelation"
 Cohesion: 0.17
@@ -906,8 +910,8 @@ Cohesion: 0.29
 Nodes (4): inverse_vol_weights(), Inverse-volatility weights.      Returns::          {           "weights":     [, ASSET_A has vol=1% (lowest) so should have the highest weight., TestInverseVolWeights
 
 ### Community 154 - "DbHealth"
-Cohesion: 0.23
-Nodes (6): ohlson_o(), Ohlson O-Score (1980 logit model, 9 coefficients).      O = -1.32 - 0.407*SIZE, Unpack the four sub-dicts from a yfinance bundle, defaulting to {}., _unpack(), A firm with low debt ratio and positive earnings should have         lower prob, TestOhlsonO
+Cohesion: 0.16
+Nodes (5): _FakeTicker, DataFrame, Minimal yf.Ticker stand-in., TestDividendEvents, TestRobustness
 
 ### Community 155 - "DcfResponse"
 Cohesion: 0.18
@@ -926,8 +930,8 @@ Cohesion: 0.15
 Nodes (13): _months(), DatetimeIndex, Tests for oil_shock_service (demand vs. oil-specific decomposition) — Phase 39., Rising oil on demand is expansionary; rising oil on supply is not., Oil returns generated as demand_beta * copper returns + an oil-only shock., demand + supply must reconstruct the total return exactly., A month whose move is almost entirely explained by copper reads as demand., _synthetic() (+5 more)
 
 ### Community 159 - "DupontResponse"
-Cohesion: 0.24
-Nodes (9): mergers(), M&A deal tracker: announced deals, monthly volume, sector heatmap., _extract_tickers(), get_ma_data(), _guess_sector(), M&A / Corporate Actions service — Phase 30.  Tracks announced merger & acquisi, Extract potential ticker symbols from news text (1-5 uppercase letters)., Guess sector from ticker list. (+1 more)
+Cohesion: 0.22
+Nodes (9): mergers(), M&A / Corporate Actions router — Phase 30., M&A deal tracker: announced deals, monthly volume, sector heatmap., _extract_tickers(), get_ma_data(), _guess_sector(), Extract potential ticker symbols from news text (1-5 uppercase letters)., Guess sector from ticker list. (+1 more)
 
 ### Community 161 - "EmploymentData"
 Cohesion: 0.20
@@ -958,8 +962,8 @@ Cohesion: 0.16
 Nodes (14): _pts(), Tests for credit_conditions_service (SOFR-IORB, SLOOS, EBP, NFCI/ANFCI) — Phase, The skip_if guard must refuse payloads with no usable indicator., A transient download failure must degrade to [] and never raise., If the Fed changes the CSV layout we must not emit garbage rows., test_fetch_ebp_returns_empty_on_source_failure(), test_fetch_ebp_returns_empty_on_unexpected_schema(), test_is_empty_guard_blocks_caching_of_useless_payloads() (+6 more)
 
 ### Community 168 - "FactbookProfile"
-Cohesion: 0.26
-Nodes (5): _parse_ff_csv(), Parse a Ken French daily CSV file from raw bytes.      These CSVs have a text, Unit test the CSV parsing logic with a hand-crafted mini-CSV., Values in the CSV are in percent; parser must divide by 100., TestParseFfCsv
+Cohesion: 0.23
+Nodes (11): business_dynamism(), Business dynamism dashboard: new business density, startup time,     and histor, get_business_data(), _latest(), _load_doing_business(), Business Dynamism service — Phase 30.  Computes business formation KPIs across, Convert {year: value} to [{date, value}] for frontend., Load historical Doing Business scores from static JSON. (+3 more)
 
 ### Community 169 - "FactbookSection"
 Cohesion: 0.16
@@ -970,20 +974,20 @@ Cohesion: 0.25
 Nodes (8): _clean(), get_moments(), _gk_variance(), DataFrame, Series, Convert to Python float; map NaN/inf/None → None., Per-day Garman-Klass variance estimate.      Formula: 0.5 * ln(H/L)^2 - _GK_K *, Return realized moments time-series for *ticker*.      Returns:         {
 
 ### Community 171 - "FearGreedResponse"
-Cohesion: 0.18
-Nodes (12): oil_shocks(), Demand vs. oil-specific decomposition of real WTI returns (Kilian-style proxy)., _decompose(), get_oil_shocks(), _ols(), ndarray, Series, Demand vs. oil-specific decomposition of real WTI returns. (+4 more)
+Cohesion: 0.17
+Nodes (13): oil_shocks(), Demand vs. oil-specific decomposition of real WTI returns (Kilian-style proxy)., _decompose(), get_oil_shocks(), _ols(), ndarray, Series, Oil shock decomposition — Phase 39.  Kilian (2009, AER) showed that the *level* (+5 more)
 
 ### Community 173 - "FFData"
 Cohesion: 0.25
 Nodes (7): 24 Pages (full investment research stack), Axiom Finance — Tech Stack (Phases 0–31), Backend, External Data Sources (no paid APIs required), Frontend, Infrastructure, Overview
 
 ### Community 174 - "FFFactorRow"
-Cohesion: 0.23
-Nodes (13): _compute_taylor_rule(), _download_acm_sync(), _fetch_many_fred_sync(), get_rates_data(), _get_rates_data_sync(), _latest(), Series, Rates & Yields service: yield curve, Taylor Rule, ACM decomposition, credit spre (+5 more)
+Cohesion: 0.20
+Nodes (9): _event(), _fetch_ticker_events(), ipo_events(), Convert a pandas Timestamp, unix-seconds int, or date string to 'YYYY-MM-DD'., Fetch earnings and dividend events for a single ticker via yfinance.      Retu, Return IPO events from Finnhub in [start, end].  Empty without API key., Build a calendar event with all schema keys present (defaults to None)., _ts_to_date() (+1 more)
 
 ### Community 175 - "FibLevel"
-Cohesion: 0.26
-Nodes (11): analyst_data(), _clean(), Any, DataFrame, Analyst-data service: price targets, consensus ratings, earnings surprises, for, Convert to float, return None for NaN/inf/unconvertible., Return DataFrame from a Ticker attribute/method; None on any error., Call a Ticker method; return None on any error. (+3 more)
+Cohesion: 0.20
+Nodes (4): patch_network(), Offline unit tests for valuation_engine.py (no network calls)., Block all network calls in discount_rates and valuation_engine., TestRIMModel
 
 ### Community 176 - "FinancialConditionsData"
 Cohesion: 0.29
@@ -998,12 +1002,12 @@ Cohesion: 0.29
 Nodes (5): _bdays(), patch_momentum(), DatetimeIndex, Offline tests for momentum_service (Phase 14).  get_close_frame and constituent_, Patch constituents and yfinance_service inside momentum_service.
 
 ### Community 179 - "._run_single"
-Cohesion: 0.22
-Nodes (10): _get_correlation_matrix(), get_cross_asset_correlations(), get_fx_macro_link(), get_multi_country_portfolio(), DataFrame, Cross-Asset & Factor Analytics service — Phase 39.  Three capabilities built o, Compute correlation matrix for a mixed set of assets.      Accepts tickers fro, Build FX / commodity / macro linkage data.      Uses existing BIS effective FX (+2 more)
+Cohesion: 0.31
+Nodes (6): breadth(), constituents_endpoint(), movers(), _norm_index(), Dashboard endpoints: breadth, global indices, Fear & Greed, top movers.  All a, Index membership (yfinance-ready symbols); cached weekly. Reused by the     tre
 
 ### Community 180 - "SnowflakeMini.tsx"
-Cohesion: 0.28
-Nodes (6): EarningsQuality(), fmtNum(), fmtPct(), UNIVERSES, ToggleChip(), EarningsQualityData
+Cohesion: 0.36
+Nodes (7): inequality(), Inequality & development dashboard: Gini coefficient, income shares,     povert, get_inequality_data(), _latest(), Inequality & Development service — Phase 29.  Cross-country inequality indicat, _signal(), _to_timeseries()
 
 ### Community 181 - "Form4Response"
 Cohesion: 0.33
@@ -1011,15 +1015,15 @@ Nodes (4): _is_empty_result(), Persist value to SQLite; non-fatal on failure., W
 
 ### Community 182 - "FrontierData"
 Cohesion: 0.29
-Nodes (6): FIELDS, FilterRow, readValue(), renderValue(), ScreenerResponse, ScreenerRow
+Nodes (5): DotProps, MonteCarlo(), Props, MCData, MCPortfolioPoint
 
 ### Community 183 - "corporate.py"
-Cohesion: 0.29
-Nodes (3): ErrorBoundary, Props, State
+Cohesion: 0.38
+Nodes (6): _current_week(), get_calendar(), _norm_index(), Economic Calendar router — Phase 4.  GET /api/calendar?index=dow&start=YYYY-MM, Return (Monday, Sunday) of the current ISO week as 'YYYY-MM-DD' strings., Return aggregated economic calendar (macro, earnings, dividends, IPOs).
 
 ### Community 184 - "apply_presets"
-Cohesion: 0.40
-Nodes (5): funding_liquidity(), Funding and Liquidity gauge., get_funding_liquidity(), _latest(), Fetch M2SL, SOFR, CP spread, and SOFR-FF spread from FRED.
+Cohesion: 0.38
+Nodes (6): _clean(), _fetch_one(), get_sector_dupont(), Sector DuPont Analysis — Phase 27.  Decompose ROE into Net Profit Margin × Ass, Fetch DuPont components for a single ticker from yfinance., Compute median DuPont decomposition by GICS sector for the S&P 500.
 
 ### Community 185 - "FxCross"
 Cohesion: 0.40
@@ -1030,8 +1034,8 @@ Cohesion: 0.50
 Nodes (4): create_png(), main(), Generate placeholder icons for Tauri development.  Creates a single large RGBA, Create a minimal valid RGBA PNG file with a solid color.
 
 ### Community 187 - "_clean_float"
-Cohesion: 0.53
-Nodes (5): get_labor_data(), _latest(), Labor Market Deep Dive service — Phase 28.  Cross-country labor indicators: LF, _signal(), _to_timeseries()
+Cohesion: 0.33
+Nodes (3): _make_earnings_df(), Build a minimal earnings_dates DataFrame like yfinance returns., TestDateRangeFiltering
 
 ### Community 188 - "FxMacroLinkResponse"
 Cohesion: 0.50
@@ -1057,10 +1061,6 @@ Nodes (5): crossborder_claims(), Cross-border finance router — trade flows bet
 Cohesion: 0.36
 Nodes (4): Series, Compute the most-recent RSI value for a price series., _rsi(), TestRsi
 
-### Community 290 - "_db_path"
-Cohesion: 0.33
-Nodes (6): net_liquidity(), Fed plumbing: net liquidity (WALCL − RRP − TGA), reserves, SPX overlay., _fetch_spx_points(), get_net_liquidity(), Weekly Fed-plumbing dashboard: net liquidity, RRP, TGA, reserves, SPX overlay., Weekly ^GSPC closes for the overlay chart (best-effort).
-
 ### Community 292 - "test_treemap.py"
 Cohesion: 0.40
 Nodes (5): country_list(), OpenFactbook country profiles router., List all ~260 countries with ISO codes and names., get_country_list(), Return [{iso2, iso3, name, flag, region}] for all ~260 countries.
@@ -1069,77 +1069,61 @@ Nodes (5): country_list(), OpenFactbook country profiles router., List all ~260 
 Cohesion: 0.28
 Nodes (5): Providers(), LearningContext, LearningContextType, LearningProvider(), queryClient
 
-### Community 294 - "ScreenerTab.tsx"
-Cohesion: 0.40
-Nodes (5): factor_regression(), _ols(), ndarray, Run OLS via numpy.linalg.lstsq and return coefficients + diagnostics.      Par, Run a Fama-French factor regression for a single ticker.      Parameters
-
 ### Community 296 - "reset_connection"
 Cohesion: 0.38
 Nodes (6): AXES, Props, SCORE_COLOR(), SCORE_KEYS, SnowflakeMini(), SnowflakeScores
 
 ### Community 300 - "log_returns"
-Cohesion: 0.50
-Nodes (3): CAPMAttribution(), Props, CAPMData
+Cohesion: 0.38
+Nodes (6): GlobalIndices(), pct(), pctColor(), Row(), IndexRow, IndicesResponse
 
 ### Community 307 - "apply_presets"
 Cohesion: 0.47
 Nodes (3): apply_presets(), Filter rows to those that pass ALL of the given presets (AND logic)., TestApplyPresets
 
-### Community 308 - "short_interest_service.py"
-Cohesion: 0.50
-Nodes (3): CorrelationHeatmap(), Props, CorrelationData
-
 ### Community 309 - "TestGrahamFormulaModel"
-Cohesion: 0.50
-Nodes (4): COLORS, Props, RiskContribution(), RiskContribData
+Cohesion: 0.33
+Nodes (5): get_snowflake(), get_snowflake_batch(), Snowflake Composite Score router — Phase 9., Full Snowflake score for a single ticker (5 axes, 0–10 each)., Lightweight Snowflake scores for multiple tickers (cache-only).
 
 ### Community 310 - "get_factor_regime"
-Cohesion: 0.50
-Nodes (4): commodities(), _get_commodities_sync(), Fetch commodity prices primarily from FRED, with yfinance for 1D/1W changes., Commodity futures prices, changes, Gold/Oil ratio, Axiom Commodity Index.
-
-### Community 311 - "StressTesting.tsx"
-Cohesion: 0.50
-Nodes (4): fx_heatmap(), _get_fx_heatmap_sync(), FX heatmap using FRED daily exchange rates., 1D % change for major currency crosses (FX heatmap).
+Cohesion: 0.47
+Nodes (5): get_dividend_analysis(), _latest_val(), Dividend Analysis service — Phase 27.  Dividend yield, growth rates, payout ra, Return dividend yield, growth rates, payout ratio, sustainability, and DDM fair, _safe_div()
 
 ### Community 312 - "PresetPills.tsx"
 Cohesion: 0.50
 Nodes (4): DEFERRED_IDS, PresetPills(), PresetPillsProps, PresetDef
 
-### Community 313 - "_get_fx_ppp_sync"
-Cohesion: 0.50
-Nodes (4): fx_ppp(), _get_fx_ppp_sync(), Compute PPP-implied exchange rates vs spot for G10 pairs using FRED CPI + DEX., Purchasing Power Parity implied exchange rates vs spot for G10 pairs.
-
-### Community 314 - "get_recession_probability"
-Cohesion: 0.50
-Nodes (4): NY-Fed-style 12-month-ahead probit on the 10y–3m spread + Sahm rule., recession_probability(), get_recession_probability(), NY-Fed-style 12-month-ahead recession probability from the 10y-3m spread.
-
 ### Community 315 - "black_litterman"
-Cohesion: 0.67
-Nodes (3): black_litterman(), BLRequest, Black-Litterman posterior + optimal weights (compute-on-demand).
+Cohesion: 0.40
+Nodes (3): Props, StressTesting(), StressScenario
 
 ### Community 316 - "fama_french"
+Cohesion: 0.50
+Nodes (4): _expected_rs(), hurst_exponent(), Anis & Lloyd (1976) expected R/S for an iid series of length n.      Raw R/S is, Hurst exponent via corrected R/S analysis on log returns.     H < 0.5 → mean-rev
+
+### Community 320 - "simulate_custom_shock"
 Cohesion: 0.67
-Nodes (3): fama_french(), FFRequest, Fama-French factor attribution for the portfolio (on-demand).
+Nodes (3): DataFrame, Simulate a custom macro shock on a portfolio using simple beta exposure.     Sh, simulate_custom_shock()
 
 ## Knowledge Gaps
-- **594 isolated node(s):** `Phase 39 — High-evidence credit, oil, and rates indicators (2026-08-22)`, `Phase 38b — Five analyst features: net liquidity, recession model, earnings quality, event study, factor regime (2026-07-03)`, `Phase 38a — Event-loop hygiene: threadpool offloading + cache single-flight (2026-07-02)`, `Phase 37 — Fix-it sprint: COT data, error boundaries, UI consistency, desktop logging (2026-07-02)`, `Cache poisoning fix + macro/Atlas data resilience + theming (2026-07-02)` (+589 more)
+- **596 isolated node(s):** `IGNORED_CONSOLE`, `PAGES`, `Phase 39 — High-evidence credit, oil, and rates indicators (2026-08-22)`, `Phase 38b — Five analyst features: net liquidity, recession model, earnings quality, event study, factor regime (2026-07-03)`, `Phase 38a — Event-loop hygiene: threadpool offloading + cache single-flight (2026-07-02)` (+591 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **114 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **123 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `cached()` connect `Task 6 Brief` to `CentralBanksData`, `CommoditiesData`, `ConfigResponse`, `No Paid APIs Required`, `Task 3 Brief`, `CountryRiskEntry`, `App Icon Square150x150`, `App Icon Square310x310`, `SovereignRedirect`, `FibLevel`, `_make_earnings_df`, `._run_single`, `Providers`, `ResultTab`, `WalkthroughBanner`, `fmtNum`, `AiSummaryResponse`, `AtlasCountry`, `AxiomFairValue`, `BacktestMetrics`, `BacktestPoint`, `BreadthResponse`?**
+- **Why does `cached()` connect `Task 6 Brief` to `ConfigResponse`, `No Paid APIs Required`, `Task 3 Brief`, `App Icon Square150x150`, `App Icon Square310x310`, `SovereignRedirect`, `_make_earnings_df`, `get_factor_regime`, `apply_presets`, `Providers`, `ResultTab`, `fmtNum`, `RatioGuide`, `AiSummaryHistoryItem`, `AiSummaryResponse`, `AtlasCountry`, `AxiomFairValue`, `BacktestMetrics`, `BreadthResponse`?**
   _High betweenness centrality (0.028) - this node is a cross-community bridge._
-- **Why does `valuation_models()` connect `Providers` to `CreditGapCountry`, `AiSummaryHistoryItem`, `BulkDatasetStatus`?**
+- **Why does `valuation_models()` connect `Providers` to `AiSummaryHistoryItem`, `ScreenerTab.tsx`, `ErrorBoundary`, `FibLevel`, `CreditGapCountry`, `BulkDatasetStatus`, `BusinessCountry`, `_get_fx_ppp_sync`, `get_recession_probability`?**
+  _High betweenness centrality (0.017) - this node is a cross-community bridge._
+- **Why does `treemap()` connect `App Icon Square89x89` to `Task 6 Brief`?**
   _High betweenness centrality (0.016) - this node is a cross-community bridge._
-- **What connects `Advanced rolling risk metrics, tail-risk models, and stress testing.`, `Convert a pandas Series (DatetimeIndex or str index) to [{date, value}].`, `Annualised rolling volatility (std × √252).` to the rest of the system?**
-  _1544 weakly-connected nodes found - possible documentation gaps or missing edges._
+- **What connects `IGNORED_CONSOLE`, `PAGES`, `Advanced rolling risk metrics, tail-risk models, and stress testing.` to the rest of the system?**
+  _1546 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `Backend Python Requirements` be split into smaller, more focused modules?**
-  _Cohesion score 0.042522522522522525 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.05520614954577219 - nodes in this community are weakly interconnected._
 - **Should `Axiom Finance Branding/Logo` be split into smaller, more focused modules?**
-  _Cohesion score 0.03500522466039707 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.04779189352692075 - nodes in this community are weakly interconnected._
 - **Should `Cross-Platform 3-OS Build Matrix` be split into smaller, more focused modules?**
   _Cohesion score 0.041666666666666664 - nodes in this community are weakly interconnected._
-- **Should `Changelog` be split into smaller, more focused modules?**
-  _Cohesion score 0.12857142857142856 - nodes in this community are weakly interconnected._

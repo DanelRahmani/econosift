@@ -61,7 +61,7 @@ for (const { path, landmark, value } of PAGES) {
     await expect(
       page.getByText(landmark).first(),
       `${path} never rendered its landmark`,
-    ).toBeVisible({ timeout: 75_000 });
+    ).toBeVisible({ timeout: 100_000 });
 
     const body = await page.locator("body").innerText();
     expect(value.test(body), `${path} rendered no numeric content`).toBe(true);
@@ -72,10 +72,10 @@ for (const { path, landmark, value } of PAGES) {
 
 test("navigation between pages preserves the shell", async ({ page }) => {
   await page.goto("/macro", { waitUntil: "domcontentloaded" });
-  await expect(page.getByText(/Macro Intelligence/i).first()).toBeVisible({ timeout: 75_000 });
+  await expect(page.getByText(/Macro Intelligence/i).first()).toBeVisible({ timeout: 100_000 });
 
   await page.goto("/portfolio", { waitUntil: "domcontentloaded" });
-  await expect(page.getByText(/Portfolio Analytics/i).first()).toBeVisible({ timeout: 75_000 });
+  await expect(page.getByText(/Portfolio Analytics/i).first()).toBeVisible({ timeout: 100_000 });
 
   // Global nav survives client-side transitions.
   await expect(page.getByRole("link", { name: /Macro/i }).first()).toBeVisible();

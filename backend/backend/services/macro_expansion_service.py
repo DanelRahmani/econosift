@@ -9,6 +9,7 @@ import pandas as pd
 
 from ..cache import async_cached
 from ..config import FRED_API_KEY
+from .ratelimit import fred_limiter
 
 log = logging.getLogger(__name__)
 
@@ -24,7 +25,10 @@ def _fetch_fred_series_sync(
     result: dict[str, list[dict]] = {}
     for sid in series_ids:
         try:
-            s = fred.get_series(sid, observation_start=start)
+            # Throttled: a cold cache fans out dozens of series at once and FRED
+            # caps at 120 requests/minute per key.
+            with fred_limiter:
+                s = fred.get_series(sid, observation_start=start)
             if s is None or s.empty:
                 result[sid] = []
                 continue

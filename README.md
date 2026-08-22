@@ -346,6 +346,26 @@ Without API keys, the platform gracefully degrades — using World Bank, IMF, an
 
 ---
 
+## 🔒 Security model
+
+**Axiom has no authentication, by design.** It is a single-user, self-hosted
+research tool, so there are no accounts, sessions, or roles.
+
+That makes two things load-bearing:
+
+- **Nginx binds to loopback only** (`127.0.0.1:80` in `docker-compose.yml`). The
+  app is not reachable from your network. To use it from another machine, forward
+  the port over SSH — `ssh -L 8080:127.0.0.1:80 you@host` — rather than changing
+  the binding.
+- **CORS uses an explicit origin allowlist** (`backend/backend/main.py`). Binding
+  to loopback alone would not be enough: a web page you visit in your browser can
+  reach `127.0.0.1`, and `PUT /api/admin/config` writes API keys to `.env`. The
+  allowlist stops an arbitrary site from preflighting that request. Set
+  `AXIOM_CORS_ORIGINS` (comma-separated) to add origins when tunnelling.
+
+Do not expose this app to the internet without putting authentication in front
+of it.
+
 ## 🧪 Development
 
 ```bash

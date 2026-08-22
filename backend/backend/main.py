@@ -1,6 +1,7 @@
 """Axiom Finance FastAPI application entrypoint."""
 from __future__ import annotations
 
+import os
 import threading
 from contextlib import asynccontextmanager
 
@@ -32,9 +33,35 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Axiom Finance API", version="1.0.0", lifespan=lifespan)
 
+# Axiom has no authentication by design — it is a single-user, self-hosted app.
+# That makes the CORS policy load-bearing: with allow_origins=["*"] any page you
+# happened to visit could preflight and PUT /api/admin/config, which writes API
+# keys to .env. Binding nginx to loopback does not help there, because a browser
+# on this machine can reach loopback. So the origin list is explicit.
+#
+# The Tauri desktop build serves a static export, so its page origin is
+# tauri://localhost (macOS/Linux) or http://tauri.localhost (Windows) while it
+# calls the backend on 127.0.0.1:8000 — both must stay allowed or the desktop
+# app breaks. AXIOM_CORS_ORIGINS (comma-separated) extends the list for anyone
+# tunnelling in from another host.
+_DEFAULT_ORIGINS = [
+    "http://localhost",
+    "http://localhost:80",
+    "http://localhost:3000",
+    "http://localhost:8000",
+    "http://127.0.0.1",
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:8000",
+    "tauri://localhost",
+    "http://tauri.localhost",
+]
+_extra_origins = [
+    o.strip() for o in os.getenv("AXIOM_CORS_ORIGINS", "").split(",") if o.strip()
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_DEFAULT_ORIGINS + _extra_origins,
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
