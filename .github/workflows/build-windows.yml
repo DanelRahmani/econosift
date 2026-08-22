@@ -103,8 +103,22 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: AxiomFinance-${{ matrix.artifact }}
-          path: desktop/src-tauri/target/release/bundle/**/*
+          # Only the installers, not the whole bundle tree. `bundle/**/*` also
+          # swept up the .deb staging directory, which made each Linux artifact
+          # 1.12 GB instead of ~100 MB and burned through the account's artifact
+          # storage quota — the upload then failed with "storage quota has been
+          # hit" even though the build itself had succeeded.
+          # Only one of these three patterns matches on any given runner;
+          # if-no-files-found still catches a genuinely empty build.
+          path: |
+            desktop/src-tauri/target/release/bundle/nsis/*-setup.exe
+            desktop/src-tauri/target/release/bundle/dmg/*.dmg
+            desktop/src-tauri/target/release/bundle/deb/*.deb
           if-no-files-found: error
+          # These are reproducible build outputs, not the release channel
+          # (tagged releases attach via softprops below). Expire them so they
+          # cannot silently accumulate into the quota again.
+          retention-days: 14
 
       - name: Attach installer to release (tag builds only)
         if: startsWith(github.ref, 'refs/tags/v')

@@ -285,8 +285,8 @@
     "semantic_hash": "c8bd579a6bb81565f9bdb6179e930e91"
   },
   "backend/backend/services/constituents.py": {
-    "mtime": 1787427145.1594374,
-    "ast_hash": "eb3f2e4e8e60f1863fded8ebf7f0027e",
+    "mtime": 1787432943.0582297,
+    "ast_hash": "abdf9816836d5016bf2bbad84e190c05",
     "semantic_hash": ""
   },
   "backend/backend/services/corporate_health_service.py": {
@@ -970,8 +970,8 @@
     "semantic_hash": ""
   },
   "frontend/app/portfolio/page.tsx": {
-    "mtime": 1783013251.948099,
-    "ast_hash": "203fe36a182f8908c23217c691477686",
+    "mtime": 1787433266.6154578,
+    "ast_hash": "25c4a2307d2f25cdb71b3fc52f9a9369",
     "semantic_hash": ""
   },
   "frontend/app/research/page.tsx": {
@@ -980,8 +980,8 @@
     "semantic_hash": ""
   },
   "frontend/app/risk/page.tsx": {
-    "mtime": 1783013284.554152,
-    "ast_hash": "99ba7d3d7ef820cb3d10cbb13303f49e",
+    "mtime": 1787433266.616967,
+    "ast_hash": "8f416c6601922be21c8e42cc4f39dd10",
     "semantic_hash": ""
   },
   "frontend/app/scenario/page.tsx": {
@@ -1370,9 +1370,9 @@
     "semantic_hash": "98ed5ea97a5c608ab5f3934c1b7d753a"
   },
   "frontend/components/markets/RatiosTab.tsx": {
-    "mtime": 1782601954.8722775,
-    "ast_hash": "b882cbac25d84003e17b20626936d039",
-    "semantic_hash": "b882cbac25d84003e17b20626936d039"
+    "mtime": 1787433278.1412194,
+    "ast_hash": "0e5a8785ca196663c19aa8c91b4e8463",
+    "semantic_hash": ""
   },
   "frontend/components/markets/RiskMetricsTable.tsx": {
     "mtime": 1782303820.025316,
@@ -1460,9 +1460,9 @@
     "semantic_hash": "c8a86732a9c169abb7da5af7affcc5a9"
   },
   "frontend/components/options/MonteCarloOptions.tsx": {
-    "mtime": 1782322410.8066766,
-    "ast_hash": "5f4cff5cb8a2218c212ccca969fc326f",
-    "semantic_hash": "5f4cff5cb8a2218c212ccca969fc326f"
+    "mtime": 1787433278.143219,
+    "ast_hash": "9cd36db8457fb8df811280e41082a7d5",
+    "semantic_hash": ""
   },
   "frontend/components/options/OIProfileChart.tsx": {
     "mtime": 1782322460.5054767,
@@ -1615,14 +1615,14 @@
     "semantic_hash": "fad626a8640c67eb0291c818292a4356"
   },
   "frontend/components/risk/MonteCarloPanel.tsx": {
-    "mtime": 1782320770.5758681,
-    "ast_hash": "98f2ad5371f6c5ff11c94330be26b3d8",
-    "semantic_hash": "98f2ad5371f6c5ff11c94330be26b3d8"
+    "mtime": 1787433278.145224,
+    "ast_hash": "59f2ff1ffb6b81662f772f46199702eb",
+    "semantic_hash": ""
   },
   "frontend/components/risk/OnDemandRisk.tsx": {
-    "mtime": 1782320740.9919045,
-    "ast_hash": "c5b02fb0ba0dbfddf624be89ea9f4e51",
-    "semantic_hash": "c5b02fb0ba0dbfddf624be89ea9f4e51"
+    "mtime": 1787433278.1868763,
+    "ast_hash": "cd976b59151e430b0136d03b3369d17c",
+    "semantic_hash": ""
   },
   "frontend/components/risk/RiskKPIRow.tsx": {
     "mtime": 1782320618.7511437,
@@ -1635,9 +1635,9 @@
     "semantic_hash": "9d2906767d3c03f324c246ce308a2370"
   },
   "frontend/components/risk/StressTestPanel.tsx": {
-    "mtime": 1782320799.406183,
-    "ast_hash": "87ccc0ab1d4d8969b116b87272a5d959",
-    "semantic_hash": "87ccc0ab1d4d8969b116b87272a5d959"
+    "mtime": 1787433278.1892526,
+    "ast_hash": "905c8d7bd5c7a2ddd39319d0f4b8f6fe",
+    "semantic_hash": ""
   },
   "frontend/components/screener/PresetPills.tsx": {
     "mtime": 1782601954.9173386,
@@ -1790,9 +1790,9 @@
     "semantic_hash": ""
   },
   "frontend/package.json": {
-    "mtime": 1782945722.3436863,
-    "ast_hash": "a82debdd08c800eb78df66c2d5da7363",
-    "semantic_hash": "a82debdd08c800eb78df66c2d5da7363"
+    "mtime": 1787433150.8086646,
+    "ast_hash": "e1232cfb1c0d8702c8400a71c6881b1c",
+    "semantic_hash": ""
   },
   "frontend/playwright.config.ts": {
     "mtime": 1787432416.5481565,
@@ -1945,8 +1945,8 @@
     "semantic_hash": "91d2823943849687bf0386015edf6c35"
   },
   "ACTIVE_ISSUES.md": {
-    "mtime": 1787428943.4643092,
-    "ast_hash": "066c46672210fe41050d103a58c338ff",
+    "mtime": 1787434437.3132463,
+    "ast_hash": "b60e30814df59e428a8729ec1f97348f",
     "semantic_hash": ""
   },
   "API_suggestions.md": {
@@ -1955,8 +1955,8 @@
     "semantic_hash": "7281672a8dc09b1a85fc0da617c32d8b"
   },
   "CHANGELOG.md": {
-    "mtime": 1787432544.2979977,
-    "ast_hash": "344a5f9b9ef81f677e3f268e008325c6",
+    "mtime": 1787434437.548868,
+    "ast_hash": "3e38c4d756f05906fca41e0613463795",
     "semantic_hash": ""
   },
   "CLAUDE.md": {
@@ -2240,8 +2240,8 @@
     "semantic_hash": ""
   },
   ".github/workflows/ci.yml": {
-    "mtime": 1787425375.3096166,
-    "ast_hash": "c0c1b58a929ea97f524fe9094c9fd82e",
+    "mtime": 1787433321.8965905,
+    "ast_hash": "bd923a29ca617a5f7b340ee2ddc17244",
     "semantic_hash": ""
   },
   "backend/tests/test_options_engine.py": {
@@ -2342,6 +2342,11 @@
   "frontend/components/macro/RiskDial.tsx": {
     "mtime": 1787430695.3543446,
     "ast_hash": "aa12f80b22139938ba0e2507d713ab5e",
+    "semantic_hash": ""
+  },
+  "frontend/.eslintrc.json": {
+    "mtime": 1787433266.3738222,
+    "ast_hash": "b3266a65a447ed10da704fe7a762f426",
     "semantic_hash": ""
   }
 }

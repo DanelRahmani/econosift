@@ -346,5 +346,15 @@
   "344": "TestRIMModel",
   "345": "treemap.py",
   "346": "_single_dcf",
-  "347": "DatetimeIndex"
+  "347": "DatetimeIndex",
+  "348": "inequality",
+  "349": "macro_regime",
+  "350": "oil_shocks",
+  "351": "rates",
+  "352": "snapshot",
+  "353": "yield_curve",
+  "354": "regime_series",
+  "355": "taylor_rule",
+  "356": "trade_flows",
+  "357": "_threshold_score"
 }
