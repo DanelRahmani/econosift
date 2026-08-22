@@ -468,7 +468,12 @@ def _append_rsi_manual(df: pd.DataFrame) -> None:
     loss = (-delta).clip(lower=0)
     avg_gain = gain.ewm(com=13, min_periods=14).mean()
     avg_loss = loss.ewm(com=13, min_periods=14).mean()
-    rs = avg_gain / avg_loss.replace(0, float("nan"))
+    # Dividing by a zero average loss is intentional: pandas yields +inf, so
+    # RSI resolves to its correct limit of 100 for an unbroken advance.
+    # Replacing the zero with NaN instead (as this used to) blanked RSI exactly
+    # when it should read most overbought. A genuinely flat series gives 0/0 ->
+    # NaN, which is right, since RSI is undefined without any movement.
+    rs = avg_gain / avg_loss
     df["RSI_14"] = 100.0 - (100.0 / (1.0 + rs))
 
 
