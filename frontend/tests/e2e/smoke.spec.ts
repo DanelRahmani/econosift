@@ -63,8 +63,14 @@ for (const { path, landmark, value } of PAGES) {
       `${path} never rendered its landmark`,
     ).toBeVisible({ timeout: 100_000 });
 
-    const body = await page.locator("body").innerText();
-    expect(value.test(body), `${path} rendered no numeric content`).toBe(true);
+    // Poll rather than assert once: on pages whose landmark is a static <h1>
+    // (e.g. /macro) the landmark appears immediately, well before any data.
+    await expect
+      .poll(
+        async () => value.test(await page.locator("body").innerText()),
+        { message: `${path} rendered no numeric content`, timeout: 60_000 },
+      )
+      .toBe(true);
 
     expect(errors, `${path} logged console errors`).toEqual([]);
   });

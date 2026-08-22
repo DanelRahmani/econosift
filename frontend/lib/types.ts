@@ -2570,3 +2570,71 @@ export interface ErrorLogResponse {
     newest: string | null;
   };
 }
+
+// Signal backtester (Phase 43)
+export interface BacktestPerf {
+  totalReturn: number | null;
+  cagr: number | null;
+  vol: number | null;
+  sharpe: number | null;
+  maxDrawdown: number | null;
+  hitRate: number | null;
+  periods: number;
+}
+
+export interface BacktestLeg {
+  gross: BacktestPerf;
+  net: BacktestPerf;
+  equityCurve: { date: string; value: number }[];
+  totalCostDrag: number;
+}
+
+export interface BacktestSignalDef {
+  key: string;
+  label: string;
+  description: string;
+  isFundamental: boolean;
+}
+
+export interface BacktestResponse {
+  available: boolean;
+  reason?: string;
+  warning?: string;
+  caveat?: string;
+  quantiles?: Record<string, BacktestLeg>;
+  longShort?: BacktestLeg;
+  periods?: number;
+  skippedPeriods?: number;
+  start?: string;
+  end?: string;
+  avgTurnover?: number | null;
+  settings?: {
+    rebalance: string;
+    nQuantiles: number;
+    costBps: number;
+    longShort: boolean;
+    universePointInTime: boolean;
+  };
+  meta?: {
+    signal: string;
+    label: string;
+    universe: string;
+    period: string;
+    tickersRequested: number;
+    tickersWithData: number;
+    universeTruncated: boolean;
+    maxTickers: number;
+    isFundamental: boolean;
+  };
+}
+
+export interface BacktestRequestBody {
+  signal: string;
+  universe: string;
+  period: string;
+  rebalance: string;
+  nQuantiles: number;
+  costBps: number;
+  longShort: boolean;
+  pointInTimeUniverse: boolean;
+}

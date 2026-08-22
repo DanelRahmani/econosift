@@ -89,3 +89,21 @@ test("macro tab selection survives a reload", async ({ page }) => {
     page.getByRole("heading", { name: /Credit & Funding Conditions/i }),
   ).toBeVisible({ timeout: TAB_TIMEOUT });
 });
+
+test("backtester tab renders without auto-running the analysis", async ({ page }) => {
+  const posts: string[] = [];
+  page.on("request", (r) => {
+    if (r.method() === "POST" && r.url().includes("/research/backtest")) posts.push(r.url());
+  });
+
+  await page.goto("/research?tab=backtest", { waitUntil: "domcontentloaded" });
+
+  await expect(page.getByRole("heading", { name: /Signal Backtester/i })).toBeVisible({
+    timeout: TAB_TIMEOUT,
+  });
+  await expect(page.getByRole("button", { name: /Run Analysis/i })).toBeVisible();
+
+  // Compute tier red: heavy work must never fire on mount.
+  await page.waitForTimeout(3000);
+  expect(posts, "backtest POSTed on mount — the Run Analysis gate is broken").toEqual([]);
+});

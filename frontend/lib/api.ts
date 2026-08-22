@@ -38,6 +38,7 @@ import type {
   GlobalHousingData, CreditGapsData, FiscalData, TradeData, LaborData, EnergyData,
   NetLiquidityData, RecessionProbabilityData, EarningsQualityData, EventStudyData, FactorRegimeData,
   CreditConditionsData, OilShocksData, TreasuryNoiseData,
+  BacktestResponse, BacktestSignalDef, BacktestRequestBody,
   CurrencyCrisisData, BankingStabilityData, InequalityData,
   BusinessData, ShortInterestData, MAData,
   FactbookCountry, FactbookProfile, CrossborderData,
@@ -541,6 +542,8 @@ export const api = {
   researchEventStudy: (p: { ticker: string; eventType: string; window: number }) =>
     post<EventStudyData>("/research/event-study", p),
   researchFactorRegime: () => get<FactorRegimeData>("/research/factor-regime"),
+  backtestSignals: () => get<{ signals: BacktestSignalDef[] }>("/research/backtest/signals"),
+  runBacktest: (body: BacktestRequestBody) => post<BacktestResponse>("/research/backtest", body),
   scenarioHistorical: () => get<any>("/scenario/historical"),
   scenarioStress: (holdings: Holding[]) => post<any>("/scenario/historical/stress", { holdings }),
   scenarioCustom: (holdings: Holding[], shocks: Record<string, number>) =>

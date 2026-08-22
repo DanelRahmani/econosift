@@ -11,6 +11,7 @@ import { CrossAssetCorrelation } from "@/components/research/CrossAssetCorrelati
 import { FxMacroLink } from "@/components/research/FxMacroLink";
 import { MultiCountryPortfolio } from "@/components/research/MultiCountryPortfolio";
 import { EventStudyTab } from "@/components/research/EventStudyTab";
+import { BacktestTab } from "@/components/research/BacktestTab";
 import { FactorRegimeTab } from "@/components/research/FactorRegimeTab";
 import { useUrlState } from "@/lib/useUrlState";
 
@@ -26,6 +27,7 @@ const TABS = [
   { key: "econlab", label: "Econometric Lab" },
   { key: "eventstudy", label: "Event Study" },
   { key: "factorregime", label: "Factor Regime" },
+  { key: "backtest", label: "Backtester" },
 ] as const;
 type TabKey = (typeof TABS)[number]["key"];
 
@@ -74,6 +76,7 @@ function ResearchPageInner() {
       {tab === "econlab" && <EconLabTab />}
       {tab === "eventstudy" && <EventStudyTab />}
       {tab === "factorregime" && <FactorRegimeTab />}
+      {tab === "backtest" && <BacktestTab />}
     </main>
   );
 }
