@@ -6,7 +6,9 @@ import asyncio
 from ..cache import async_cached
 from . import macro_expansion_service as mes
 
-_SERIES = ("BAMLC0A0CM", "BAMLH0A0HYM2", "BAMLC0A4CBBBOAS", "SOFR", "DTB3", "TEDRATE")
+# BBB OAS is BAMLC0A4CBBB on FRED; the "...OAS"-suffixed id does not exist and
+# silently returned nothing, leaving bbb_spread permanently null.
+_SERIES = ("BAMLC0A0CM", "BAMLH0A0HYM2", "BAMLC0A4CBBB", "SOFR", "DTB3", "TEDRATE")
 _START = "2000-01-01"
 
 # Thresholds (percentile-based, approximate historical norms)
@@ -40,7 +42,7 @@ async def get_credit_pulse() -> dict:
     data = await _fetch_series()
     ig = data.get("BAMLC0A0CM", [])
     hy = data.get("BAMLH0A0HYM2", [])
-    bbb = data.get("BAMLC0A4CBBBOAS", [])
+    bbb = data.get("BAMLC0A4CBBB", [])
     sofr = data.get("SOFR", [])
     dtb3 = data.get("DTB3", [])
     ted = data.get("TEDRATE", [])

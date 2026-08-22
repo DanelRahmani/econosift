@@ -61,6 +61,9 @@ const LeadingIndicatorsLazy = dynamic(() =>
 const FinancialConditionsLazy = dynamic(() =>
   import("./FinancialConditions").then((m) => ({ default: m.FinancialConditions }))
 );
+const CreditConditionsLazy = dynamic(() =>
+  import("./CreditConditions").then((m) => ({ default: m.CreditConditions }))
+);
 const SentimentTabLazy = dynamic(() =>
   import("./SentimentTab").then((m) => ({ default: m.SentimentTab }))
 );
@@ -79,7 +82,14 @@ function TabContent({ activeTab }: { activeTab: string }) {
     case "commodities": return <CommoditiesTabLazy />;
     case "fx":          return <FxTabLazy />;
     case "leading":     return <LeadingIndicatorsLazy />;
-    case "financial":   return <FinancialConditionsLazy />;
+    // Credit conditions is a sibling, not a child, so its fast FRED fetch is not
+    // gated behind the much slower financial-conditions endpoint.
+    case "financial":   return (
+      <div className="space-y-6">
+        <CreditConditionsLazy />
+        <FinancialConditionsLazy />
+      </div>
+    );
     case "sentiment":   return <SentimentTabLazy />;
     default:            return <MacroOverviewLazy />;
   }

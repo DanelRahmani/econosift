@@ -1077,6 +1077,97 @@ export interface RecessionProbabilityData {
   model?: { alpha: number | null; beta: number | null; nObs: number };
 }
 
+// Credit & funding conditions — SOFR-IORB, SLOOS, EBP, NFCI/ANFCI (Phase 39)
+export type ConditionSignal = "normal" | "stress" | "unknown";
+
+export interface CreditConditionsData {
+  error?: string;
+  kpis?: {
+    sofr_iorb: number | null;
+    sloos_ci: number | null;
+    ebp: number | null;
+    gz_spread: number | null;
+    gz_recession_prob: number | null;
+    nfci: number | null;
+    anfci: number | null;
+  };
+  history?: {
+    sofr_iorb: MacroTimeSeries[];
+    sloos_ci: MacroTimeSeries[];
+    ebp: MacroTimeSeries[];
+    gz_spread: MacroTimeSeries[];
+    gz_recession_prob: MacroTimeSeries[];
+    nfci: MacroTimeSeries[];
+    anfci: MacroTimeSeries[];
+  };
+  signals?: {
+    sofr_iorb: ConditionSignal;
+    sloos_ci: ConditionSignal;
+    ebp: ConditionSignal;
+    anfci: ConditionSignal;
+  };
+  asOf?: {
+    sofr_iorb: string | null;
+    sloos_ci: string | null;
+    ebp: string | null;
+    nfci: string | null;
+  };
+  sources?: Record<string, string>;
+}
+
+// Oil shock decomposition — demand vs. oil-specific (Phase 39)
+export interface OilShockPoint {
+  date: string;
+  total: number;
+  demand: number;
+  supply: number;
+}
+
+export interface OilShocksData {
+  available: boolean;
+  reason?: string;
+  latest?: {
+    date: string;
+    total: number;
+    demand: number;
+    supply: number;
+    dominant: "demand" | "supply";
+    interpretation: "expansionary" | "contractionary";
+  };
+  trailing12m?: { total: number; demand: number; supply: number; months: number };
+  regression?: {
+    n: number;
+    r2: number;
+    beta_igrea: number;
+    beta_copper: number;
+    t_igrea: number | null;
+    t_copper: number | null;
+    sampleStart: string;
+    sampleEnd: string;
+  };
+  history?: OilShockPoint[];
+  method?: string;
+  sources?: string;
+}
+
+// Treasury curve-fit noise — HPW-style illiquidity gauge (Phase 39)
+export interface TreasuryNoiseData {
+  error?: string;
+  kpis?: {
+    latest: number | null;
+    asOf: string | null;
+    ma20: number | null;
+    percentile: number | null;
+    median: number | null;
+    max: number | null;
+  };
+  history?: MacroTimeSeries[];
+  recent?: MacroTimeSeries[];
+  method?: string;
+  limitation?: string;
+  sources?: string;
+}
+
 // Earnings quality / Sloan accruals (Phase 38b)
 export interface EarningsQualityRow {
   ticker: string;
@@ -2271,6 +2362,8 @@ export interface YieldCurvesData {
   };
   real_yields: YieldCurvePoint[];
   breakevens: Record<string, number | null>;
+  /** 5y5y forward breakeven — a forward, not a spot tenor, so kept separate. */
+  forward_breakeven_5y5y?: { current: number | null; history: MacroTimeSeries[] };
   term_premium: { current: number | null; history: MacroTimeSeries[] };
   foreign_10y: Record<string, { yield_10y: number | null; spread_vs_us: number | null }>;
   global_yields?: GlobalYieldCountry[];

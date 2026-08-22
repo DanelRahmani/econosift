@@ -5,6 +5,17 @@
 
 ---
 
+## Phase 39 — High-evidence credit, oil, and rates indicators (2026-08-22)
+
+Adds the indicators with the strongest out-of-sample evidence in the literature that the platform did not already carry, each with a documented causal channel rather than a bare correlation.
+
+- **Credit & funding conditions** (`credit_conditions_service.py`, `/api/macro/credit-conditions`, Macro → Financial & Funding Conditions): SOFR−IORB reserve scarcity (IOER spliced pre-2021-07-29), SLOOS net C&I tightening (`DRTSCILM` — Lown & Morgan 2006), the Gilchrist-Zakrajšek **Excess Bond Premium** with its GZ spread and recession probability (direct Fed CSV, not on FRED), and NFCI/ANFCI. 12 tests incl. source-failure and schema-drift paths.
+- **Oil shock decomposition** (`oil_shock_service.py`, `/api/macro/oil-shocks`, Macro → Commodities): splits real WTI monthly returns into a global-demand component (ΔIGREA + real copper) and an oil-specific residual, so a price move is interpretable per Kilian (2009) instead of directionless. Labelled throughout as a reduced-form proxy, **not** the structural VAR. 10 tests on synthetic fixtures with a known generating beta.
+- **Treasury curve-fit noise** (`treasury_noise_service.py`, `/api/yield/noise`, new Yield → Curve Noise tab): daily Nelson-Siegel RMSE across the CMT tenors, an HPW-style (2013) arbitrage-capital gauge. Verified against history and **documented as limited**: it reaches ~20bps in 2008 vs ~7bps in calm 2017 but stays ~10bps in March 2020, because CMT is already an official smoothed curve and cannot show on-the-run dislocation. Shipped with that caveat surfaced in the UI. 9 tests.
+- **5y5y forward breakeven** (`T5YIFR`) added to `yield_curve_service` as a separate field (a forward, not a spot tenor) and charted on Yield → Real & Breakeven.
+- **Bug fix:** `credit_market.py` requested `BAMLC0A4CBBBOAS`, which does not exist on FRED — the BBB spread KPI had been silently `null`. Corrected to `BAMLC0A4CBBB`.
+- Credit conditions mounted as a sibling of `FinancialConditions` in `MacroTabShell` rather than a child, so it is not gated behind that tab's ~120s cold fetch.
+
 ## Phase 38b — Five analyst features: net liquidity, recession model, earnings quality, event study, factor regime (2026-07-03)
 
 - **F1 Fed Plumbing & Net Liquidity** (`liquidity_service.py`, `/api/macro/net-liquidity`, Funding & Liquidity tab): net liquidity = WALCL − RRP − TGA on the weekly H.4.1 Wednesday grid + bank reserves + SPX overlay. FRED unit scales verified against live magnitudes (WALCL/WTREGEN/WRESBAL millions, RRPONTSYD billions — the live curl gate caught a wrong initial assumption). 5-KPI row, dual-axis SPX chart, components chart, 26-week WoW table. 5 pure-compute tests.

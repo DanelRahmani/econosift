@@ -35,6 +35,11 @@ _REAL_TENORS = [
     ("30y", "DFII30", 30),
 ]
 _BREAKEVEN_SERIES = {"5y": "T5YIE", "10y": "T10YIE", "30y": "T30YIE"}
+# 5y5y forward breakeven — the inflation compensation priced for the five years
+# starting five years out. Strips near-term energy passthrough, which is why it
+# is the anchor measure the FOMC cites. Note it still embeds an inflation risk
+# premium, so it is not a pure expectation.
+_FWD_BREAKEVEN_SERIES = "T5YIFR"
 # ISO2-keyed dict with name + FRED series per country (23 countries)
 _FOREIGN: dict[str, dict[str, str]] = {
     "DE": {"name": "Germany",      "fred": "IRLTLT01DEM156N"},
@@ -66,6 +71,7 @@ _ALL_SERIES = tuple(
     [sid for _, sid, _ in _US_TENORS]
     + [sid for _, sid, _ in _REAL_TENORS]
     + list(_BREAKEVEN_SERIES.values())
+    + [_FWD_BREAKEVEN_SERIES]
     + ["ACMTP10"]
     + [info["fred"] for info in _FOREIGN.values()]
 )
@@ -152,6 +158,14 @@ async def get_yield_curves() -> dict:
         if dgs30 is not None and dfii30 is not None:
             breakevens["30y"] = round(dgs30 - dfii30, 4)
 
+    # 5y5y forward breakeven — kept out of the `breakevens` dict because it is a
+    # forward, not a spot tenor, and would corrupt a breakeven-vs-tenor curve.
+    fwd_be_hist = [p for p in data.get(_FWD_BREAKEVEN_SERIES, []) if p.get("value") is not None]
+    forward_breakeven_5y5y = {
+        "current": _latest(data.get(_FWD_BREAKEVEN_SERIES, [])),
+        "history": fwd_be_hist[-500:],
+    }
+
     # ACM term premium
     tp_hist = [p for p in data.get("ACMTP10", []) if p.get("value") is not None]
     term_premium = {
@@ -206,6 +220,7 @@ async def get_yield_curves() -> dict:
         },
         "real_yields":  real_points,
         "breakevens":   breakevens,
+        "forward_breakeven_5y5y": forward_breakeven_5y5y,
         "term_premium": term_premium,
         "foreign_10y":  foreign,
         "global_yields": global_yields,

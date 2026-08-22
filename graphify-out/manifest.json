@@ -115,8 +115,8 @@
     "semantic_hash": "397985721404b1fb15b2374dcc32759d"
   },
   "backend/backend/routers/macro.py": {
-    "mtime": 1783031066.054561,
-    "ast_hash": "f1083f152b3b524b794c27c99a7c4f1f",
+    "mtime": 1787410470.8482513,
+    "ast_hash": "bf0870288b8a544d79c138bf39f8a509",
     "semantic_hash": ""
   },
   "backend/backend/routers/market.py": {
@@ -220,9 +220,9 @@
     "semantic_hash": "27a976202cc85571bb53598ec37f4620"
   },
   "backend/backend/routers/yield_curve.py": {
-    "mtime": 1782456688.7895207,
-    "ast_hash": "99bab8f17969685267ad5b5cc57e738f",
-    "semantic_hash": "99bab8f17969685267ad5b5cc57e738f"
+    "mtime": 1787410476.6125772,
+    "ast_hash": "c4f9be7d250fd98afb03ad33260c37a9",
+    "semantic_hash": ""
   },
   "backend/backend/services/__init__.py": {
     "mtime": 1782211724.113188,
@@ -305,9 +305,9 @@
     "semantic_hash": "8f3dce2888c756ae84686af916dd83ca"
   },
   "backend/backend/services/credit_market.py": {
-    "mtime": 1782456460.5811477,
-    "ast_hash": "49d6b6fcdc27c2d80d563309eca47415",
-    "semantic_hash": "49d6b6fcdc27c2d80d563309eca47415"
+    "mtime": 1787410432.4884806,
+    "ast_hash": "a0845d38b80c46b0572f47cb5b377aec",
+    "semantic_hash": ""
   },
   "backend/backend/services/cross_asset_service.py": {
     "mtime": 1782773564.6593611,
@@ -585,9 +585,9 @@
     "semantic_hash": "fb29f40a95513236a6c23c6f153cc6c4"
   },
   "backend/backend/services/yield_curve_service.py": {
-    "mtime": 1782815150.9236326,
-    "ast_hash": "869150d37db48a31afc5bc725fcefb93",
-    "semantic_hash": "869150d37db48a31afc5bc725fcefb93"
+    "mtime": 1787410464.7603304,
+    "ast_hash": "8bf9e57894d7c69dbd15ecbd44c4c677",
+    "semantic_hash": ""
   },
   "backend/backend/sources/__init__.py": {
     "mtime": 1782211724.1194253,
@@ -1015,8 +1015,8 @@
     "semantic_hash": "23ec4f47941eb3d0568beb609043077b"
   },
   "frontend/app/yield/page.tsx": {
-    "mtime": 1783013274.55032,
-    "ast_hash": "b7a512d4d08695996c1c0bcf16aa56e5",
+    "mtime": 1787411110.4606967,
+    "ast_hash": "3b46337b124b04c859afa4545d0967a5",
     "semantic_hash": ""
   },
   "frontend/components/AiSummaryPanel.tsx": {
@@ -1165,9 +1165,9 @@
     "semantic_hash": "b6d426a3afffb88bfc2e63318c0ed280"
   },
   "frontend/components/macro/CommoditiesTab.tsx": {
-    "mtime": 1782324540.1095169,
-    "ast_hash": "513b3799daecae309ce630481fdb4e5e",
-    "semantic_hash": "513b3799daecae309ce630481fdb4e5e"
+    "mtime": 1787411052.5603082,
+    "ast_hash": "5fa4b8dee237044784a4e6fd4f2eee53",
+    "semantic_hash": ""
   },
   "frontend/components/macro/CountryComparison.tsx": {
     "mtime": 1782303820.0150747,
@@ -1190,7 +1190,7 @@
     "semantic_hash": "864c4abda7aad5ec636c7d13b5ce5137"
   },
   "frontend/components/macro/FinancialConditions.tsx": {
-    "mtime": 1782986980.5256622,
+    "mtime": 1787411822.1502757,
     "ast_hash": "041ed65ccfb611e8770485a663dc8dc7",
     "semantic_hash": "041ed65ccfb611e8770485a663dc8dc7"
   },
@@ -1270,8 +1270,8 @@
     "semantic_hash": "f8ecfd3fbc29cae5ae4acddfd7af2790"
   },
   "frontend/components/macro/MacroTabShell.tsx": {
-    "mtime": 1783013194.9544241,
-    "ast_hash": "28760e02dcb6a2d8c28af602a5501d4d",
+    "mtime": 1787411832.5705488,
+    "ast_hash": "662726348b2394b92cbedb4146c8aa1d",
     "semantic_hash": ""
   },
   "frontend/components/macro/PositioningTab.tsx": {
@@ -1720,8 +1720,8 @@
     "semantic_hash": "9687f46104117bd2a209c1dd47a016f2"
   },
   "frontend/lib/api.ts": {
-    "mtime": 1783031056.9837255,
-    "ast_hash": "c928436a7cb4507f94392c9c94d3a676",
+    "mtime": 1787410917.5043068,
+    "ast_hash": "84e8987c9ee50d7046a492e08c5c5f0e",
     "semantic_hash": ""
   },
   "frontend/lib/atlasScale.ts": {
@@ -1760,8 +1760,8 @@
     "semantic_hash": "ee7b33c281f735bfb2282c254cf35101"
   },
   "frontend/lib/types.ts": {
-    "mtime": 1783031046.4499493,
-    "ast_hash": "cae7e5e7573464ab718bc96344c09057",
+    "mtime": 1787410907.3049858,
+    "ast_hash": "64a34f35f9a1306ee1868e5ab48e7908",
     "semantic_hash": ""
   },
   "frontend/lib/useKeyboardShortcuts.ts": {
@@ -1955,8 +1955,8 @@
     "semantic_hash": "7281672a8dc09b1a85fc0da617c32d8b"
   },
   "CHANGELOG.md": {
-    "mtime": 1783031343.558205,
-    "ast_hash": "17ee81d6cc5a0cf9bbac004d2e6f1294",
+    "mtime": 1787412158.8139033,
+    "ast_hash": "348d9ab21845a9ca3dd41535362453f3",
     "semantic_hash": ""
   },
   "CLAUDE.md": {
@@ -2192,6 +2192,51 @@
   ".playwright-mcp/page-2026-07-02T18-03-05-542Z.yml": {
     "mtime": 1783015385.5489776,
     "ast_hash": "ef38e4b5f9539106ff8fffe75f62a605",
+    "semantic_hash": ""
+  },
+  "backend/backend/services/credit_conditions_service.py": {
+    "mtime": 1787410327.4707768,
+    "ast_hash": "bbbd6f9da88cf58a54d426edcea4e8ee",
+    "semantic_hash": ""
+  },
+  "backend/backend/services/oil_shock_service.py": {
+    "mtime": 1787410366.5781908,
+    "ast_hash": "c0e8d597c7e6a8f79e1eacb65d4fdfd0",
+    "semantic_hash": ""
+  },
+  "backend/backend/services/treasury_noise_service.py": {
+    "mtime": 1787410581.840101,
+    "ast_hash": "2d94a7b89bd037c83759593a02a08f49",
+    "semantic_hash": ""
+  },
+  "backend/tests/test_credit_conditions_service.py": {
+    "mtime": 1787410603.4739454,
+    "ast_hash": "09688bb8afd6b8bfb3d3b0097b085e70",
+    "semantic_hash": ""
+  },
+  "backend/tests/test_oil_shock_service.py": {
+    "mtime": 1787410672.413456,
+    "ast_hash": "f7125a9b36ab4eb61c229269a344fe5a",
+    "semantic_hash": ""
+  },
+  "backend/tests/test_treasury_noise_service.py": {
+    "mtime": 1787410647.396204,
+    "ast_hash": "ec443cd13bfbc36e247245bfc7771469",
+    "semantic_hash": ""
+  },
+  "frontend/components/macro/CreditConditions.tsx": {
+    "mtime": 1787411839.0453198,
+    "ast_hash": "77960913130ca97978f7cb4602918d24",
+    "semantic_hash": ""
+  },
+  "frontend/components/macro/OilShockDecomposition.tsx": {
+    "mtime": 1787411043.0570705,
+    "ast_hash": "1eb0624bdaad8604f02bf49793ad81fb",
+    "semantic_hash": ""
+  },
+  "frontend/components/yield/CurveNoiseTab.tsx": {
+    "mtime": 1787412070.7878172,
+    "ast_hash": "b1b18cea54b233fdeae839c5d88e77c8",
     "semantic_hash": ""
   }
 }

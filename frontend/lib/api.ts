@@ -37,6 +37,7 @@ import type {
   ConfigResponse, ConfigUpdateRequest,
   GlobalHousingData, CreditGapsData, FiscalData, TradeData, LaborData, EnergyData,
   NetLiquidityData, RecessionProbabilityData, EarningsQualityData, EventStudyData, FactorRegimeData,
+  CreditConditionsData, OilShocksData, TreasuryNoiseData,
   CurrencyCrisisData, BankingStabilityData, InequalityData,
   BusinessData, ShortInterestData, MAData,
   FactbookCountry, FactbookProfile, CrossborderData,
@@ -523,6 +524,11 @@ export const api = {
   macroFunding: () => get<any>("/macro/funding"),
   macroNetLiquidity: () => get<NetLiquidityData>("/macro/net-liquidity"),
   macroRecessionProbability: () => get<RecessionProbabilityData>("/macro/recession-probability"),
+
+  // --- Phase 39: high-evidence credit / oil / rates indicators ---
+  macroCreditConditions: () => get<CreditConditionsData>("/macro/credit-conditions"),
+  macroOilShocks: () => get<OilShocksData>("/macro/oil-shocks"),
+  yieldNoise: () => get<TreasuryNoiseData>("/yield/noise"),
   corporateEarningsQuality: (universe: string) =>
     get<EarningsQualityData>(`/corporate/earnings-quality?universe=${encodeURIComponent(universe)}`),
   researchEventStudy: (p: { ticker: string; eventType: string; window: number }) =>

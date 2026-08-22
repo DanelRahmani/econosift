@@ -1143,6 +1143,18 @@ async def net_liquidity():
     from ..services.liquidity_service import get_net_liquidity
     return await get_net_liquidity()
 
+@router.get("/credit-conditions")
+async def credit_conditions():
+    """SOFR-IORB reserve scarcity, SLOOS lending standards, excess bond premium, NFCI/ANFCI."""
+    from ..services.credit_conditions_service import get_credit_conditions
+    return await get_credit_conditions()
+
+@router.get("/oil-shocks")
+async def oil_shocks():
+    """Demand vs. oil-specific decomposition of real WTI returns (Kilian-style proxy)."""
+    from ..services.oil_shock_service import get_oil_shocks
+    return await get_oil_shocks()
+
 @router.get("/recession-probability")
 async def recession_probability():
     """NY-Fed-style 12-month-ahead probit on the 10y–3m spread + Sahm rule."""
