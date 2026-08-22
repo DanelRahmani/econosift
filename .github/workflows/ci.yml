@@ -1,0 +1,75 @@
+name: CI
+
+# Runs the test suite on every push to DEV/main and on PRs into main.
+#
+# Until now nothing gated the DEV -> main pull request: the backend suite only
+# ran when someone remembered to run it locally. This workflow makes the tests
+# that already exist actually load-bearing.
+#
+# The backend suite is deliberately offline — conftest.py resets both cache
+# tiers per test and every service degrades to an empty result when an API key
+# is absent, so no secrets are needed here. Verified by running the full suite
+# with FRED/FINNHUB/GEMINI unset and a throwaway AXIOM_DATA_DIR.
+#
+# Python is pinned to 3.12 to match backend/Dockerfile (the shipping runtime).
+# build-windows.yml uses 3.13 for the PyInstaller desktop freeze; that is a
+# separate concern and intentionally not aligned here.
+#
+# Frontend runs `tsc --noEmit` only. `next lint` has never been initialised in
+# this repo (no .eslintrc), so it prompts interactively and would hang a
+# runner — wiring ESLint up is tracked separately.
+
+on:
+  push:
+    branches: [DEV, main]
+  pull_request:
+    branches: [main]
+
+# A newer push to the same branch supersedes an in-flight run.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r backend/requirements.txt
+
+      - name: Run pytest
+        working-directory: backend
+        # AXIOM_DATA_DIR points at a scratch path so the suite never touches a
+        # developer's real SQLite volume and always starts from a clean DB.
+        env:
+          AXIOM_DATA_DIR: ${{ runner.temp }}/axiom-data
+        run: pytest -q
+
+  frontend:
+    name: Frontend typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Typecheck
+        working-directory: frontend
+        run: npx tsc --noEmit
