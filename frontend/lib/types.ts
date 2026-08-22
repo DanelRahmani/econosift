@@ -2638,3 +2638,44 @@ export interface BacktestRequestBody {
   longShort: boolean;
   pointInTimeUniverse: boolean;
 }
+
+// Composite risk dial (Phase 43)
+export interface RiskDialComponent {
+  key: string;
+  label: string;
+  z: number;
+  sign: number;
+  contribution: number;
+  rationale: string;
+}
+
+export interface RiskDialData {
+  available: boolean;
+  reason?: string;
+  compositeZ?: number;
+  shrunkZ?: number;
+  exposureMultiplier?: number;
+  regime?: "risk-on" | "neutral" | "risk-off";
+  components?: RiskDialComponent[];
+  componentsUsed?: number;
+  componentsPossible?: number;
+  settings?: { shrinkage: number; zWindow: number; minExposure: number; maxExposure: number };
+  method?: string;
+  caveat?: string;
+}
+
+export interface RiskDialBacktest {
+  available: boolean;
+  reason?: string;
+  months?: number;
+  start?: string;
+  end?: string;
+  timed?: { cagr: number | null; vol: number; sharpe: number | null; maxDrawdown: number };
+  static?: { cagr: number | null; vol: number; sharpe: number | null; maxDrawdown: number };
+  beatsStatic?: boolean;
+  avgExposure?: number;
+  totalCostDrag?: number;
+  verdict?: string;
+  note?: string;
+  costBps?: number;
+}

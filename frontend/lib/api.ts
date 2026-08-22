@@ -39,6 +39,7 @@ import type {
   NetLiquidityData, RecessionProbabilityData, EarningsQualityData, EventStudyData, FactorRegimeData,
   CreditConditionsData, OilShocksData, TreasuryNoiseData,
   BacktestResponse, BacktestSignalDef, BacktestRequestBody,
+  RiskDialData, RiskDialBacktest,
   CurrencyCrisisData, BankingStabilityData, InequalityData,
   BusinessData, ShortInterestData, MAData,
   FactbookCountry, FactbookProfile, CrossborderData,
@@ -536,6 +537,8 @@ export const api = {
   // --- Phase 39: high-evidence credit / oil / rates indicators ---
   macroCreditConditions: () => get<CreditConditionsData>("/macro/credit-conditions"),
   macroOilShocks: () => get<OilShocksData>("/macro/oil-shocks"),
+  macroRiskDial: () => get<RiskDialData>("/macro/risk-dial"),
+  macroRiskDialBacktest: () => get<RiskDialBacktest>("/macro/risk-dial/backtest"),
   yieldNoise: () => get<TreasuryNoiseData>("/yield/noise"),
   corporateEarningsQuality: (universe: string) =>
     get<EarningsQualityData>(`/corporate/earnings-quality?universe=${encodeURIComponent(universe)}`),

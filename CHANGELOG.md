@@ -5,6 +5,16 @@
 
 ---
 
+## Phase 42-43 — Point-in-time data, out-of-sample scoring, and a backtester (2026-08-22)
+
+- **Survivorship bias removed** (`constituents.members_as_of`): reconstructs index membership on any past date by walking Wikipedia's change log backwards. The log moved to its own article since it was last looked at, and coverage is only reliable from ~2010 (20-27 changes/yr, vs under 2/yr before 2005) — earlier dates return `complete: false` rather than a confidently wrong roster. Verified against known events: TSLA absent before Dec 2020, and ATVI/FISV/DISCA/XLNX correctly restored to the 2018 roster despite being gone today.
+- **FRED vintages** (`vintage` / `first_release` on `fetch_fred_series`): 45 of 46 quarterly GDP observations differ between first release and latest, so anything scored on revised data flatters itself.
+- **🐛 Recession model scored out of sample:** the probit was fitted over the whole history then applied back across it. `_walk_forward_probit` refits monthly on data available at the time. The paths diverge sharply — in late 2000 the in-sample model reads 24% where the real-time model reads 97%. Both are charted. (What was *not* wrong: T10Y3M is never revised and the service already used SAHMREALTIME.)
+- **P3-14 logged:** fundamentals are latest-restatement on yfinance and cannot be honestly backtested on free data. The backtester refuses fundamental signals unless `allow_lookahead=True`.
+- **Vectorized backtester** (`backtest_engine.py`, `POST /api/research/backtest`, Research → Backtester, 🔴 tier): quantile sorts with turnover-based costs, gross and net side by side, optional point-in-time universe. Two alignment sentinels pin that positions formed at *t* earn the return from *t* to *t+1* — writing them caught a double-lag in the first draft that would have understated every signal. Six price-derived signals wired up. First result is unflattering and honest: S&P 500 momentum nets **-2.6% CAGR** over 108 months with the survivorship correction on.
+- **Composite risk dial** (`composite_signal_service.py`, `/api/macro/risk-dial`, Macro → Financial Conditions): blends EBP, ANFCI, SLOOS, HY OAS, term spread and SOFR-IORB into one exposure multiplier, shrunk 50% toward zero (Campbell-Thompson), clipped to [0.4×, 1.2×] — a dial, never a binary call. **Ships with its own walk-forward self-test published beside it:** over 403 months (1993-2026) it returns Sharpe 0.82 vs 0.74 buy-and-hold with max drawdown -40.6% vs -50.8%, net of costs, at ~1.0× average exposure. A losing result would be displayed the same way.
+- **Exposure & ops:** loopback binding, explicit CORS allowlist, FRED/Finnhub outbound throttling, and a live error feed on Admin (Phase 41 items shipped alongside).
+
 ## Phase 40-41 — Test safety net, two maths fixes, and exposure hardening (2026-08-22)
 
 - **CI now runs the tests** (`.github/workflows/ci.yml`): pytest + `tsc --noEmit` on every push to `DEV`/`main` and every PR into `main`, plus a Playwright job that boots the docker stack. Nothing previously gated the `DEV` → `main` PR. The backend suite was verified genuinely offline (no API keys, throwaway `AXIOM_DATA_DIR`), so no network markers were needed. `next lint` is deliberately excluded — ESLint has never been initialised here and would hang a runner.

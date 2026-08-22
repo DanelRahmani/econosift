@@ -64,6 +64,9 @@ const FinancialConditionsLazy = dynamic(() =>
 const CreditConditionsLazy = dynamic(() =>
   import("./CreditConditions").then((m) => ({ default: m.CreditConditions }))
 );
+const RiskDialLazy = dynamic(() =>
+  import("./RiskDial").then((m) => ({ default: m.RiskDial }))
+);
 const SentimentTabLazy = dynamic(() =>
   import("./SentimentTab").then((m) => ({ default: m.SentimentTab }))
 );
@@ -86,6 +89,7 @@ function TabContent({ activeTab }: { activeTab: string }) {
     // independently and neither blanks the other while it loads.
     case "financial":   return (
       <div className="space-y-6">
+        <RiskDialLazy />
         <CreditConditionsLazy />
         <FinancialConditionsLazy />
       </div>

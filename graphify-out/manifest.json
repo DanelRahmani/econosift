@@ -115,8 +115,8 @@
     "semantic_hash": "397985721404b1fb15b2374dcc32759d"
   },
   "backend/backend/routers/macro.py": {
-    "mtime": 1787410470.8482513,
-    "ast_hash": "bf0870288b8a544d79c138bf39f8a509",
+    "mtime": 1787430624.146993,
+    "ast_hash": "7a40ff79b36975b629a8d0c697849108",
     "semantic_hash": ""
   },
   "backend/backend/routers/market.py": {
@@ -155,8 +155,8 @@
     "semantic_hash": "0b1ea5f0344301a388cefdfbc8e921fd"
   },
   "backend/backend/routers/research.py": {
-    "mtime": 1783031078.5692377,
-    "ast_hash": "e5fe86b9bd3c9ec7b555f92d160345e4",
+    "mtime": 1787429379.1691883,
+    "ast_hash": "2bc8991ed4fd081d7bc654338d9111af",
     "semantic_hash": ""
   },
   "backend/backend/routers/risk.py": {
@@ -975,8 +975,8 @@
     "semantic_hash": ""
   },
   "frontend/app/research/page.tsx": {
-    "mtime": 1783031141.4333847,
-    "ast_hash": "e04360fc6a4464378d8b3179f899528f",
+    "mtime": 1787429519.956176,
+    "ast_hash": "932b5454d62014ac2cc4d4287ca8d1c7",
     "semantic_hash": ""
   },
   "frontend/app/risk/page.tsx": {
@@ -1270,8 +1270,8 @@
     "semantic_hash": "f8ecfd3fbc29cae5ae4acddfd7af2790"
   },
   "frontend/components/macro/MacroTabShell.tsx": {
-    "mtime": 1787414042.2676473,
-    "ast_hash": "442bae32ef206eaf6caf4a867ed8514a",
+    "mtime": 1787430704.5381005,
+    "ast_hash": "244b38a8593b920a41ba5cee7269ba8d",
     "semantic_hash": ""
   },
   "frontend/components/macro/PositioningTab.tsx": {
@@ -1720,8 +1720,8 @@
     "semantic_hash": "9687f46104117bd2a209c1dd47a016f2"
   },
   "frontend/lib/api.ts": {
-    "mtime": 1787426511.2138486,
-    "ast_hash": "295ebcd4dea4d0e47ecb9ee0ca713a8d",
+    "mtime": 1787430661.8350072,
+    "ast_hash": "5d6f352ad5c18aa7308b2def1b75ff17",
     "semantic_hash": ""
   },
   "frontend/lib/atlasScale.ts": {
@@ -1760,8 +1760,8 @@
     "semantic_hash": "ee7b33c281f735bfb2282c254cf35101"
   },
   "frontend/lib/types.ts": {
-    "mtime": 1787428394.784364,
-    "ast_hash": "f80ad520a990612053145fa4d453165c",
+    "mtime": 1787430661.8340163,
+    "ast_hash": "f65b732a346e661ca0eba5de9268f2f7",
     "semantic_hash": ""
   },
   "frontend/lib/useKeyboardShortcuts.ts": {
@@ -1795,8 +1795,8 @@
     "semantic_hash": "a82debdd08c800eb78df66c2d5da7363"
   },
   "frontend/playwright.config.ts": {
-    "mtime": 1787424245.3146937,
-    "ast_hash": "6dc61c7c5178f51487c50d6867744c8b",
+    "mtime": 1787432416.5481565,
+    "ast_hash": "a4bdb7e11af9ae0e0ce595fa05b1eb7f",
     "semantic_hash": ""
   },
   "frontend/postcss.config.js": {
@@ -1955,8 +1955,8 @@
     "semantic_hash": "7281672a8dc09b1a85fc0da617c32d8b"
   },
   "CHANGELOG.md": {
-    "mtime": 1787426981.5257826,
-    "ast_hash": "0b75dfc2ee255952dad58fb8b8a930ad",
+    "mtime": 1787432544.2979977,
+    "ast_hash": "344a5f9b9ef81f677e3f268e008325c6",
     "semantic_hash": ""
   },
   "CLAUDE.md": {
@@ -2265,13 +2265,13 @@
     "semantic_hash": ""
   },
   "frontend/tests/e2e/smoke.spec.ts": {
-    "mtime": 1787426214.8950748,
-    "ast_hash": "a14f9635adc6eb5c10fd12140e47f2c4",
+    "mtime": 1787430252.748659,
+    "ast_hash": "f9a624d5af27ff404d502896a5f84574",
     "semantic_hash": ""
   },
   "frontend/tests/e2e/tabs.spec.ts": {
-    "mtime": 1787425997.3409061,
-    "ast_hash": "a0a2fb52b8298826c92a7bbeb16d63e0",
+    "mtime": 1787430995.3852694,
+    "ast_hash": "f4abf3d8d6b0b049e1eb1a9f64582ad7",
     "semantic_hash": ""
   },
   "backend/backend/services/ratelimit.py": {
@@ -2317,6 +2317,31 @@
   "backend/tests/test_backtest_engine.py": {
     "mtime": 1787429164.4679933,
     "ast_hash": "313bf6e676681352fc4cd212dd3cde1e",
+    "semantic_hash": ""
+  },
+  "backend/backend/services/backtest_signals.py": {
+    "mtime": 1787429352.2061017,
+    "ast_hash": "863a9921c8e40fbfaa25a805fdfa3547",
+    "semantic_hash": ""
+  },
+  "frontend/components/research/BacktestTab.tsx": {
+    "mtime": 1787429505.8524268,
+    "ast_hash": "695174a0cda86dc8124365e97ac57063",
+    "semantic_hash": ""
+  },
+  "backend/backend/services/composite_signal_service.py": {
+    "mtime": 1787431806.8250835,
+    "ast_hash": "86796ec43551b3c9ef87fa5165faa6c7",
+    "semantic_hash": ""
+  },
+  "backend/tests/test_composite_signal_service.py": {
+    "mtime": 1787430741.9710891,
+    "ast_hash": "4d7d4c951ca7375c0839efe61ea5278b",
+    "semantic_hash": ""
+  },
+  "frontend/components/macro/RiskDial.tsx": {
+    "mtime": 1787430695.3543446,
+    "ast_hash": "aa12f80b22139938ba0e2507d713ab5e",
     "semantic_hash": ""
   }
 }

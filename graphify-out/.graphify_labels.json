@@ -324,5 +324,21 @@
   "322": "InflationTab.tsx",
   "323": "tabs.spec.ts",
   "324": "CorrelationHeatmap.tsx",
-  "325": "RiskContribution.tsx"
+  "325": "RiskContribution.tsx",
+  "326": "_clean_float",
+  "327": "_db_path",
+  "328": "reset_connection",
+  "329": "_threshold_score",
+  "330": "test_risk_contributions_sum_to_portfolio_volatility",
+  "331": "test_risk_contribution_normalises_weights_that_do_not_sum_to_one",
+  "332": "test_frontier_returns_are_non_decreasing",
+  "333": "test_kelly_fraction_equals_mu_over_sigma_squared",
+  "334": "RollingMetrics.tsx",
+  "335": "CorrelationHeatmap.tsx",
+  "336": "RiskContribution.tsx",
+  "337": "FakeResp",
+  "338": "test_discount_rates.py",
+  "339": "simulate_custom_shock",
+  "340": "get_historical_episodes",
+  "341": "test_custom_skip_if_predicate"
 }

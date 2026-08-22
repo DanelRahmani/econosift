@@ -16,6 +16,11 @@ const useExternalServer = !!process.env.PLAYWRIGHT_BASE_URL;
 export default defineConfig({
   testDir: "./tests/e2e",
   fullyParallel: true,
+  // The backend is a single uvicorn process and every page fans out to many
+  // uncached endpoints. Five parallel workers saturate it and the suite starts
+  // failing on its own load rather than on real defects — capping workers is
+  // the fix, not longer timeouts.
+  workers: 2,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   reporter: "list",

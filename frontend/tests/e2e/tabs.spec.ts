@@ -107,3 +107,22 @@ test("backtester tab renders without auto-running the analysis", async ({ page }
   await page.waitForTimeout(3000);
   expect(posts, "backtest POSTed on mount — the Run Analysis gate is broken").toEqual([]);
 });
+
+test("risk dial renders with its own backtest published alongside", async ({ page }) => {
+  await page.goto("/macro?tab=financial", { waitUntil: "domcontentloaded" });
+
+  await expect(page.getByRole("heading", { name: /Composite Risk Dial/i })).toBeVisible({
+    timeout: TAB_TIMEOUT,
+  });
+
+  const body = await page.locator("body").innerText();
+  const hasDial = /Suggested equity exposure/i.test(body);
+  const hasFailure = /unavailable|FRED API key/i.test(body);
+  expect(hasDial || hasFailure).toBe(true);
+
+  // The self-test must be shown, not hidden — that is the point of it.
+  if (hasDial) {
+    await expect(page.getByRole("heading", { name: /Does this dial actually help/i }))
+      .toBeVisible({ timeout: TAB_TIMEOUT });
+  }
+});
