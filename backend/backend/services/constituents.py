@@ -12,6 +12,8 @@ Wikipedia table lacks that column, e.g. Nasdaq-100 / Dow 30).
 """
 from __future__ import annotations
 
+import datetime as _dt
+import re as _re
 import threading
 import time
 
@@ -206,3 +208,185 @@ def get_constituents(index: str) -> list[dict]:
 def constituent_symbols(index: str) -> list[str]:
     """Convenience: just the yfinance-ready ticker symbols for an index."""
     return [c["symbol"] for c in get_constituents(index)]
+
+
+# ---------------------------------------------------------------------------
+# Point-in-time membership (Phase 42, task C1)
+#
+# `get_constituents` returns *today's* members. Any historical study built on
+# that silently excludes every company that was delisted, acquired or went
+# bankrupt — survivorship bias, worth roughly 1-4% a year on US large caps and
+# always in the flattering direction.
+#
+# Wikipedia keeps an index change log on a separate page. Note the change table
+# once lived on "List of S&P 500 companies" and no longer does; it now has its
+# own article. Reconstruction walks that log backwards from the current roster.
+#
+# Coverage is the honest limit here. Measured against the live page, the log
+# carries ~20-27 changes/year from 2010 onward, which matches the index's real
+# turnover, but under 2/year before 2005 — it is a *selected* history, not a
+# complete one. Reconstructions before _COVERAGE_FROM are flagged incomplete
+# rather than presented as fact.
+# ---------------------------------------------------------------------------
+
+_CHANGES_PAGES: dict[str, str] = {
+    "sp500": "Historical components of the S&P 500",
+    "dow": "Historical components of the Dow Jones Industrial Average",
+}
+
+# Before this date the change log is too sparse to reconstruct a roster.
+_COVERAGE_FROM = _dt.date(2010, 1, 1)
+
+_changes_cache: dict[str, tuple[float, list[dict]]] = {}
+
+
+def _parse_change_date(raw: str) -> _dt.date | None:
+    """Parse the change log's date cell, which is free text like 'August 18, 2026'."""
+    text = _re.sub(r"\[\[|\]\]|<[^>]+>", " ", raw or "").strip()
+    text = _re.sub(r"\s+", " ", text)
+    for fmt in ("%B %d, %Y", "%b %d, %Y", "%Y-%m-%d", "%d %B %Y", "%B %Y"):
+        try:
+            return _dt.datetime.strptime(text, fmt).date()
+        except ValueError:
+            continue
+    # Last resort: a bare year-month-day anywhere in the cell.
+    m = _re.search(r"(19|20)\d{2}-\d{2}-\d{2}", text)
+    if m:
+        try:
+            return _dt.date.fromisoformat(m.group(0))
+        except ValueError:
+            return None
+    return None
+
+
+def _parse_changes(wikitext: str) -> list[dict]:
+    """Extract [{date, added, removed}] from the change-log table, newest first.
+
+    The table uses a two-row header (Added/Removed each span Ticker+Security),
+    so the ticker columns are located by the second header row rather than
+    assumed positionally.
+    """
+    parsed = wtp.parse(wikitext)
+    for table in parsed.tables:
+        try:
+            rows = table.data(strip=True)
+        except Exception:
+            continue
+        if not rows or len(rows) < 3:
+            continue
+
+        header = [(_cell(c) or "").lower() for c in rows[0]]
+        if not any("date" in h for h in header):
+            continue
+
+        # Row 1 disambiguates the spanned Added/Removed columns.
+        sub = [(_cell(c) or "").lower() for c in rows[1]]
+        ticker_cols = [i for i, c in enumerate(sub) if "ticker" in c or "symbol" in c]
+        if len(ticker_cols) < 2:
+            continue
+        added_i, removed_i = ticker_cols[0], ticker_cols[1]
+
+        out: list[dict] = []
+        for row in rows[2:]:
+            if not row or removed_i >= len(row):
+                continue
+            when = _parse_change_date(row[0] or "")
+            if when is None:
+                continue
+            added = _clean_symbol(row[added_i] or "") if added_i < len(row) else ""
+            removed = _clean_symbol(row[removed_i] or "")
+            if not added and not removed:
+                continue
+            out.append({"date": when, "added": added or None, "removed": removed or None})
+
+        if out:
+            out.sort(key=lambda c: c["date"], reverse=True)
+            return out
+    return []
+
+
+def get_membership_changes(index: str) -> list[dict]:
+    """Index change log, newest first, cached weekly. Empty when unsupported."""
+    key = ALIASES.get(index.strip().lower())
+    page = _CHANGES_PAGES.get(key or "")
+    if page is None:
+        return []
+
+    now = time.time()
+    with _lock:
+        hit = _changes_cache.get(key)
+    if hit and now - hit[0] < _TTL:
+        return hit[1]
+
+    try:
+        changes = _parse_changes(_fetch_wikitext(page))
+    except Exception:
+        changes = []
+
+    if changes:
+        with _lock:
+            _changes_cache[key] = (now, changes)
+        return changes
+    return hit[1] if hit else []
+
+
+def members_as_of(index: str, as_of: _dt.date) -> dict:
+    """Reconstruct index membership on a past date.
+
+    Walks the change log backwards from today's roster: for every change that
+    took effect *after* ``as_of``, undo it — drop the added ticker and restore
+    the removed one.
+
+    Returns ``{"symbols", "asOf", "complete", "coverageFrom", "changesApplied"}``.
+    ``complete`` is False when the request predates reliable coverage or when
+    the change log could not be fetched; callers should surface that rather
+    than treat the roster as fact.
+    """
+    current = constituent_symbols(index)
+    if not current:
+        return {
+            "symbols": [], "asOf": as_of.isoformat(), "complete": False,
+            "coverageFrom": _COVERAGE_FROM.isoformat(), "changesApplied": 0,
+            "note": "current membership unavailable",
+        }
+
+    today = _dt.date.today()
+    if as_of >= today:
+        return {
+            "symbols": sorted(current), "asOf": as_of.isoformat(), "complete": True,
+            "coverageFrom": _COVERAGE_FROM.isoformat(), "changesApplied": 0,
+        }
+
+    changes = get_membership_changes(index)
+    if not changes:
+        return {
+            "symbols": sorted(current), "asOf": as_of.isoformat(), "complete": False,
+            "coverageFrom": _COVERAGE_FROM.isoformat(), "changesApplied": 0,
+            "note": "change log unavailable — this is today's roster, not a point-in-time one",
+        }
+
+    roster = set(current)
+    applied = 0
+    for ch in changes:                      # newest first
+        if ch["date"] <= as_of:
+            break
+        if ch["added"]:
+            roster.discard(ch["added"])     # it had not joined yet
+        if ch["removed"]:
+            roster.add(ch["removed"])       # it was still a member
+        applied += 1
+
+    result = {
+        "symbols": sorted(roster),
+        "asOf": as_of.isoformat(),
+        "complete": as_of >= _COVERAGE_FROM,
+        "coverageFrom": _COVERAGE_FROM.isoformat(),
+        "changesApplied": applied,
+    }
+    if not result["complete"]:
+        result["note"] = (
+            f"the change log is sparse before {_COVERAGE_FROM.isoformat()} "
+            "(under ~2 changes/year vs ~20 actual), so this roster is incomplete "
+            "and still carries survivorship bias"
+        )
+    return result
