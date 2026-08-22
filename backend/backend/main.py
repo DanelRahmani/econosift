@@ -23,6 +23,11 @@ from .services import screener_service
 async def lifespan(app: FastAPI):
     from .database import init_db
     from .services.jobs import start_scheduler
+    from .services import errorlog
+    # Capture source failures in memory so the Admin page can surface them;
+    # every service degrades quietly by design, which otherwise makes a broken
+    # provider indistinguishable from a genuinely empty result.
+    errorlog.install()
     init_db()
     threading.Thread(target=screener_service.warm_all, daemon=True).start()
     scheduler = start_scheduler()

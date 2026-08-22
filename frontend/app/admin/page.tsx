@@ -5,6 +5,7 @@ import { useEffect, useState, useCallback } from "react";
 import { api } from "@/lib/api";
 import type { HealthResponse, PrefetchStatus, BulkDatasetStatus, ConfigResponse } from "@/lib/types";
 import { Card, Skeleton } from "@/components/ui";
+import { RecentFailures } from "@/components/admin/RecentFailures";
 import { useTheme, DEFAULT_COLORS, type ThemeColors } from "@/components/ThemeProvider";
 
 function fmtUptime(sec: number): string {
@@ -219,6 +220,10 @@ export default function AdminPage() {
       ) : (
         <Card><div className="text-text-muted text-sm">Could not reach backend.</div></Card>
       )}
+
+      {/* Live-ops error feed. Mounted outside the health branch on purpose —
+          when health itself is failing is exactly when you want to read this. */}
+      <RecentFailures />
     </div>
   );
 }

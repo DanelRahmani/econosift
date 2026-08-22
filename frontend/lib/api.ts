@@ -34,7 +34,7 @@ import type {
   WikiCategoriesResponse, WikiTermsResponse,
   PrefetchStatus,
   BulkDatasetStatus,
-  ConfigResponse, ConfigUpdateRequest,
+  ConfigResponse, ConfigUpdateRequest, ErrorLogResponse,
   GlobalHousingData, CreditGapsData, FiscalData, TradeData, LaborData, EnergyData,
   NetLiquidityData, RecessionProbabilityData, EarningsQualityData, EventStudyData, FactorRegimeData,
   CreditConditionsData, OilShocksData, TreasuryNoiseData,
@@ -178,6 +178,13 @@ export const api = {
 
   updateConfig: (body: ConfigUpdateRequest) =>
     put<ConfigResponse>(`/admin/config`, body),
+
+  // --- Phase 41: live-ops error feed ---
+  adminErrors: (limit = 100) =>
+    get<ErrorLogResponse>(`/admin/errors?limit=${limit}`),
+
+  clearAdminErrors: () =>
+    post<{ status: string }>(`/admin/errors/clear`, {}),
 
   // --- Phase 0 ---
   dcf: (

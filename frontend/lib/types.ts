@@ -2548,3 +2548,21 @@ export interface MultiCountryPortfolio {
   currencyExposure: Record<string, number>;
   error?: string;
 }
+// Live-ops error feed from the backend ring buffer (Phase 41)
+export interface ErrorLogEntry {
+  timestamp: string;
+  level: string;
+  source: string;
+  message: string;
+}
+
+export interface ErrorLogResponse {
+  entries: ErrorLogEntry[];
+  stats: {
+    total: number;
+    capacity: number;
+    bySource: Record<string, number>;
+    oldest: string | null;
+    newest: string | null;
+  };
+}

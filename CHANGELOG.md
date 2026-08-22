@@ -5,6 +5,17 @@
 
 ---
 
+## Phase 40-41 — Test safety net, two maths fixes, and exposure hardening (2026-08-22)
+
+- **CI now runs the tests** (`.github/workflows/ci.yml`): pytest + `tsc --noEmit` on every push to `DEV`/`main` and every PR into `main`, plus a Playwright job that boots the docker stack. Nothing previously gated the `DEV` → `main` PR. The backend suite was verified genuinely offline (no API keys, throwaway `AXIOM_DATA_DIR`), so no network markers were needed. `next lint` is deliberately excluded — ESLint has never been initialised here and would hang a runner.
+- **Options engine tested** (32 tests): put-call parity, the textbook 10.4506 reference, Greeks against finite differences, IV round-trips, CRR converging to Black-Scholes for American calls and exceeding it for deep-ITM puts. No defects found.
+- **Portfolio engine tested** (35 tests): a helper builds prices whose log returns have *exactly* a specified mean and covariance, making the checks algebraic — Kelly is exactly μ/σ², risk contributions sum exactly to portfolio vol (Euler), Black-Litterman equilibrium matches δΣw, and a view equal to equilibrium leaves the posterior unchanged. No defects found.
+- **🐛 Hurst exponent fixed:** R/S ran on price *levels* instead of increments, returning ~1.0 for random-walk, trending and mean-reverting series alike — the Risk page reported "Trending" for essentially every ticker. Now differences internally with the Anis-Lloyd small-sample correction; measured unbiased (mean 0.502–0.510), and the existing 0.4/0.6 bands turn out to be its 95% null interval, so they were kept. AAPL/KO/TLT now read 0.50–0.56.
+- **🐛 RSI fallback fixed:** it replaced a zero average loss with NaN, blanking RSI exactly when it should read 100 (an unbroken advance).
+- **Playwright smoke suite** (15 specs): 8 pages + the 5 Phase 39 tabs. Tabs assert a *coherent state* — data or an explicit unavailable message — because CI runs keyless and legitimately renders the latter; a blank panel is the regression being caught.
+- **Exposure hardened:** nginx binds `127.0.0.1:80`; CORS moved from `allow_origins=["*"]` to an explicit allowlist (tauri origins kept for the desktop build), verified by a rejected `evil.com` preflight against `PUT /api/admin/config`. New `ratelimit.py` throttles FRED (120/min) and Finnhub (60/min) at their call sites.
+- **Live-ops error feed:** `errorlog.py` keeps the last 200 WARNING+ records in memory, exposed at `/api/admin/errors` and surfaced as "Recent Failures" on the Admin page — services degrade quietly by design, which previously made a broken source indistinguishable from an empty one.
+
 ## Phase 39 — High-evidence credit, oil, and rates indicators (2026-08-22)
 
 Adds the indicators with the strongest out-of-sample evidence in the literature that the platform did not already carry, each with a documented causal channel rather than a bare correlation.

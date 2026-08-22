@@ -40,9 +40,9 @@
     "semantic_hash": ""
   },
   "backend/backend/main.py": {
-    "mtime": 1782767448.77336,
-    "ast_hash": "2c93c69242836151765081fc1a8e8485",
-    "semantic_hash": "2c93c69242836151765081fc1a8e8485"
+    "mtime": 1787425496.0558167,
+    "ast_hash": "b27a2f7a9dbc31b84c7f60937e674858",
+    "semantic_hash": ""
   },
   "backend/backend/middleware.py": {
     "mtime": 1782420619.5365047,
@@ -375,9 +375,9 @@
     "semantic_hash": "7e8f946392f03fdd5dbfcc8ff89ba29f"
   },
   "backend/backend/services/finnhub_service.py": {
-    "mtime": 1782303819.95183,
-    "ast_hash": "a6516688ae0f1b9c13533182992b78ee",
-    "semantic_hash": "a6516688ae0f1b9c13533182992b78ee"
+    "mtime": 1787425571.0740802,
+    "ast_hash": "297f2c226f4cd2e468db9958f358b907",
+    "semantic_hash": ""
   },
   "backend/backend/services/fiscal_service.py": {
     "mtime": 1782769163.3022077,
@@ -430,9 +430,9 @@
     "semantic_hash": "6ee34ff4dc24c2c1e281d5482016948d"
   },
   "backend/backend/services/macro_expansion_service.py": {
-    "mtime": 1782324096.3700364,
-    "ast_hash": "469ff2cf868a3e9f4162dce9cfac069c",
-    "semantic_hash": "469ff2cf868a3e9f4162dce9cfac069c"
+    "mtime": 1787425542.946497,
+    "ast_hash": "9c4236873a977b45a8b73d509697fdfa",
+    "semantic_hash": ""
   },
   "backend/backend/services/macro_regime_service.py": {
     "mtime": 1782986980.512082,
@@ -1990,8 +1990,8 @@
     "semantic_hash": "64cac7689eb193bc5faf0c1e384e0324"
   },
   "README.md": {
-    "mtime": 1782987961.078761,
-    "ast_hash": "4659078c7a9b6f93414f4364522a8dd2",
+    "mtime": 1787425642.4015532,
+    "ast_hash": "423cb0c96ccc94f1209395ba31fe8554",
     "semantic_hash": ""
   },
   "RELEASE_PLAN.md": {
@@ -2025,9 +2025,9 @@
     "semantic_hash": "534637b40cfadac3db14e8a7da50106c"
   },
   "docker-compose.yml": {
-    "mtime": 1782642799.5520346,
-    "ast_hash": "a3d5f559d5e82870d342fb260b29a67f",
-    "semantic_hash": "a3d5f559d5e82870d342fb260b29a67f"
+    "mtime": 1787425496.1635296,
+    "ast_hash": "fc9879af04660374c0e2a80728e5e9f5",
+    "semantic_hash": ""
   },
   "desktop/src-tauri/icons/128x128.png": {
     "mtime": 1782945722.2352252,
@@ -2265,13 +2265,23 @@
     "semantic_hash": ""
   },
   "frontend/tests/e2e/smoke.spec.ts": {
-    "mtime": 1787425189.4985194,
-    "ast_hash": "e77d7335678e07381c3754de2822ac41",
+    "mtime": 1787426214.8950748,
+    "ast_hash": "a14f9635adc6eb5c10fd12140e47f2c4",
     "semantic_hash": ""
   },
   "frontend/tests/e2e/tabs.spec.ts": {
-    "mtime": 1787424291.2562509,
-    "ast_hash": "72152dece63cb45a3f0d1bc776079759",
+    "mtime": 1787425997.3409061,
+    "ast_hash": "a0a2fb52b8298826c92a7bbeb16d63e0",
+    "semantic_hash": ""
+  },
+  "backend/backend/services/ratelimit.py": {
+    "mtime": 1787425512.6001835,
+    "ast_hash": "3c3bd097fdd6e45b89f9c2e88fcac7e6",
+    "semantic_hash": ""
+  },
+  "backend/tests/test_ratelimit.py": {
+    "mtime": 1787425587.2727513,
+    "ast_hash": "a79ca445b16713cc584013f48a9346c5",
     "semantic_hash": ""
   }
 }

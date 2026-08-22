@@ -311,16 +311,10 @@
   "309": "TestGrahamFormulaModel",
   "310": "get_factor_regime",
   "311": "StressTesting.tsx",
-  "312": "PresetPills.tsx",
   "313": "_get_fx_ppp_sync",
   "314": "get_recession_probability",
-  "315": "black_litterman",
-  "316": "fama_french",
   "317": "Any",
   "318": "CorrelationMatrix.tsx",
   "319": "smoke.spec.ts",
-  "320": "simulate_custom_shock",
-  "321": "analyze",
-  "322": "get_historical_episodes",
   "323": "tabs.spec.ts"
 }
