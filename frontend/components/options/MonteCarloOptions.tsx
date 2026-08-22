@@ -219,7 +219,7 @@ export function MonteCarloOptions({ ticker, expiry, theme }: Props) {
 
       {!result && !loading && (
         <div className="flex items-center justify-center h-32 text-text-muted text-sm">
-          Configure inputs above and click "Run Analysis" to price this option
+          Configure inputs above and click &quot;Run Analysis&quot; to price this option
         </div>
       )}
     </div>

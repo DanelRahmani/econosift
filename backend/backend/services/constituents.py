@@ -24,10 +24,15 @@ import wikitextparser as wtp
 _API = "https://en.wikipedia.org/w/api.php"
 # Raw page titles — let requests URL-encode them (don't pre-encode "&" or it
 # gets double-escaped into %2526 and the API 404s).
+# Wikipedia has moved every one of these onto dedicated "List of ..." articles.
+# The parent articles (e.g. "Nasdaq-100") now carry only history and milestone
+# tables, so pointing at them silently returned zero members — the screener and
+# backtester universes for ndx/dow were empty rather than erroring. The parsing
+# itself was fine; only the titles were stale.
 _PAGES: dict[str, str] = {
     "sp500": "List of S&P 500 companies",
-    "ndx": "Nasdaq-100",
-    "dow": "Dow Jones Industrial Average",
+    "ndx": "List of NASDAQ-100 companies",
+    "dow": "List of Dow Jones Industrial Average companies",
 }
 ALIASES = {
     "sp500": "sp500", "spx": "sp500", "^gspc": "sp500", "s&p500": "sp500",
@@ -229,9 +234,15 @@ def constituent_symbols(index: str) -> list[str]:
 # rather than presented as fact.
 # ---------------------------------------------------------------------------
 
+# Only the S&P 500 has a change log in a Date / Added / Removed shape that can
+# be walked backwards. The Dow's "Historical components" article exists but is
+# laid out as ~64 wide period tables with no date column, and the Nasdaq-100 has
+# no change article at all — so neither can be reconstructed by this parser.
+# They are deliberately absent rather than listed-but-broken: members_as_of then
+# returns today's roster flagged complete=False with an explicit note, instead
+# of implying point-in-time support it does not have.
 _CHANGES_PAGES: dict[str, str] = {
     "sp500": "Historical components of the S&P 500",
-    "dow": "Historical components of the Dow Jones Industrial Average",
 }
 
 # Before this date the change log is too sparse to reconstruct a roster.

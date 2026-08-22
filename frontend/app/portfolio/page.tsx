@@ -226,7 +226,7 @@ function PortfolioPageInner() {
             )}
             {!analyzeLoading && !analyzeData && !analyzeError && (
               <div className="flex items-center justify-center h-64 text-text-muted text-sm">
-                Click "Analyze Portfolio" to get started.
+                Click &quot;Analyze Portfolio&quot; to get started.
               </div>
             )}
           </>

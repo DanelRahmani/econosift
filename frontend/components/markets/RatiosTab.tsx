@@ -274,7 +274,7 @@ function LegendCard() {
         </span>
       </div>
       <p className="text-text-muted text-xs mt-2 border-t border-border/40 pt-2">
-        Click any <span className="font-semibold text-text-secondary">ⓘ</span> icon to see the metric's definition, Favorable / Average / Caution thresholds, and any known exceptions. Valuation multiples (P/E, P/B, EV/EBITDA, etc.) use{" "}
+        Click any <span className="font-semibold text-text-secondary">ⓘ</span> icon to see the metric&apos;s definition, Favorable / Average / Caution thresholds, and any known exceptions. Valuation multiples (P/E, P/B, EV/EBITDA, etc.) use{" "}
         <span className="text-success font-medium">green = cheaper</span>,{" "}
         <span className="text-danger font-medium">red = richer</span>.
       </p>

@@ -15,9 +15,11 @@ name: CI
 # build-windows.yml uses 3.13 for the PyInstaller desktop freeze; that is a
 # separate concern and intentionally not aligned here.
 #
-# Frontend runs `tsc --noEmit` only. `next lint` has never been initialised in
-# this repo (no .eslintrc), so it prompts interactively and would hang a
-# runner — wiring ESLint up is tracked separately.
+# Frontend runs `tsc --noEmit` and `next lint`. ESLint had never been
+# initialised here, so `next lint` used to prompt interactively and would hang a
+# runner; it now has a committed .eslintrc.json with eslint pinned to 8.x and
+# eslint-config-next matched to Next 14 (9.x / 16.x both break `next lint` on
+# this Next version).
 
 on:
   push:
@@ -73,6 +75,12 @@ jobs:
       - name: Typecheck
         working-directory: frontend
         run: npx tsc --noEmit
+
+      - name: Lint
+        working-directory: frontend
+        # Warnings are allowed through (mostly react-hooks/exhaustive-deps on
+        # pre-existing components); errors are not.
+        run: npx next lint --max-warnings=9999
 
   e2e:
     name: Playwright smoke

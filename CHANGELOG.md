@@ -5,6 +5,12 @@
 
 ---
 
+## Phase 44 — Empty index universes fixed, ESLint wired into CI (2026-08-22)
+
+- **🐛 Nasdaq-100 and Dow universes were silently empty.** Wikipedia moved both membership tables onto dedicated "List of ..." articles; the parent pages now carry only history and milestone tables, so the parser found nothing and `get_constituents` returned `[]` without raising — the screener and backtester universes for `ndx`/`dow` were blank rather than broken-looking. Only the page titles were stale. Now: sp500 503, ndx 102, dow 30, all verified end-to-end through the backtester.
+- Point-in-time reconstruction stays S&P-500-only and says so: the Dow's historical article is ~64 wide period tables with no date column and the Nasdaq-100 has no change article, so `_CHANGES_PAGES` lists only sp500 and the others degrade with an explicit `complete: false` note rather than being listed-but-broken.
+- **ESLint wired into CI.** It had never been initialised, so `next lint` prompted interactively and would hang a runner. Now committed with `eslint@8` and `eslint-config-next@14` pinned to match Next 14 (9.x and 16.x both break `next lint` on this version). All 13 pre-existing errors fixed — 11 unescaped JSX entities plus two `eslint-disable` comments referencing a rule the config never loaded, resolved by registering the plugin rather than deleting the suppressions.
+
 ## Phase 42-43 — Point-in-time data, out-of-sample scoring, and a backtester (2026-08-22)
 
 - **Survivorship bias removed** (`constituents.members_as_of`): reconstructs index membership on any past date by walking Wikipedia's change log backwards. The log moved to its own article since it was last looked at, and coverage is only reliable from ~2010 (20-27 changes/yr, vs under 2/yr before 2005) — earlier dates return `complete: false` rather than a confidently wrong roster. Verified against known events: TSLA absent before Dec 2020, and ATVI/FISV/DISCA/XLNX correctly restored to the 2018 roster despite being gone today.
