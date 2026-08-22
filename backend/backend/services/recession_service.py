@@ -100,6 +100,58 @@ def _extract_recessions(usrec_pts: list[dict]) -> list[dict]:
     return episodes
 
 
+def _walk_forward_probit(
+    monthly_spread: list[dict],
+    usrec_map: dict[str, float],
+    min_train: int = 120,
+) -> list[dict]:
+    """Out-of-sample recession probability using only data available at the time.
+
+    The in-sample path fits one probit over the whole history and then applies
+    those coefficients back across it, so every point is informed by recessions
+    that had not happened yet. This refits at each month on the observations
+    whose 12-month-ahead outcome was already known by then, and predicts one
+    step out — what the model would actually have printed at the time.
+
+    Note the remaining, irreducible look-ahead: NBER dates recessions with a lag
+    of months, so even a walk-forward fit uses labels nobody had contemporaneously.
+    This is the standard caveat on every yield-curve recession model, not a
+    defect that can be engineered away with free data.
+    """
+    if not monthly_spread:
+        return []
+
+    def _add_months(ym: str, n: int) -> str:
+        return str(pd.Period(ym, freq="M") + n)
+
+    out: list[dict] = []
+    alpha = beta = None
+    for i, pt in enumerate(monthly_spread):
+        now = pt["date"]
+        # Training pairs whose outcome month is already in the past at `now`.
+        xs: list[float] = []
+        ys: list[int] = []
+        for prev in monthly_spread[:i]:
+            target_month = _add_months(prev["date"], 12)
+            if target_month > now:
+                continue
+            target = usrec_map.get(target_month)
+            if target is not None:
+                xs.append(prev["value"])
+                ys.append(int(target))
+
+        if len(xs) >= min_train:
+            fitted_a, fitted_b = _fit_probit(xs, ys)
+            if fitted_a is not None and fitted_b is not None:
+                alpha, beta = fitted_a, fitted_b
+
+        if alpha is not None and beta is not None:
+            p = float(norm.cdf(alpha + beta * pt["value"])) * 100.0
+            out.append({"date": now, "value": round(p, 2)})
+
+    return out
+
+
 def _compute_recession(data: dict[str, list[dict]]) -> dict:
     """Pure computation over already-fetched FRED points; unit-testable."""
     if not data:
@@ -135,6 +187,9 @@ def _compute_recession(data: dict[str, list[dict]]) -> dict:
             p = float(norm.cdf(alpha + beta * pt["value"])) * 100.0
             prob_history.append({"date": pt["date"], "value": round(p, 2)})
 
+    # Out-of-sample path: what the model would have printed at the time.
+    realtime_history = _walk_forward_probit(monthly_spread, usrec_map)
+
     months_inverted = 0
     for pt in reversed(monthly_spread):
         if pt["value"] < 0:
@@ -154,9 +209,11 @@ def _compute_recession(data: dict[str, list[dict]]) -> dict:
             "spreadPct": _latest(spread_pts),
             "monthsInverted": months_inverted,
             "smoothedProb": _latest(smoothed_pts),
+            "prob12mRealtime": _latest(realtime_history),
         },
         "history": {
             "probability": prob_history,
+            "probabilityRealtime": realtime_history,
             "spread": monthly_spread,
             "sahm": sahm_pts,
             "smoothedProb": smoothed_pts,
@@ -166,6 +223,14 @@ def _compute_recession(data: dict[str, list[dict]]) -> dict:
             "alpha": round(alpha, 6) if alpha is not None else None,
             "beta": round(beta, 6) if beta is not None else None,
             "nObs": len(train_x),
+            "note": (
+                "`probability` is in-sample: one probit fitted over the whole "
+                "history and applied back across it, so every point is informed "
+                "by recessions that had not happened yet. `probabilityRealtime` "
+                "refits each month on data available at the time. NBER dates "
+                "recessions with a lag, so even the real-time path uses labels "
+                "nobody had contemporaneously."
+            ),
         },
     }
 

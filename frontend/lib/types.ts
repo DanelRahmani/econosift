@@ -1066,15 +1066,19 @@ export interface RecessionProbabilityData {
     spreadPct: number | null;
     monthsInverted: number;
     smoothedProb: number | null;
+    /** Walk-forward estimate refitted monthly on data available at the time. */
+    prob12mRealtime?: number | null;
   };
   history?: {
     probability: MacroTimeSeries[];
+    /** Out-of-sample path; shorter than `probability` (needs a training window). */
+    probabilityRealtime?: MacroTimeSeries[];
     spread: MacroTimeSeries[];
     sahm: MacroTimeSeries[];
     smoothedProb: MacroTimeSeries[];
   };
   recessions?: { start: string; end: string }[];
-  model?: { alpha: number | null; beta: number | null; nObs: number };
+  model?: { alpha: number | null; beta: number | null; nObs: number; note?: string };
 }
 
 // Credit & funding conditions — SOFR-IORB, SLOOS, EBP, NFCI/ANFCI (Phase 39)

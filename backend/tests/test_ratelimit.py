@@ -16,8 +16,10 @@ def test_consecutive_acquires_are_spaced_by_the_minimum_interval():
             pass
     elapsed = time.monotonic() - start
 
-    # Four starts means three enforced gaps.
-    assert elapsed >= 0.05 * 3
+    # Four starts means three enforced gaps. A small tolerance is needed
+    # because time.sleep can undershoot slightly on Windows' timer resolution;
+    # the point is that the gaps are enforced, not that they are exact.
+    assert elapsed >= 0.05 * 3 * 0.9
 
 
 def test_concurrency_is_bounded():
