@@ -356,5 +356,9 @@
   "354": "regime_series",
   "355": "taylor_rule",
   "356": "trade_flows",
-  "357": "_threshold_score"
+  "357": "_threshold_score",
+  "358": "net_liquidity",
+  "359": "positioning",
+  "360": "search_countries",
+  "361": "get_historical_episodes"
 }
