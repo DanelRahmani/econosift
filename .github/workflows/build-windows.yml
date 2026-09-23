@@ -1,20 +1,13 @@
-name: Build Windows Desktop
+name: Build Desktop Installers
 
-# Builds the Axiom Finance Tauri app for Windows, macOS, and Linux: freezes
+# Builds the Axiom Finance Tauri app for Windows and Linux: freezes
 # the FastAPI backend with PyInstaller (onedir), stages it into the Tauri
 # resources, then runs `tauri build` to produce an installer per OS and
 # uploads each as an artifact. PyInstaller can't cross-compile, so each OS
 # builds its own backend binary on its own GitHub-hosted runner.
 #
-# GitHub's windows-latest runners already ship Rust + the MSVC C++ Build
-# Tools; macos-latest ships Rust + Xcode tools. Linux needs WebKitGTK etc.
-# installed explicitly (see the Linux-only step below).
-#
-# macOS builds are unsigned/unnotarized (no Apple Developer account) — users
-# will see a Gatekeeper "unidentified developer" warning and need to
-# right-click → Open the first time. macOS runners are Apple Silicon
-# (arm64) only; add an x86_64-apple-darwin leg later if Intel Mac support
-# is needed.
+# Windows and Linux are the supported desktop release targets. macOS
+# packaging is deferred until there is a concrete need for it.
 
 on:
   workflow_dispatch: {}          # manual "Run workflow" button (needs workflow on default branch)
@@ -35,8 +28,6 @@ jobs:
         include:
           - os: windows-latest
             artifact: windows-installer
-          - os: macos-latest
-            artifact: macos-installer
           - os: ubuntu-latest
             artifact: linux-installer
     runs-on: ${{ matrix.os }}
@@ -108,11 +99,10 @@ jobs:
           # 1.12 GB instead of ~100 MB and burned through the account's artifact
           # storage quota — the upload then failed with "storage quota has been
           # hit" even though the build itself had succeeded.
-          # Only one of these three patterns matches on any given runner;
+          # Only one of these patterns matches on any given runner;
           # if-no-files-found still catches a genuinely empty build.
           path: |
             desktop/src-tauri/target/release/bundle/nsis/*-setup.exe
-            desktop/src-tauri/target/release/bundle/dmg/*.dmg
             desktop/src-tauri/target/release/bundle/deb/*.deb
           if-no-files-found: error
           # These are reproducible build outputs, not the release channel
@@ -126,5 +116,4 @@ jobs:
         with:
           files: |
             desktop/src-tauri/target/release/bundle/nsis/*-setup.exe
-            desktop/src-tauri/target/release/bundle/dmg/*.dmg
             desktop/src-tauri/target/release/bundle/deb/*.deb

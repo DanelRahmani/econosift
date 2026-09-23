@@ -3,7 +3,7 @@ name: Promote main → PRODUCTION
 # Gated release: run this manually (Actions ▸ "Promote main → PRODUCTION" ▸ Run)
 # when you want to cut a new desktop build. It merges the current `main` into
 # `PRODUCTION` and pushes, then kicks off build-windows.yml against PRODUCTION,
-# which produces the Windows / macOS / Linux installers.
+# which produces the Windows and Linux installers.
 #
 # Why the explicit dispatch at the end: a push made with the default
 # GITHUB_TOKEN does NOT trigger other workflows' `on: push` (GitHub blocks that
