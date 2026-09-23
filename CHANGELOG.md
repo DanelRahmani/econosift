@@ -77,13 +77,13 @@ Adds the indicators with the strongest out-of-sample evidence in the literature 
 
 ## Gated desktop release flow — main → PRODUCTION (2026-07-01)
 
-- `main` is now feature-development only: `build-windows.yml` no longer builds on `main`/PRs — it triggers on `PRODUCTION` pushes, `v*` tags, and manual dispatch.
+- `main` is now feature-development only: `build-desktop.yml` no longer builds on `main`/PRs — it triggers on `PRODUCTION` pushes, `v*` tags, and manual dispatch.
 - New `promote-to-production.yml` (manual "Promote main → PRODUCTION"): merges `main` into `PRODUCTION`, pushes, then dispatches the 3-OS build (needed because a `GITHUB_TOKEN` push doesn't trigger other workflows).
 - New `TAURI_BUILD.md` documents the four contracts a `main` feature must respect to stay Tauri-packageable (`config.DATA_DIR` for all writes, static export + full `generateStaticParams`, 127.0.0.1:8000 backend + health gate, PyInstaller `collect_all`) and the release steps.
 
 ## Cross-platform desktop builds — Windows · macOS · Linux (2026-07-01)
 
-`build-windows.yml` now builds on a 3-OS matrix (`windows-latest` / `macos-latest` / `ubuntu-latest`), each freezing its own PyInstaller backend and running `tauri build`:
+`build-desktop.yml` now builds on a 3-OS matrix (`windows-latest` / `macos-latest` / `ubuntu-latest`), each freezing its own PyInstaller backend and running `tauri build`:
 
 - **Windows** → NSIS `*-setup.exe`, **macOS** → `*.dmg` (Apple Silicon, unsigned), **Linux** → `*.deb`.
 - Linux `tauri.conf.json` originally also targeted **AppImage**, but it can't be bundled on GitHub's runners (`linuxdeploy` needs FUSE; `APPIMAGE_EXTRACT_AND_RUN`/`NO_STRIP` didn't clear it — likely a WebKitGTK-4.1 plugin issue). Dropped `appimage` and ship `.deb` only (tracked as P3-13).
@@ -109,7 +109,7 @@ Supersedes the original Phase 37 desktop scaffolding, which built but failed to 
 - **Tauri wiring:** dropped the sidecar/updater approach; the backend folder is bundled via `bundle.resources` and spawned from `src-tauri/src/lib.rs` using a resource-resolved path, with `AXIOM_DATA_DIR` passed on the command.
 - **Data dir:** `database.py` now resolves the SQLite path from `config.DATA_DIR` (`%APPDATA%/AxiomFinance`) instead of a CWD-relative `./data`, so the DB no longer scatters based on launch directory.
 - **Cold-start race:** health-gate splash in `providers.tsx` polls `/api/health` before mounting; React Query retry bumped.
-- **Windows-only, local build**, production windowless (`console=False`). NSIS installer (165 MB) published via **Git LFS** under `releases/`; GitHub Actions `build-windows.yml` builds on `windows-latest`.
+- **Windows-only, local build**, production windowless (`console=False`). NSIS installer (165 MB) published via **Git LFS** under `releases/`; GitHub Actions `build-desktop.yml` builds on `windows-latest`.
 - **Verified:** clean install launched from a neutral CWD serves live data (`/api/health`, `/api/search` → 200); DB + WAL/SHM land in `%APPDATA%/AxiomFinance` with no stray copies.
 - **Known caveats:** DESK-01 (`backend.log` not written under `console=False`), DESK-02 (backend orphaned on force-kill) — tracked in `ACTIVE_ISSUES.md`.
 

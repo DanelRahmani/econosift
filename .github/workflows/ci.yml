@@ -12,7 +12,7 @@ name: CI
 # with FRED/FINNHUB/GEMINI unset and a throwaway AXIOM_DATA_DIR.
 #
 # Python is pinned to 3.12 to match backend/Dockerfile (the shipping runtime).
-# build-windows.yml uses 3.13 for the PyInstaller desktop freeze; that is a
+# build-desktop.yml uses 3.13 for the PyInstaller desktop freeze; that is a
 # separate concern and intentionally not aligned here.
 #
 # Frontend runs `tsc --noEmit` and `next lint`. ESLint had never been

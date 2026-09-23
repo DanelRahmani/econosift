@@ -115,7 +115,7 @@ Axiom Finance ships as a **native desktop app** for Windows and Linux — no Doc
   powershell -ExecutionPolicy Bypass -File desktop\build-windows.ps1
   ```
   Produces `desktop/src-tauri/target/release/bundle/nsis/Axiom Finance_<ver>_x64-setup.exe`.
-- **CI:** `.github/workflows/build-windows.yml` builds Windows and Linux installers on native `windows-latest` and `ubuntu-latest` runners (freeze → stage → `tauri build`) and uploads them as artifacts. PyInstaller can't cross-compile, so each OS freezes its own backend on its own runner.
+- **CI:** `.github/workflows/build-desktop.yml` builds Windows and Linux installers on native `windows-latest` and `ubuntu-latest` runners (freeze → stage → `tauri build`) and uploads them as artifacts. PyInstaller can't cross-compile, so each OS freezes its own backend on its own runner.
 - **Releasing:** `main` is feature development (no installers). Cut a desktop build with **Actions ▸ "Promote main → PRODUCTION"**, which merges `main` into `PRODUCTION` and triggers the Windows/Linux build. See [`TAURI_BUILD.md`](./TAURI_BUILD.md) for the full flow and the contracts a `main` feature must respect to stay packageable.
 
 See [`desktop/README.md`](./desktop/README.md) for architecture and build details, and [`TAURI_BUILD.md`](./TAURI_BUILD.md) for the desktop release process.

@@ -56,7 +56,7 @@ The original `claude_plan.md` roadmap (Phases 0–12) is fully delivered, as is 
 
 ### Windows and Linux Desktop Package (Tauri) — v1.0.0
 
-Alongside the Docker deployment, Axiom Finance ships as a native Windows and Linux desktop app (`desktop/`); macOS packaging is deferred. A Tauri v2 Rust shell hosts the static Next.js export and spawns the FastAPI backend — frozen with PyInstaller **onedir** (`backend/build.spec`, `collect_all()` over the full dependency stack) — as a child process on `127.0.0.1:8000`. App data lives under the OS app-data directory via `AXIOM_DATA_DIR` (`database.py` resolves the SQLite path from `config.DATA_DIR`). Build Windows with `desktop/build-windows.ps1`; CI builds NSIS and Debian installers on native runners via `.github/workflows/build-windows.yml`. See [`desktop/README.md`](./desktop/README.md) for build steps and DESK-01/DESK-02 in [`ACTIVE_ISSUES.md`](./ACTIVE_ISSUES.md) for known caveats.
+Alongside the Docker deployment, Axiom Finance ships as a native Windows and Linux desktop app (`desktop/`); macOS packaging is deferred. A Tauri v2 Rust shell hosts the static Next.js export and spawns the FastAPI backend — frozen with PyInstaller **onedir** (`backend/build.spec`, `collect_all()` over the full dependency stack) — as a child process on `127.0.0.1:8000`. App data lives under the OS app-data directory via `AXIOM_DATA_DIR` (`database.py` resolves the SQLite path from `config.DATA_DIR`). Build Windows with `desktop/build-windows.ps1`; CI builds NSIS and Debian installers on native runners via `.github/workflows/build-desktop.yml`. See [`desktop/README.md`](./desktop/README.md) for build steps and DESK-01/DESK-02 in [`ACTIVE_ISSUES.md`](./ACTIVE_ISSUES.md) for known caveats.
 
 ### Module Maps
 

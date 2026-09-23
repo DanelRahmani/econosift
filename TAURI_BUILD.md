@@ -67,7 +67,7 @@ develop on main  ──►  Promote to PRODUCTION (one click)  ──►  Window
 2. Go to **Actions ▸ "Promote main → PRODUCTION" ▸ Run workflow**.
    - It merges `main` into `PRODUCTION`, pushes, and then triggers the build.
    - (Equivalent by hand: `git push origin main:PRODUCTION` when it fast-forwards.)
-3. **Actions ▸ "Build Windows Desktop"** runs on `PRODUCTION` and produces:
+3. **Actions ▸ "Build Windows and Linux Desktop"** runs on `PRODUCTION` and produces:
 
    | OS | Artifact | Notes |
    |----|----------|-------|
@@ -83,10 +83,10 @@ installer name references in `README.md` / `releases/`) before promoting.
 ### Workflows involved
 
 - `.github/workflows/promote-to-production.yml` — the manual promote button.
-- `.github/workflows/build-windows.yml` — the Windows/Linux matrix build (freeze backend
+- `.github/workflows/build-desktop.yml` — the Windows/Linux matrix build (freeze backend
   → stage into Tauri resources → `tauri build`). Triggers on push to
   `PRODUCTION`, on `v*` tags, and via manual dispatch.
 
 > Note: the promote job pushes with the default `GITHUB_TOKEN`, which by design
-> does **not** trigger `build-windows.yml`'s `on: push` — so the promote job
+> does **not** trigger `build-desktop.yml`'s `on: push` — so the promote job
 > dispatches the build explicitly as its last step.

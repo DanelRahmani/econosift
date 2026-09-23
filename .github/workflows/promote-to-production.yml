@@ -2,7 +2,7 @@ name: Promote main → PRODUCTION
 
 # Gated release: run this manually (Actions ▸ "Promote main → PRODUCTION" ▸ Run)
 # when you want to cut a new desktop build. It merges the current `main` into
-# `PRODUCTION` and pushes, then kicks off build-windows.yml against PRODUCTION,
+# `PRODUCTION` and pushes, then kicks off build-desktop.yml against PRODUCTION,
 # which produces the Windows and Linux installers.
 #
 # Why the explicit dispatch at the end: a push made with the default
@@ -42,4 +42,4 @@ jobs:
       - name: Trigger the desktop build on PRODUCTION
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh workflow run build-windows.yml --ref PRODUCTION
+        run: gh workflow run build-desktop.yml --ref PRODUCTION
