@@ -20,6 +20,8 @@ from ..services import dupont_service
 from ..services import cross_asset_service
 from ..services import event_study_service
 from ..services import fama_french as ff_service
+from ..services import backtest_signals
+from ..services.backtest_engine import LookaheadError, run_backtest
 
 router = APIRouter(prefix="/api/research", tags=["research"])
 
@@ -183,4 +185,70 @@ async def multi_country_portfolio(req: MultiCountryRequest):
                      for h in req.holdings]
         return await cross_asset_service.get_multi_country_portfolio(holdings, req.period)
     except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+# --- Phase 43: signal backtester (compute tier: red / Run Analysis) ---
+
+class BacktestRequest(BaseModel):
+    signal: str = "momentum_12_1"
+    universe: str = "sp500"
+    period: str = "10y"
+    rebalance: str = Field(default="M", pattern="^(W|M|Q)$")
+    nQuantiles: int = Field(default=5, ge=2, le=10)
+    costBps: float = Field(default=10.0, ge=0.0, le=500.0)
+    longShort: bool = True
+    pointInTimeUniverse: bool = True
+    allowLookahead: bool = False
+
+
+@router.get("/backtest/signals")
+async def list_backtest_signals():
+    """Registry of backtestable signals. All price-derived — see P3-14."""
+    return {"signals": backtest_signals.available_signals()}
+
+
+def _run_backtest_sync(req: "BacktestRequest") -> dict:
+    signal, prices, meta = backtest_signals.build_signal(
+        req.signal, universe=req.universe, period=req.period
+    )
+
+    universe_fn = None
+    if req.pointInTimeUniverse:
+        import datetime as _dt
+
+        from ..services import constituents
+
+        def universe_fn(d: _dt.date, _u=req.universe):
+            return constituents.members_as_of(_u, d)["symbols"]
+
+    result = run_backtest(
+        signal,
+        prices,
+        rebalance=req.rebalance,
+        n_quantiles=req.nQuantiles,
+        long_short=req.longShort,
+        cost_bps=req.costBps,
+        universe_as_of=universe_fn,
+        allow_lookahead=req.allowLookahead,
+        is_fundamental=meta["isFundamental"],
+    )
+    result["meta"] = meta
+    return result
+
+
+@router.post("/backtest")
+async def post_backtest(req: BacktestRequest):
+    """Backtest a cross-sectional signal. Compute tier: red — never auto-fired.
+
+    Downloads a price panel and runs a quantile sort, so it takes tens of
+    seconds on a cold cache.
+    """
+    try:
+        return await asyncio.to_thread(_run_backtest_sync, req)
+    except LookaheadError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:  # pragma: no cover - defensive
         raise HTTPException(status_code=500, detail=str(exc)) from exc

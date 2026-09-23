@@ -14,7 +14,7 @@ Axiom Finance is a self-hosted financial analytics platform built on FastAPI + N
 - **Risk** (`/risk`): Rolling metrics (20D/60D/120D/252D), GARCH(1,1), Hurst exponent, OU mean-reversion, Engle-Granger cointegration, correlation matrix, historical stress scenarios
 - **Options** (`/options`): IV30, IV Rank/Percentile, Greeks (Δ/Γ/Θ/V/ρ), term structure, volatility smile, OI profile, max pain, Black-Scholes, CRR binomial tree, Monte Carlo
 - **Calendar** (`/calendar`): Economic releases, earnings with EPS surprise, ex-dividend dates, IPOs, central bank meetings
-- **Yield** (`/yield`): US Treasury spot curve, TIPS real yields, breakevens, ACM term premium, multi-country yield comparison
+- **Yield** (`/yield`): US Treasury spot curve, TIPS real yields, breakevens (incl. 5y5y forward), ACM term premium, Nelson-Siegel curve-fit noise, multi-country yield comparison
 - **Policy & Sovereign** (`/policy`, `/sovereign`): CB divergence score, G10 carry differentials, sovereign risk rankings, 6-KPI traffic-light
 - **Atlas** (`/atlas`): Choropleth world map of 6 macro indicators across ~200 countries (2000–2024), year-slider animation, regional blocs (G7/G20/Eurozone/EM), Top/Bottom-10 rankings
 - **Wiki** (`/wiki`): Searchable financial dictionary — 410+ terms across 26 categories, each with a detailed explanation. Category sidebar, debounced search, expandable term cards, related-term cross-linking
@@ -54,9 +54,9 @@ The original `claude_plan.md` roadmap (Phases 0–12) is fully delivered, as is 
 
 > **After completing each phase, add a one-line entry to [`CHANGELOG.md`](./CHANGELOG.md)** with phase number, date, and concise description of what was shipped.
 
-### Windows Desktop Package (Tauri) — v1.0.0
+### Windows and Linux Desktop Package (Tauri) — v1.0.0
 
-Alongside the Docker deployment, Axiom Finance ships as a native Windows desktop app (`desktop/`). A Tauri v2 Rust shell hosts the static Next.js export and spawns the FastAPI backend — frozen with PyInstaller **onedir** (`backend/build.spec`, `collect_all()` over the full dependency stack) — as a child process on `127.0.0.1:8000`. App data lives in `%APPDATA%/AxiomFinance` via `AXIOM_DATA_DIR` (`database.py` resolves the SQLite path from `config.DATA_DIR`). Build with `desktop/build-windows.ps1`; the NSIS installer is published via Git LFS under `releases/` and built in CI by `.github/workflows/build-windows.yml`. See [`desktop/README.md`](./desktop/README.md) for build steps and DESK-01/DESK-02 in [`ACTIVE_ISSUES.md`](./ACTIVE_ISSUES.md) for known caveats.
+Alongside the Docker deployment, Axiom Finance ships as a native Windows and Linux desktop app (`desktop/`); macOS packaging is deferred. A Tauri v2 Rust shell hosts the static Next.js export and spawns the FastAPI backend — frozen with PyInstaller **onedir** (`backend/build.spec`, `collect_all()` over the full dependency stack) — as a child process on `127.0.0.1:8000`. App data lives under the OS app-data directory via `AXIOM_DATA_DIR` (`database.py` resolves the SQLite path from `config.DATA_DIR`). Build Windows with `desktop/build-windows.ps1`; CI builds NSIS and Debian installers on native runners via `.github/workflows/build-desktop.yml`. See [`desktop/README.md`](./desktop/README.md) for build steps and DESK-01/DESK-02 in [`ACTIVE_ISSUES.md`](./ACTIVE_ISSUES.md) for known caveats.
 
 ### Module Maps
 
@@ -64,7 +64,7 @@ See the INFO folder for detailed file-by-file breakdowns of the backend and fron
 
 | File | Covers |
 |------|--------|
-| [`INFO/backend_structure.md`](./INFO/backend_structure.md) | All 33 routers, 68 services, 8 source adapters, database, tests |
+| [`INFO/backend_structure.md`](./INFO/backend_structure.md) | All 33 routers, 78 services, 8 source adapters, database, tests |
 | [`INFO/frontend_structure.md`](./INFO/frontend_structure.md) | All 25 pages, 118 components, 8 lib files |
 
 Key architecture notes:
@@ -184,13 +184,3 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 ### Skills
 - Automatically invoke available skills whenever they are relevant to the task at hand — do not wait to be asked.
 - Examples: use `/senior-frontend` or `/senior-backend` when implementing features, `/api-design-reviewer` when adding routes, `/financial-analyst` when working on finance-related features, `/ui-ux-pro-max` for UI work, `/security-review` before pushing sensitive changes, `/spec-driven-workflow` for planning larger features.
-
-## graphify
-
-This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
-
-Rules:
-- For codebase questions, first run `graphify query "<question>"` when graphify-out/graph.json exists. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
-- If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
-- Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
-- After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).

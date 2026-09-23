@@ -1,0 +1,5 @@
+{
+  "extends": "next/core-web-vitals",
+  "plugins": ["@typescript-eslint"],
+  "ignorePatterns": ["tests/e2e/**", ".next/**", "out/**"]
+}

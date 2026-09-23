@@ -9,6 +9,7 @@ import pandas as pd
 
 from ..cache import async_cached
 from ..config import FRED_API_KEY
+from .ratelimit import fred_limiter
 
 log = logging.getLogger(__name__)
 
@@ -16,7 +17,21 @@ log = logging.getLogger(__name__)
 def _fetch_fred_series_sync(
     series_ids: list[str],
     start: str,
+    vintage: str | None = None,
+    first_release: bool = False,
 ) -> dict[str, list[dict]]:
+    """Fetch FRED series, optionally as they stood at a past point in time.
+
+    By default this returns the *latest revision* of every observation, which is
+    the right choice for describing history but wrong for evaluating a model:
+    GDP and payrolls are revised heavily, so a rule scored on revised data looks
+    better than it could ever have been in real time. The Sahm rule is the sharp
+    case — it is explicitly designed to fire in real time, so grading it on
+    revised data defeats its purpose.
+
+    ``first_release`` returns each observation as first published.
+    ``vintage`` (YYYY-MM-DD) returns the series as it stood on that date.
+    """
     if not FRED_API_KEY:
         return {}
     from fredapi import Fred
@@ -24,7 +39,29 @@ def _fetch_fred_series_sync(
     result: dict[str, list[dict]] = {}
     for sid in series_ids:
         try:
-            s = fred.get_series(sid, observation_start=start)
+            # Throttled: a cold cache fans out dozens of series at once and FRED
+            # caps at 120 requests/minute per key.
+            with fred_limiter:
+                if first_release:
+                    s = fred.get_series_first_release(sid)
+                    if s is not None and not s.empty and start:
+                        s = s[s.index >= pd.Timestamp(start)]
+                elif vintage:
+                    s = fred.get_series_as_of_date(sid, vintage)
+                    # ALFRED returns a long frame (date, realtime_start, value);
+                    # collapse to the latest value known as of the vintage date.
+                    if s is not None and len(s) and not isinstance(s, pd.Series):
+                        s = (
+                            s.sort_values("realtime_start")
+                            .groupby("date")["value"]
+                            .last()
+                        )
+                        s.index = pd.to_datetime(s.index)
+                        if start:
+                            s = s[s.index >= pd.Timestamp(start)]
+                        s = pd.to_numeric(s, errors="coerce").dropna()
+                else:
+                    s = fred.get_series(sid, observation_start=start)
             if s is None or s.empty:
                 result[sid] = []
                 continue
@@ -50,11 +87,21 @@ async def fetch_fred_series(
     start: str = "2000-01-01",
     as_pct_change: list[str] | None = None,
     as_yoy: list[str] | None = None,
+    vintage: str | None = None,
+    first_release: bool = False,
 ) -> dict[str, list[dict]]:
-    """Fetch multiple FRED series and return {series_id: [{date, value}, ...]}."""
+    """Fetch multiple FRED series and return {series_id: [{date, value}, ...]}.
+
+    ``vintage`` / ``first_release`` request the data as it stood in the past
+    rather than at its latest revision — see :func:`_fetch_fred_series_sync`.
+    Both are part of the cache key (``_make_key`` folds in every kwarg), so
+    vintage requests cannot collide with latest-revision entries.
+    """
     try:
         ids = list(series_ids)
-        raw = await asyncio.to_thread(_fetch_fred_series_sync, ids, start)
+        raw = await asyncio.to_thread(
+            _fetch_fred_series_sync, ids, start, vintage, first_release
+        )
         # Apply YoY % change for requested series
         yoy_ids = set(as_pct_change or []) | set(as_yoy or [])
         for sid in yoy_ids:

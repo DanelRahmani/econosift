@@ -123,7 +123,7 @@ export function OnDemandRisk({ ticker, tickers, theme }: Props) {
         loading={garchLoading}
       >
         <p className="text-xs text-text-muted">
-          Fits a GARCH(1,1) model to {ticker}'s return history. Returns conditional variance
+          Fits a GARCH(1,1) model to {ticker}&apos;s return history. Returns conditional variance
           parameters and a 1-day-ahead volatility forecast.
         </p>
         {garch && !garch.error && (
@@ -153,7 +153,7 @@ export function OnDemandRisk({ ticker, tickers, theme }: Props) {
         loading={hurstLoading}
       >
         <p className="text-xs text-text-muted">
-          R/S analysis on {ticker}'s price series. H &lt; 0.5 = mean-reverting, H ≈ 0.5 = random walk,
+          R/S analysis on {ticker}&apos;s price series. H &lt; 0.5 = mean-reverting, H ≈ 0.5 = random walk,
           H &gt; 0.5 = trending.
         </p>
         {hurst && (

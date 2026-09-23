@@ -276,7 +276,7 @@ function RiskPageInner() {
         {tab === "On-Demand" && (
           <div className="space-y-2">
             <div className="p-3 rounded-md bg-warning/10 border border-warning/30 text-xs text-warning">
-              On-demand calculations · Click "Calculate" to run each model individually (~2–3s per model)
+              On-demand calculations · Click &quot;Calculate&quot; to run each model individually (~2–3s per model)
             </div>
             <OnDemandRisk ticker={primaryTicker} tickers={tickersStr} theme={theme} />
           </div>

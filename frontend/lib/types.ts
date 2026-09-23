@@ -1066,15 +1066,110 @@ export interface RecessionProbabilityData {
     spreadPct: number | null;
     monthsInverted: number;
     smoothedProb: number | null;
+    /** Walk-forward estimate refitted monthly on data available at the time. */
+    prob12mRealtime?: number | null;
   };
   history?: {
     probability: MacroTimeSeries[];
+    /** Out-of-sample path; shorter than `probability` (needs a training window). */
+    probabilityRealtime?: MacroTimeSeries[];
     spread: MacroTimeSeries[];
     sahm: MacroTimeSeries[];
     smoothedProb: MacroTimeSeries[];
   };
   recessions?: { start: string; end: string }[];
-  model?: { alpha: number | null; beta: number | null; nObs: number };
+  model?: { alpha: number | null; beta: number | null; nObs: number; note?: string };
+}
+
+// Credit & funding conditions — SOFR-IORB, SLOOS, EBP, NFCI/ANFCI (Phase 39)
+export type ConditionSignal = "normal" | "stress" | "unknown";
+
+export interface CreditConditionsData {
+  error?: string;
+  kpis?: {
+    sofr_iorb: number | null;
+    sloos_ci: number | null;
+    ebp: number | null;
+    gz_spread: number | null;
+    gz_recession_prob: number | null;
+    nfci: number | null;
+    anfci: number | null;
+  };
+  history?: {
+    sofr_iorb: MacroTimeSeries[];
+    sloos_ci: MacroTimeSeries[];
+    ebp: MacroTimeSeries[];
+    gz_spread: MacroTimeSeries[];
+    gz_recession_prob: MacroTimeSeries[];
+    nfci: MacroTimeSeries[];
+    anfci: MacroTimeSeries[];
+  };
+  signals?: {
+    sofr_iorb: ConditionSignal;
+    sloos_ci: ConditionSignal;
+    ebp: ConditionSignal;
+    anfci: ConditionSignal;
+  };
+  asOf?: {
+    sofr_iorb: string | null;
+    sloos_ci: string | null;
+    ebp: string | null;
+    nfci: string | null;
+  };
+  sources?: Record<string, string>;
+}
+
+// Oil shock decomposition — demand vs. oil-specific (Phase 39)
+export interface OilShockPoint {
+  date: string;
+  total: number;
+  demand: number;
+  supply: number;
+}
+
+export interface OilShocksData {
+  available: boolean;
+  reason?: string;
+  latest?: {
+    date: string;
+    total: number;
+    demand: number;
+    supply: number;
+    dominant: "demand" | "supply";
+    interpretation: "expansionary" | "contractionary";
+  };
+  trailing12m?: { total: number; demand: number; supply: number; months: number };
+  regression?: {
+    n: number;
+    r2: number;
+    beta_igrea: number;
+    beta_copper: number;
+    t_igrea: number | null;
+    t_copper: number | null;
+    sampleStart: string;
+    sampleEnd: string;
+  };
+  history?: OilShockPoint[];
+  method?: string;
+  sources?: string;
+}
+
+// Treasury curve-fit noise — HPW-style illiquidity gauge (Phase 39)
+export interface TreasuryNoiseData {
+  error?: string;
+  kpis?: {
+    latest: number | null;
+    asOf: string | null;
+    ma20: number | null;
+    percentile: number | null;
+    median: number | null;
+    max: number | null;
+  };
+  history?: MacroTimeSeries[];
+  recent?: MacroTimeSeries[];
+  method?: string;
+  limitation?: string;
+  sources?: string;
 }
 
 // Earnings quality / Sloan accruals (Phase 38b)
@@ -2271,6 +2366,8 @@ export interface YieldCurvesData {
   };
   real_yields: YieldCurvePoint[];
   breakevens: Record<string, number | null>;
+  /** 5y5y forward breakeven — a forward, not a spot tenor, so kept separate. */
+  forward_breakeven_5y5y?: { current: number | null; history: MacroTimeSeries[] };
   term_premium: { current: number | null; history: MacroTimeSeries[] };
   foreign_10y: Record<string, { yield_10y: number | null; spread_vs_us: number | null }>;
   global_yields?: GlobalYieldCountry[];
@@ -2454,4 +2551,131 @@ export interface MultiCountryPortfolio {
   countryAllocation: Record<string, number>;
   currencyExposure: Record<string, number>;
   error?: string;
+}
+// Live-ops error feed from the backend ring buffer (Phase 41)
+export interface ErrorLogEntry {
+  timestamp: string;
+  level: string;
+  source: string;
+  message: string;
+}
+
+export interface ErrorLogResponse {
+  entries: ErrorLogEntry[];
+  stats: {
+    total: number;
+    capacity: number;
+    bySource: Record<string, number>;
+    oldest: string | null;
+    newest: string | null;
+  };
+}
+
+// Signal backtester (Phase 43)
+export interface BacktestPerf {
+  totalReturn: number | null;
+  cagr: number | null;
+  vol: number | null;
+  sharpe: number | null;
+  maxDrawdown: number | null;
+  hitRate: number | null;
+  periods: number;
+}
+
+export interface BacktestLeg {
+  gross: BacktestPerf;
+  net: BacktestPerf;
+  equityCurve: { date: string; value: number }[];
+  totalCostDrag: number;
+}
+
+export interface BacktestSignalDef {
+  key: string;
+  label: string;
+  description: string;
+  isFundamental: boolean;
+}
+
+export interface BacktestResponse {
+  available: boolean;
+  reason?: string;
+  warning?: string;
+  caveat?: string;
+  quantiles?: Record<string, BacktestLeg>;
+  longShort?: BacktestLeg;
+  periods?: number;
+  skippedPeriods?: number;
+  start?: string;
+  end?: string;
+  avgTurnover?: number | null;
+  settings?: {
+    rebalance: string;
+    nQuantiles: number;
+    costBps: number;
+    longShort: boolean;
+    universePointInTime: boolean;
+  };
+  meta?: {
+    signal: string;
+    label: string;
+    universe: string;
+    period: string;
+    tickersRequested: number;
+    tickersWithData: number;
+    universeTruncated: boolean;
+    maxTickers: number;
+    isFundamental: boolean;
+  };
+}
+
+export interface BacktestRequestBody {
+  signal: string;
+  universe: string;
+  period: string;
+  rebalance: string;
+  nQuantiles: number;
+  costBps: number;
+  longShort: boolean;
+  pointInTimeUniverse: boolean;
+}
+
+// Composite risk dial (Phase 43)
+export interface RiskDialComponent {
+  key: string;
+  label: string;
+  z: number;
+  sign: number;
+  contribution: number;
+  rationale: string;
+}
+
+export interface RiskDialData {
+  available: boolean;
+  reason?: string;
+  compositeZ?: number;
+  shrunkZ?: number;
+  exposureMultiplier?: number;
+  regime?: "risk-on" | "neutral" | "risk-off";
+  components?: RiskDialComponent[];
+  componentsUsed?: number;
+  componentsPossible?: number;
+  settings?: { shrinkage: number; zWindow: number; minExposure: number; maxExposure: number };
+  method?: string;
+  caveat?: string;
+}
+
+export interface RiskDialBacktest {
+  available: boolean;
+  reason?: string;
+  months?: number;
+  start?: string;
+  end?: string;
+  timed?: { cagr: number | null; vol: number; sharpe: number | null; maxDrawdown: number };
+  static?: { cagr: number | null; vol: number; sharpe: number | null; maxDrawdown: number };
+  beatsStatic?: boolean;
+  avgExposure?: number;
+  totalCostDrag?: number;
+  verdict?: string;
+  note?: string;
+  costBps?: number;
 }

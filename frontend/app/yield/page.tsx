@@ -10,12 +10,13 @@ import { CHART_COLORS } from "@/lib/format";
 import { PolicyDivergenceTable } from "@/components/policy/PolicyDivergenceTable";
 import { SovereignSpreadTable } from "@/components/sovereign/SovereignSpreadTable";
 import { CentralBanksTab } from "@/components/macro/CentralBanksTab";
+import { CurveNoiseTab } from "@/components/yield/CurveNoiseTab";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   BarChart, Bar, ReferenceLine,
 } from "recharts";
 
-const TABS = ["US Curve", "Foreign Spreads", "Global Yields", "Real & Breakeven", "US Rates Detail", "Policy Tracker", "Sovereign Risk", "Central Banks", "Default Risk"] as const;
+const TABS = ["US Curve", "Foreign Spreads", "Global Yields", "Real & Breakeven", "Curve Noise", "US Rates Detail", "Policy Tracker", "Sovereign Risk", "Central Banks", "Default Risk"] as const;
 
 function KpiCard({ label, value, badge }: { label: string; value: string; badge?: string }) {
   return (
@@ -317,6 +318,7 @@ function YieldPageInner() {
   if (error || !data) return <div className="p-8 text-red-400">Failed to load yield data.</div>;
 
   const { us_curve, foreign_10y, real_yields, breakevens, term_premium, global_yields } = data;
+  const fwdBreakeven = data.forward_breakeven_5y5y;
   const fmt = (v: number | null, decimals = 2) => v != null ? `${v.toFixed(decimals)}%` : "N/A";
 
   return (
@@ -378,13 +380,39 @@ function YieldPageInner() {
               <Bar dataKey="yield" fill="#8b5cf6" radius={[3, 3, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
-          <div className="mt-4 grid grid-cols-3 gap-3">
+          <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3">
             {Object.entries(breakevens).map(([tenor, val]) => (
               <KpiCard key={tenor} label={`${tenor} Breakeven`} value={fmt(val)} />
             ))}
+            <KpiCard label="5y5y Forward Breakeven" value={fmt(fwdBreakeven?.current ?? null)} />
           </div>
+
+          {/* 5y5y forward breakeven — the FOMC's preferred anchor measure */}
+          {(fwdBreakeven?.history?.length ?? 0) > 0 && (
+            <div className="mt-6">
+              <h2 className="text-sm font-medium mb-1 text-muted">5y5y Forward Breakeven Inflation</h2>
+              <p className="text-xs text-text-secondary mb-3">
+                Inflation compensation priced for the five years starting five years out.
+                Because it strips near-term energy passthrough, it is the anchor measure the
+                FOMC cites for long-run expectations — though it still embeds an inflation
+                risk premium, so it is not a pure expectation.
+              </p>
+              <ResponsiveContainer width="100%" height={240}>
+                <LineChart data={fwdBreakeven!.history.map((p) => ({ date: p.date, value: p.value }))}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(128,128,128,0.18)" />
+                  <XAxis dataKey="date" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
+                  <YAxis tickFormatter={(v) => `${v.toFixed(1)}%`} domain={["auto", "auto"]} tick={{ fontSize: 11 }} />
+                  <Tooltip formatter={(v: number) => [`${v?.toFixed(2)}%`, "5y5y forward"]} />
+                  <ReferenceLine y={2} stroke="#10b981" strokeDasharray="4 4" label={{ value: "2% target", fontSize: 10, fill: "#10b981" }} />
+                  <Line type="monotone" dataKey="value" stroke="#f59e0b" dot={false} strokeWidth={1.6} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          )}
         </div>
       )}
+
+      {tab === "Curve Noise" && <CurveNoiseTab />}
 
       {tab === "US Rates Detail" && <USRatesDetailTab />}
 

@@ -52,10 +52,12 @@ export function RecessionProbability() {
   const probChart = useMemo(() => {
     const spreadPts = data?.history?.spread ?? [];
     const probMap = new Map((data?.history?.probability ?? []).map((p) => [p.date, p.value]));
+    const rtMap = new Map((data?.history?.probabilityRealtime ?? []).map((p) => [p.date, p.value]));
     const smoothMap = new Map((data?.history?.smoothedProb ?? []).map((p) => [p.date.slice(0, 7), p.value]));
     return spreadPts.map((p) => ({
       date: p.date,
       probability: probMap.get(p.date) ?? null,
+      realtime: rtMap.get(p.date) ?? null,
       smoothed: smoothMap.get(p.date) ?? null,
     }));
   }, [data]);
@@ -126,12 +128,23 @@ export function RecessionProbability() {
           <RecessionKpi label="10y–3m Spread" value={fmtNum(kpis.spreadPct, 2, "%")} />
           <RecessionKpi label="Months Inverted" value={kpis.monthsInverted != null ? `${kpis.monthsInverted}` : "—"} />
           <RecessionKpi label="FRED Smoothed Prob" value={fmtNum(kpis.smoothedProb, 1, "%")} />
+          <RecessionKpi
+            label="Real-time P(recession)"
+            value={fmtNum(kpis.prob12mRealtime, 1, "%")}
+          />
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="p-4 bg-surface border border-border rounded-lg shadow-sm">
-          <h3 className="font-semibold text-sm mb-2">12-Month Recession Probability</h3>
+          <h3 className="font-semibold text-sm mb-1">12-Month Recession Probability</h3>
+          <p className="text-xs text-text-secondary mb-2">
+            The solid line fits one probit over the whole history and applies it
+            back across it, so every point knows about recessions that had not
+            happened yet. The dashed line refits each month on data available at
+            the time — what the model would actually have printed. They diverge
+            sharply before the 2001 and 2008 recessions.
+          </p>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={probChart}>
@@ -141,7 +154,16 @@ export function RecessionProbability() {
                 <Tooltip contentStyle={tooltipStyle} />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
                 <RecessionAreas />
-                <Line type="monotone" dataKey="probability" name="Model P(recession)" stroke={CHART_COLORS[0]} dot={false} connectNulls />
+                <Line type="monotone" dataKey="probability" name="In-sample P(recession)" stroke={CHART_COLORS[0]} dot={false} connectNulls />
+                <Line
+                  type="monotone"
+                  dataKey="realtime"
+                  name="Real-time (walk-forward)"
+                  stroke={CHART_COLORS[3] ?? "#f59e0b"}
+                  strokeDasharray="4 3"
+                  dot={false}
+                  connectNulls
+                />
                 <Line
                   type="monotone"
                   dataKey="smoothed"

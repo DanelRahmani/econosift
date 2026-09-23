@@ -5,6 +5,44 @@
 
 ---
 
+## Phase 44 — Empty index universes fixed, ESLint wired into CI (2026-08-22)
+
+- **🐛 Nasdaq-100 and Dow universes were silently empty.** Wikipedia moved both membership tables onto dedicated "List of ..." articles; the parent pages now carry only history and milestone tables, so the parser found nothing and `get_constituents` returned `[]` without raising — the screener and backtester universes for `ndx`/`dow` were blank rather than broken-looking. Only the page titles were stale. Now: sp500 503, ndx 102, dow 30, all verified end-to-end through the backtester.
+- Point-in-time reconstruction stays S&P-500-only and says so: the Dow's historical article is ~64 wide period tables with no date column and the Nasdaq-100 has no change article, so `_CHANGES_PAGES` lists only sp500 and the others degrade with an explicit `complete: false` note rather than being listed-but-broken.
+- **ESLint wired into CI.** It had never been initialised, so `next lint` prompted interactively and would hang a runner. Now committed with `eslint@8` and `eslint-config-next@14` pinned to match Next 14 (9.x and 16.x both break `next lint` on this version). All 13 pre-existing errors fixed — 11 unescaped JSX entities plus two `eslint-disable` comments referencing a rule the config never loaded, resolved by registering the plugin rather than deleting the suppressions.
+
+## Phase 42-43 — Point-in-time data, out-of-sample scoring, and a backtester (2026-08-22)
+
+- **Survivorship bias removed** (`constituents.members_as_of`): reconstructs index membership on any past date by walking Wikipedia's change log backwards. The log moved to its own article since it was last looked at, and coverage is only reliable from ~2010 (20-27 changes/yr, vs under 2/yr before 2005) — earlier dates return `complete: false` rather than a confidently wrong roster. Verified against known events: TSLA absent before Dec 2020, and ATVI/FISV/DISCA/XLNX correctly restored to the 2018 roster despite being gone today.
+- **FRED vintages** (`vintage` / `first_release` on `fetch_fred_series`): 45 of 46 quarterly GDP observations differ between first release and latest, so anything scored on revised data flatters itself.
+- **🐛 Recession model scored out of sample:** the probit was fitted over the whole history then applied back across it. `_walk_forward_probit` refits monthly on data available at the time. The paths diverge sharply — in late 2000 the in-sample model reads 24% where the real-time model reads 97%. Both are charted. (What was *not* wrong: T10Y3M is never revised and the service already used SAHMREALTIME.)
+- **P3-14 logged:** fundamentals are latest-restatement on yfinance and cannot be honestly backtested on free data. The backtester refuses fundamental signals unless `allow_lookahead=True`.
+- **Vectorized backtester** (`backtest_engine.py`, `POST /api/research/backtest`, Research → Backtester, 🔴 tier): quantile sorts with turnover-based costs, gross and net side by side, optional point-in-time universe. Two alignment sentinels pin that positions formed at *t* earn the return from *t* to *t+1* — writing them caught a double-lag in the first draft that would have understated every signal. Six price-derived signals wired up. First result is unflattering and honest: S&P 500 momentum nets **-2.6% CAGR** over 108 months with the survivorship correction on.
+- **Composite risk dial** (`composite_signal_service.py`, `/api/macro/risk-dial`, Macro → Financial Conditions): blends EBP, ANFCI, SLOOS, HY OAS, term spread and SOFR-IORB into one exposure multiplier, shrunk 50% toward zero (Campbell-Thompson), clipped to [0.4×, 1.2×] — a dial, never a binary call. **Ships with its own walk-forward self-test published beside it:** over 403 months (1993-2026) it returns Sharpe 0.82 vs 0.74 buy-and-hold with max drawdown -40.6% vs -50.8%, net of costs, at ~1.0× average exposure. A losing result would be displayed the same way.
+- **Exposure & ops:** loopback binding, explicit CORS allowlist, FRED/Finnhub outbound throttling, and a live error feed on Admin (Phase 41 items shipped alongside).
+
+## Phase 40-41 — Test safety net, two maths fixes, and exposure hardening (2026-08-22)
+
+- **CI now runs the tests** (`.github/workflows/ci.yml`): pytest + `tsc --noEmit` on every push to `DEV`/`main` and every PR into `main`, plus a Playwright job that boots the docker stack. Nothing previously gated the `DEV` → `main` PR. The backend suite was verified genuinely offline (no API keys, throwaway `AXIOM_DATA_DIR`), so no network markers were needed. `next lint` is deliberately excluded — ESLint has never been initialised here and would hang a runner.
+- **Options engine tested** (32 tests): put-call parity, the textbook 10.4506 reference, Greeks against finite differences, IV round-trips, CRR converging to Black-Scholes for American calls and exceeding it for deep-ITM puts. No defects found.
+- **Portfolio engine tested** (35 tests): a helper builds prices whose log returns have *exactly* a specified mean and covariance, making the checks algebraic — Kelly is exactly μ/σ², risk contributions sum exactly to portfolio vol (Euler), Black-Litterman equilibrium matches δΣw, and a view equal to equilibrium leaves the posterior unchanged. No defects found.
+- **🐛 Hurst exponent fixed:** R/S ran on price *levels* instead of increments, returning ~1.0 for random-walk, trending and mean-reverting series alike — the Risk page reported "Trending" for essentially every ticker. Now differences internally with the Anis-Lloyd small-sample correction; measured unbiased (mean 0.502–0.510), and the existing 0.4/0.6 bands turn out to be its 95% null interval, so they were kept. AAPL/KO/TLT now read 0.50–0.56.
+- **🐛 RSI fallback fixed:** it replaced a zero average loss with NaN, blanking RSI exactly when it should read 100 (an unbroken advance).
+- **Playwright smoke suite** (15 specs): 8 pages + the 5 Phase 39 tabs. Tabs assert a *coherent state* — data or an explicit unavailable message — because CI runs keyless and legitimately renders the latter; a blank panel is the regression being caught.
+- **Exposure hardened:** nginx binds `127.0.0.1:80`; CORS moved from `allow_origins=["*"]` to an explicit allowlist (tauri origins kept for the desktop build), verified by a rejected `evil.com` preflight against `PUT /api/admin/config`. New `ratelimit.py` throttles FRED (120/min) and Finnhub (60/min) at their call sites.
+- **Live-ops error feed:** `errorlog.py` keeps the last 200 WARNING+ records in memory, exposed at `/api/admin/errors` and surfaced as "Recent Failures" on the Admin page — services degrade quietly by design, which previously made a broken source indistinguishable from an empty one.
+
+## Phase 39 — High-evidence credit, oil, and rates indicators (2026-08-22)
+
+Adds the indicators with the strongest out-of-sample evidence in the literature that the platform did not already carry, each with a documented causal channel rather than a bare correlation.
+
+- **Credit & funding conditions** (`credit_conditions_service.py`, `/api/macro/credit-conditions`, Macro → Financial & Funding Conditions): SOFR−IORB reserve scarcity (IOER spliced pre-2021-07-29), SLOOS net C&I tightening (`DRTSCILM` — Lown & Morgan 2006), the Gilchrist-Zakrajšek **Excess Bond Premium** with its GZ spread and recession probability (direct Fed CSV, not on FRED), and NFCI/ANFCI. 12 tests incl. source-failure and schema-drift paths.
+- **Oil shock decomposition** (`oil_shock_service.py`, `/api/macro/oil-shocks`, Macro → Commodities): splits real WTI monthly returns into a global-demand component (ΔIGREA + real copper) and an oil-specific residual, so a price move is interpretable per Kilian (2009) instead of directionless. Labelled throughout as a reduced-form proxy, **not** the structural VAR. 10 tests on synthetic fixtures with a known generating beta.
+- **Treasury curve-fit noise** (`treasury_noise_service.py`, `/api/yield/noise`, new Yield → Curve Noise tab): daily Nelson-Siegel RMSE across the CMT tenors, an HPW-style (2013) arbitrage-capital gauge. Verified against history and **documented as limited**: it reaches ~20bps in 2008 vs ~7bps in calm 2017 but stays ~10bps in March 2020, because CMT is already an official smoothed curve and cannot show on-the-run dislocation. Shipped with that caveat surfaced in the UI. 9 tests.
+- **5y5y forward breakeven** (`T5YIFR`) added to `yield_curve_service` as a separate field (a forward, not a spot tenor) and charted on Yield → Real & Breakeven.
+- **Bug fix:** `credit_market.py` requested `BAMLC0A4CBBBOAS`, which does not exist on FRED — the BBB spread KPI had been silently `null`. Corrected to `BAMLC0A4CBBB`.
+- Credit conditions mounted as a sibling of `FinancialConditions` in `MacroTabShell` rather than a child, so the two panels fetch independently and neither blanks the other while loading.
+
 ## Phase 38b — Five analyst features: net liquidity, recession model, earnings quality, event study, factor regime (2026-07-03)
 
 - **F1 Fed Plumbing & Net Liquidity** (`liquidity_service.py`, `/api/macro/net-liquidity`, Funding & Liquidity tab): net liquidity = WALCL − RRP − TGA on the weekly H.4.1 Wednesday grid + bank reserves + SPX overlay. FRED unit scales verified against live magnitudes (WALCL/WTREGEN/WRESBAL millions, RRPONTSYD billions — the live curl gate caught a wrong initial assumption). 5-KPI row, dual-axis SPX chart, components chart, 26-week WoW table. 5 pure-compute tests.
@@ -39,13 +77,13 @@
 
 ## Gated desktop release flow — main → PRODUCTION (2026-07-01)
 
-- `main` is now feature-development only: `build-windows.yml` no longer builds on `main`/PRs — it triggers on `PRODUCTION` pushes, `v*` tags, and manual dispatch.
+- `main` is now feature-development only: `build-desktop.yml` no longer builds on `main`/PRs — it triggers on `PRODUCTION` pushes, `v*` tags, and manual dispatch.
 - New `promote-to-production.yml` (manual "Promote main → PRODUCTION"): merges `main` into `PRODUCTION`, pushes, then dispatches the 3-OS build (needed because a `GITHUB_TOKEN` push doesn't trigger other workflows).
 - New `TAURI_BUILD.md` documents the four contracts a `main` feature must respect to stay Tauri-packageable (`config.DATA_DIR` for all writes, static export + full `generateStaticParams`, 127.0.0.1:8000 backend + health gate, PyInstaller `collect_all`) and the release steps.
 
 ## Cross-platform desktop builds — Windows · macOS · Linux (2026-07-01)
 
-`build-windows.yml` now builds on a 3-OS matrix (`windows-latest` / `macos-latest` / `ubuntu-latest`), each freezing its own PyInstaller backend and running `tauri build`:
+`build-desktop.yml` now builds on a 3-OS matrix (`windows-latest` / `macos-latest` / `ubuntu-latest`), each freezing its own PyInstaller backend and running `tauri build`:
 
 - **Windows** → NSIS `*-setup.exe`, **macOS** → `*.dmg` (Apple Silicon, unsigned), **Linux** → `*.deb`.
 - Linux `tauri.conf.json` originally also targeted **AppImage**, but it can't be bundled on GitHub's runners (`linuxdeploy` needs FUSE; `APPIMAGE_EXTRACT_AND_RUN`/`NO_STRIP` didn't clear it — likely a WebKitGTK-4.1 plugin issue). Dropped `appimage` and ship `.deb` only (tracked as P3-13).
@@ -71,7 +109,7 @@ Supersedes the original Phase 37 desktop scaffolding, which built but failed to 
 - **Tauri wiring:** dropped the sidecar/updater approach; the backend folder is bundled via `bundle.resources` and spawned from `src-tauri/src/lib.rs` using a resource-resolved path, with `AXIOM_DATA_DIR` passed on the command.
 - **Data dir:** `database.py` now resolves the SQLite path from `config.DATA_DIR` (`%APPDATA%/AxiomFinance`) instead of a CWD-relative `./data`, so the DB no longer scatters based on launch directory.
 - **Cold-start race:** health-gate splash in `providers.tsx` polls `/api/health` before mounting; React Query retry bumped.
-- **Windows-only, local build**, production windowless (`console=False`). NSIS installer (165 MB) published via **Git LFS** under `releases/`; GitHub Actions `build-windows.yml` builds on `windows-latest`.
+- **Windows-only, local build**, production windowless (`console=False`). NSIS installer (165 MB) published via **Git LFS** under `releases/`; GitHub Actions `build-desktop.yml` builds on `windows-latest`.
 - **Verified:** clean install launched from a neutral CWD serves live data (`/api/health`, `/api/search` → 200); DB + WAL/SHM land in `%APPDATA%/AxiomFinance` with no stray copies.
 - **Known caveats:** DESK-01 (`backend.log` not written under `console=False`), DESK-02 (backend orphaned on force-kill) — tracked in `ACTIVE_ISSUES.md`.
 

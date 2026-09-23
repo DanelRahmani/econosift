@@ -35,7 +35,8 @@ frontend/
 │   ├── portfolio/page.tsx      # /portfolio — performance, correlation, frontier, BL, stress
 │   ├── research/page.tsx       # /research — Risk Parity, FX Carry, Momentum, Realized Moments, Econ Lab
 │   ├── atlas/page.tsx          # /atlas — world choropleth: 6 indicators, year slider, regional blocs
-│   ├── yield/page.tsx          # /yield — US spot curve, TIPS, breakevens, ACM term premium
+│   ├── yield/page.tsx          # /yield — US spot curve, TIPS, breakevens (incl. 5y5y forward),
+│   │                           #   ACM term premium, curve-fit noise
 │   ├── policy/page.tsx         # /policy — CB divergence, G10 carry, sovereign risk
 │   ├── sovereign/page.tsx      # /sovereign — 6-KPI traffic-light risk rankings, ~200 countries
 │   ├── scenario/page.tsx       # /scenario — stress scenario designer (Phase 18B stub)
@@ -72,14 +73,15 @@ frontend/
 │   │                           #   InstitutionalHolders, InsiderActivity, NewsFeed, SectorHeatmap,
 │   │                           #   Treemap, RankingsTab, ScreenerTab, PortfolioTab, TabSkeleton,
 │   │                           #   ShortInterestPanel
-│   ├── macro/                  # 31 files: MacroTabShell, MacroDashboard, MacroOverview, MacroChart,
+│   ├── macro/                  # 34 files: MacroTabShell, MacroDashboard, MacroOverview, MacroChart,
 │   │                           #   CountrySelector, IndicatorSelector, CountryComparison, RegimeClock,
 │   │                           #   RegimeDetector, RegimeOverlay, YieldCurve, FxWidget, FxTab,
 │   │                           #   InflationHeatmap/InflationTab, GrowthEmployment, HousingTab,
 │   │                           #   CommoditiesTab, LeadingIndicators, FinancialConditions,
 │   │                           #   PositioningTab, SentimentTab, CentralBanksTab, CountryRiskTab,
 │   │                           #   EconLabTab, TaylorRuleWidget, FiscalTab, LaborTab, EnergyTab,
-│   │                           #   InequalityTab, BusinessTab, FundingLiquidityTab
+│   │                           #   InequalityTab, BusinessTab, FundingLiquidityTab,
+│   │                           #   CreditConditions, OilShockDecomposition
 │   ├── options/                # IVKPIRow, IVTermStructure, IVSmile, OIProfileChart, ChainTable, MonteCarloOptions
 │   ├── risk/                   # RiskKPIRow, RollingMetricsChart, ExtendedRiskTable, CorrelationHeatmap,
 │   │                           #   OnDemandRisk, MonteCarloPanel, StressTestPanel
@@ -94,7 +96,7 @@ frontend/
 │   ├── atlas/                  # WorldMap, YearSlider, RegionFilter, ColorLegend, AtlasKPIs, RankingTable, IndicatorSelector
 │   ├── policy/                 # PolicyDivergenceTable
 │   ├── sovereign/              # SovereignSpreadTable
-│   ├── yield/                  # MultiCountryYieldChart
+│   ├── yield/                  # MultiCountryYieldChart, CurveNoiseTab
 │   ├── stability/              # CurrencyCrisisPanel, BankingStabilityPanel
 │   ├── wiki/                   # WikiSearch, WikiTermCard, WikiCategoryNav
 │   │

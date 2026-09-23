@@ -7,6 +7,7 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
+from scipy.special import gamma as gamma_fn
 
 from .metrics import _clean, log_returns, TRADING_DAYS
 
@@ -230,27 +231,63 @@ def extended_metrics(
 # On-demand models (🟡)
 # ──────────────────────────────────────────────────────────────────────────────
 
+def _expected_rs(n: int) -> float:
+    """Anis & Lloyd (1976) expected R/S for an iid series of length n.
+
+    Raw R/S is biased upward badly at the sample sizes we work with — an iid
+    series returns ~0.63 rather than 0.5 — so the estimate is de-biased against
+    this expectation. Peters' large-n form avoids the gamma overflow above 340.
+    """
+    s = sum(math.sqrt((n - i) / i) for i in range(1, n))
+    if n <= 340:
+        return (gamma_fn((n - 1) / 2.0) / (math.sqrt(math.pi) * gamma_fn(n / 2.0))) * s
+    return (1.0 / math.sqrt(n * math.pi / 2.0)) * s
+
+
 def hurst_exponent(prices: pd.Series) -> dict:
     """
-    Hurst exponent via R/S analysis.
+    Hurst exponent via corrected R/S analysis on log returns.
     H < 0.5 → mean-reverting, H ≈ 0.5 → random walk, H > 0.5 → trending.
+
+    Takes a *price* series and differences it internally. R/S must be applied to
+    the increments, not the levels: run on prices directly it returns ~1.0 for
+    a random walk, a trending series and a mean-reverting series alike, i.e. it
+    cannot distinguish the three regimes it exists to classify.
+
+    A constant drift does not make H exceed 0.5 — GBM with drift still has iid
+    increments. Only genuine autocorrelation in the returns moves it.
+
+    The 0.4 / 0.6 interpretation bands are roughly the 95% interval of this
+    estimator under the null: measured on iid data it has mean ~0.50 and sd
+    ~0.045 at the default 3y window. A reading inside the band is not evidence
+    of memory.
     """
     p = prices.dropna()
-    n = len(p)
+    if len(p) < 20:
+        return {"hurst": None, "interpretation": "Insufficient data"}
+
+    vals = p.values.astype(float)
+    # Log returns where the series is a positive price level; plain first
+    # differences otherwise (e.g. a spread that legitimately crosses zero).
+    if np.all(vals > 0):
+        x = np.diff(np.log(vals))
+    else:
+        x = np.diff(vals)
+
+    n = len(x)
     if n < 20:
         return {"hurst": None, "interpretation": "Insufficient data"}
 
-    lags = range(2, min(n // 2, 100))
     rs_list = []
     lag_list = []
-    for lag in lags:
-        chunks = [p.iloc[i: i + lag].values for i in range(0, n - lag + 1, lag)]
+    # Lags below ~8 give unstable R/S regardless of the correction.
+    for lag in range(8, min(n // 2, 200)):
         rs_vals = []
-        for chunk in chunks:
+        for i in range(0, n - lag + 1, lag):
+            chunk = x[i: i + lag]
             if len(chunk) < 2:
                 continue
-            mean_c = np.mean(chunk)
-            dev = chunk - mean_c
+            dev = chunk - np.mean(chunk)
             cumdev = np.cumsum(dev)
             r = np.max(cumdev) - np.min(cumdev)
             s = np.std(chunk, ddof=1)
@@ -265,7 +302,9 @@ def hurst_exponent(prices: pd.Series) -> dict:
 
     log_lags = np.log(lag_list)
     log_rs = np.log(rs_list)
-    h = float(np.polyfit(log_lags, log_rs, 1)[0])
+    expected = np.array([math.log(_expected_rs(l)) for l in lag_list])
+    # Regressing the de-biased ratio recovers H - 0.5.
+    h = 0.5 + float(np.polyfit(log_lags, log_rs - expected, 1)[0])
     h = _clean(h)
 
     if h is None:

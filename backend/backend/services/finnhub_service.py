@@ -9,6 +9,7 @@ import requests
 
 from ..cache import cached
 from ..config import FINNHUB_API_KEY
+from .ratelimit import finnhub_limiter
 
 _BASE = "https://finnhub.io/api/v1"
 
@@ -18,11 +19,14 @@ def _get(path: str, params: dict) -> dict | None:
     if not FINNHUB_API_KEY:
         return None
     try:
-        resp = requests.get(
-            _BASE + path,
-            params={**params, "token": FINNHUB_API_KEY},
-            timeout=15,
-        )
+        # Free tier is 60 calls/minute; the limiter keeps a cold cache from
+        # burning the quota and silently degrading every panel at once.
+        with finnhub_limiter:
+            resp = requests.get(
+                _BASE + path,
+                params={**params, "token": FINNHUB_API_KEY},
+                timeout=15,
+            )
         resp.raise_for_status()
         return resp.json()
     except Exception:

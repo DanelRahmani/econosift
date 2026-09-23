@@ -1143,6 +1143,30 @@ async def net_liquidity():
     from ..services.liquidity_service import get_net_liquidity
     return await get_net_liquidity()
 
+@router.get("/credit-conditions")
+async def credit_conditions():
+    """SOFR-IORB reserve scarcity, SLOOS lending standards, excess bond premium, NFCI/ANFCI."""
+    from ..services.credit_conditions_service import get_credit_conditions
+    return await get_credit_conditions()
+
+@router.get("/oil-shocks")
+async def oil_shocks():
+    """Demand vs. oil-specific decomposition of real WTI returns (Kilian-style proxy)."""
+    from ..services.oil_shock_service import get_oil_shocks
+    return await get_oil_shocks()
+
+@router.get("/risk-dial")
+async def risk_dial():
+    """Composite exposure multiplier blending the standalone risk indicators."""
+    from ..services.composite_signal_service import get_composite_dial
+    return await get_composite_dial()
+
+@router.get("/risk-dial/backtest")
+async def risk_dial_backtest(cost_bps: float = 10.0):
+    """Walk-forward self-evaluation of the composite dial vs buy-and-hold."""
+    from ..services.composite_signal_service import get_dial_backtest
+    return await get_dial_backtest(cost_bps)
+
 @router.get("/recession-probability")
 async def recession_probability():
     """NY-Fed-style 12-month-ahead probit on the 10y–3m spread + Sahm rule."""

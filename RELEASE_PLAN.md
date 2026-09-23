@@ -23,7 +23,7 @@ runners, no local Mac/Linux needed at any point.
 
 ### 1. Retire the broken workflow
 Delete `.github/workflows/build-desktop.yml`. It's a stale duplicate of
-`build-windows.yml` with the onefile/onedir bug described in `GITBUILD.md`
+`build-desktop.yml` with the onefile/onedir bug described in `GITBUILD.md`
 and has failed on every run since 2026-07-01. Confirm no other workflow or
 doc references it before deleting (check `README.md` badges, `CLAUDE.md`).
 
@@ -57,7 +57,7 @@ Leave `bundle.macOS.minimumSystemVersion` and `bundle.linux.deb.depends` as
 they are unless the build surfaces a concrete problem with them.
 
 ### 4. Rewrite the CI workflow as a 3-OS matrix
-Take `build-windows.yml` as the base (it's already onedir-correct) and add
+Take `build-desktop.yml` as the base (it's already onedir-correct) and add
 a matrix dimension instead of hardcoding `windows-latest`:
 
 ```yaml
@@ -85,7 +85,7 @@ Key changes needed inside the job:
   ```
 
 - **Stage step** — keep the existing `shell: pwsh` block from
-  `build-windows.yml` (PowerShell Core is preinstalled on all three
+  `build-desktop.yml` (PowerShell Core is preinstalled on all three
   GitHub-hosted runner images), just parametrize the exe suffix instead of
   hardcoding `.exe`:
   ```powershell

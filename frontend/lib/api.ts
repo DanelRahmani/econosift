@@ -34,9 +34,12 @@ import type {
   WikiCategoriesResponse, WikiTermsResponse,
   PrefetchStatus,
   BulkDatasetStatus,
-  ConfigResponse, ConfigUpdateRequest,
+  ConfigResponse, ConfigUpdateRequest, ErrorLogResponse,
   GlobalHousingData, CreditGapsData, FiscalData, TradeData, LaborData, EnergyData,
   NetLiquidityData, RecessionProbabilityData, EarningsQualityData, EventStudyData, FactorRegimeData,
+  CreditConditionsData, OilShocksData, TreasuryNoiseData,
+  BacktestResponse, BacktestSignalDef, BacktestRequestBody,
+  RiskDialData, RiskDialBacktest,
   CurrencyCrisisData, BankingStabilityData, InequalityData,
   BusinessData, ShortInterestData, MAData,
   FactbookCountry, FactbookProfile, CrossborderData,
@@ -177,6 +180,13 @@ export const api = {
 
   updateConfig: (body: ConfigUpdateRequest) =>
     put<ConfigResponse>(`/admin/config`, body),
+
+  // --- Phase 41: live-ops error feed ---
+  adminErrors: (limit = 100) =>
+    get<ErrorLogResponse>(`/admin/errors?limit=${limit}`),
+
+  clearAdminErrors: () =>
+    post<{ status: string }>(`/admin/errors/clear`, {}),
 
   // --- Phase 0 ---
   dcf: (
@@ -523,11 +533,20 @@ export const api = {
   macroFunding: () => get<any>("/macro/funding"),
   macroNetLiquidity: () => get<NetLiquidityData>("/macro/net-liquidity"),
   macroRecessionProbability: () => get<RecessionProbabilityData>("/macro/recession-probability"),
+
+  // --- Phase 39: high-evidence credit / oil / rates indicators ---
+  macroCreditConditions: () => get<CreditConditionsData>("/macro/credit-conditions"),
+  macroOilShocks: () => get<OilShocksData>("/macro/oil-shocks"),
+  macroRiskDial: () => get<RiskDialData>("/macro/risk-dial"),
+  macroRiskDialBacktest: () => get<RiskDialBacktest>("/macro/risk-dial/backtest"),
+  yieldNoise: () => get<TreasuryNoiseData>("/yield/noise"),
   corporateEarningsQuality: (universe: string) =>
     get<EarningsQualityData>(`/corporate/earnings-quality?universe=${encodeURIComponent(universe)}`),
   researchEventStudy: (p: { ticker: string; eventType: string; window: number }) =>
     post<EventStudyData>("/research/event-study", p),
   researchFactorRegime: () => get<FactorRegimeData>("/research/factor-regime"),
+  backtestSignals: () => get<{ signals: BacktestSignalDef[] }>("/research/backtest/signals"),
+  runBacktest: (body: BacktestRequestBody) => post<BacktestResponse>("/research/backtest", body),
   scenarioHistorical: () => get<any>("/scenario/historical"),
   scenarioStress: (holdings: Holding[]) => post<any>("/scenario/historical/stress", { holdings }),
   scenarioCustom: (holdings: Holding[], shocks: Record<string, number>) =>

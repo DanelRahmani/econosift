@@ -1,0 +1,169 @@
+name: Build Windows and Linux Desktop
+
+# Builds the Axiom Finance Tauri app for Windows and Linux: freezes
+# the FastAPI backend with PyInstaller (onedir), stages it into the Tauri
+# resources, then runs `tauri build` to produce an installer per OS. One
+# workflow run fans out to native Windows and Linux runners, then collects
+# the results and publishes a tagged release once both builds succeed.
+# PyInstaller can't cross-compile, so each OS needs its own native runner.
+#
+# Windows and Linux are the supported desktop release targets. macOS
+# packaging is deferred until there is a concrete need for it.
+
+on:
+  workflow_dispatch: {}          # manual "Run workflow" button (needs workflow on default branch)
+  push:
+    tags: ["v*"]                 # build + attach to release on version tags
+    branches: [PRODUCTION]       # release builds only — promote main -> PRODUCTION to trigger
+    paths:
+      - "backend/**"
+      - "desktop/**"
+      - "frontend/**"
+      - ".github/workflows/build-desktop.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build ${{ matrix.artifact }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            artifact: windows-installer
+            bundle_dir: nsis
+            bundle: nsis
+            installer_glob: '*-setup.exe'
+          - os: ubuntu-latest
+            artifact: linux-installer
+            bundle_dir: deb
+            bundle: deb
+            installer_glob: '*.deb'
+    runs-on: ${{ matrix.os }}
+    env:
+      CARGO_NET_RETRY: 10
+      CARGO_HTTP_TIMEOUT: 120
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Set up Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: "20"
+
+      - name: Set up Rust (stable)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop/src-tauri
+
+      - name: Install Linux build dependencies (WebKitGTK, GTK, AppIndicator)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev \
+            librsvg2-dev build-essential libssl-dev libgtk-3-dev
+
+      - name: Install backend deps
+        working-directory: backend
+        run: pip install --disable-pip-version-check --retries 5 --timeout 60 -r requirements.txt -r requirements-build.txt
+
+      - name: Freeze backend (PyInstaller onedir)
+        working-directory: backend
+        run: pyinstaller --clean build.spec --noconfirm
+
+      - name: Stage backend into Tauri resources
+        shell: pwsh
+        run: |
+          $exeSuffix = if ($IsWindows) { ".exe" } else { "" }
+          $stage = "desktop/src-tauri/binaries/axiom-backend"
+          if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
+          New-Item -ItemType Directory -Force -Path (Split-Path $stage) | Out-Null
+          Copy-Item backend/dist/axiom-backend $stage -Recurse -Force
+          if (-not $IsWindows) { & chmod +x "$stage/axiom-backend$exeSuffix" }
+          if (-not (Test-Path "$stage/axiom-backend$exeSuffix")) { throw "backend not staged" }
+
+      - name: Install frontend deps
+        working-directory: frontend
+        run: npm ci --fetch-retries=5
+
+      - name: Install desktop (Tauri CLI) deps
+        working-directory: desktop
+        run: npm ci --fetch-retries=5
+
+      - name: Build Tauri app (frontend export + locked Rust + installer)
+        working-directory: desktop
+        run: npm run build -- --ci --verbose --bundles ${{ matrix.bundle }} -- --locked
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v6
+        with:
+          name: AxiomFinance-${{ matrix.artifact }}
+          # Upload only the final installer, never Tauri's large staging tree.
+          path: desktop/src-tauri/target/release/bundle/${{ matrix.bundle_dir }}/${{ matrix.installer_glob }}
+          if-no-files-found: error
+          retention-days: 14
+
+  collect:
+    name: Collect installers
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download both platform installers
+        uses: actions/download-artifact@v5
+        with:
+          pattern: AxiomFinance-*-installer
+          path: release-assets
+          merge-multiple: true
+
+      - name: Verify the complete installer set
+        shell: bash
+        run: |
+          windows_count=$(find release-assets -maxdepth 1 -type f -name '*-setup.exe' | wc -l)
+          linux_count=$(find release-assets -maxdepth 1 -type f -name '*.deb' | wc -l)
+          test "$windows_count" -eq 1 || { echo "Expected one Windows installer, found $windows_count" >&2; exit 1; }
+          test "$linux_count" -eq 1 || { echo "Expected one Linux installer, found $linux_count" >&2; exit 1; }
+
+      - name: Upload combined Windows and Linux installers
+        uses: actions/upload-artifact@v6
+        with:
+          name: AxiomFinance-Windows-Linux-Installers
+          path: release-assets/*
+          if-no-files-found: error
+          retention-days: 14
+
+  publish-release:
+    name: Publish tagged release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: collect
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download combined installers
+        uses: actions/download-artifact@v5
+        with:
+          name: AxiomFinance-Windows-Linux-Installers
+          path: release-assets
+
+      - name: Publish both installers together
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release-assets/*-setup.exe
+            release-assets/*.deb

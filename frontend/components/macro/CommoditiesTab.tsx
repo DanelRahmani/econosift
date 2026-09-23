@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import type { CommoditiesData, CommodityRow } from "@/lib/types";
 import { Card } from "@/components/ui";
+import { OilShockDecomposition } from "./OilShockDecomposition";
 import {
   LineChart,
   Line,
@@ -210,6 +211,8 @@ export function CommoditiesTab() {
           </ResponsiveContainer>
         </Card>
       )}
+      {/* Oil shock decomposition (Phase 39) */}
+      <OilShockDecomposition />
     </div>
   );
 }

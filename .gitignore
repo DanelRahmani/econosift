@@ -22,7 +22,7 @@ desktop/src-tauri/target/
 desktop/src-tauri/gen/
 *.spec.bak
 
-# Non-Windows Tauri icons (this is a Windows-only build; regenerate with `tauri icon`)
+# Unused Tauri mobile icons (regenerate with `tauri icon` if mobile targets are added)
 desktop/src-tauri/icons/android/
 desktop/src-tauri/icons/ios/
 
@@ -44,6 +44,6 @@ Thumbs.db
 # Playwright MCP session artifacts (transient browser logs/snapshots)
 .playwright-mcp/
 
-# graphify derived artifacts: AST cache regenerates free; dated dirs are local backups
-graphify-out/cache/ast/
-graphify-out/20*/
+# Playwright
+frontend/test-results/
+frontend/playwright-report/

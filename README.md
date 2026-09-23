@@ -99,14 +99,13 @@ docker compose down     # stop everything
 
 ---
 
-## 🖥️ Desktop App (v1.0.0) — Windows · macOS · Linux
+## 🖥️ Desktop App (v1.0.0) — Windows & Linux
 
-Axiom Finance also ships as a **native desktop app** — no Docker required. A [Tauri](https://tauri.app/) v2 shell hosts the static Next.js frontend and spawns the FastAPI backend (frozen with PyInstaller) as a local child process on `127.0.0.1:8000`. App data (SQLite DB, settings, `.env` API keys) lives in the OS app-data dir (`%APPDATA%/AxiomFinance` on Windows, `~/Library/Application Support/AxiomFinance` on macOS, `~/.local/share/AxiomFinance` on Linux).
+Axiom Finance ships as a **native desktop app** for Windows and Linux — no Docker required. A [Tauri](https://tauri.app/) v2 shell hosts the static Next.js frontend and spawns the FastAPI backend (frozen with PyInstaller) as a local child process on `127.0.0.1:8000`. App data (SQLite DB, settings, `.env` API keys) lives in the OS app-data dir (`%APPDATA%/AxiomFinance` on Windows, `~/.local/share/AxiomFinance` on Linux). macOS packaging is deferred and is not part of the release build.
 
 | OS | Installer | Notes |
 |----|-----------|-------|
 | **Windows** | NSIS `*-setup.exe` | Published via Git LFS at `releases/AxiomFinance-1.0.0-x64-setup.exe`. |
-| **macOS** | `*.dmg` (Apple Silicon) | Unsigned/unnotarized — first launch needs right-click → **Open** to bypass Gatekeeper. |
 | **Linux** | `*.deb` (Debian/Ubuntu, amd64) | AppImage is not shipped — it can't be bundled on GitHub's runners (see `ACTIVE_ISSUES.md` P3-13). |
 
 - **Install:** download the installer for your OS (from the CI artifacts / release) and run it. A splash screen appears while the analysis engine warms up, then the dashboard loads live data. Add optional FRED / Finnhub / Gemini API keys from the in-app **Admin** page — no rebuild needed, just restart.
@@ -116,8 +115,8 @@ Axiom Finance also ships as a **native desktop app** — no Docker required. A [
   powershell -ExecutionPolicy Bypass -File desktop\build-windows.ps1
   ```
   Produces `desktop/src-tauri/target/release/bundle/nsis/Axiom Finance_<ver>_x64-setup.exe`.
-- **CI:** `.github/workflows/build-windows.yml` builds all three installers on a `windows-latest` / `macos-latest` / `ubuntu-latest` matrix (freeze → stage → `tauri build`) and uploads each as an artifact. PyInstaller can't cross-compile, so each OS freezes its own backend on its own runner.
-- **Releasing:** `main` is feature development (no installers). Cut a desktop build with **Actions ▸ "Promote main → PRODUCTION"**, which merges `main` into `PRODUCTION` and triggers the 3-OS build. See [`TAURI_BUILD.md`](./TAURI_BUILD.md) for the full flow and the contracts a `main` feature must respect to stay packageable.
+- **CI:** `.github/workflows/build-desktop.yml` builds Windows and Linux installers on native `windows-latest` and `ubuntu-latest` runners (freeze → stage → `tauri build`) and uploads them as artifacts. PyInstaller can't cross-compile, so each OS freezes its own backend on its own runner.
+- **Releasing:** `main` is feature development (no installers). Cut a desktop build with **Actions ▸ "Promote main → PRODUCTION"**, which merges `main` into `PRODUCTION` and triggers the Windows/Linux build. See [`TAURI_BUILD.md`](./TAURI_BUILD.md) for the full flow and the contracts a `main` feature must respect to stay packageable.
 
 See [`desktop/README.md`](./desktop/README.md) for architecture and build details, and [`TAURI_BUILD.md`](./TAURI_BUILD.md) for the desktop release process.
 
@@ -345,6 +344,26 @@ axiomfinance/
 Without API keys, the platform gracefully degrades — using World Bank, IMF, and BIS for macro data; calendar/news/insider data will be unavailable without Finnhub.
 
 ---
+
+## 🔒 Security model
+
+**Axiom has no authentication, by design.** It is a single-user, self-hosted
+research tool, so there are no accounts, sessions, or roles.
+
+That makes two things load-bearing:
+
+- **Nginx binds to loopback only** (`127.0.0.1:80` in `docker-compose.yml`). The
+  app is not reachable from your network. To use it from another machine, forward
+  the port over SSH — `ssh -L 8080:127.0.0.1:80 you@host` — rather than changing
+  the binding.
+- **CORS uses an explicit origin allowlist** (`backend/backend/main.py`). Binding
+  to loopback alone would not be enough: a web page you visit in your browser can
+  reach `127.0.0.1`, and `PUT /api/admin/config` writes API keys to `.env`. The
+  allowlist stops an arbitrary site from preflighting that request. Set
+  `AXIOM_CORS_ORIGINS` (comma-separated) to add origins when tunnelling.
+
+Do not expose this app to the internet without putting authentication in front
+of it.
 
 ## 🧪 Development
 

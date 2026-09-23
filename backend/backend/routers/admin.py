@@ -171,6 +171,24 @@ async def bulk_data_refresh():
 # Cache — flush poisoned/stale entries so data re-fetches fresh
 # ---------------------------------------------------------------------------
 
+@router.get("/errors")
+async def recent_errors(limit: int = 100):
+    """Recent WARNING+ log records from the running process.
+
+    In-memory only, capped at errorlog.MAX_ENTRIES, and cleared on restart —
+    this is a live-ops view, not an audit trail.
+    """
+    from ..services import errorlog
+    return {"entries": errorlog.recent(limit), "stats": errorlog.stats()}
+
+
+@router.post("/errors/clear")
+async def clear_errors():
+    from ..services import errorlog
+    errorlog.clear()
+    return {"status": "cleared"}
+
+
 @router.post("/cache/clear")
 async def clear_cache(name: str | None = None):
     """Flush cached data (memory + SQLite). Optional ``name`` targets one cache.

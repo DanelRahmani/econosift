@@ -137,7 +137,7 @@ export function StressTestPanel({ ticker, theme }: Props) {
       </div>
 
       <p className="text-xs text-text-muted">
-        Replays {ticker}'s actual historical returns across 4 major market crises. Requires
+        Replays {ticker}&apos;s actual historical returns across 4 major market crises. Requires
         sufficient historical data (pre-2001 for dot-com). Returns and drawdowns computed
         from real price sequences.
       </p>
