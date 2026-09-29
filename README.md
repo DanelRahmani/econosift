@@ -4,7 +4,7 @@
 
 **An open-source, self-hosted research workbench for macroeconomics and financial markets.** EconoSift combines global economic data, quantitative analysis, portfolio and risk tools, and optional AI-assisted summaries in one application.
 
-[![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](LICENSE) · [Releases](https://github.com/DanelRahmani/econosift/releases) · [Report an issue](https://github.com/DanelRahmani/econosift/issues)
+[![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](LICENSE) · [Download desktop installers](https://github.com/DanelRahmani/econosift/releases) · [Report an issue](https://github.com/DanelRahmani/econosift/issues)
 
 EconoSift is built for independent research and runs on your own machine or server. No paid data APIs are required. Optional [FRED](https://fred.stlouisfed.org/docs/api/api_key.html) and [Finnhub](https://finnhub.io/) keys add coverage, while an optional [Gemini API key](https://aistudio.google.com/apikey) enables AI-generated company, macro, and dashboard summaries.
 
@@ -15,7 +15,7 @@ EconoSift is built for independent research and runs on your own machine or serv
 - **Quant research:** test portfolio strategies, study cross-asset relationships, and run econometric, factor, momentum, and carry analyses.
 - **Portfolio and risk:** analyze allocation, attribution, drawdowns, volatility, stress scenarios, and options exposures.
 
-Run it with Docker Compose or install the native Windows or Linux desktop build. See [Quick Start](#-quick-start) and [Desktop App](#-desktop-app) below.
+Run it with Docker Compose or install a native Windows, Linux, or Apple Silicon macOS desktop build. See [Quick Start](#-quick-start) and [Desktop App](#-desktop-app) below.
 
 ---
 
@@ -114,14 +114,15 @@ docker compose down     # stop everything
 
 ---
 
-## 🖥️ Desktop App (v1.0.0) — Windows & Linux
+## 🖥️ Desktop App (v1.0.0) — Windows, Linux & macOS
 
-EconoSift ships as a **native desktop app** for Windows and Linux — no Docker required. A [Tauri](https://tauri.app/) v2 shell hosts the static Next.js frontend and spawns the FastAPI backend (frozen with PyInstaller) as a local child process on `127.0.0.1:8000`. New installs use `%APPDATA%/EconoSift` on Windows and `~/.local/share/EconoSift` on Linux; existing Axiom Finance data directories are reused on upgrade. macOS packaging is deferred and is not part of the release build.
+EconoSift ships as a **native desktop app** for Windows, Linux, and Apple Silicon Macs — no Docker required. A [Tauri](https://tauri.app/) v2 shell hosts the static Next.js frontend and spawns the FastAPI backend (frozen with PyInstaller) as a local child process on `127.0.0.1:8000`. New installs use `%APPDATA%/EconoSift` on Windows, `~/.local/share/EconoSift` on Linux, and `~/Library/Application Support/EconoSift` on macOS; existing Axiom Finance data directories are reused on upgrade.
 
 | OS | Installer | Notes |
 |----|-----------|-------|
-| **Windows** | NSIS `*-setup.exe` | Attached to the GitHub Release after both platform builds succeed. |
+| **Windows** | NSIS `*-setup.exe` | Attached to each GitHub Release. |
 | **Linux** | `*.deb` (Debian/Ubuntu, amd64) | AppImage is not shipped — it can't be bundled on GitHub's runners (see `ACTIVE_ISSUES.md` P3-13). |
+| **macOS** | `*_aarch64.dmg` (Apple Silicon) | Unsigned and not notarized; macOS Gatekeeper may require users to approve opening the app. |
 
 - **Install:** download the installer for your OS from the repository's GitHub Releases and run it. Every successful `PRODUCTION` build publishes a numbered prerelease; version tags (`v*`) publish stable releases. A splash screen appears while the analysis engine warms up, then the dashboard loads live data. Add optional FRED / Finnhub / Gemini API keys from the in-app **Admin** page — no rebuild needed, just restart.
 - **Build from source (Windows):**
@@ -130,8 +131,8 @@ EconoSift ships as a **native desktop app** for Windows and Linux — no Docker 
   powershell -ExecutionPolicy Bypass -File desktop\build-windows.ps1
   ```
   Produces `desktop/src-tauri/target/release/bundle/nsis/EconoSift_<ver>_x64-setup.exe`.
-- **CI:** `.github/workflows/build-desktop.yml` builds Windows and Linux installers on native `windows-latest` and `ubuntu-latest` runners (freeze → stage → `tauri build`). It uploads Actions artifacts and publishes the installers to a GitHub Release after both platform builds succeed. PyInstaller can't cross-compile, so each OS freezes its own backend on its own runner.
-- **Releasing:** `main` is feature development (no installers). Cut a desktop build with **Actions ▸ "Promote main → PRODUCTION"**, which merges `main` into `PRODUCTION` and triggers the Windows/Linux build. See [`TAURI_BUILD.md`](./TAURI_BUILD.md) for the full flow and the contracts a `main` feature must respect to stay packageable.
+- **CI:** `.github/workflows/build-desktop.yml` builds Windows, Linux, and Apple Silicon macOS installers on native runners (freeze → stage → `tauri build`). The combined installers are attached to the GitHub Release; numbered `PRODUCTION` prereleases are listed alongside stable version-tagged releases. PyInstaller can't cross-compile, so each OS freezes its own backend on its own runner.
+- **Releasing:** `main` is feature development (no installers). Cut a desktop build with **Actions ▸ "Promote main → PRODUCTION"**, which merges `main` into `PRODUCTION` and triggers the Windows/Linux/macOS build. See [`TAURI_BUILD.md`](./TAURI_BUILD.md) for the full flow and the contracts a `main` feature must respect to stay packageable.
 
 See [`desktop/README.md`](./desktop/README.md) for architecture and build details, and [`TAURI_BUILD.md`](./TAURI_BUILD.md) for the desktop release process.
 

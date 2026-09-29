@@ -1,6 +1,6 @@
-# EconoSift — Windows and Linux Desktop (Tauri)
+# EconoSift — Desktop App (Tauri)
 
-Packages EconoSift as a native Windows or Linux app: a Tauri shell hosting the static
+Packages EconoSift as a native Windows, Linux, or Apple Silicon macOS app: a Tauri shell hosting the static
 Next.js frontend, with the FastAPI backend bundled as a child process on
 `http://127.0.0.1:8000`.
 
@@ -18,10 +18,10 @@ econosift (Tauri/Rust; `.exe` on Windows)
   Tauri `bundle.resources` and spawned from `src-tauri/src/lib.rs`.
 - App data (SQLite DB, `backend.log`, `settings.json`) lives in the OS app-data
   directory (`%APPDATA%/EconoSift/` on Windows, `~/.local/share/EconoSift/`
-  on Linux), passed to the backend via `ECONOSIFT_DATA_DIR`. Existing
-  `%APPDATA%/AxiomFinance/` and `~/.local/share/AxiomFinance/` data directories
-  continue to be selected when present; the legacy `AXIOM_DATA_DIR` variable
-  is also accepted.
+  on Linux, `~/Library/Application Support/EconoSift/` on macOS), passed to the
+  backend via `ECONOSIFT_DATA_DIR`. Existing Axiom Finance data directories
+  continue to be selected when present; the legacy `AXIOM_DATA_DIR` variable is
+  also accepted.
 - A startup splash (`frontend/components/providers.tsx`) polls `/api/health`
   before mounting, so panels don't fire before the backend is ready.
 
@@ -34,6 +34,7 @@ econosift (Tauri/Rust; `.exe` on Windows)
 - **Linux:** Tauri's Linux build dependencies, including WebKitGTK 4.1, GTK,
   AppIndicator, OpenSSL, and a C/C++ toolchain (see the CI workflow for the
   Ubuntu package list).
+- **macOS:** a supported Apple Silicon Mac. CI builds a DMG on a native Apple Silicon runner.
 - **Node** (for the frontend export + Tauri CLI): `cd desktop && npm install`
 
 ## Build
@@ -43,8 +44,9 @@ powershell -ExecutionPolicy Bypass -File desktop\build-windows.ps1
 ```
 
 On Windows, produces `desktop/src-tauri/target/release/bundle/nsis/EconoSift_<ver>_x64-setup.exe`.
-Linux `.deb` installers are built in CI on `ubuntu-latest`. macOS packaging is
-deferred and is not included in the release matrix.
+Linux `.deb` installers and an Apple Silicon `.dmg` are built in CI on native runners.
+The macOS DMG is unsigned and not notarized, so Gatekeeper may require manual
+approval before opening the app the first time.
 
 The script runs the three stages (freeze backend → stage into resources →
 `tauri build`). To run stages manually, see the commands inside the script.
@@ -54,7 +56,7 @@ The script runs the three stages (freeze backend → stage into resources →
 - **Auto-updater is disabled** (`tauri.conf.json`) — it needs signing keys.
 - Build artifacts (`backend/dist`, `backend/build`, `src-tauri/binaries`,
   `src-tauri/target`) are gitignored. CI uploads installers as Actions artifacts
-  and attaches them to a GitHub Release after both supported platforms build.
+  and attaches them to a GitHub Release after all supported platform builds.
   Pushes to `PRODUCTION` create numbered prereleases; `v*` tags create stable
   releases.
 - Backend is built windowless (`console=False`). Crash diagnostics are *meant*
