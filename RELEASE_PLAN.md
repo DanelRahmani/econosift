@@ -30,13 +30,13 @@ doc references it before deleting (check `README.md` badges, `CLAUDE.md`).
 ### 2. Make the Rust shell OS-aware
 `desktop/src-tauri/src/lib.rs` currently hardcodes:
 ```rust
-"binaries/axiom-backend/axiom-backend.exe"
+"binaries/econosift-backend/econosift-backend.exe"
 ```
 Change to resolve the exe name conditionally:
 ```rust
-let exe_name = if cfg!(windows) { "axiom-backend.exe" } else { "axiom-backend" };
+let exe_name = if cfg!(windows) { "econosift-backend.exe" } else { "econosift-backend" };
 let backend_exe = app.path().resolve(
-    format!("binaries/axiom-backend/{exe_name}"),
+    format!("binaries/econosift-backend/{exe_name}"),
     BaseDirectory::Resource,
 )
 ```
@@ -90,15 +90,15 @@ Key changes needed inside the job:
   hardcoding `.exe`:
   ```powershell
   $exeSuffix = if ($IsWindows) { ".exe" } else { "" }
-  $stage = "desktop/src-tauri/binaries/axiom-backend"
+  $stage = "desktop/src-tauri/binaries/econosift-backend"
   if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
   New-Item -ItemType Directory -Force -Path (Split-Path $stage) | Out-Null
-  Copy-Item backend/dist/axiom-backend $stage -Recurse -Force
-  if (-not $IsWindows) { chmod +x "$stage/axiom-backend" }
-  if (-not (Test-Path "$stage/axiom-backend$exeSuffix")) { throw "backend not staged" }
+  Copy-Item backend/dist/econosift-backend $stage -Recurse -Force
+  if (-not $IsWindows) { chmod +x "$stage/econosift-backend" }
+  if (-not (Test-Path "$stage/econosift-backend$exeSuffix")) { throw "backend not staged" }
   ```
   (`chmod` needs to run via a Unix shell call from pwsh, e.g.
-  `& chmod +x "$stage/axiom-backend"` — verify this actually executes with
+  `& chmod +x "$stage/econosift-backend"` — verify this actually executes with
   correct permissions when implementing; pwsh's own `Set-ItemProperty`
   doesn't set the Unix exec bit.)
 
@@ -107,7 +107,7 @@ Key changes needed inside the job:
   ```yaml
   - uses: actions/upload-artifact@v4
     with:
-      name: AxiomFinance-${{ matrix.os }}-installer
+      name: EconoSift-${{ matrix.os }}-installer
       path: desktop/src-tauri/target/release/bundle/**/*
       if-no-files-found: error
   ```

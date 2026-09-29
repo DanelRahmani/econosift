@@ -1,10 +1,10 @@
 name: Build Windows and Linux Desktop
 
-# Builds the Axiom Finance Tauri app for Windows and Linux: freezes
+# Builds the EconoSift Tauri app for Windows and Linux: freezes
 # the FastAPI backend with PyInstaller (onedir), stages it into the Tauri
 # resources, then runs `tauri build` to produce an installer per OS. One
 # workflow run fans out to native Windows and Linux runners, then collects
-# the results and publishes a tagged release once both builds succeed.
+# the results and publishes downloadable GitHub Releases once both builds succeed.
 # PyInstaller can't cross-compile, so each OS needs its own native runner.
 #
 # Windows and Linux are the supported desktop release targets. macOS
@@ -90,12 +90,12 @@ jobs:
         shell: pwsh
         run: |
           $exeSuffix = if ($IsWindows) { ".exe" } else { "" }
-          $stage = "desktop/src-tauri/binaries/axiom-backend"
+          $stage = "desktop/src-tauri/binaries/econosift-backend"
           if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
           New-Item -ItemType Directory -Force -Path (Split-Path $stage) | Out-Null
-          Copy-Item backend/dist/axiom-backend $stage -Recurse -Force
-          if (-not $IsWindows) { & chmod +x "$stage/axiom-backend$exeSuffix" }
-          if (-not (Test-Path "$stage/axiom-backend$exeSuffix")) { throw "backend not staged" }
+          Copy-Item backend/dist/econosift-backend $stage -Recurse -Force
+          if (-not $IsWindows) { & chmod +x "$stage/econosift-backend$exeSuffix" }
+          if (-not (Test-Path "$stage/econosift-backend$exeSuffix")) { throw "backend not staged" }
 
       - name: Install frontend deps
         working-directory: frontend
@@ -112,7 +112,7 @@ jobs:
       - name: Upload installer
         uses: actions/upload-artifact@v6
         with:
-          name: AxiomFinance-${{ matrix.artifact }}
+          name: EconoSift-${{ matrix.artifact }}
           # Upload only the final installer, never Tauri's large staging tree.
           path: desktop/src-tauri/target/release/bundle/${{ matrix.bundle_dir }}/${{ matrix.installer_glob }}
           if-no-files-found: error
@@ -126,7 +126,7 @@ jobs:
       - name: Download both platform installers
         uses: actions/download-artifact@v5
         with:
-          pattern: AxiomFinance-*-installer
+          pattern: EconoSift-*-installer
           path: release-assets
           merge-multiple: true
 
@@ -141,14 +141,15 @@ jobs:
       - name: Upload combined Windows and Linux installers
         uses: actions/upload-artifact@v6
         with:
-          name: AxiomFinance-Windows-Linux-Installers
+          name: EconoSift-Windows-Linux-Installers
           path: release-assets/*
           if-no-files-found: error
           retention-days: 14
 
   publish-release:
-    name: Publish tagged release
-    if: startsWith(github.ref, 'refs/tags/v')
+    name: Publish installers to GitHub Release
+    # Production builds become numbered prereleases; version tags become stable releases.
+    if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/PRODUCTION'
     needs: collect
     runs-on: ubuntu-latest
     permissions:
@@ -157,13 +158,18 @@ jobs:
       - name: Download combined installers
         uses: actions/download-artifact@v5
         with:
-          name: AxiomFinance-Windows-Linux-Installers
+          name: EconoSift-Windows-Linux-Installers
           path: release-assets
 
       - name: Publish both installers together
-        if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || format('continuous-{0}', github.run_number) }}
+          name: ${{ startsWith(github.ref, 'refs/tags/v') && format('EconoSift {0}', github.ref_name) || format('EconoSift continuous build {0}', github.run_number) }}
+          target_commitish: ${{ github.sha }}
+          prerelease: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+          make_latest: ${{ startsWith(github.ref, 'refs/tags/v') && 'true' || 'false' }}
+          generate_release_notes: true
           files: |
             release-assets/*-setup.exe
             release-assets/*.deb

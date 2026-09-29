@@ -52,7 +52,7 @@ def _fetch_wikitext(page: str) -> str:
         "action": "parse", "page": page, "prop": "wikitext",
         "format": "json", "formatversion": "2", "redirects": "1",
     }
-    headers = {"User-Agent": "AxiomFinance/1.0 (research dashboard)"}
+    headers = {"User-Agent": "EconoSift/1.0 (research dashboard)"}
     resp = requests.get(_API, params=params, headers=headers, timeout=20)
     resp.raise_for_status()
     return resp.json()["parse"]["wikitext"]

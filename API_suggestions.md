@@ -1,6 +1,6 @@
-# Axiom Finance – Free API & Datasource Suggestions (G20, Key Financial Hubs & Research Strategies)
+# EconoSift – Free API & Datasource Suggestions (G20, Key Financial Hubs & Research Strategies)
 
-This document lists free APIs and structured datasources (no HTML webscraping) that can support Axiom Finance’s goal of becoming a global hub for financial and economic metrics, from basic ratios to advanced macro models, econometrics, and research-based trading analytics.[cite:10][cite:37][cite:39]
+This document lists free APIs and structured datasources (no HTML webscraping) that can support EconoSift’s goal of becoming a global hub for financial and economic metrics, from basic ratios to advanced macro models, econometrics, and research-based trading analytics.[cite:10][cite:37][cite:39]
 
 ## 1. G20 Central Bank & Monetary Policy Data
 
@@ -10,7 +10,7 @@ This document lists free APIs and structured datasources (no HTML webscraping) t
 - **Python access**: Generic SDMX libraries (`sdmx`, `pandasdmx`) or ECB-specific wrappers.[cite:91][cite:96]
 - **What you get**:
   - Euro area monetary statistics (policy rates, reserves, money aggregates), yield curves, macro aggregates.[cite:61]
-- **Use in Axiom Finance**:
+- **Use in EconoSift**:
   - Eurozone monetary policy and yield curve panels (Rates & Yields, Financial Conditions).[cite:10]
   - Carry trade inputs (EUR short rates, yield curve term structure).[cite:140]
 
@@ -20,7 +20,7 @@ This document lists free APIs and structured datasources (no HTML webscraping) t
 - **Access**: Free registration via My DNB; subscribe to “Public” and “DNB Statistics API”.[cite:49]
 - **What you get**:
   - Dutch monetary aggregates, interest rates, payment statistics, financial sector data.
-- **Use in Axiom Finance**:
+- **Use in EconoSift**:
   - Netherlands central bank dashboards (policy rates, banking metrics).
   - Inputs to Netherlands macro and financial hub panels.
 
@@ -30,7 +30,7 @@ This document lists free APIs and structured datasources (no HTML webscraping) t
 - **Python package**: `bank-of-england` (PyPI) – wrapper for BoE IADB.[cite:88]
 - **What you get**:
   - Bank Rate, SONIA, gilt yields, exchange rates, mortgage rates, credit and money supply.[cite:62]
-- **Use in Axiom Finance**:
+- **Use in EconoSift**:
   - UK monetary policy, yield curve, and housing dashboards.
   - FX carry inputs (GBP short rates, curve) and risk-parity bond data.[cite:127][cite:134]
 
@@ -39,7 +39,7 @@ This document lists free APIs and structured datasources (no HTML webscraping) t
 - **API / Portal**: BoJ Time-Series Data Search (CSV/flat files).[cite:57][cite:63]
 - **What you get**:
   - Policy rates, price indices, Tankan survey, Flow of Funds, balance of payments.[cite:63]
-- **Use in Axiom Finance**:
+- **Use in EconoSift**:
   - Japan macro tabs (Growth & Employment, Inflation, Financial Conditions).[cite:10]
   - FX carry inputs (JPY short rates) and macro modeling for IS-LM-PC.[cite:140]
 
@@ -49,7 +49,7 @@ This document lists free APIs and structured datasources (no HTML webscraping) t
 - **Python package**: `pyvalet` – pandas-integrated wrapper.[cite:89]
 - **What you get**:
   - FX rates, economic statistics, yields, CPI, monetary aggregates.[cite:70]
-- **Use in Axiom Finance**:
+- **Use in EconoSift**:
   - Canada macro & monetary dashboards.
   - Risk-parity bond data and FX carry inputs (CAD rates).[cite:127][cite:134]
 
@@ -59,7 +59,7 @@ This document lists free APIs and structured datasources (no HTML webscraping) t
 - **Python packages**: `sgs`, `BacenAPI` – wrappers for SGS.[cite:90][cite:95][cite:100]
 - **What you get**:
   - Interest rates, FX, credit, activity indices, inflation, expectations.[cite:68][cite:80]
-- **Use in Axiom Finance**:
+- **Use in EconoSift**:
   - Brazil macro dashboards and expectations panels.
   - Carry trade and global macro strategy inputs (BRL rates, inflation).[cite:131][cite:134]
 
@@ -68,7 +68,7 @@ This document lists free APIs and structured datasources (no HTML webscraping) t
 - **API / Datasource**: RBA statistics tables and CSV data.[cite:69][cite:72][cite:75]
 - **What you get**:
   - Policy rates, exchange rates, banking statistics, historical economic data.[cite:69][cite:75]
-- **Use in Axiom Finance**:
+- **Use in EconoSift**:
   - Australia monetary & FX dashboards.
   - FX carry inputs (AUD short rates, curve) and risk-parity portfolios.[cite:134][cite:127]
 
@@ -77,7 +77,7 @@ This document lists free APIs and structured datasources (no HTML webscraping) t
 - **API / Datasource**: NBS public data via data.stats.gov.cn (structured endpoints).[cite:52]
 - **What you get**:
   - GDP, price indices, money supply, provincial and sectoral stats.[cite:52]
-- **Use in Axiom Finance**:
+- **Use in EconoSift**:
   - China macro atlas and production function estimation.
   - Carry and macro regime analysis using Chinese policy and macro data.[cite:131][cite:140]
 
@@ -86,20 +86,20 @@ This document lists free APIs and structured datasources (no HTML webscraping) t
 - **API / Datasource**: RBI Database on Indian Economy (CSV/Excel).
 - **What you get**:
   - Policy rates, monetary aggregates, credit, inflation, external sector.
-- **Use in Axiom Finance**:
+- **Use in EconoSift**:
   - India macro dashboards and FX carry inputs (INR rates).[cite:134]
 
 ### 1.10 South African Reserve Bank (SARB) – South Africa
 
 - **API / Datasource**: SARB statistics and quarterly bulletin data (CSV/Excel).
-- **Use in Axiom Finance**:
+- **Use in EconoSift**:
   - South Africa macro & monetary panels.
   - EM risk-parity and carry strategy inputs.
 
 ### 1.11 Central Bank of the Russian Federation – Russia
 
 - **API / Datasource**: CBR statistics via CSV/XML.
-- **Use in Axiom Finance**:
+- **Use in EconoSift**:
   - Russia macro and monetary dashboards.
   - FX carry strategies and Russia-specific risk analysis.
 
@@ -118,7 +118,7 @@ These support broad carry trade, macro regime classification, and cross-country 
 - **API / Portal**: SNB Data Portal API (`data.snb.ch`).[cite:103][cite:106][cite:109]
 - **What you get**:
   - Exchange rates, SNB balance sheet, monetary aggregates, SARON rates, banking statistics, balance of payments.[cite:109]
-- **Use in Axiom Finance**:
+- **Use in EconoSift**:
   - Switzerland financial hub dashboard (FX, reserves, banking stats).
   - Inputs for global risk-parity and cross-border funding/carry analysis.[cite:133]
 
@@ -127,7 +127,7 @@ These support broad carry trade, macro regime classification, and cross-country 
 - **API / Portal**: HKMA Open API (`api.hkma.gov.hk`).[cite:104][cite:107][cite:116]
 - **What you get**:
   - Monetary base, interbank liquidity (HIBOR, daily figures), FX reserves, economic statistics.[cite:107][cite:110][cite:113]
-- **Use in Axiom Finance**:
+- **Use in EconoSift**:
   - Hong Kong hub dashboard (liquidity, FX, reserves).
   - Carry trade inputs (HKD rates) and hub-specific macro stress tests.[cite:134]
 
@@ -136,7 +136,7 @@ These support broad carry trade, macro regime classification, and cross-country 
 - **API / Portal**: MAS statistics and Singapore’s open data portal (`data.gov.sg`) with MAS-sourced datasets.[cite:105][cite:108][cite:111]
 - **What you get**:
   - Money supply, exchange rates, SORA, foreign reserves, banking statistics.[cite:105][cite:108]
-- **Use in Axiom Finance**:
+- **Use in EconoSift**:
   - Singapore financial hub dashboard.
   - FX carry, risk-parity, and systemic risk panels for a key Asian hub.[cite:137]
 
@@ -144,7 +144,7 @@ These support broad carry trade, macro regime classification, and cross-country 
 
 - **CBS Open Data API** – Dutch regional and national statistics.[cite:55]
 - **DNB Statistics API** – Central bank monetary and financial sector data (see 1.2).[cite:49]
-- **Use in Axiom Finance**:
+- **Use in EconoSift**:
   - Detailed Netherlands hub view combining macro, regional, and central bank metrics.
 
 ## 3. National Statistical Offices & Global Macro APIs (Non-Central Bank)
@@ -240,9 +240,9 @@ The following sources are particularly important for the new project ideas aroun
 - **Combined datasets** from market data (yfinance/Alpha Vantage/IEX) and macro/factor sources (FRED, World Bank, Ken French, NSOs).[cite:5][cite:10][cite:53][cite:58]
   - Provide feature sets (returns, vol, fundamentals, macro variables, realized moments) for cross-sectional ML predictors and extended factor models.[cite:124][cite:135]
 
-## 8. Already Implemented in Axiom Finance (Further Suggestions)
+## 8. Already Implemented in EconoSift (Further Suggestions)
 
-These data sources are already part of Axiom Finance’s current or planned architecture, but can be expanded using some of the ideas in this document:[cite:5][cite:10][cite:37]
+These data sources are already part of EconoSift’s current or planned architecture, but can be expanded using some of the ideas in this document:[cite:5][cite:10][cite:37]
 
 - **FRED (Federal Reserve Economic Data)** – US macro series and yields (`FRED_API_KEY` in `.env`).[cite:5][cite:34]
 - **World Bank Open Data API** – Global indicators (macro, development).[cite:10]
@@ -255,4 +255,4 @@ These data sources are already part of Axiom Finance’s current or planned arch
 - **Ken French and Damodaran datasets** – Factor returns and ERP/multiples.[cite:10]
 - **yfinance** – Market data across equities, ETFs, FX, and commodities.[cite:5][cite:37]
 
-These “already implemented” sources form the backbone of Axiom Finance. The additional APIs and structured datasets above are sufficient to support the new research-based strategy modules (momentum, risk parity, carry, realized moments, causal momentum, and ML factor labs) while respecting the project’s constraints of **free access and no webscraping**.[cite:10][cite:127][cite:129][cite:134][cite:135][cite:140]
+These “already implemented” sources form the backbone of EconoSift. The additional APIs and structured datasets above are sufficient to support the new research-based strategy modules (momentum, risk parity, carry, realized moments, causal momentum, and ML factor labs) while respecting the project’s constraints of **free access and no webscraping**.[cite:10][cite:127][cite:129][cite:134][cite:135][cite:140]

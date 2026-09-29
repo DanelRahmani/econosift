@@ -4,7 +4,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Axiom brand palette. Values are RGB triplets so
+/* EconoSift brand palette. Values are RGB triplets so
    Tailwind opacity modifiers work. .dark overrides switch the whole theme. */
 :root {
   --background: 255 255 255;
@@ -14,10 +14,10 @@
   --border: 228 228 234;
   --text-secondary: 60 60 70;
   --text-muted: 140 140 150;
-  --primary: 107 15 26;        /* #6b0f1a deep maroon */
-  --primary-light: 196 57 74;  /* #c4394a crimson */
+  --primary: 20 42 67;         /* #142A43 deep navy */
+  --primary-light: 47 143 131; /* #2F8F83 muted teal */
   --success: 22 163 74;
-  --warning: 202 138 4;
+  --warning: 217 154 54;         /* #D99A36 restrained amber */
   --danger: 220 38 38;
   color-scheme: light;
 }
@@ -30,10 +30,10 @@
   --border: 38 38 44;            /* neutral dark border */
   --text-secondary: 174 174 186; /* light grey secondary */
   --text-muted: 120 120 132;
-  --primary: 196 57 74;          /* #c4394a crimson */
-  --primary-light: 224 105 122;
+  --primary: 47 143 131;         /* #2F8F83 muted teal */
+  --primary-light: 84 174 161;
   --success: 34 197 94;
-  --warning: 234 179 8;
+  --warning: 217 154 54;         /* #D99A36 restrained amber */
   --danger: 239 68 68;
   color-scheme: dark;
 }

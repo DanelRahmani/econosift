@@ -1,5 +1,7 @@
 # Tauri Desktop Package — Progress (Windows)
 
+> Historical build record: the product name and identifiers below describe the original Axiom Finance release. EconoSift keeps these data paths available to existing installs.
+
 Goal: ship a Windows installer that launches Axiom Finance as a desktop app — a
 Tauri shell hosting the static-exported Next.js frontend, with the FastAPI backend
 spawned as a bundled child process on `http://127.0.0.1:8000`.

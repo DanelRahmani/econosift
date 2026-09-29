@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ThemeToggle } from "./ThemeToggle";
 import { LearningToggle } from "./LearningToggle";
+import { useTheme } from "./ThemeProvider";
 
 const primaryTabs = [
   { href: "/dashboard", label: "Dashboard" },
@@ -66,6 +67,7 @@ const allMoreHrefs = moreGroups.flatMap((g) => g.items.map((i) => i.href));
 
 export function Navbar() {
   const pathname = usePathname();
+  const { theme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -85,9 +87,16 @@ export function Navbar() {
   return (
     <nav className="sticky top-0 z-50 bg-surface/80 border-b border-border backdrop-blur">
       <div className="max-w-7xl mx-auto px-4 h-14 flex items-center gap-6">
-        <Link href="/dashboard" className="font-display font-extrabold text-lg tracking-tight shrink-0">
-          <span className="text-accent">Axiom</span>{" "}
-          <span className="text-text-primary">Finance</span>
+        <Link href="/dashboard" aria-label="EconoSift home" className="shrink-0">
+          <span
+            role="img"
+            aria-label="EconoSift"
+            className="block w-[180px] h-14 bg-center bg-no-repeat"
+            style={{
+              backgroundImage: `url('/econosift-logo-${theme}.png')`,
+              backgroundSize: "100% auto",
+            }}
+          />
         </Link>
         <div className="hidden md:flex items-center gap-1 min-w-0 flex-1">
           <div className="flex items-center gap-1 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">

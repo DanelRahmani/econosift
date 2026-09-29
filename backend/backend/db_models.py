@@ -1,4 +1,4 @@
-"""SQLAlchemy ORM models for Axiom Finance persistence layer."""
+"""SQLAlchemy ORM models for EconoSift persistence layer."""
 from __future__ import annotations
 
 from datetime import datetime, timezone

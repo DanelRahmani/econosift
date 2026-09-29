@@ -1,4 +1,4 @@
-"""SQLAlchemy engine, session factory, and init_db for Axiom Finance."""
+"""SQLAlchemy engine, session factory, and init_db for EconoSift."""
 from __future__ import annotations
 
 import os
@@ -7,8 +7,8 @@ import pathlib
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
 
-# Resolve the data dir from config (single source of truth): AXIOM_DATA_DIR if
-# set, otherwise the OS app-data dir (%APPDATA%/AxiomFinance on Windows). Do NOT
+# Resolve the data dir from config (single source of truth): ECONOSIFT_DATA_DIR
+# (or legacy AXIOM_DATA_DIR) if set, otherwise the OS app-data dir. Do NOT
 # default to a CWD-relative "./data" — in the packaged desktop app the backend's
 # working directory is unpredictable, which would scatter the SQLite DB.
 from .config import DATA_DIR

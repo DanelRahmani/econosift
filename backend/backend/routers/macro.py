@@ -579,7 +579,7 @@ _YF_FALLBACK = {
     "Wheat": "ZW=F", "Corn": "ZC=F", "Soybeans": "ZS=F",
 }
 
-_AXIOM_BASKET_FRED = ["DCOILWTICO", "GOLDAMGBD228NLBR", "DHHNGSP", "PCOPPUSDM", "PWHEAMTUSDM"]
+_ECONOSIFT_BASKET_FRED = ["DCOILWTICO", "GOLDAMGBD228NLBR", "DHHNGSP", "PCOPPUSDM", "PWHEAMTUSDM"]
 
 
 def _get_commodities_sync() -> dict:
@@ -672,12 +672,12 @@ def _get_commodities_sync() -> dict:
     except Exception as exc:
         log.debug("Gold/Oil ratio failed: %s", exc)
 
-    # Axiom Commodity Index (equal-weighted, normalized, from FRED)
-    axiom_index: list[dict] = []
+    # EconoSift Commodity Index (equal-weighted, normalized, from FRED)
+    econosift_index: list[dict] = []
     try:
-        ax_data = _fetch_fred_series_sync(_AXIOM_BASKET_FRED, start="2020-01-01")
+        ax_data = _fetch_fred_series_sync(_ECONOSIFT_BASKET_FRED, start="2020-01-01")
         closes_basket: dict[str, pd.Series] = {}
-        for fid in _AXIOM_BASKET_FRED:
+        for fid in _ECONOSIFT_BASKET_FRED:
             pts = ax_data.get(fid, [])
             if len(pts) >= 2:
                 s = pd.Series({p["date"]: p["value"] for p in pts})
@@ -688,23 +688,23 @@ def _get_commodities_sync() -> dict:
                     closes_basket[fid] = s / ref
         if closes_basket:
             idx_df = pd.DataFrame(closes_basket).mean(axis=1) * 100
-            axiom_index = [
+            econosift_index = [
                 {"date": str(d.date()), "value": round(float(v), 4)}
                 for d, v in idx_df.dropna().items()
             ]
     except Exception as exc:
-        log.debug("Axiom commodity index failed: %s", exc)
+        log.debug("EconoSift commodity index failed: %s", exc)
 
     return {
         "asOf": today, "kpis": kpis, "table": table_rows,
         "ratios": {"goldOilRatio": gold_oil_ratio},
-        "axiomIndex": axiom_index,
+        "axiomIndex": econosift_index,
     }
 
 
 @router.get("/commodities")
 async def commodities():
-    """Commodity futures prices, changes, Gold/Oil ratio, Axiom Commodity Index."""
+    """Commodity futures prices, changes, Gold/Oil ratio, EconoSift Commodity Index."""
     return await asyncio.to_thread(_get_commodities_sync)
 
 

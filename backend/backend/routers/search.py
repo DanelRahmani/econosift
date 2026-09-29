@@ -9,7 +9,7 @@ from ..cache import async_cached
 router = APIRouter(prefix="/api/search", tags=["search"])
 
 _URL = "https://query2.finance.yahoo.com/v1/finance/search"
-_HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; AxiomFinance/1.0)"}
+_HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; EconoSift/1.0)"}
 
 
 @async_cached("search")

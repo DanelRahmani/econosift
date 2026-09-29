@@ -38,7 +38,7 @@ _FF5_URL = (
 _HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-        "AxiomFinance/1.0 (research use)"
+        "EconoSift/1.0 (research use)"
     )
 }
 _TIMEOUT = 30  # seconds

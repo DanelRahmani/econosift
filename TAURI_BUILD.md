@@ -23,7 +23,7 @@ honour these four contracts:
    `/app/...`, or a CWD-relative path. The frozen desktop exe runs from an
    unpredictable working directory, so anything that writes (SQLite DB, `.env`
    API keys, bulk-data files, caches) must resolve under `config.DATA_DIR`
-   (`AXIOM_DATA_DIR` env var → OS app-data dir). See `backend/backend/config.py`
+   (`ECONOSIFT_DATA_DIR` env var; legacy `AXIOM_DATA_DIR` is accepted → OS app-data dir). See `backend/backend/config.py`
    and `database.py`. A hardcoded Docker path is exactly what broke bulk-data on
    desktop (see `ACTIVE_ISSUES.md` DESK-05).
 
@@ -37,7 +37,7 @@ honour these four contracts:
 
 3. **The backend talks to the frontend only over `http://127.0.0.1:8000`.** The
    Tauri shell (`desktop/src-tauri/src/lib.rs`) spawns the backend, passes
-   `AXIOM_DATA_DIR`, and the frontend gates on `/api/health` before rendering
+   `ECONOSIFT_DATA_DIR`, and the frontend gates on `/api/health` before rendering
    (`frontend/components/providers.tsx`). Don't assume a reverse proxy, cookies
    from a specific origin, or absolute URLs.
 
@@ -74,11 +74,13 @@ develop on main  ──►  Promote to PRODUCTION (one click)  ──►  Window
    | Windows | NSIS `*-setup.exe` | |
    | Linux | `*.deb` (amd64) | AppImage not shipped — see `ACTIVE_ISSUES.md` P3-13 |
 
-   Download them from the run's **Artifacts**. Tagging a `v*` release also
-   attaches the installers to the GitHub Release.
+   The workflow uploads them as run artifacts and then publishes a numbered
+   prerelease with both installers attached to GitHub Releases. Tagging a `v*`
+   release publishes a stable GitHub Release instead.
 
-**Versioning:** bump the version in `desktop/src-tauri/tauri.conf.json` (and the
-installer name references in `README.md` / `releases/`) before promoting.
+**Versioning:** bump the version in `desktop/src-tauri/tauri.conf.json` before
+cutting a stable `v*` tag. Production branch builds are individually tagged
+using the workflow run number.
 
 ### Workflows involved
 

@@ -1,5 +1,5 @@
 """
-Valuation Engine — 8 models + CAPM implied + Axiom Fair Value composite.
+Valuation Engine — 8 models + CAPM implied + EconoSift Fair Value composite.
 
 Each model returns:
   {"model": str, "value": float|None, "locked": bool,
@@ -507,7 +507,7 @@ def _capm_implied(ctx: _Ctx) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Axiom Fair Value composite
+# EconoSift Fair Value composite
 # ---------------------------------------------------------------------------
 
 # Model name → base weight (will renormalize over unlocked models)
@@ -522,7 +522,7 @@ _WEIGHTS: dict[str, float] = {
 }
 
 
-def _axiom_fair_value(models: list[dict], spot: float | None) -> dict:
+def _composite_fair_value(models: list[dict], spot: float | None) -> dict:
     """Weighted composite of unlocked models, renormalised."""
     available: list[tuple[str, float, float]] = []  # (name, value, weight)
     for m in models:
@@ -585,7 +585,7 @@ def valuation_models(
     growth: float | None = None,
 ) -> dict:
     """
-    Compute all 8 valuation models + CAPM implied + Axiom Fair Value composite.
+    Compute all 8 valuation models + CAPM implied + the EconoSift composite fair value.
 
     Parameters
     ----------
@@ -603,7 +603,7 @@ def valuation_models(
         wacc (WACC dict),
         models (list of 8 model dicts),
         capmImplied (CAPM implied fair value dict),
-        axiomFairValue (composite dict),
+        axiomFairValue (legacy composite dict key; retained for API compatibility),
         asOf (ISO date string)
     """
     ctx = _Ctx(bundle, beta, growth)
@@ -620,7 +620,7 @@ def valuation_models(
     ]
 
     capm_implied = _capm_implied(ctx)
-    composite = _axiom_fair_value(models, ctx.spot)
+    composite = _composite_fair_value(models, ctx.spot)
 
     return {
         "ticker": ctx.ticker,

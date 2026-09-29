@@ -404,10 +404,10 @@ class TestCAPMImplied:
 
 
 # ---------------------------------------------------------------------------
-# Axiom Fair Value composite
+# EconoSift Fair Value composite
 # ---------------------------------------------------------------------------
 
-class TestAxiomFairValue:
+class TestCompositeFairValue:
     def test_composite_value_present_full_bundle(self):
         from backend.services.valuation_engine import valuation_models
         result = valuation_models(_make_bundle(), beta=1.0, growth=0.10)

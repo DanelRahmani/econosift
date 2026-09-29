@@ -25,7 +25,7 @@ AVAILABLE_MODELS = [
 GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 
 SYSTEM_PROMPT = (
-    "You are an expert financial analyst writing for Axiom Finance, a self-hosted "
+    "You are an expert financial analyst writing for EconoSift, a self-hosted "
     "investment research platform. Your responses should be concise, data-driven, "
     "and written in plain English. Start with a 2-3 sentence paragraph headline "
     "summarising the key takeaway, then follow with 4-8 bullet points of key insights. "

@@ -78,9 +78,9 @@ export function SnowflakeChart({ ticker, onAxisClick, compact = false }: Props) 
   const verdictColor = VERDICT_COLOR[data.verdict] ?? VERDICT_COLOR.Unknown;
   const overall = data.overallScore?.toFixed(1) ?? "—";
 
-  const fillColor = theme === "dark" ? "#c4394a" : "#6b0f1a";
+  const fillColor = theme === "dark" ? "#2F8F83" : "#142A43";
   const fillOpacity = theme === "dark" ? 0.25 : 0.20;
-  const strokeColor = theme === "dark" ? "#c4394a" : "#6b0f1a";
+  const strokeColor = theme === "dark" ? "#2F8F83" : "#142A43";
 
   return (
     <Card className="p-4 space-y-3">

@@ -9,7 +9,7 @@ name: CI
 # The backend suite is deliberately offline — conftest.py resets both cache
 # tiers per test and every service degrades to an empty result when an API key
 # is absent, so no secrets are needed here. Verified by running the full suite
-# with FRED/FINNHUB/GEMINI unset and a throwaway AXIOM_DATA_DIR.
+# with FRED/FINNHUB/GEMINI unset and a throwaway ECONOSIFT_DATA_DIR.
 #
 # Python is pinned to 3.12 to match backend/Dockerfile (the shipping runtime).
 # build-desktop.yml uses 3.13 for the PyInstaller desktop freeze; that is a
@@ -50,10 +50,10 @@ jobs:
 
       - name: Run pytest
         working-directory: backend
-        # AXIOM_DATA_DIR points at a scratch path so the suite never touches a
+        # ECONOSIFT_DATA_DIR points at a scratch path so the suite never touches a
         # developer's real SQLite volume and always starts from a clean DB.
         env:
-          AXIOM_DATA_DIR: ${{ runner.temp }}/axiom-data
+          ECONOSIFT_DATA_DIR: ${{ runner.temp }}/econosift-data
         run: pytest -q
 
   frontend:

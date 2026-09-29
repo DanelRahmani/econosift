@@ -90,7 +90,7 @@ def _fetch_ebp_sync() -> list[dict]:
     the cache guard then refuses to persist a partial payload.
     """
     try:
-        resp = httpx.get(_EBP_URL, timeout=45, headers={"User-Agent": "axiom-finance/1.0"})
+        resp = httpx.get(_EBP_URL, timeout=45, headers={"User-Agent": "econosift/1.0"})
         resp.raise_for_status()
         df = pd.read_csv(io.StringIO(resp.text))
         if df.empty or "ebp" not in df.columns:

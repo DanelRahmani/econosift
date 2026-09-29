@@ -1,6 +1,6 @@
-# Financial & Economic Terms — Axiom Finance Glossary
+# Financial & Economic Terms — EconoSift Glossary
 
-Every financial and economic term used across the Axiom Finance platform, organized by category.
+Every financial and economic term used across the EconoSift platform, organized by category.
 
 ---
 
@@ -91,7 +91,7 @@ Every financial and economic term used across the Axiom Finance platform, organi
 | **Undervalued** | Current price is below estimated intrinsic value |
 | **Overvalued** | Current price is above estimated intrinsic value |
 | **Significantly Undervalued / Overvalued** | Extreme deviation from fair value estimate |
-| **Axiom Fair Value** | Composite weighted-average valuation from all 8 models + CAPM |
+| **EconoSift Composite Fair Value** | Composite weighted-average valuation from all 8 models + CAPM |
 | **Sensitivity Heatmap/Grid** | Matrix showing how DCF value changes across different WACC/growth assumptions |
 | **8-Model Valuation Engine** | Suite of 8 distinct valuation models aggregated into a composite fair value |
 | **Moody's AAA Yield** | Yield on Moody's AAA-rated corporate bonds (used as credit spread reference) |
@@ -692,4 +692,4 @@ Every financial and economic term used across the Axiom Finance platform, organi
 
 ---
 
-*Compiled on 2026-06-26 from all pages of Axiom Finance (Markets, Dashboard, Screener, Sectors, Treemap, Calendar, Portfolio, Risk, Options, Research, Macro, Yield, Policy, Sovereign, Atlas, Scenario) and all backend services.*
+*Compiled on 2026-06-26 from all pages of the app (then named Axiom Finance: Markets, Dashboard, Screener, Sectors, Treemap, Calendar, Portfolio, Risk, Options, Research, Macro, Yield, Policy, Sovereign, Atlas, Scenario) and all backend services.*
