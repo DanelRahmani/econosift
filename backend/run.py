@@ -21,8 +21,8 @@ if _here not in sys.path:
 
 
 def _log_path() -> str:
-    """Resolve %APPDATA%/AxiomFinance/backend.log (matches config.py / Tauri)."""
-    data_dir = os.getenv("AXIOM_DATA_DIR")
+    """Resolve the app-data backend log path, matching config.py and Tauri."""
+    data_dir = os.getenv("ECONOSIFT_DATA_DIR") or os.getenv("AXIOM_DATA_DIR")
     if not data_dir:
         if sys.platform == "win32":
             base = os.environ.get(
@@ -34,7 +34,9 @@ def _log_path() -> str:
             base = os.environ.get(
                 "XDG_DATA_HOME", os.path.join(os.path.expanduser("~"), ".local", "share")
             )
-        data_dir = os.path.join(base, "AxiomFinance")
+        current = os.path.join(base, "EconoSift")
+        legacy = os.path.join(base, "AxiomFinance")
+        data_dir = current if os.path.isdir(current) or not os.path.isdir(legacy) else legacy
     os.makedirs(data_dir, exist_ok=True)
     return os.path.join(data_dir, "backend.log")
 

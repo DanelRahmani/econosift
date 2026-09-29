@@ -1,4 +1,4 @@
-"""Shared pytest fixtures for the Axiom Finance backend test suite.
+"""Shared pytest fixtures for the EconoSift backend test suite.
 
 Math/model tests run fully offline against synthetic data. Network-touching
 tests (yfinance, FRED, etc.) should be marked and skipped in CI; we keep the

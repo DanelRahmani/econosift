@@ -13,7 +13,15 @@ struct BackendProcess(Mutex<Option<CommandChild>>);
 /// Resolve the OS-standard app data directory.
 fn app_data_dir() -> std::path::PathBuf {
     let base = dirs::data_dir().unwrap_or_else(|| std::path::PathBuf::from("."));
-    base.join("AxiomFinance")
+    let current = base.join("EconoSift");
+    let legacy = base.join("AxiomFinance");
+    if current.exists() {
+        current
+    } else if legacy.exists() {
+        legacy
+    } else {
+        current
+    }
 }
 
 /// Poll the backend health endpoint until it responds or timeout elapses.
@@ -57,19 +65,19 @@ pub fn run() {
             let data_dir_str = data_dir.to_string_lossy().to_string();
 
             // Resolve the bundled onedir backend executable from the resource dir.
-            // In `tauri dev` this resolves to src-tauri/binaries/axiom-backend/…;
+            // In `tauri dev` this resolves to src-tauri/binaries/econosift-backend/…;
             // in a bundled build it resolves inside the app's resource directory.
             // PyInstaller only adds the .exe suffix on Windows.
-            let exe_name = if cfg!(windows) { "axiom-backend.exe" } else { "axiom-backend" };
+            let exe_name = if cfg!(windows) { "econosift-backend.exe" } else { "econosift-backend" };
             let backend_exe = app
                 .path()
                 .resolve(
-                    format!("binaries/axiom-backend/{exe_name}"),
+                    format!("binaries/econosift-backend/{exe_name}"),
                     BaseDirectory::Resource,
                 )
                 .expect("Failed to resolve backend executable path");
 
-            // Spawn the Python backend as a child process. Pass AXIOM_DATA_DIR
+            // Spawn the Python backend as a child process. Pass ECONOSIFT_DATA_DIR
             // explicitly on the command — the shell plugin does not inherit env
             // vars set via std::env::set_var at runtime, so without this the
             // backend falls back to a CWD-relative ./data and its SQLite DB /
@@ -77,13 +85,13 @@ pub fn run() {
             let (_rx, child) = app
                 .shell()
                 .command(backend_exe)
-                .env("AXIOM_DATA_DIR", &data_dir_str)
+                .env("ECONOSIFT_DATA_DIR", &data_dir_str)
                 .spawn()
                 .expect("Failed to spawn backend process");
 
             // Stash the child so it can be killed on exit — dropping a
             // CommandChild does NOT terminate the underlying OS process, which
-            // is why axiom-backend.exe used to keep running after the app closed.
+            // is why econosift-backend.exe used to keep running after the app closed.
             *app.state::<BackendProcess>().0.lock().unwrap() = Some(child);
 
             // Wait for backend to be ready (non-blocking)
@@ -112,10 +120,10 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![get_app_data_dir])
         .build(tauri::generate_context!())
-        .expect("error while building Axiom Finance")
+        .expect("error while building EconoSift")
         .run(|app_handle, event| {
             // Kill the spawned backend on normal app exit (window close / quit).
-            // Force-killing axiom-finance.exe itself still orphans the backend —
+            // Force-killing econosift.exe itself still orphans the backend —
             // that requires OS-level process-group/job-object handling, which is
             // a separate, larger fix (see ACTIVE_ISSUES.md DESK-02).
             if let tauri::RunEvent::ExitRequested { .. } = event {

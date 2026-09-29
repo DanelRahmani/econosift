@@ -206,7 +206,7 @@ export interface ValModel {
 export type ValVerdict =
   | "Significantly Undervalued" | "Undervalued" | "Fairly Valued"
   | "Overvalued" | "Significantly Overvalued" | "Insufficient Data";
-export interface AxiomFairValue {
+export interface CompositeFairValue {
   value: number | null;
   upsidePct: number | null;
   verdict: ValVerdict;
@@ -219,7 +219,7 @@ export interface ValuationCore {
   wacc: WaccInfo;
   models: ValModel[];
   capmImplied: ValModel;
-  axiomFairValue: AxiomFairValue;
+  axiomFairValue: CompositeFairValue;
   asOf: string;
 }
 export interface Fundamentals {

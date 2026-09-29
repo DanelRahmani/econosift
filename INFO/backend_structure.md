@@ -1,4 +1,4 @@
-# Axiom Finance — Backend File Structure
+# EconoSift — Backend File Structure
 
 > **Last updated:** 2026-06-29 — reflects all phases through Phase 31.
 > Routers: 33 · Services: 68 · Tests: 568+
@@ -64,7 +64,7 @@ backend/
 │   │   ├── stability.py        # /api/stability/currency-crisis|banking — EWS models, KLR methodology
 │   │   ├── technicals.py       # /api/technicals — SMA, EMA, MACD, RSI, BB, Ichimoku, Fib, Pivot Points
 │   │   ├── treemap.py          # /api/treemap — S&P 500 / NDX / Dow squarified treemap
-│   │   ├── valuation.py        # /api/valuation/full|dcf|factors — 8-model + CAPM + Axiom Fair Value
+│   │   ├── valuation.py        # /api/valuation/full|dcf|factors — 8-model + CAPM + EconoSift Composite Fair Value
 │   │   ├── wiki.py             # /api/wiki/categories|terms|term — 410-term financial dictionary
 │   │   └── yield_curve.py      # /api/yield/curves|noise — spot curve, TIPS, breakevens, ACM term premium, curve-fit noise
 │   │
@@ -81,7 +81,7 @@ backend/
 │   │   │
 │   │   # --- Fundamentals & valuation ---
 │   │   ├── fundamentals.py          # Piotroski F-Score, Beneish M-Score, Ohlson O-Score, ROIC, CCC
-│   │   ├── valuation_engine.py      # 8-model valuation + Axiom composite fair value
+│   │   ├── valuation_engine.py      # 8-model valuation + EconoSift composite fair value
 │   │   ├── dcf_engine.py            # Two-stage DCF with terminal value, 3 scenarios, 7×7 sensitivity heatmap
 │   │   ├── discount_rates.py        # WACC, CAPM cost of equity, country-specific risk-free rate, ERP
 │   │   ├── analyst_service.py       # Analyst ratings + consensus price targets, earnings surprises, forward estimates

@@ -1,4 +1,4 @@
-# Axiom Finance — Feature Idea List
+# EconoSift — Feature Idea List
 
 > Last cleaned: 2026-06-30 — Phase 40 shipped (Navigation Reshuffle). All P3 items + nav reshuffle complete.
 > Remaining: 0 ideas. IDEA_LIST is fully delivered.

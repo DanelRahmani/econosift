@@ -80,10 +80,10 @@ export function currencySymbol(code: string | undefined): string {
   return CURRENCY_SYMBOLS[code] || `${code} `;
 }
 
-// Brand-led series palette: crimson first, then complementary hues that read
-// well on both light and dark Axiom backgrounds.
+// Brand-led series palette: navy, teal, and amber first, followed by
+// complementary hues that read well on both light and dark EconoSift surfaces.
 export const CHART_COLORS = [
-  "#c4394a", "#3b82f6", "#16a34a", "#ca8a04",
+  "#142A43", "#2F8F83", "#D99A36", "#3b82f6",
   "#0891b2", "#9333ea", "#ea580c", "#db2777",
 ];
 

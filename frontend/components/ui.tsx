@@ -194,8 +194,8 @@ export function ChartSkeleton({ height = "h-80" }: { height?: string }) {
 // from the active theme rather than relying on CSS variables in SVG.
 export function chartPalette(theme: "light" | "dark") {
   return theme === "dark"
-    ? { grid: "#2a2a30", axis: "#aeaeba", tooltipBg: "#1a1a1e", tooltipBorder: "#c4394a", tooltipText: "#f2f2f7" }
-    : { grid: "#e4e4ea", axis: "#8c8c96", tooltipBg: "#ffffff", tooltipBorder: "#6b0f1a", tooltipText: "#0f0f14" };
+    ? { grid: "#2a2a30", axis: "#aeaeba", tooltipBg: "#1a1a1e", tooltipBorder: "#2F8F83", tooltipText: "#f2f2f7" }
+    : { grid: "#e4e4ea", axis: "#8c8c96", tooltipBg: "#ffffff", tooltipBorder: "#142A43", tooltipText: "#0f0f14" };
 }
 
 export function chartTooltipStyle(theme: "light" | "dark" = "dark") {

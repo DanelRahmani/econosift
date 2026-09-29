@@ -8,8 +8,9 @@ import { Providers } from "@/components/providers";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 export const metadata: Metadata = {
-  title: "Axiom Finance",
-  description: "Multi-asset financial analytics dashboard",
+  title: "EconoSift",
+  description: "Self-hosted macroeconomic and investment research workspace",
+  icons: { icon: "/econosift-icon.png" },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

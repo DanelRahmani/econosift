@@ -1,6 +1,6 @@
 {
   "identifier": "default",
-  "description": "Default capabilities for Axiom Finance",
+  "description": "Default capabilities for EconoSift",
   "windows": ["main"],
   "permissions": [
     "core:default",
@@ -19,6 +19,7 @@
     {
       "identifier": "fs:scope",
       "allow": [
+        { "path": "$APPDATA/EconoSift/**" },
         { "path": "$APPDATA/AxiomFinance/**" }
       ]
     }

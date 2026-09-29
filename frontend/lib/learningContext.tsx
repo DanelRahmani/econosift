@@ -2,7 +2,8 @@
 
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
 
-const LS_KEY = "axiom_beginner_mode";
+const LS_KEY = "econosift_beginner_mode";
+const LEGACY_LS_KEY = "axiom_beginner_mode";
 
 interface LearningContextType {
   isBeginnerMode: boolean;
@@ -23,7 +24,8 @@ export function LearningProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     try {
-      const stored = localStorage.getItem(LS_KEY);
+      const stored = localStorage.getItem(LS_KEY) ?? localStorage.getItem(LEGACY_LS_KEY);
+      if (stored !== null && !localStorage.getItem(LS_KEY)) localStorage.setItem(LS_KEY, stored);
       if (stored === "true") setIsBeginnerMode(true);
     } catch {
       // ignore

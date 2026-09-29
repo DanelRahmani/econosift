@@ -4,14 +4,17 @@ import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
 import type { Transaction, PnLSummary } from "@/lib/types";
 
-const LS_KEY = "axiom_transactions";
+const LS_KEY = "econosift_transactions";
+const LEGACY_LS_KEY = "axiom_transactions";
 
 function loadTransactions(): Transaction[] {
   try {
-    const raw = localStorage.getItem(LS_KEY);
+    const raw = localStorage.getItem(LS_KEY) ?? localStorage.getItem(LEGACY_LS_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw) as Transaction[];
-    return Array.isArray(parsed) ? parsed : [];
+    if (!Array.isArray(parsed)) return [];
+    if (!localStorage.getItem(LS_KEY)) localStorage.setItem(LS_KEY, JSON.stringify(parsed));
+    return parsed;
   } catch {
     return [];
   }
@@ -228,7 +231,7 @@ export function TransactionLog() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `axiom_transactions_${todayStr()}.json`;
+    a.download = `econosift_transactions_${todayStr()}.json`;
     a.click();
     URL.revokeObjectURL(url);
   }

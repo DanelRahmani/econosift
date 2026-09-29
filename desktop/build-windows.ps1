@@ -1,4 +1,4 @@
-# Build the Axiom Finance Windows desktop app end-to-end.
+# Build the EconoSift Windows desktop app end-to-end.
 #
 #   1. Freeze the FastAPI backend with PyInstaller (onedir)
 #   2. Stage it into the Tauri resources folder
@@ -13,7 +13,7 @@ $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot          # repo root
 $backend = Join-Path $root "backend"
 $desktop = Join-Path $root "desktop"
-$stage = Join-Path $desktop "src-tauri\binaries\axiom-backend"
+$stage = Join-Path $desktop "src-tauri\binaries\econosift-backend"
 
 Write-Host "==> [1/3] Freezing backend (PyInstaller onedir)..." -ForegroundColor Cyan
 Push-Location $backend
@@ -23,8 +23,8 @@ Pop-Location
 
 Write-Host "==> [2/3] Staging backend into Tauri resources..." -ForegroundColor Cyan
 if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
-Copy-Item (Join-Path $backend "dist\axiom-backend") $stage -Recurse -Force
-if (-not (Test-Path (Join-Path $stage "axiom-backend.exe"))) { throw "Backend exe not staged" }
+Copy-Item (Join-Path $backend "dist\econosift-backend") $stage -Recurse -Force
+if (-not (Test-Path (Join-Path $stage "econosift-backend.exe"))) { throw "Backend exe not staged" }
 
 Write-Host "==> [3/3] tauri build (frontend + Rust + NSIS)..." -ForegroundColor Cyan
 $env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"

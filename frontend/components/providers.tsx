@@ -52,7 +52,7 @@ function BackendGate({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-white dark:bg-neutral-950">
       <div className="text-2xl font-semibold tracking-tight text-neutral-900 dark:text-neutral-100">
-        Axiom <span className="text-red-600">Finance</span>
+        EconoSift <span className="text-red-600">Finance</span>
       </div>
       <div className="h-8 w-8 animate-spin rounded-full border-2 border-neutral-300 border-t-red-600" />
       <div className="text-sm text-neutral-500">Starting analysis engine…</div>

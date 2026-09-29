@@ -12,7 +12,7 @@ export interface ThemeColors {
 }
 
 /** Built-in brand defaults, shown in the picker when nothing is customised. */
-export const DEFAULT_COLORS: ThemeColors = { primary: "#6b0f1a", accent: "#c4394a" };
+export const DEFAULT_COLORS: ThemeColors = { primary: "#142A43", accent: "#2F8F83" };
 
 interface ThemeCtx {
   theme: Theme;
@@ -30,7 +30,10 @@ const Ctx = createContext<ThemeCtx>({
   resetColors: () => {},
 });
 
-const COLORS_KEY = "axiom-colors";
+const THEME_KEY = "econosift-theme";
+const LEGACY_THEME_KEY = "axiom-theme";
+const COLORS_KEY = "econosift-colors";
+const LEGACY_COLORS_KEY = "axiom-colors";
 
 /** "#6b0f1a" → "107 15 26" (the RGB-triplet form the CSS variables expect). */
 function hexToTriplet(hex: string): string | null {
@@ -62,10 +65,18 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     const current = document.documentElement.classList.contains("dark") ? "dark" : "light";
     setTheme(current);
     try {
-      const raw = localStorage.getItem(COLORS_KEY);
+      const raw = localStorage.getItem(COLORS_KEY) ?? localStorage.getItem(LEGACY_COLORS_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
         if (parsed && parsed.primary && parsed.accent) {
+          const isFormerDefault = parsed.primary.toLowerCase() === "#6b0f1a" && parsed.accent.toLowerCase() === "#c4394a";
+          if (isFormerDefault) {
+            localStorage.removeItem(COLORS_KEY);
+            setColorsState(null);
+            applyColors(null);
+            return;
+          }
+          if (!localStorage.getItem(COLORS_KEY)) localStorage.setItem(COLORS_KEY, raw);
           setColorsState(parsed);
           applyColors(parsed); // init script also applies this pre-paint
         }
@@ -79,7 +90,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     const root = document.documentElement;
     root.classList.toggle("dark", next === "dark");
     try {
-      localStorage.setItem("axiom-theme", next);
+      localStorage.setItem(THEME_KEY, next);
     } catch {
       /* ignore */
     }
@@ -125,7 +136,7 @@ export function useTheme() {
 export const themeInitScript = `
 (function() {
   try {
-    var t = localStorage.getItem('axiom-theme');
+    var t = localStorage.getItem('econosift-theme') || localStorage.getItem('axiom-theme');
     if (!t) t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
     if (t === 'dark') document.documentElement.classList.add('dark');
     else document.documentElement.classList.remove('dark');
@@ -133,9 +144,13 @@ export const themeInitScript = `
     document.documentElement.classList.add('dark');
   }
   try {
-    var c = localStorage.getItem('axiom-colors');
+    var c = localStorage.getItem('econosift-colors') || localStorage.getItem('axiom-colors');
     if (c) {
       var o = JSON.parse(c);
+      if (String(o.primary).toLowerCase() === '#6b0f1a' && String(o.accent).toLowerCase() === '#c4394a') {
+        localStorage.removeItem('econosift-colors');
+        return;
+      }
       var trip = function (h) {
         if (!h) return null;
         var m = /^#?([0-9a-fA-F]{6})$/.exec(('' + h).trim());

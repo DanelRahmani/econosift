@@ -1,4 +1,4 @@
-// ── Axiom Finance Wiki — Financial Terms Dictionary ──
+// ── EconoSift Wiki — Financial Terms Dictionary ──
 // Static data: ~300 terms across 26 categories, each with a 3-5 sentence
 // detailed explanation.  No API required — all search/filter is client-side.
 
@@ -162,7 +162,7 @@ export const TERMS: WikiTerm[] = [
     term: "ETF (Exchange-Traded Fund)",
     category: "indices",
     definition:
-      "An ETF is a pooled investment vehicle that trades on an exchange like a stock, but holds a basket of assets like a mutual fund. ETFs can track indices (passive) or be actively managed. They offer intraday liquidity, transparency of holdings, and generally lower expense ratios than mutual funds. The creation/redemption mechanism involving authorised participants keeps ETF prices close to their net asset value (NAV). Examples at Axiom include SPY, QQQ, AGG, DIA, and the sector SPDR suite (XLK, XLF, etc.).",
+      "An ETF is a pooled investment vehicle that trades on an exchange like a stock, but holds a basket of assets like a mutual fund. ETFs can track indices (passive) or be actively managed. They offer intraday liquidity, transparency of holdings, and generally lower expense ratios than mutual funds. The creation/redemption mechanism involving authorised participants keeps ETF prices close to their net asset value (NAV). Examples at EconoSift include SPY, QQQ, AGG, DIA, and the sector SPDR suite (XLK, XLF, etc.).",
     related: ["spy", "qqq", "agg", "spdr-sector-etfs"],
   },
 
@@ -418,7 +418,7 @@ export const TERMS: WikiTerm[] = [
     term: "DCF (Discounted Cash Flow)",
     category: "valuation",
     definition:
-      "Discounted Cash Flow is an intrinsic valuation method that estimates the value of an investment based on its expected future cash flows, discounted back to present value using a required rate of return. The core principle is that a dollar tomorrow is worth less than a dollar today due to the time value of money and risk. In a two-stage DCF — the most common variant used on Axiom — cash flows are projected explicitly for a high-growth period (Stage 1, typically 5 years) and then a terminal value captures all cash flows beyond that using a perpetual growth assumption. DCF is considered the most theoretically sound valuation approach, but its output is highly sensitive to assumptions about growth rates and discount rates.",
+      "Discounted Cash Flow is an intrinsic valuation method that estimates the value of an investment based on its expected future cash flows, discounted back to present value using a required rate of return. The core principle is that a dollar tomorrow is worth less than a dollar today due to the time value of money and risk. In a two-stage DCF — the most common variant used on EconoSift — cash flows are projected explicitly for a high-growth period (Stage 1, typically 5 years) and then a terminal value captures all cash flows beyond that using a perpetual growth assumption. DCF is considered the most theoretically sound valuation approach, but its output is highly sensitive to assumptions about growth rates and discount rates.",
     related: ["two-stage-dcf", "wacc", "terminal-growth-rate", "intrinsic-value", "fcf"],
   },
   {
@@ -466,7 +466,7 @@ export const TERMS: WikiTerm[] = [
     term: "CAPM Implied Return",
     category: "valuation",
     definition:
-      "The CAPM implied return is the expected annual return for a stock derived from the CAPM formula, given its beta, the current risk-free rate, and the equity risk premium. It represents what the market 'should' demand to hold the stock, not what it will actually deliver. At Axiom, this is displayed as one of the valuation models in the 8-model engine and compared against the stock's current valuation to gauge whether expected returns justify the price.",
+      "The CAPM implied return is the expected annual return for a stock derived from the CAPM formula, given its beta, the current risk-free rate, and the equity risk premium. It represents what the market 'should' demand to hold the stock, not what it will actually deliver. At EconoSift, this is displayed as one of the valuation models in the 8-model engine and compared against the stock's current valuation to gauge whether expected returns justify the price.",
     related: ["capm", "cost-of-equity", "expected-return", "axiom-fair-value"],
   },
   {
@@ -482,7 +482,7 @@ export const TERMS: WikiTerm[] = [
     term: "DDM (Dividend Discount Model)",
     category: "valuation",
     definition:
-      "The Dividend Discount Model values a stock as the sum of all expected future dividends, discounted back to present value at the required rate of return. The simplest form is the Gordon Growth Model (constant growth), but multi-stage DDMs allow for varying growth phases. DDM is theoretically elegant — a stock's value is ultimately the present value of the cash it returns to shareholders — but it is impractical for companies that do not pay dividends or have unpredictable dividend policies. At Axiom, DDM is one of the 8 valuation models in the composite valuation engine.",
+      "The Dividend Discount Model values a stock as the sum of all expected future dividends, discounted back to present value at the required rate of return. The simplest form is the Gordon Growth Model (constant growth), but multi-stage DDMs allow for varying growth phases. DDM is theoretically elegant — a stock's value is ultimately the present value of the cash it returns to shareholders — but it is impractical for companies that do not pay dividends or have unpredictable dividend policies. At EconoSift, DDM is one of the 8 valuation models in the composite valuation engine.",
     related: ["gordon-growth-model", "dcf", "dividend-yield", "axiom-fair-value"],
   },
   {
@@ -522,7 +522,7 @@ export const TERMS: WikiTerm[] = [
     term: "Intrinsic Value",
     category: "valuation",
     definition:
-      "Intrinsic value is the estimated true per-share worth of a stock based on fundamental analysis — what a rational investor 'should' pay, independent of the current market price. Different models produce different intrinsic value estimates, which is why Axiom aggregates 8 models into an Axiom Fair Value composite. The gap between intrinsic value and market price is the upside/downside percentage. Warren Buffett popularised the concept, defining intrinsic value as 'the discounted value of the cash that can be taken out of a business during its remaining life.'",
+      "Intrinsic value is the estimated true per-share worth of a stock based on fundamental analysis — what a rational investor 'should' pay, independent of the current market price. Different models produce different intrinsic value estimates, which is why EconoSift aggregates 8 models into a composite fair value estimate. The gap between intrinsic value and market price is the upside/downside percentage. Warren Buffett popularised the concept, defining intrinsic value as 'the discounted value of the cash that can be taken out of a business during its remaining life.'",
     related: ["axiom-fair-value", "dcf", "upside-downside", "fair-value"],
   },
   {
@@ -538,7 +538,7 @@ export const TERMS: WikiTerm[] = [
     term: "Fair Value / Fairly Valued",
     category: "valuation",
     definition:
-      "A stock is considered 'fairly valued' when its market price is approximately in line with its estimated intrinsic value — typically defined as within ±10% of the intrinsic value estimate. This implies the market is efficiently pricing the company based on available information. Fair value is not a permanent state; new information, earnings reports, or macro shifts can rapidly move a stock from fairly valued to under- or overvalued. Axiom's Axiom Fair Value composite provides a weighted-average fair value estimate from 8 models plus CAPM.",
+      "A stock is considered 'fairly valued' when its market price is approximately in line with its estimated intrinsic value — typically defined as within ±10% of the intrinsic value estimate. This implies the market is efficiently pricing the company based on available information. Fair value is not a permanent state; new information, earnings reports, or macro shifts can rapidly move a stock from fairly valued to under- or overvalued. EconoSift's composite fair value estimate provides a weighted-average fair value estimate from 8 models plus CAPM.",
     related: ["intrinsic-value", "axiom-fair-value", "undervalued", "overvalued"],
   },
   {
@@ -546,7 +546,7 @@ export const TERMS: WikiTerm[] = [
     term: "Undervalued",
     category: "valuation",
     definition:
-      "A stock is undervalued when its market price trades below its estimated intrinsic value, suggesting the market is not fully recognising the company's worth. On Axiom, this is typically defined as intrinsic value > 110% of market price (more than 10% upside). Value investors seek undervalued stocks, believing the market will eventually correct the mispricing. However, stocks can remain undervalued for extended periods; a catalyst — such as an earnings beat, buyback announcement, or macro shift — is often needed to close the gap.",
+      "A stock is undervalued when its market price trades below its estimated intrinsic value, suggesting the market is not fully recognising the company's worth. On EconoSift, this is typically defined as intrinsic value > 110% of market price (more than 10% upside). Value investors seek undervalued stocks, believing the market will eventually correct the mispricing. However, stocks can remain undervalued for extended periods; a catalyst — such as an earnings beat, buyback announcement, or macro shift — is often needed to close the gap.",
     related: ["overvalued", "fair-value", "intrinsic-value", "axiom-fair-value"],
   },
   {
@@ -554,15 +554,15 @@ export const TERMS: WikiTerm[] = [
     term: "Overvalued",
     category: "valuation",
     definition:
-      "A stock is overvalued when its market price exceeds its estimated intrinsic value, typically by more than 10%. This can result from excessive optimism, momentum buying, or a deterioration in fundamentals that the market has not yet priced in. Overvalued stocks are candidates for selling or shorting, though timing is difficult — overvalued stocks can become even more overvalued in the short term. Axiom flags overvalued stocks through its 8-model valuation engine, with the Axiom Fair Value composite providing the summary verdict.",
+      "A stock is overvalued when its market price exceeds its estimated intrinsic value, typically by more than 10%. This can result from excessive optimism, momentum buying, or a deterioration in fundamentals that the market has not yet priced in. Overvalued stocks are candidates for selling or shorting, though timing is difficult — overvalued stocks can become even more overvalued in the short term. EconoSift flags overvalued stocks through its 8-model valuation engine, with the composite fair value estimate providing the summary verdict.",
     related: ["undervalued", "fair-value", "intrinsic-value", "axiom-fair-value"],
   },
   {
     slug: "axiom-fair-value",
-    term: "Axiom Fair Value",
+    term: "EconoSift Composite Fair Value",
     category: "valuation",
     definition:
-      "Axiom Fair Value is the weighted-average composite valuation from Axiom's 8-model engine plus the CAPM implied return model. Each model's output is weighted (configurable by the user's trust in each methodology), and the weighted average is compared against the current market price to produce the upside/downside percentage and a verdict — from 'Significantly Undervalued' to 'Significantly Overvalued.' The composite is designed to be more robust than any single model by diversifying across valuation philosophies: discounted cash flow, relative multiples, dividend-based, and risk-based approaches.",
+      "EconoSift Composite Fair Value is the weighted-average composite valuation from EconoSift's 8-model engine plus the CAPM implied return model. Each model's output is weighted (configurable by the user's trust in each methodology), and the weighted average is compared against the current market price to produce the upside/downside percentage and a verdict — from 'Significantly Undervalued' to 'Significantly Overvalued.' The composite is designed to be more robust than any single model by diversifying across valuation philosophies: discounted cash flow, relative multiples, dividend-based, and risk-based approaches.",
     related: ["intrinsic-value", "valuation-engine", "upside-downside", "fair-value"],
   },
   {
@@ -578,7 +578,7 @@ export const TERMS: WikiTerm[] = [
     term: "8-Model Valuation Engine",
     category: "valuation",
     definition:
-      "Axiom's 8-Model Valuation Engine is a suite of 8 distinct valuation methodologies — including DCF, DDM, GGM, relative multiples (P/E, EV/EBITDA, P/B, P/S), and FCF yield — plus the CAPM implied return, aggregated into a composite Axiom Fair Value. Each model is independently computed; if an input is missing (e.g., no dividends for DDM), that model is 'locked' and excluded from the composite. The engine provides a diversified valuation view, reducing reliance on any single methodology's assumptions.",
+      "EconoSift's 8-Model Valuation Engine is a suite of 8 distinct valuation methodologies — including DCF, DDM, GGM, relative multiples (P/E, EV/EBITDA, P/B, P/S), and FCF yield — plus the CAPM implied return, aggregated into a composite EconoSift Composite Fair Value. Each model is independently computed; if an input is missing (e.g., no dividends for DDM), that model is 'locked' and excluded from the composite. The engine provides a diversified valuation view, reducing reliance on any single methodology's assumptions.",
     related: ["axiom-fair-value", "dcf", "ddm", "gordon-growth-model", "locked-model"],
   },
   {
@@ -586,7 +586,7 @@ export const TERMS: WikiTerm[] = [
     term: "Locked Model",
     category: "valuation",
     definition:
-      "A locked model is a valuation model within the 8-model engine that could not be computed because one or more required inputs were missing or invalid. For example, the DDM locks if the company does not pay a dividend, and the DCF locks if free cash flow data is unavailable. Locked models are excluded from the Axiom Fair Value composite so they do not distort the final estimate. Axiom displays which models are locked and the reason why, ensuring transparency.",
+      "A locked model is a valuation model within the 8-model engine that could not be computed because one or more required inputs were missing or invalid. For example, the DDM locks if the company does not pay a dividend, and the DCF locks if free cash flow data is unavailable. Locked models are excluded from the composite fair value estimate so they do not distort the final estimate. EconoSift displays which models are locked and the reason why, ensuring transparency.",
     related: ["valuation-engine", "axiom-fair-value", "dcf", "ddm"],
   },
   {
@@ -686,7 +686,7 @@ export const TERMS: WikiTerm[] = [
     term: "Dividend Yield",
     category: "ratios",
     definition:
-      "Dividend yield is the annual dividend per share divided by the stock price, expressed as a percentage. It represents the cash return an investor receives from dividends alone, independent of capital appreciation. A high dividend yield can signal value — or it can signal distress if the stock price has fallen and the dividend is at risk of being cut. Sustainable dividend yield should be assessed against the payout ratio and free cash flow coverage. On Axiom, the dividend yield shown is corrected for yfinance's occasionally mis-scaled raw data.",
+      "Dividend yield is the annual dividend per share divided by the stock price, expressed as a percentage. It represents the cash return an investor receives from dividends alone, independent of capital appreciation. A high dividend yield can signal value — or it can signal distress if the stock price has fallen and the dividend is at risk of being cut. Sustainable dividend yield should be assessed against the payout ratio and free cash flow coverage. On EconoSift, the dividend yield shown is corrected for yfinance's occasionally mis-scaled raw data.",
     related: ["payout-ratio", "fcf-yield", "ddm", "gordon-growth-model"],
   },
   {
@@ -710,7 +710,7 @@ export const TERMS: WikiTerm[] = [
     term: "ROIC (Return on Invested Capital)",
     category: "ratios",
     definition:
-      "ROIC = NOPAT / Invested Capital, where Invested Capital = Total Debt + Equity − Cash. It is the most comprehensive profitability metric — it measures how efficiently a company allocates capital to generate returns above its cost of capital. A company with ROIC > WACC is creating value; ROIC < WACC is destroying value. ROIC is central to Axiom's quality growth screening preset and is considered by many professional investors to be the single most important measure of business quality.",
+      "ROIC = NOPAT / Invested Capital, where Invested Capital = Total Debt + Equity − Cash. It is the most comprehensive profitability metric — it measures how efficiently a company allocates capital to generate returns above its cost of capital. A company with ROIC > WACC is creating value; ROIC < WACC is destroying value. ROIC is central to EconoSift's quality growth screening preset and is considered by many professional investors to be the single most important measure of business quality.",
     related: ["nopat", "wacc", "roe", "invested-capital"],
   },
   {
@@ -902,7 +902,7 @@ export const TERMS: WikiTerm[] = [
     term: "Volume Ratio",
     category: "ratios",
     definition:
-      "Volume Ratio = Current Day's Volume / Average Daily Volume. A ratio above 2.0 indicates 'unusual volume' — trading activity significantly above normal levels, often associated with earnings releases, news events, or institutional accumulation/distribution. It is a popular screener criterion because unusual volume often precedes significant price moves. The Axiom screener includes an Unusual Volume preset that flags stocks with volume > 2× the 20-day average.",
+      "Volume Ratio = Current Day's Volume / Average Daily Volume. A ratio above 2.0 indicates 'unusual volume' — trading activity significantly above normal levels, often associated with earnings releases, news events, or institutional accumulation/distribution. It is a popular screener criterion because unusual volume often precedes significant price moves. The EconoSift screener includes an Unusual Volume preset that flags stocks with volume > 2× the 20-day average.",
     related: ["average-volume", "short-ratio", "obv"],
   },
 
@@ -946,7 +946,7 @@ export const TERMS: WikiTerm[] = [
     term: "Beta (β)",
     category: "risk",
     definition:
-      "Beta measures a stock's systematic risk — its sensitivity to movements in the overall market. A beta of 1.0 means the stock tends to move in lockstep with the market; beta > 1 implies amplification (a 1% market move translates to >1% stock move); beta < 1 implies dampening. Beta is the key input in CAPM and is calculated by regressing the stock's returns against the benchmark's returns. Beta is not static — it varies over time and with different lookback periods, which is why Axiom provides rolling beta metrics.",
+      "Beta measures a stock's systematic risk — its sensitivity to movements in the overall market. A beta of 1.0 means the stock tends to move in lockstep with the market; beta > 1 implies amplification (a 1% market move translates to >1% stock move); beta < 1 implies dampening. Beta is the key input in CAPM and is calculated by regressing the stock's returns against the benchmark's returns. Beta is not static — it varies over time and with different lookback periods, which is why EconoSift provides rolling beta metrics.",
     related: ["alpha", "capm", "systematic-risk", "r-squared", "sharpe-ratio"],
   },
   {
@@ -1042,7 +1042,7 @@ export const TERMS: WikiTerm[] = [
     term: "Rolling Metrics",
     category: "risk",
     definition:
-      "Rolling metrics compute risk statistics (volatility, beta, Sharpe, VaR, drawdown) over a sliding window — typically 20D, 60D, 120D, or 252D — that advances one period at a time. This produces a time series of each metric, revealing how risk has evolved rather than just a single point-in-time number. For example, rolling 60-day beta shows when a stock became more or less market-sensitive over time. Axiom's Risk page provides rolling metrics across multiple windows for any ticker.",
+      "Rolling metrics compute risk statistics (volatility, beta, Sharpe, VaR, drawdown) over a sliding window — typically 20D, 60D, 120D, or 252D — that advances one period at a time. This produces a time series of each metric, revealing how risk has evolved rather than just a single point-in-time number. For example, rolling 60-day beta shows when a stock became more or less market-sensitive over time. EconoSift's Risk page provides rolling metrics across multiple windows for any ticker.",
     related: ["beta", "annualised-volatility", "sharpe-ratio", "var"],
   },
   {
@@ -1050,7 +1050,7 @@ export const TERMS: WikiTerm[] = [
     term: "Correlation Matrix",
     category: "risk",
     definition:
-      "A correlation matrix is a table showing pairwise Pearson correlation coefficients between all assets in a portfolio, with values ranging from −1 (perfectly opposite) to +1 (perfectly together). It is the foundational input for portfolio diversification — assets with low or negative correlations provide greater diversification benefits. Correlations are not stable: they tend to rise during crises (the 'correlation to one' phenomenon), precisely when diversification is most needed. Axiom's Risk page provides a visual colour-coded correlation heatmap.",
+      "A correlation matrix is a table showing pairwise Pearson correlation coefficients between all assets in a portfolio, with values ranging from −1 (perfectly opposite) to +1 (perfectly together). It is the foundational input for portfolio diversification — assets with low or negative correlations provide greater diversification benefits. Correlations are not stable: they tend to rise during crises (the 'correlation to one' phenomenon), precisely when diversification is most needed. EconoSift's Risk page provides a visual colour-coded correlation heatmap.",
     related: ["pearson-correlation", "diversification", "efficient-frontier", "cointegration"],
   },
   {
@@ -1090,7 +1090,7 @@ export const TERMS: WikiTerm[] = [
     term: "Forecast Vol (GARCH)",
     category: "risk",
     definition:
-      "Forecast volatility from a GARCH model is the one-step-ahead conditional volatility prediction — the model's best estimate of tomorrow's volatility given today's information. It is forward-looking, unlike historical volatility which is purely backward-looking. GARCH forecasts adapt quickly to market conditions: a large price move today pushes tomorrow's forecast up automatically. At Axiom, GARCH forecasts are computed on the Risk page via the 🟡 Calculate button.",
+      "Forecast volatility from a GARCH model is the one-step-ahead conditional volatility prediction — the model's best estimate of tomorrow's volatility given today's information. It is forward-looking, unlike historical volatility which is purely backward-looking. GARCH forecasts adapt quickly to market conditions: a large price move today pushes tomorrow's forecast up automatically. At EconoSift, GARCH forecasts are computed on the Risk page via the 🟡 Calculate button.",
     related: ["garch", "volatility", "var", "options-iv"],
   },
   {
@@ -1106,7 +1106,7 @@ export const TERMS: WikiTerm[] = [
     term: "Ornstein-Uhlenbeck (OU) Process",
     category: "risk",
     definition:
-      "The Ornstein-Uhlenbeck process is a mean-reverting stochastic process widely used in pairs trading and interest-rate modelling. It has three parameters: theta (mean-reversion speed), mu (long-run mean), and sigma (volatility). The half-life — the time for a deviation to revert halfway to the mean — is ln(2)/theta. Pairs with short half-lives (a few days) are good candidates for mean-reversion strategies. Axiom's Risk page fits OU processes to pairs and reports the parameters.",
+      "The Ornstein-Uhlenbeck process is a mean-reverting stochastic process widely used in pairs trading and interest-rate modelling. It has three parameters: theta (mean-reversion speed), mu (long-run mean), and sigma (volatility). The half-life — the time for a deviation to revert halfway to the mean — is ln(2)/theta. Pairs with short half-lives (a few days) are good candidates for mean-reversion strategies. EconoSift's Risk page fits OU processes to pairs and reports the parameters.",
     related: ["cointegration", "hurst", "half-life", "theta-ou", "mu-ou"],
   },
   {
@@ -1170,7 +1170,7 @@ export const TERMS: WikiTerm[] = [
     term: "Stress Testing",
     category: "risk",
     definition:
-      "Stress testing replays a portfolio through an actual historical crisis period — such as the 2008 Financial Crisis, the 2020 COVID crash, the 2022 rate-hike cycle, or the dot-com bust — to see how it would have performed. Unlike statistical models, stress tests use real data from extreme events, capturing correlations and liquidity dynamics that models miss. Axiom offers four historical stress scenarios on the Risk page via the 🟡 Calculate button.",
+      "Stress testing replays a portfolio through an actual historical crisis period — such as the 2008 Financial Crisis, the 2020 COVID crash, the 2022 rate-hike cycle, or the dot-com bust — to see how it would have performed. Unlike statistical models, stress tests use real data from extreme events, capturing correlations and liquidity dynamics that models miss. EconoSift offers four historical stress scenarios on the Risk page via the 🟡 Calculate button.",
     related: ["var", "cvar", "monte-carlo-risk", "maximum-drawdown"],
   },
 
@@ -1198,7 +1198,7 @@ export const TERMS: WikiTerm[] = [
     term: "IV Percentile",
     category: "options",
     definition:
-      "IV Percentile is the percentage of trading days over the past year when IV was below the current level. An IV Percentile of 85 means IV has been lower than today's level on 85% of days — options are expensive relative to recent history. IV Percentile is similar to IV Rank but less sensitive to outliers because it is based on count rather than range. Both are displayed on Axiom's Options page.",
+      "IV Percentile is the percentage of trading days over the past year when IV was below the current level. An IV Percentile of 85 means IV has been lower than today's level on 85% of days — options are expensive relative to recent history. IV Percentile is similar to IV Rank but less sensitive to outliers because it is based on count rather than range. Both are displayed on EconoSift's Options page.",
     related: ["iv-rank", "implied-volatility"],
   },
   {
@@ -1326,7 +1326,7 @@ export const TERMS: WikiTerm[] = [
     term: "CRR (Cox-Ross-Rubinstein) Binomial Tree",
     category: "options",
     definition:
-      "The CRR binomial tree is a discrete-time option pricing model that builds a tree of possible future prices over the option's life, then works backward from expiration to calculate the option's present value. Unlike Black-Scholes, it can handle American-style (early-exercise) options and dividends. Each step splits into an up-move and down-move, with probabilities calibrated to match the risk-neutral world. Axiom uses the CRR model to price American options alongside the Black-Scholes benchmark.",
+      "The CRR binomial tree is a discrete-time option pricing model that builds a tree of possible future prices over the option's life, then works backward from expiration to calculate the option's present value. Unlike Black-Scholes, it can handle American-style (early-exercise) options and dividends. Each step splits into an up-move and down-move, with probabilities calibrated to match the risk-neutral world. EconoSift uses the CRR model to price American options alongside the Black-Scholes benchmark.",
     related: ["black-scholes", "american-option", "monte-carlo-options"],
   },
   {
@@ -1334,7 +1334,7 @@ export const TERMS: WikiTerm[] = [
     term: "Brent's Method (IV Backsolve)",
     category: "options",
     definition:
-      "Brent's method is a robust numerical root-finding algorithm used to back-solve implied volatility from an option's market price. Because the Black-Scholes formula cannot be inverted algebraically for volatility, an iterative search is required. Brent's method combines bisection, secant, and inverse quadratic interpolation for rapid and reliable convergence. This is the standard algorithm for IV backsolve and is used by Axiom's options engine.",
+      "Brent's method is a robust numerical root-finding algorithm used to back-solve implied volatility from an option's market price. Because the Black-Scholes formula cannot be inverted algebraically for volatility, an iterative search is required. Brent's method combines bisection, secant, and inverse quadratic interpolation for rapid and reliable convergence. This is the standard algorithm for IV backsolve and is used by EconoSift's options engine.",
     related: ["implied-volatility", "black-scholes", "iv-backsolve"],
   },
   {
@@ -1350,7 +1350,7 @@ export const TERMS: WikiTerm[] = [
     term: "IV Term Structure",
     category: "options",
     definition:
-      "The IV term structure shows implied volatility across different expiration dates for the same (usually ATM) strike. Normally, longer-dated options have higher IV because uncertainty increases with time. An inverted term structure — near-term IV higher than longer-term IV — signals acute near-term fear, common around earnings or crisis events. The shape of the term structure is a powerful sentiment and event-risk indicator. Axiom's Options page plots the full term structure.",
+      "The IV term structure shows implied volatility across different expiration dates for the same (usually ATM) strike. Normally, longer-dated options have higher IV because uncertainty increases with time. An inverted term structure — near-term IV higher than longer-term IV — signals acute near-term fear, common around earnings or crisis events. The shape of the term structure is a powerful sentiment and event-risk indicator. EconoSift's Options page plots the full term structure.",
     related: ["iv-smile", "implied-volatility", "expiry", "contango-backwardation"],
   },
   {
@@ -1358,7 +1358,7 @@ export const TERMS: WikiTerm[] = [
     term: "Options Chain",
     category: "options",
     definition:
-      "An options chain is a table listing all available call and put options for a given ticker and expiration date, showing strike, bid, ask, last price, volume, open interest, and implied volatility for each. It is the primary interface for options trading. Axiom's Options page displays the full chain with calculated Greeks and allows filtering by moneyness range.",
+      "An options chain is a table listing all available call and put options for a given ticker and expiration date, showing strike, bid, ask, last price, volume, open interest, and implied volatility for each. It is the primary interface for options trading. EconoSift's Options page displays the full chain with calculated Greeks and allows filtering by moneyness range.",
     related: ["open-interest", "oi-profile", "implied-volatility", "delta", "expiry"],
   },
   {
@@ -1366,7 +1366,7 @@ export const TERMS: WikiTerm[] = [
     term: "Monte Carlo Options Pricing",
     category: "options",
     definition:
-      "Monte Carlo option pricing simulates thousands of random price paths for the underlying, calculates the option payoff for each path, and averages the discounted payoffs to estimate the option's fair value. It is more flexible than Black-Scholes or binomial trees — it can handle path-dependent (exotic) options, stochastic volatility, and complex payoff structures. The trade-off is computational cost: many simulations are needed for precise estimates. Axiom uses Monte Carlo for options pricing via the 🔴 Run Analysis button.",
+      "Monte Carlo option pricing simulates thousands of random price paths for the underlying, calculates the option payoff for each path, and averages the discounted payoffs to estimate the option's fair value. It is more flexible than Black-Scholes or binomial trees — it can handle path-dependent (exotic) options, stochastic volatility, and complex payoff structures. The trade-off is computational cost: many simulations are needed for precise estimates. EconoSift uses Monte Carlo for options pricing via the 🔴 Run Analysis button.",
     related: ["black-scholes", "crr-binomial", "monte-carlo-risk"],
   },
   {
@@ -1382,7 +1382,7 @@ export const TERMS: WikiTerm[] = [
     term: "OI Profile",
     category: "options",
     definition:
-      "The OI (Open Interest) Profile is a chart showing the concentration of open interest across different strike prices. Peaks in the OI profile often act as support or resistance — large put OI at a strike can create a 'put wall' that supports price; large call OI can create a 'call wall' that caps price. The OI profile is used alongside max pain to gauge potential price magnets and barriers. Axiom's Options page plots the full OI profile.",
+      "The OI (Open Interest) Profile is a chart showing the concentration of open interest across different strike prices. Peaks in the OI profile often act as support or resistance — large put OI at a strike can create a 'put wall' that supports price; large call OI can create a 'call wall' that caps price. The OI profile is used alongside max pain to gauge potential price magnets and barriers. EconoSift's Options page plots the full OI profile.",
     related: ["open-interest", "max-pain", "put-call-oi-ratio", "options-chain"],
   },
 
@@ -1410,7 +1410,7 @@ export const TERMS: WikiTerm[] = [
     term: "GDP Per Capita",
     category: "macro",
     definition:
-      "GDP per capita is GDP divided by the country's population — a rough measure of average living standards and economic productivity. It is widely used for cross-country comparisons because it normalises for population size. However, it is an average that says nothing about inequality: a country can have high GDP per capita alongside widespread poverty. It is one of the six indicators on Axiom's Atlas page.",
+      "GDP per capita is GDP divided by the country's population — a rough measure of average living standards and economic productivity. It is widely used for cross-country comparisons because it normalises for population size. However, it is an average that says nothing about inequality: a country can have high GDP per capita alongside widespread poverty. It is one of the six indicators on EconoSift's Atlas page.",
     related: ["gdp", "atlas", "purchasing-power-parity"],
   },
   {
@@ -1498,7 +1498,7 @@ export const TERMS: WikiTerm[] = [
     term: "Sahm Rule",
     category: "macro",
     definition:
-      "The Sahm Rule — developed by economist Claudia Sahm — identifies the start of a recession when the three-month moving average of the unemployment rate rises by 0.50 percentage points or more above its low over the prior 12 months. It is simple, timely, and has accurately identified every US recession since 1970 with few false positives. It is used as a real-time recession indicator on Axiom's Macro page.",
+      "The Sahm Rule — developed by economist Claudia Sahm — identifies the start of a recession when the three-month moving average of the unemployment rate rises by 0.50 percentage points or more above its low over the prior 12 months. It is simple, timely, and has accurately identified every US recession since 1970 with few false positives. It is used as a real-time recession indicator on EconoSift's Macro page.",
     related: ["unemployment-rate", "recession", "nfp"],
   },
   {
@@ -1530,7 +1530,7 @@ export const TERMS: WikiTerm[] = [
     term: "Existing Home Sales",
     category: "macro",
     definition:
-      "Existing home sales measure the number of previously owned homes (single-family, condos, co-ops) sold during the month, reported at a seasonally adjusted annualised rate. It is the largest component of the US housing market (~90% of sales). Sales are sensitive to mortgage rates, employment, and consumer confidence. Axiom displays existing home sales on the Housing tab of the Macro page.",
+      "Existing home sales measure the number of previously owned homes (single-family, condos, co-ops) sold during the month, reported at a seasonally adjusted annualised rate. It is the largest component of the US housing market (~90% of sales). Sales are sensitive to mortgage rates, employment, and consumer confidence. EconoSift displays existing home sales on the Housing tab of the Macro page.",
     related: ["housing-starts", "mortgage-rate", "case-shiller"],
   },
   {
@@ -1678,7 +1678,7 @@ export const TERMS: WikiTerm[] = [
     term: "US Spot Curve",
     category: "yieldcurve",
     definition:
-      "The US spot curve shows current Treasury yields across the full maturity spectrum — typically 11 standard tenors from 1-month to 30-year. It is the 'live' yield curve, updated with each day's closing yields. Axiom's Yield page displays the US spot curve alongside foreign 10-year yields, TIPS real yields, and breakeven inflation rates.",
+      "The US spot curve shows current Treasury yields across the full maturity spectrum — typically 11 standard tenors from 1-month to 30-year. It is the 'live' yield curve, updated with each day's closing yields. EconoSift's Yield page displays the US spot curve alongside foreign 10-year yields, TIPS real yields, and breakeven inflation rates.",
     related: ["yield-curve", "treasury-yield", "foreign-10y", "tenor"],
   },
   {
@@ -1702,7 +1702,7 @@ export const TERMS: WikiTerm[] = [
     term: "HY OAS (High Yield Option-Adjusted Spread)",
     category: "yieldcurve",
     definition:
-      "The High Yield OAS is the spread of speculative-grade (junk) bonds over Treasuries. HY spreads are much wider and more volatile than IG spreads because default risk is significantly higher. HY OAS above 800–1,000 basis points historically signals recession fears or credit stress. It is a key component of Axiom's Financial Conditions monitoring.",
+      "The High Yield OAS is the spread of speculative-grade (junk) bonds over Treasuries. HY spreads are much wider and more volatile than IG spreads because default risk is significantly higher. HY OAS above 800–1,000 basis points historically signals recession fears or credit stress. It is a key component of EconoSift's Financial Conditions monitoring.",
     related: ["ig-oas", "bbb-spread", "credit-risk", "financial-conditions"],
   },
   {
@@ -1726,7 +1726,7 @@ export const TERMS: WikiTerm[] = [
     term: "Funding Spread",
     category: "yieldcurve",
     definition:
-      "A funding spread is the difference between a short-term funding rate (like SOFR, LIBOR, or commercial paper) and the risk-free benchmark (typically the T-bill rate or Fed Funds). Widening funding spreads signal stress in short-term funding markets and reduced liquidity. Axiom's Policy page tracks multiple funding spreads — SOFR-FF, CP spread, and the TED spread — to monitor financial system health.",
+      "A funding spread is the difference between a short-term funding rate (like SOFR, LIBOR, or commercial paper) and the risk-free benchmark (typically the T-bill rate or Fed Funds). Widening funding spreads signal stress in short-term funding markets and reduced liquidity. EconoSift's Policy page tracks multiple funding spreads — SOFR-FF, CP spread, and the TED spread — to monitor financial system health.",
     related: ["sofr", "fed-funds-rate", "ted-spread", "cp-spread"],
   },
   {
@@ -1734,7 +1734,7 @@ export const TERMS: WikiTerm[] = [
     term: "M2 Money Supply",
     category: "yieldcurve",
     definition:
-      "M2 is the broad measure of US money supply, encompassing cash, checking deposits, savings deposits, money market securities, and other near-money assets. It expanded dramatically during 2020–2021 due to pandemic stimulus, contributing to the subsequent inflation surge. The year-over-year change in M2 is tracked on Axiom's Funding & Liquidity tab as a gauge of monetary conditions and future inflation pressure.",
+      "M2 is the broad measure of US money supply, encompassing cash, checking deposits, savings deposits, money market securities, and other near-money assets. It expanded dramatically during 2020–2021 due to pandemic stimulus, contributing to the subsequent inflation surge. The year-over-year change in M2 is tracked on EconoSift's Funding & Liquidity tab as a gauge of monetary conditions and future inflation pressure.",
     related: ["m2-yoy", "inflation", "quantity-theory", "fed-balance-sheet"],
   },
 
@@ -1746,7 +1746,7 @@ export const TERMS: WikiTerm[] = [
     term: "Central Bank",
     category: "centralbanks",
     definition:
-      "A central bank is a national institution responsible for managing a country's currency, money supply, and interest rates. Its primary mandates typically include price stability (controlling inflation) and often maximum employment (the Fed's 'dual mandate'). Central banks conduct monetary policy by setting short-term policy rates, conducting open market operations, and sometimes quantitative easing/tightening. Seven major central banks — the Fed, ECB, BoE, BoJ, BoC, RBA, and SNB — are tracked on Axiom's Central Banks tab.",
+      "A central bank is a national institution responsible for managing a country's currency, money supply, and interest rates. Its primary mandates typically include price stability (controlling inflation) and often maximum employment (the Fed's 'dual mandate'). Central banks conduct monetary policy by setting short-term policy rates, conducting open market operations, and sometimes quantitative easing/tightening. Seven major central banks — the Fed, ECB, BoE, BoJ, BoC, RBA, and SNB — are tracked on EconoSift's Central Banks tab.",
     related: ["fed", "ecb", "policy-rate", "monetary-policy"],
   },
   {
@@ -1770,7 +1770,7 @@ export const TERMS: WikiTerm[] = [
     term: "Policy Rate",
     category: "centralbanks",
     definition:
-      "The policy rate is the key interest rate set by a central bank to influence economic activity and inflation. It is the rate at which the central bank lends to commercial banks or the target for overnight interbank lending. Changes in the policy rate ripple through the entire economy: mortgage rates, corporate borrowing costs, bond yields, and equity valuations all adjust. Axiom's Central Banks tab tracks policy rates for 7 major central banks from 2005 to present.",
+      "The policy rate is the key interest rate set by a central bank to influence economic activity and inflation. It is the rate at which the central bank lends to commercial banks or the target for overnight interbank lending. Changes in the policy rate ripple through the entire economy: mortgage rates, corporate borrowing costs, bond yields, and equity valuations all adjust. EconoSift's Central Banks tab tracks policy rates for 7 major central banks from 2005 to present.",
     related: ["fed-funds-rate", "ecb-main-refinancing-rate", "central-bank", "tightening", "easing"],
   },
   {
@@ -1810,7 +1810,7 @@ export const TERMS: WikiTerm[] = [
     term: "Divergence Score",
     category: "centralbanks",
     definition:
-      "The central bank divergence score measures how much each G7 central bank's policy rate deviates from the G7 average. A positive score means the bank is tighter than peers; a negative score means looser. Divergence drives FX markets — currencies of hawkish (tighter) central banks tend to strengthen against those of dovish (looser) central banks. Axiom's Policy page displays the divergence score for all major CBs.",
+      "The central bank divergence score measures how much each G7 central bank's policy rate deviates from the G7 average. A positive score means the bank is tighter than peers; a negative score means looser. Divergence drives FX markets — currencies of hawkish (tighter) central banks tend to strengthen against those of dovish (looser) central banks. EconoSift's Policy page displays the divergence score for all major CBs.",
     related: ["policy-rate", "fx-carry", "central-bank", "eur-usd"],
   },
   {
@@ -1818,7 +1818,7 @@ export const TERMS: WikiTerm[] = [
     term: "Fed Balance Sheet (WALCL)",
     category: "centralbanks",
     definition:
-      "The Fed's balance sheet (FRED series WALCL) shows total assets held by the Federal Reserve — currently $6–8 trillion, reflecting Treasury and MBS holdings accumulated through quantitative easing (QE). Expanding the balance sheet is stimulative (QE); shrinking it is contractionary (QT). Balance sheet changes affect long-term interest rates, financial conditions, and risk asset valuations. Axiom displays the Fed balance sheet in trillions of dollars on the Central Banks and Financial Conditions tabs.",
+      "The Fed's balance sheet (FRED series WALCL) shows total assets held by the Federal Reserve — currently $6–8 trillion, reflecting Treasury and MBS holdings accumulated through quantitative easing (QE). Expanding the balance sheet is stimulative (QE); shrinking it is contractionary (QT). Balance sheet changes affect long-term interest rates, financial conditions, and risk asset valuations. EconoSift displays the Fed balance sheet in trillions of dollars on the Central Banks and Financial Conditions tabs.",
     related: ["quantitative-easing", "quantitative-tightening", "fed", "financial-conditions"],
   },
   {
@@ -1826,7 +1826,7 @@ export const TERMS: WikiTerm[] = [
     term: "CB Meeting Calendar",
     category: "centralbanks",
     definition:
-      "The central bank meeting calendar lists the scheduled policy meetings for the Fed, ECB, BoE, BoJ, BoC, RBA, and SNB. Markets price rate expectations ahead of these meetings, and surprises can cause large asset moves. Axiom's Central Banks tab shows upcoming meetings with the days remaining, tracked via a curated JSON dataset of 52 CB meetings.",
+      "The central bank meeting calendar lists the scheduled policy meetings for the Fed, ECB, BoE, BoJ, BoC, RBA, and SNB. Markets price rate expectations ahead of these meetings, and surprises can cause large asset moves. EconoSift's Central Banks tab shows upcoming meetings with the days remaining, tracked via a curated JSON dataset of 52 CB meetings.",
     related: ["fed", "ecb", "policy-rate", "calendar"],
   },
   {
@@ -1862,7 +1862,7 @@ export const TERMS: WikiTerm[] = [
     term: "FX Pair",
     category: "fx",
     definition:
-      "An FX pair consists of two currencies: the base currency (first) and the quote currency (second). EUR/USD = 1.10 means €1 buys $1.10. Major pairs all involve USD; crosses (e.g., EUR/GBP) do not. The G10 currency pairs are the most liquid: EUR/USD, USD/JPY, GBP/USD, USD/CHF, AUD/USD, USD/CAD, NZD/USD. Axiom's FX Heatmap shows daily changes across all major crosses.",
+      "An FX pair consists of two currencies: the base currency (first) and the quote currency (second). EUR/USD = 1.10 means €1 buys $1.10. Major pairs all involve USD; crosses (e.g., EUR/GBP) do not. The G10 currency pairs are the most liquid: EUR/USD, USD/JPY, GBP/USD, USD/CHF, AUD/USD, USD/CAD, NZD/USD. EconoSift's FX Heatmap shows daily changes across all major crosses.",
     related: ["fx-rate", "base-currency", "quote-currency", "g10-currencies"],
   },
   {
@@ -1894,7 +1894,7 @@ export const TERMS: WikiTerm[] = [
     term: "G10 Currencies",
     category: "fx",
     definition:
-      "The G10 currencies are the ten most liquid and widely traded developed-market currencies: US Dollar (USD), Euro (EUR), Japanese Yen (JPY), British Pound (GBP), Swiss Franc (CHF), Canadian Dollar (CAD), Australian Dollar (AUD), New Zealand Dollar (NZD), Swedish Krona (SEK), and Norwegian Krone (NOK). They form the core of the global FX market and are the universe for Axiom's FX Carry strategy and FX Heatmap.",
+      "The G10 currencies are the ten most liquid and widely traded developed-market currencies: US Dollar (USD), Euro (EUR), Japanese Yen (JPY), British Pound (GBP), Swiss Franc (CHF), Canadian Dollar (CAD), Australian Dollar (AUD), New Zealand Dollar (NZD), Swedish Krona (SEK), and Norwegian Krone (NOK). They form the core of the global FX market and are the universe for EconoSift's FX Carry strategy and FX Heatmap.",
     related: ["fx-carry", "fx-pair", "dxy", "carry-trade"],
   },
   {
@@ -1910,7 +1910,7 @@ export const TERMS: WikiTerm[] = [
     term: "FX Carry",
     category: "fx",
     definition:
-      "FX carry is an investment strategy of borrowing in a low-interest-rate currency (funding currency) and lending in a high-interest-rate currency (target currency), profiting from the interest rate differential — the 'carry.' For example, borrowing JPY at 0% and investing in AUD at 4% earns a 4% annualised carry. The risk is that the target currency depreciates enough to wipe out the carry (a 'carry crash'). Axiom's Research Hub provides a G10 carry table and a long-top-3/short-bottom-3 backtest.",
+      "FX carry is an investment strategy of borrowing in a low-interest-rate currency (funding currency) and lending in a high-interest-rate currency (target currency), profiting from the interest rate differential — the 'carry.' For example, borrowing JPY at 0% and investing in AUD at 4% earns a 4% annualised carry. The risk is that the target currency depreciates enough to wipe out the carry (a 'carry crash'). EconoSift's Research Hub provides a G10 carry table and a long-top-3/short-bottom-3 backtest.",
     related: ["carry-trade", "g10-currencies", "carry-annualised", "vol-adjusted-carry"],
   },
   {
@@ -1934,7 +1934,7 @@ export const TERMS: WikiTerm[] = [
     term: "PPP (Purchasing Power Parity)",
     category: "fx",
     definition:
-      "Purchasing Power Parity is the exchange rate at which a basket of identical goods would cost the same in two different countries. It is a long-run equilibrium concept — if a Big Mac costs $5 in the US and €4 in the Eurozone, PPP would imply EUR/USD = 1.25. Currencies that are far from their PPP-implied rate are considered overvalued or undervalued in the long run. Axiom's Macro page provides PPP estimates for 8 major pairs using FRED exchange rates and CPI data.",
+      "Purchasing Power Parity is the exchange rate at which a basket of identical goods would cost the same in two different countries. It is a long-run equilibrium concept — if a Big Mac costs $5 in the US and €4 in the Eurozone, PPP would imply EUR/USD = 1.25. Currencies that are far from their PPP-implied rate are considered overvalued or undervalued in the long run. EconoSift's Macro page provides PPP estimates for 8 major pairs using FRED exchange rates and CPI data.",
     related: ["ppp-overvaluation", "fx-rate", "real-effective-exchange-rate", "cpi"],
   },
   {
@@ -1950,7 +1950,7 @@ export const TERMS: WikiTerm[] = [
     term: "FX Heatmap",
     category: "fx",
     definition:
-      "An FX heatmap is a colour-coded grid showing 1-day percentage changes across all major currency crosses. Green cells indicate the base currency strengthening (positive change); red cells indicate weakening. The heatmap provides an at-a-glance view of FX market dynamics — which currencies are strong and which are weak on the day. Axiom's Macro page features an FX heatmap powered by FRED DEX exchange rate series.",
+      "An FX heatmap is a colour-coded grid showing 1-day percentage changes across all major currency crosses. Green cells indicate the base currency strengthening (positive change); red cells indicate weakening. The heatmap provides an at-a-glance view of FX market dynamics — which currencies are strong and which are weak on the day. EconoSift's Macro page features an FX heatmap powered by FRED DEX exchange rate series.",
     related: ["fx-rate", "fx-pair", "g10-currencies", "dxy"],
   },
 
@@ -1962,7 +1962,7 @@ export const TERMS: WikiTerm[] = [
     term: "Efficient Frontier",
     category: "portfolio",
     definition:
-      "The efficient frontier is the set of portfolios that offer the highest expected return for each level of risk (standard deviation) — or equivalently, the lowest risk for each level of return. It is derived from mean-variance optimisation, developed by Harry Markowitz in 1952 (for which he won the Nobel Prize). Portfolios below the frontier are suboptimal; portfolios on the frontier represent the best possible risk-return trade-offs given the available assets. Axiom's Portfolio page computes and plots the efficient frontier for user-defined holdings.",
+      "The efficient frontier is the set of portfolios that offer the highest expected return for each level of risk (standard deviation) — or equivalently, the lowest risk for each level of return. It is derived from mean-variance optimisation, developed by Harry Markowitz in 1952 (for which he won the Nobel Prize). Portfolios below the frontier are suboptimal; portfolios on the frontier represent the best possible risk-return trade-offs given the available assets. EconoSift's Portfolio page computes and plots the efficient frontier for user-defined holdings.",
     related: ["mean-variance-optimisation", "max-sharpe-portfolio", "global-minimum-variance"],
   },
   {
@@ -1994,7 +1994,7 @@ export const TERMS: WikiTerm[] = [
     term: "Black-Litterman Model",
     category: "portfolio",
     definition:
-      "The Black-Litterman model — developed by Fischer Black and Robert Litterman at Goldman Sachs — addresses the instability of mean-variance optimisation by starting with equilibrium market-cap weights (implied by CAPM) and blending them with the investor's specific views (e.g., 'Tech will outperform by 5%'). The resulting expected returns are more stable and intuitive than raw historical estimates. Axiom's Portfolio page implements Black-Litterman via the 🟡 Calculate button.",
+      "The Black-Litterman model — developed by Fischer Black and Robert Litterman at Goldman Sachs — addresses the instability of mean-variance optimisation by starting with equilibrium market-cap weights (implied by CAPM) and blending them with the investor's specific views (e.g., 'Tech will outperform by 5%'). The resulting expected returns are more stable and intuitive than raw historical estimates. EconoSift's Portfolio page implements Black-Litterman via the 🟡 Calculate button.",
     related: ["mean-variance-optimisation", "efficient-frontier", "bl-return", "capm"],
   },
   {
@@ -2010,7 +2010,7 @@ export const TERMS: WikiTerm[] = [
     term: "Optimal Weights",
     category: "portfolio",
     definition:
-      "Optimal weights are the portfolio allocation percentages that maximise the objective function — typically Sharpe ratio, risk-adjusted return, or a utility function. They are the output of portfolio optimisation. At Axiom, optimal weights are displayed for both Black-Litterman-adjusted optimisation and standard mean-variance optimisation, allowing comparison.",
+      "Optimal weights are the portfolio allocation percentages that maximise the objective function — typically Sharpe ratio, risk-adjusted return, or a utility function. They are the output of portfolio optimisation. At EconoSift, optimal weights are displayed for both Black-Litterman-adjusted optimisation and standard mean-variance optimisation, allowing comparison.",
     related: ["mean-variance-optimisation", "black-litterman", "efficient-frontier"],
   },
   {
@@ -2018,7 +2018,7 @@ export const TERMS: WikiTerm[] = [
     term: "Monte Carlo Simulation (Portfolio)",
     category: "portfolio",
     definition:
-      "Monte Carlo simulation for portfolios generates thousands of random portfolio return outcomes by drawing from the estimated multivariate return distribution, producing a distribution of possible future portfolio values. It answers questions like 'What is the probability of a 20% loss over the next year?' Unlike parametric methods, Monte Carlo can incorporate non-normal distributions and complex interactions. Axiom's Portfolio page offers Monte Carlo simulation for forward-looking risk estimation.",
+      "Monte Carlo simulation for portfolios generates thousands of random portfolio return outcomes by drawing from the estimated multivariate return distribution, producing a distribution of possible future portfolio values. It answers questions like 'What is the probability of a 20% loss over the next year?' Unlike parametric methods, Monte Carlo can incorporate non-normal distributions and complex interactions. EconoSift's Portfolio page offers Monte Carlo simulation for forward-looking risk estimation.",
     related: ["monte-carlo-risk", "var", "efficient-frontier", "stress-testing"],
   },
   {
@@ -2026,7 +2026,7 @@ export const TERMS: WikiTerm[] = [
     term: "Kelly Criterion",
     category: "portfolio",
     definition:
-      "The Kelly Criterion is a formula for optimal bet sizing to maximise the long-run growth rate of capital. Kelly Fraction = (Expected Return − Risk-Free Rate) / Variance. Betting more than the Kelly fraction reduces long-run growth; betting less is conservative but safer. The full Kelly is considered aggressive — many practitioners use 'half-Kelly' to reduce volatility while retaining most of the growth benefit. Axiom's Portfolio page displays the Kelly fraction for each holding.",
+      "The Kelly Criterion is a formula for optimal bet sizing to maximise the long-run growth rate of capital. Kelly Fraction = (Expected Return − Risk-Free Rate) / Variance. Betting more than the Kelly fraction reduces long-run growth; betting less is conservative but safer. The full Kelly is considered aggressive — many practitioners use 'half-Kelly' to reduce volatility while retaining most of the growth benefit. EconoSift's Portfolio page displays the Kelly fraction for each holding.",
     related: ["kelly-fraction", "sharpe-ratio", "position-sizing"],
   },
   {
@@ -2042,7 +2042,7 @@ export const TERMS: WikiTerm[] = [
     term: "Fama-French Factor Models",
     category: "portfolio",
     definition:
-      "The Fama-French models explain portfolio returns using multiple risk factors beyond just market beta. The 3-factor model adds SMB (small minus big, the size premium) and HML (high minus low, the value premium). The 5-factor model further adds RMW (profitability) and CMA (investment). These models capture well-documented return patterns that CAPM cannot explain. Axiom provides Fama-French 3-factor and 5-factor attribution for any portfolio or ticker.",
+      "The Fama-French models explain portfolio returns using multiple risk factors beyond just market beta. The 3-factor model adds SMB (small minus big, the size premium) and HML (high minus low, the value premium). The 5-factor model further adds RMW (profitability) and CMA (investment). These models capture well-documented return patterns that CAPM cannot explain. EconoSift provides Fama-French 3-factor and 5-factor attribution for any portfolio or ticker.",
     related: ["smb", "hml", "rmw", "cma", "factor-loading", "capm"],
   },
   {
@@ -2146,7 +2146,7 @@ export const TERMS: WikiTerm[] = [
     term: "Contribution (Portfolio Return Attribution)",
     category: "portfolio",
     definition:
-      "Return contribution is each holding's weight multiplied by its total return over the period — showing how much each position contributed to the overall portfolio return. It answers 'which holdings drove performance?' A position with a small weight but huge return can contribute as much as a large-weight position with modest return. Axiom's Portfolio page provides full contribution breakdowns.",
+      "Return contribution is each holding's weight multiplied by its total return over the period — showing how much each position contributed to the overall portfolio return. It answers 'which holdings drove performance?' A position with a small weight but huge return can contribute as much as a large-weight position with modest return. EconoSift's Portfolio page provides full contribution breakdowns.",
     related: ["total-return", "risk-contribution", "portfolio"],
   },
 
@@ -2158,7 +2158,7 @@ export const TERMS: WikiTerm[] = [
     term: "Risk Parity",
     category: "research",
     definition:
-      "Risk parity is a portfolio construction approach that allocates risk — not capital — equally across assets. In a traditional 60/40 portfolio, equities contribute ~90% of the risk because they are far more volatile than bonds. Risk parity equalises risk contributions, typically resulting in much higher bond allocations (often levered to match return targets). The two main methods are inverse-volatility weighting (simpler) and Equal Risk Contribution via optimisation (more precise, using SLSQP solver). Axiom's Research Hub implements both.",
+      "Risk parity is a portfolio construction approach that allocates risk — not capital — equally across assets. In a traditional 60/40 portfolio, equities contribute ~90% of the risk because they are far more volatile than bonds. Risk parity equalises risk contributions, typically resulting in much higher bond allocations (often levered to match return targets). The two main methods are inverse-volatility weighting (simpler) and Equal Risk Contribution via optimisation (more precise, using SLSQP solver). EconoSift's Research Hub implements both.",
     related: ["erc", "inverse-vol-weighting", "60-40-benchmark", "risk-contribution"],
   },
   {
@@ -2174,7 +2174,7 @@ export const TERMS: WikiTerm[] = [
     term: "Inverse Vol Weighting",
     category: "research",
     definition:
-      "Inverse-vol weighting assigns portfolio weights proportional to 1/σ (one divided by volatility). The least volatile asset gets the largest weight. It is a simple, model-free approximation of risk parity that ignores correlations. While less precise than ERC, it is robust and less prone to estimation error. Axiom's Research Hub uses inverse-vol as the baseline risk parity method.",
+      "Inverse-vol weighting assigns portfolio weights proportional to 1/σ (one divided by volatility). The least volatile asset gets the largest weight. It is a simple, model-free approximation of risk parity that ignores correlations. While less precise than ERC, it is robust and less prone to estimation error. EconoSift's Research Hub uses inverse-vol as the baseline risk parity method.",
     related: ["risk-parity", "erc", "volatility"],
   },
   {
@@ -2182,7 +2182,7 @@ export const TERMS: WikiTerm[] = [
     term: "60/40 Benchmark",
     category: "research",
     definition:
-      "The 60/40 portfolio — 60% equities (usually SPY) and 40% bonds (usually AGG) — is the classic balanced portfolio benchmark. It has historically delivered equity-like returns with significantly lower volatility. However, in rising-rate environments where stock-bond correlations turn positive, the diversification benefit diminishes. Axiom's risk parity backtest compares risk parity strategies against a 60/40 benchmark over multiple periods.",
+      "The 60/40 portfolio — 60% equities (usually SPY) and 40% bonds (usually AGG) — is the classic balanced portfolio benchmark. It has historically delivered equity-like returns with significantly lower volatility. However, in rising-rate environments where stock-bond correlations turn positive, the diversification benefit diminishes. EconoSift's risk parity backtest compares risk parity strategies against a 60/40 benchmark over multiple periods.",
     related: ["risk-parity", "spy", "agg", "monthly-rebalance"],
   },
   {
@@ -2198,7 +2198,7 @@ export const TERMS: WikiTerm[] = [
     term: "FX Carry Trade",
     category: "research",
     definition:
-      "The FX carry trade strategy involves going long the highest-yielding G10 currencies and short the lowest-yielding ones, capturing the interest rate differential. Axiom's implementation goes long the top 3 highest-carry currencies (equally weighted) and short the bottom 3 lowest-carry currencies, rebalanced monthly, and plotted against the DXY for comparison. Carry trades historically generate steady positive returns punctuated by sharp crashes during risk-off events.",
+      "The FX carry trade strategy involves going long the highest-yielding G10 currencies and short the lowest-yielding ones, capturing the interest rate differential. EconoSift's implementation goes long the top 3 highest-carry currencies (equally weighted) and short the bottom 3 lowest-carry currencies, rebalanced monthly, and plotted against the DXY for comparison. Carry trades historically generate steady positive returns punctuated by sharp crashes during risk-off events.",
     related: ["fx-carry", "carry-annualised", "g10-currencies", "vol-adjusted-carry"],
   },
   {
@@ -2206,7 +2206,7 @@ export const TERMS: WikiTerm[] = [
     term: "Cross-Sectional Momentum",
     category: "research",
     definition:
-      "Cross-sectional momentum ranks stocks within a universe by their past return over a lookback period (1-month, 3-month, 6-month, or 12-month-minus-1-month), then sorts them into deciles from weakest (decile 1) to strongest (decile 10). The strategy is long the top decile and short the bottom decile. It is distinct from time-series momentum (trend-following) — cross-sectional momentum is about relative performance within a group. Axiom's Research Hub implements this for Dow 30 (default) with Nasdaq and S&P 500 available via 🔴 button.",
+      "Cross-sectional momentum ranks stocks within a universe by their past return over a lookback period (1-month, 3-month, 6-month, or 12-month-minus-1-month), then sorts them into deciles from weakest (decile 1) to strongest (decile 10). The strategy is long the top decile and short the bottom decile. It is distinct from time-series momentum (trend-following) — cross-sectional momentum is about relative performance within a group. EconoSift's Research Hub implements this for Dow 30 (default) with Nasdaq and S&P 500 available via 🔴 button.",
     related: ["momentum-signal", "deciles", "12m1m-momentum", "realized-moments"],
   },
   {
@@ -2238,7 +2238,7 @@ export const TERMS: WikiTerm[] = [
     term: "Realized Moments",
     category: "research",
     definition:
-      "Realized moments are statistical properties — variance, skewness, and excess kurtosis — computed from historical daily price data over rolling windows (21, 63, 252 trading days). Unlike theoretical moments of a distribution, these are 'realised' from actual observed returns. They provide a richer characterisation of return behaviour than just mean and variance. Axiom's Research Hub provides realised moments for any ticker, using Garman-Klass variance for improved efficiency.",
+      "Realized moments are statistical properties — variance, skewness, and excess kurtosis — computed from historical daily price data over rolling windows (21, 63, 252 trading days). Unlike theoretical moments of a distribution, these are 'realised' from actual observed returns. They provide a richer characterisation of return behaviour than just mean and variance. EconoSift's Research Hub provides realised moments for any ticker, using Garman-Klass variance for improved efficiency.",
     related: ["garman-klass-variance", "realized-skewness", "realized-kurtosis", "cross-sectional-momentum"],
   },
   {
@@ -2246,7 +2246,7 @@ export const TERMS: WikiTerm[] = [
     term: "Garman-Klass Variance",
     category: "research",
     definition:
-      "The Garman-Klass estimator is an OHLC-based realised variance formula: σ² = 0.5 × ln(H/L)² − (2·ln(2) − 1) × ln(C/O)². It uses opening, high, low, and closing prices to produce a more efficient variance estimate than the standard close-to-close estimator — it extracts additional information from intraday range. Garman-Klass can occasionally produce negative values (when the overnight gap dominates), which Axiom clips at zero before taking the square root.",
+      "The Garman-Klass estimator is an OHLC-based realised variance formula: σ² = 0.5 × ln(H/L)² − (2·ln(2) − 1) × ln(C/O)². It uses opening, high, low, and closing prices to produce a more efficient variance estimate than the standard close-to-close estimator — it extracts additional information from intraday range. Garman-Klass can occasionally produce negative values (when the overnight gap dominates), which EconoSift clips at zero before taking the square root.",
     related: ["realized-moments", "realized-skewness", "realized-kurtosis", "volatility"],
   },
   {
@@ -2254,7 +2254,7 @@ export const TERMS: WikiTerm[] = [
     term: "Realized Skewness",
     category: "research",
     definition:
-      "Realized skewness measures the asymmetry of the daily return distribution over a rolling window. Positive skewness means the distribution has a longer right tail (more large positive returns than negative ones of the same magnitude); negative skewness means fatter left tail (crash risk). Investors generally prefer positive skewness — lottery-like upside — but many assets, especially equities, exhibit negative skewness. Axiom's Research Hub reports rolling realized skewness at 21D, 63D, and 252D windows.",
+      "Realized skewness measures the asymmetry of the daily return distribution over a rolling window. Positive skewness means the distribution has a longer right tail (more large positive returns than negative ones of the same magnitude); negative skewness means fatter left tail (crash risk). Investors generally prefer positive skewness — lottery-like upside — but many assets, especially equities, exhibit negative skewness. EconoSift's Research Hub reports rolling realized skewness at 21D, 63D, and 252D windows.",
     related: ["realized-moments", "realized-kurtosis", "garman-klass-variance"],
   },
   {
@@ -2262,7 +2262,7 @@ export const TERMS: WikiTerm[] = [
     term: "Realized Excess Kurtosis",
     category: "research",
     definition:
-      "Realized excess kurtosis measures the 'tailedness' of the return distribution beyond what a normal distribution would predict. Excess kurtosis > 0 indicates fatter tails (more extreme events) than normal — which is nearly universal in financial returns. High kurtosis warns that extreme moves (crashes or rallies) occur more frequently than standard risk models assume. Axiom reports rolling realized excess kurtosis at 21D, 63D, and 252D windows.",
+      "Realized excess kurtosis measures the 'tailedness' of the return distribution beyond what a normal distribution would predict. Excess kurtosis > 0 indicates fatter tails (more extreme events) than normal — which is nearly universal in financial returns. High kurtosis warns that extreme moves (crashes or rallies) occur more frequently than standard risk models assume. EconoSift reports rolling realized excess kurtosis at 21D, 63D, and 252D windows.",
     related: ["realized-moments", "realized-skewness", "garch", "fat-tails"],
   },
   {
@@ -2282,7 +2282,7 @@ export const TERMS: WikiTerm[] = [
     term: "SPDR Sector ETFs",
     category: "sectors",
     definition:
-      "The Select Sector SPDRs are a family of 11 ETFs that each track a specific S&P 500 GICS sector: XLK (Technology), XLF (Financials), XLV (Health Care), XLE (Energy), XLI (Industrials), XLY (Consumer Discretionary), XLP (Consumer Staples), XLB (Materials), XLRE (Real Estate), XLC (Communication Services), and XLU (Utilities). They provide pure-play sector exposure with high liquidity and are the foundation of Axiom's Sectors page for sector rotation analysis.",
+      "The Select Sector SPDRs are a family of 11 ETFs that each track a specific S&P 500 GICS sector: XLK (Technology), XLF (Financials), XLV (Health Care), XLE (Energy), XLI (Industrials), XLY (Consumer Discretionary), XLP (Consumer Staples), XLB (Materials), XLRE (Real Estate), XLC (Communication Services), and XLU (Utilities). They provide pure-play sector exposure with high liquidity and are the foundation of EconoSift's Sectors page for sector rotation analysis.",
     related: ["xlk", "xlf", "sector-rotation", "aum"],
   },
   {
@@ -2314,7 +2314,7 @@ export const TERMS: WikiTerm[] = [
     term: "Sector Rotation Clock (Sam Stovall)",
     category: "sectors",
     definition:
-      "The sector rotation clock — popularised by Sam Stovall of S&P Capital IQ — maps typical sector leadership to four phases of the business cycle. Early cycle favours Consumer Discretionary, Financials, Real Estate, and Industrials. Mid cycle favours Technology, Communication Services, and Industrials. Late cycle favours Energy, Materials, Consumer Staples, and Health Care. Recession favours defensives: Consumer Staples, Health Care, and Utilities. The Axiom Sectors page visualises the current rotation positioning.",
+      "The sector rotation clock — popularised by Sam Stovall of S&P Capital IQ — maps typical sector leadership to four phases of the business cycle. Early cycle favours Consumer Discretionary, Financials, Real Estate, and Industrials. Mid cycle favours Technology, Communication Services, and Industrials. Late cycle favours Energy, Materials, Consumer Staples, and Health Care. Recession favours defensives: Consumer Staples, Health Care, and Utilities. The EconoSift Sectors page visualises the current rotation positioning.",
     related: ["early-cycle", "mid-cycle", "late-cycle", "recession-phase", "regime-clock"],
   },
   {
@@ -2354,7 +2354,7 @@ export const TERMS: WikiTerm[] = [
     term: "Industry Drill-Down",
     category: "sectors",
     definition:
-      "Industry drill-down is the process of decomposing a broad sector into its constituent industries and individual stocks. For example, the Technology sector can be broken into Semiconductors, Software, Hardware, and IT Services. This reveals which specific industries are driving sector performance and enables more targeted analysis. Axiom's Sectors page offers an industry drill-down for each sector ETF.",
+      "Industry drill-down is the process of decomposing a broad sector into its constituent industries and individual stocks. For example, the Technology sector can be broken into Semiconductors, Software, Hardware, and IT Services. This reveals which specific industries are driving sector performance and enables more targeted analysis. EconoSift's Sectors page offers an industry drill-down for each sector ETF.",
     related: ["sectors", "spdr-sector-etfs", "sector-returns"],
   },
   {
@@ -2362,7 +2362,7 @@ export const TERMS: WikiTerm[] = [
     term: "Sector Returns by Period",
     category: "sectors",
     definition:
-      "Sector returns by period shows the performance of each sector across different time horizons — 1 day, 1 week, 1 month, 3 months, YTD, and 1 year. This multi-period view reveals whether sector leadership is consistent (a sector leading across all periods) or rotating (different leaders at different horizons). Axiom's Sectors page displays sector returns alongside relative performance versus the S&P 500 (vs SPY).",
+      "Sector returns by period shows the performance of each sector across different time horizons — 1 day, 1 week, 1 month, 3 months, YTD, and 1 year. This multi-period view reveals whether sector leadership is consistent (a sector leading across all periods) or rotating (different leaders at different horizons). EconoSift's Sectors page displays sector returns alongside relative performance versus the S&P 500 (vs SPY).",
     related: ["sector-rotation", "spdr-sector-etfs", "vs-spy"],
   },
   {
@@ -2382,7 +2382,7 @@ export const TERMS: WikiTerm[] = [
     term: "Stock Screener",
     category: "screening",
     definition:
-      "A stock screener is a tool that filters a universe of stocks based on user-defined fundamental, technical, and sentiment criteria. It answers questions like 'Which S&P 500 stocks have P/E < 15, dividend yield > 3%, and are above their 200-day SMA?' Axiom's Screener covers the S&P 500, Nasdaq 100, and Dow 30 with 20+ preset signals and an overnight-warmed cache for instant results across 9 result tabs.",
+      "A stock screener is a tool that filters a universe of stocks based on user-defined fundamental, technical, and sentiment criteria. It answers questions like 'Which S&P 500 stocks have P/E < 15, dividend yield > 3%, and are above their 200-day SMA?' EconoSift's Screener covers the S&P 500, Nasdaq 100, and Dow 30 with 20+ preset signals and an overnight-warmed cache for instant results across 9 result tabs.",
     related: ["preset", "screener-universe", "screening-signals"],
   },
   {
@@ -2390,7 +2390,7 @@ export const TERMS: WikiTerm[] = [
     term: "Preset (Screening Signal)",
     category: "screening",
     definition:
-      "Presets are predefined screening criteria that capture common investment themes — 'Golden Cross,' 'Undervalued,' 'High Dividend,' 'Quality Growth,' 'High Short Interest,' and more. Each preset translates to specific numeric filters (e.g., RSI > 70, P/E < 15). Presets allow users to run sophisticated screens without manually constructing filter logic. Axiom offers 20+ presets on the Screener page.",
+      "Presets are predefined screening criteria that capture common investment themes — 'Golden Cross,' 'Undervalued,' 'High Dividend,' 'Quality Growth,' 'High Short Interest,' and more. Each preset translates to specific numeric filters (e.g., RSI > 70, P/E < 15). Presets allow users to run sophisticated screens without manually constructing filter logic. EconoSift offers 20+ presets on the Screener page.",
     related: ["stock-screener", "screening-signals", "golden-cross"],
   },
   {
@@ -2398,7 +2398,7 @@ export const TERMS: WikiTerm[] = [
     term: "Top Gainers",
     category: "screening",
     definition:
-      "Top gainers are the stocks with the highest positive daily percentage return within a given universe. They represent the strongest momentum on the day and are often driven by earnings beats, analyst upgrades, or sector-wide catalysts. Axiom's Screener includes a Top Gainers tab for each index universe.",
+      "Top gainers are the stocks with the highest positive daily percentage return within a given universe. They represent the strongest momentum on the day and are often driven by earnings beats, analyst upgrades, or sector-wide catalysts. EconoSift's Screener includes a Top Gainers tab for each index universe.",
     related: ["top-losers", "screener", "momentum-signal"],
   },
   {
@@ -2406,7 +2406,7 @@ export const TERMS: WikiTerm[] = [
     term: "Near 52-Week High",
     category: "screening",
     definition:
-      "A stock is 'near its 52-week high' when its current price is within a small threshold — typically 5% — of the highest price it has traded at over the past 52 weeks. These stocks are exhibiting price strength and are often in established uptrends. The Axiom screener includes a Near 52-Week High preset. However, stocks near highs can be overextended; the signal is best combined with valuation and fundamental filters.",
+      "A stock is 'near its 52-week high' when its current price is within a small threshold — typically 5% — of the highest price it has traded at over the past 52 weeks. These stocks are exhibiting price strength and are often in established uptrends. The EconoSift screener includes a Near 52-Week High preset. However, stocks near highs can be overextended; the signal is best combined with valuation and fundamental filters.",
     related: ["near-52-week-low", "52-week-high-low", "week-52-position"],
   },
   {
@@ -2438,7 +2438,7 @@ export const TERMS: WikiTerm[] = [
     term: "High Beta (>1.5)",
     category: "screening",
     definition:
-      "High-beta stocks have a beta greater than 1.5, meaning they amplify market moves — a 1% S&P 500 move translates to >1.5% for the stock, on average. In bull markets, high-beta stocks tend to outperform; in bear markets, they underperform sharply. The Axiom screener includes a High Beta preset for identifying amplified-market-exposure names.",
+      "High-beta stocks have a beta greater than 1.5, meaning they amplify market moves — a 1% S&P 500 move translates to >1.5% for the stock, on average. In bull markets, high-beta stocks tend to outperform; in bear markets, they underperform sharply. The EconoSift screener includes a High Beta preset for identifying amplified-market-exposure names.",
     related: ["beta", "low-volatility", "capm"],
   },
   {
@@ -2446,7 +2446,7 @@ export const TERMS: WikiTerm[] = [
     term: "Undervalued (Screen)",
     category: "screening",
     definition:
-      "The Undervalued preset on Axiom's Screener filters for stocks with P/E below 15 and P/B below 1.5 — classic value criteria. These stocks trade at low multiples of earnings and book value, suggesting the market may be undervaluing them. Low multiples alone are not enough; the best value opportunities also show earnings stability, manageable debt, and a catalyst for re-rating.",
+      "The Undervalued preset on EconoSift's Screener filters for stocks with P/E below 15 and P/B below 1.5 — classic value criteria. These stocks trade at low multiples of earnings and book value, suggesting the market may be undervaluing them. Low multiples alone are not enough; the best value opportunities also show earnings stability, manageable debt, and a catalyst for re-rating.",
     related: ["deep-value", "pe-ratio", "pb-ratio", "value-investing"],
   },
   {
@@ -2462,7 +2462,7 @@ export const TERMS: WikiTerm[] = [
     term: "Quality Growth",
     category: "screening",
     definition:
-      "Quality Growth combines profitability and growth criteria: ROE > 15%, Revenue Growth > 10%, and Net Margin > 10%. It identifies companies that are both highly profitable and expanding — the 'compounders.' These are the businesses most likely to create sustainable long-term shareholder value. Axiom's Screener includes Quality Growth as a preset signal.",
+      "Quality Growth combines profitability and growth criteria: ROE > 15%, Revenue Growth > 10%, and Net Margin > 10%. It identifies companies that are both highly profitable and expanding — the 'compounders.' These are the businesses most likely to create sustainable long-term shareholder value. EconoSift's Screener includes Quality Growth as a preset signal.",
     related: ["roe", "revenue-growth", "net-margin", "roic"],
   },
   {
@@ -2486,7 +2486,7 @@ export const TERMS: WikiTerm[] = [
     term: "Unusual Volume",
     category: "screening",
     definition:
-      "The Unusual Volume preset identifies stocks where today's trading volume exceeds 2× the 20-day average. Elevated volume often accompanies institutional accumulation or distribution, earnings surprises, or news catalysts. It is a useful flag for identifying stocks 'in play' — something is happening that warrants attention. Axiom screens for unusual volume across all index universes.",
+      "The Unusual Volume preset identifies stocks where today's trading volume exceeds 2× the 20-day average. Elevated volume often accompanies institutional accumulation or distribution, earnings surprises, or news catalysts. It is a useful flag for identifying stocks 'in play' — something is happening that warrants attention. EconoSift screens for unusual volume across all index universes.",
     related: ["volume-ratio", "average-volume", "obv"],
   },
   {
@@ -2530,7 +2530,7 @@ export const TERMS: WikiTerm[] = [
     term: "Ohlson O-Score",
     category: "esg",
     definition:
-      "The Ohlson O-Score is a bankruptcy probability model developed by James Ohlson in 1980. Unlike the Altman Z-Score, it uses a logistic regression framework and includes variables like size (log of total assets), total liabilities/total assets, working capital/total assets, and net income. The output is a default probability — higher scores indicate greater bankruptcy risk. It is one of several distress models available on Axiom's valuation pages.",
+      "The Ohlson O-Score is a bankruptcy probability model developed by James Ohlson in 1980. Unlike the Altman Z-Score, it uses a logistic regression framework and includes variables like size (log of total assets), total liabilities/total assets, working capital/total assets, and net income. The output is a default probability — higher scores indicate greater bankruptcy risk. It is one of several distress models available on EconoSift's valuation pages.",
     related: ["piotroski-f-score", "altman-z-score", "beneish-m-score"],
   },
   {
@@ -2538,7 +2538,7 @@ export const TERMS: WikiTerm[] = [
     term: "DuPont Analysis",
     category: "esg",
     definition:
-      "DuPont analysis decomposes ROE into its component drivers to understand what is powering — or dragging — a company's profitability. The 3-factor DuPont: ROE = Net Margin × Asset Turnover × Equity Multiplier (leverage). The 5-factor DuPont adds tax burden and interest burden for a finer-grained view. A company with high ROE driven by leverage (high equity multiplier) is riskier than one driven by high margins or asset efficiency. Axiom provides both 3-factor and 5-factor DuPont decompositions.",
+      "DuPont analysis decomposes ROE into its component drivers to understand what is powering — or dragging — a company's profitability. The 3-factor DuPont: ROE = Net Margin × Asset Turnover × Equity Multiplier (leverage). The 5-factor DuPont adds tax burden and interest burden for a finer-grained view. A company with high ROE driven by leverage (high equity multiplier) is riskier than one driven by high margins or asset efficiency. EconoSift provides both 3-factor and 5-factor DuPont decompositions.",
     related: ["roe", "net-margin", "asset-turnover", "debt-to-equity"],
   },
   {
@@ -2582,7 +2582,7 @@ export const TERMS: WikiTerm[] = [
     term: "Snowflake Composite Score",
     category: "snowflake",
     definition:
-      "The Snowflake Score is Axiom's 5-axis composite stock quality assessment scored 0–10 across five dimensions: Value (valuation attractiveness), Growth (revenue/earnings trajectory), Performance (historical risk-adjusted returns), Health (balance sheet strength), and Dividend (yield and sustainability). The Overall Score is a weighted average of all five axes, giving a holistic quality assessment. A score of 8+ suggests a high-quality stock; below 4 signals significant concerns. The Snowflake is visualised as a radar chart with a summary verdict.",
+      "The Snowflake Score is EconoSift's 5-axis composite stock quality assessment scored 0–10 across five dimensions: Value (valuation attractiveness), Growth (revenue/earnings trajectory), Performance (historical risk-adjusted returns), Health (balance sheet strength), and Dividend (yield and sustainability). The Overall Score is a weighted average of all five axes, giving a holistic quality assessment. A score of 8+ suggests a high-quality stock; below 4 signals significant concerns. The Snowflake is visualised as a radar chart with a summary verdict.",
     related: ["value-axis", "growth-axis", "performance-axis", "health-axis", "dividend-axis"],
   },
   {
@@ -2590,7 +2590,7 @@ export const TERMS: WikiTerm[] = [
     term: "Value Axis (Snowflake)",
     category: "snowflake",
     definition:
-      "The Value axis of the Snowflake score assesses a stock's valuation attractiveness using metrics like P/E, P/B, EV/EBITDA, FCF yield, and the upside/downside from Axiom's DCF engine. A high Value score means the stock appears cheap on multiple valuation dimensions. A low score suggests the stock is expensive — which may be justified by high growth, but the Snowflake separates value from growth for clarity.",
+      "The Value axis of the Snowflake score assesses a stock's valuation attractiveness using metrics like P/E, P/B, EV/EBITDA, FCF yield, and the upside/downside from EconoSift's DCF engine. A high Value score means the stock appears cheap on multiple valuation dimensions. A low score suggests the stock is expensive — which may be justified by high growth, but the Snowflake separates value from growth for clarity.",
     related: ["snowflake-score", "growth-axis", "pe-ratio", "dcf"],
   },
   {
@@ -2642,7 +2642,7 @@ export const TERMS: WikiTerm[] = [
     term: "Market Breadth",
     category: "dashboard",
     definition:
-      "Market breadth measures the number of stocks participating in a market move — advancing versus declining issues within an index. Strong breadth (many stocks rising together) confirms a healthy rally; weak breadth (a few large-caps driving the index while most stocks fall) warns that the rally may be fragile. Breadth indicators are among the most reliable leading indicators of market turning points. Axiom's Dashboard displays breadth for the S&P 500.",
+      "Market breadth measures the number of stocks participating in a market move — advancing versus declining issues within an index. Strong breadth (many stocks rising together) confirms a healthy rally; weak breadth (a few large-caps driving the index while most stocks fall) warns that the rally may be fragile. Breadth indicators are among the most reliable leading indicators of market turning points. EconoSift's Dashboard displays breadth for the S&P 500.",
     related: ["advancing-declining", "mcclellan-oscillator", "cumulative-ad-line", "new-highs-new-lows"],
   },
   {
@@ -2682,7 +2682,7 @@ export const TERMS: WikiTerm[] = [
     term: "Fear & Greed Index",
     category: "dashboard",
     definition:
-      "The Fear & Greed Index is a composite sentiment indicator that aggregates multiple market signals — stock price breadth, market momentum, junk bond demand, safe haven demand, put/call ratio, and market volatility — into a single 0–100 scale. 0 represents Extreme Fear (oversold, potentially a buying opportunity); 100 represents Extreme Greed (overbought, potentially due for a pullback). It is a contrarian indicator: extreme fear often precedes rallies; extreme greed often precedes corrections. Axiom's Dashboard displays the index with its sub-component breakdown.",
+      "The Fear & Greed Index is a composite sentiment indicator that aggregates multiple market signals — stock price breadth, market momentum, junk bond demand, safe haven demand, put/call ratio, and market volatility — into a single 0–100 scale. 0 represents Extreme Fear (oversold, potentially a buying opportunity); 100 represents Extreme Greed (overbought, potentially due for a pullback). It is a contrarian indicator: extreme fear often precedes rallies; extreme greed often precedes corrections. EconoSift's Dashboard displays the index with its sub-component breakdown.",
     related: ["market-breadth", "put-call-oi-ratio", "vix", "movers"],
   },
   {
@@ -2690,7 +2690,7 @@ export const TERMS: WikiTerm[] = [
     term: "Top Movers",
     category: "dashboard",
     definition:
-      "Top movers are the best and worst performing stocks within an index for the current trading day. They provide a real-time pulse on which names and sectors are driving (or dragging) market performance. Axiom's Dashboard displays the top 10 gainers and losers for the selected index, with percentage changes and brief fundamental snapshots.",
+      "Top movers are the best and worst performing stocks within an index for the current trading day. They provide a real-time pulse on which names and sectors are driving (or dragging) market performance. EconoSift's Dashboard displays the top 10 gainers and losers for the selected index, with percentage changes and brief fundamental snapshots.",
     related: ["top-gainers", "top-losers", "market-breadth"],
   },
   {
@@ -2726,7 +2726,7 @@ export const TERMS: WikiTerm[] = [
     term: "Regime (Quadrant)",
     category: "regime",
     definition:
-      "A macro regime is an economic state classification based on the combination of GDP growth and CPI inflation relative to thresholds. The four regimes — Goldilocks, Overheating, Slowdown, and Stagflation — each have distinct implications for asset allocation. The regime framework simplifies complex macro conditions into actionable investment context. Axiom's Macro page displays the current regime and its historical evolution via the regime clock.",
+      "A macro regime is an economic state classification based on the combination of GDP growth and CPI inflation relative to thresholds. The four regimes — Goldilocks, Overheating, Slowdown, and Stagflation — each have distinct implications for asset allocation. The regime framework simplifies complex macro conditions into actionable investment context. EconoSift's Macro page displays the current regime and its historical evolution via the regime clock.",
     related: ["goldilocks", "overheating", "slowdown", "stagflation", "regime-clock"],
   },
   {
@@ -2766,7 +2766,7 @@ export const TERMS: WikiTerm[] = [
     term: "Regime Clock",
     category: "regime",
     definition:
-      "The regime clock is a 2×2 scatter plot with GDP growth on the horizontal axis and CPI inflation on the vertical axis, divided into four colour-coded quadrants. Historical data points trace the economy's path through the quadrants over time, with the most recent point highlighted as the current regime. Axiom's regime clock provides a visual macro context for investment decisions.",
+      "The regime clock is a 2×2 scatter plot with GDP growth on the horizontal axis and CPI inflation on the vertical axis, divided into four colour-coded quadrants. Historical data points trace the economy's path through the quadrants over time, with the most recent point highlighted as the current regime. EconoSift's regime clock provides a visual macro context for investment decisions.",
     related: ["regime-quadrant", "goldilocks", "overheating", "sector-rotation"],
   },
   {
@@ -2774,7 +2774,7 @@ export const TERMS: WikiTerm[] = [
     term: "GDP Threshold",
     category: "regime",
     definition:
-      "The GDP threshold is the growth rate boundary used to classify the economy as 'above trend' (right side of the regime clock) or 'below trend' (left side). The default threshold on Axiom is 2.0% real GDP growth, roughly the long-run US trend. Adjusting the threshold changes regime classifications: a higher threshold shrinks the 'Goldilocks' and 'Overheating' zones.",
+      "The GDP threshold is the growth rate boundary used to classify the economy as 'above trend' (right side of the regime clock) or 'below trend' (left side). The default threshold on EconoSift is 2.0% real GDP growth, roughly the long-run US trend. Adjusting the threshold changes regime classifications: a higher threshold shrinks the 'Goldilocks' and 'Overheating' zones.",
     related: ["regime-clock", "cpi-threshold", "regime-quadrant", "gdp-growth"],
   },
   {
@@ -2782,7 +2782,7 @@ export const TERMS: WikiTerm[] = [
     term: "CPI Threshold",
     category: "regime",
     definition:
-      "The CPI threshold separates 'low inflation' (bottom half of the regime clock) from 'high inflation' (top half). Axiom's default is 2.5% — slightly above the Fed's 2% PCE target to allow for the typical CPI-PCE spread. Raising the threshold makes Goldilocks more common; lowering it makes Overheating and Stagflation more frequent.",
+      "The CPI threshold separates 'low inflation' (bottom half of the regime clock) from 'high inflation' (top half). EconoSift's default is 2.5% — slightly above the Fed's 2% PCE target to allow for the typical CPI-PCE spread. Raising the threshold makes Goldilocks more common; lowering it makes Overheating and Stagflation more frequent.",
     related: ["regime-clock", "gdp-threshold", "regime-quadrant", "cpi-yoy"],
   },
   {
@@ -2790,7 +2790,7 @@ export const TERMS: WikiTerm[] = [
     term: "ISM PMI (Purchasing Managers' Index)",
     category: "regime",
     definition:
-      "The ISM Manufacturing PMI is a monthly survey-based diffusion index of US manufacturing activity. Readings above 50 indicate expansion; below 50 indicate contraction. It is one of the most timely and market-moving economic indicators — released on the first business day of each month. The new orders component is particularly forward-looking. PMI is tracked on Axiom's Macro and Leading Indicators tabs.",
+      "The ISM Manufacturing PMI is a monthly survey-based diffusion index of US manufacturing activity. Readings above 50 indicate expansion; below 50 indicate contraction. It is one of the most timely and market-moving economic indicators — released on the first business day of each month. The new orders component is particularly forward-looking. PMI is tracked on EconoSift's Macro and Leading Indicators tabs.",
     related: ["leading-indicators", "cfnai", "industrial-production"],
   },
   {
@@ -2806,7 +2806,7 @@ export const TERMS: WikiTerm[] = [
     term: "GSCPI (Global Supply Chain Pressure Index)",
     category: "regime",
     definition:
-      "The GSCPI is a New York Fed index aggregating global transportation costs and supply chain indicators into a single measure. Positive readings indicate above-average supply chain pressure (delays, bottlenecks, rising shipping costs). It spiked dramatically during COVID and was a key leading indicator of the subsequent inflation surge. Axiom tracks GSCPI on the Macro Leading Indicators tab.",
+      "The GSCPI is a New York Fed index aggregating global transportation costs and supply chain indicators into a single measure. Positive readings indicate above-average supply chain pressure (delays, bottlenecks, rising shipping costs). It spiked dramatically during COVID and was a key leading indicator of the subsequent inflation surge. EconoSift tracks GSCPI on the Macro Leading Indicators tab.",
     related: ["ism-pmi", "ppi", "inflation"],
   },
   {
@@ -2814,7 +2814,7 @@ export const TERMS: WikiTerm[] = [
     term: "IS-LM-PC Framework",
     category: "regime",
     definition:
-      "The IS-LM-PC framework is a macroeconomic model integrating the Goods Market (IS curve: investment-savings equilibrium), Money Market (LM curve: liquidity preference-money supply equilibrium), and Phillips Curve (PC: inflation-unemployment relationship). It explains how fiscal policy shifts the IS curve, monetary policy shifts the LM curve, and the resulting output-inflation dynamics. Axiom's Macro Lab tab displays IS and LM curves normalised to a base year.",
+      "The IS-LM-PC framework is a macroeconomic model integrating the Goods Market (IS curve: investment-savings equilibrium), Money Market (LM curve: liquidity preference-money supply equilibrium), and Phillips Curve (PC: inflation-unemployment relationship). It explains how fiscal policy shifts the IS curve, monetary policy shifts the LM curve, and the resulting output-inflation dynamics. EconoSift's Macro Lab tab displays IS and LM curves normalised to a base year.",
     related: ["phillips-curve", "quantity-theory", "econ-lab"],
   },
   {
@@ -2830,7 +2830,7 @@ export const TERMS: WikiTerm[] = [
     term: "Quantity Theory of Money",
     category: "regime",
     definition:
-      "The Quantity Theory of Money — expressed as MV = PQ — states that Money Supply (M) × Velocity (V) = Price Level (P) × Real Output (Q). It implies that, all else equal, an increase in the money supply leads to proportional inflation. Axiom's Macro Inflation tab plots M2 money supply and GDP side by side to visualise the relationship. The theory is a long-run framework; in the short run, velocity can change and break the simple proportionality.",
+      "The Quantity Theory of Money — expressed as MV = PQ — states that Money Supply (M) × Velocity (V) = Price Level (P) × Real Output (Q). It implies that, all else equal, an increase in the money supply leads to proportional inflation. EconoSift's Macro Inflation tab plots M2 money supply and GDP side by side to visualise the relationship. The theory is a long-run framework; in the short run, velocity can change and break the simple proportionality.",
     related: ["m2-money-supply", "inflation", "gdp", "is-lm-pc"],
   },
 
@@ -2850,7 +2850,7 @@ export const TERMS: WikiTerm[] = [
     term: "STLFSI (St. Louis Fed Financial Stress Index)",
     category: "credit",
     definition:
-      "The St. Louis Fed Financial Stress Index measures the degree of financial stress in US markets using 18 weekly data series — including interest rates, yield spreads, and volatility indicators. A value of zero represents normal conditions; positive values indicate above-average stress. Spikes above 2–3 historically coincide with major financial disruptions. Axiom uses the STLFSI alongside the NFCI on the Financial Conditions tab.",
+      "The St. Louis Fed Financial Stress Index measures the degree of financial stress in US markets using 18 weekly data series — including interest rates, yield spreads, and volatility indicators. A value of zero represents normal conditions; positive values indicate above-average stress. Spikes above 2–3 historically coincide with major financial disruptions. EconoSift uses the STLFSI alongside the NFCI on the Financial Conditions tab.",
     related: ["nfci", "financial-conditions", "ted-spread", "vix"],
   },
   {
@@ -2858,7 +2858,7 @@ export const TERMS: WikiTerm[] = [
     term: "Financial Conditions",
     category: "credit",
     definition:
-      "Financial conditions describe the overall ease or tightness of financing in the economy — encompassing interest rates, credit spreads, equity market conditions, and lending standards. Easy financial conditions support economic growth and risk-taking; tight conditions constrain activity. Central banks influence financial conditions directly through policy rates and balance sheet operations. Axiom's Policy page provides a dedicated Financial Conditions tab with multiple indicators.",
+      "Financial conditions describe the overall ease or tightness of financing in the economy — encompassing interest rates, credit spreads, equity market conditions, and lending standards. Easy financial conditions support economic growth and risk-taking; tight conditions constrain activity. Central banks influence financial conditions directly through policy rates and balance sheet operations. EconoSift's Policy page provides a dedicated Financial Conditions tab with multiple indicators.",
     related: ["nfci", "stlfsi", "ig-oas", "fed-funds-rate"],
   },
   {
@@ -2866,7 +2866,7 @@ export const TERMS: WikiTerm[] = [
     term: "EPU (Economic Policy Uncertainty Index)",
     category: "credit",
     definition:
-      "The Economic Policy Uncertainty Index — developed by Baker, Bloom, and Davis — quantifies policy-related economic uncertainty by analysing newspaper coverage frequency of terms related to the economy, policy, and uncertainty. Elevated EPU is associated with lower investment, reduced hiring, and higher risk premia. The index spikes around elections, major legislation, and geopolitical crises. Axiom displays EPU with a log-scale toggle on the Financial Conditions panel.",
+      "The Economic Policy Uncertainty Index — developed by Baker, Bloom, and Davis — quantifies policy-related economic uncertainty by analysing newspaper coverage frequency of terms related to the economy, policy, and uncertainty. Elevated EPU is associated with lower investment, reduced hiring, and higher risk premia. The index spikes around elections, major legislation, and geopolitical crises. EconoSift displays EPU with a log-scale toggle on the Financial Conditions panel.",
     related: ["financial-conditions", "vix", "stlfsi"],
   },
   {
@@ -2874,7 +2874,7 @@ export const TERMS: WikiTerm[] = [
     term: "COT (Commitments of Traders)",
     category: "credit",
     definition:
-      "The Commitments of Traders report is a weekly CFTC publication showing the aggregate positions of different trader categories — commercial hedgers, large speculators, and small traders — in US futures markets. The net speculative position (long minus short) reveals where 'smart money' and 'dumb money' are positioned in assets like currencies, commodities, and Treasury futures. Extreme net speculative positions can be contrarian signals. Axiom's Positioning tab on the Macro page displays COT data for major markets.",
+      "The Commitments of Traders report is a weekly CFTC publication showing the aggregate positions of different trader categories — commercial hedgers, large speculators, and small traders — in US futures markets. The net speculative position (long minus short) reveals where 'smart money' and 'dumb money' are positioned in assets like currencies, commodities, and Treasury futures. Extreme net speculative positions can be contrarian signals. EconoSift's Positioning tab on the Macro page displays COT data for major markets.",
     related: ["net-speculative-position", "net-commercial-position", "cot-index", "fx"],
   },
   {
@@ -2882,7 +2882,7 @@ export const TERMS: WikiTerm[] = [
     term: "13F Filings",
     category: "credit",
     definition:
-      "13F filings are quarterly SEC reports disclosing the long equity holdings of institutional investment managers with over $100 million in assets. They are filed 45 days after quarter-end, so the data is always slightly stale. Despite the lag, 13F data reveals institutional positioning trends — which stocks the 'whales' are accumulating or distributing. Axiom's Markets page provides 13F analysis for individual tickers.",
+      "13F filings are quarterly SEC reports disclosing the long equity holdings of institutional investment managers with over $100 million in assets. They are filed 45 days after quarter-end, so the data is always slightly stale. Despite the lag, 13F data reveals institutional positioning trends — which stocks the 'whales' are accumulating or distributing. EconoSift's Markets page provides 13F analysis for individual tickers.",
     related: ["form-4", "insider-buy-sell", "institutional-ownership"],
   },
   {
@@ -2890,7 +2890,7 @@ export const TERMS: WikiTerm[] = [
     term: "Form 4 (Insider Transactions)",
     category: "credit",
     definition:
-      "Form 4 is an SEC filing that corporate insiders — executives, directors, and 10%+ owners — must file within two business days of trading their company's stock. Insider buying is generally considered a stronger signal than selling (which can occur for diversification or tax reasons). Clusters of insider buying — multiple insiders buying near the same time — are considered particularly bullish. Axiom's Markets page tracks Form 4 filings.",
+      "Form 4 is an SEC filing that corporate insiders — executives, directors, and 10%+ owners — must file within two business days of trading their company's stock. Insider buying is generally considered a stronger signal than selling (which can occur for diversification or tax reasons). Clusters of insider buying — multiple insiders buying near the same time — are considered particularly bullish. EconoSift's Markets page tracks Form 4 filings.",
     related: ["13f", "insider-buy-sell", "short-float"],
   },
   {
@@ -2910,7 +2910,7 @@ export const TERMS: WikiTerm[] = [
     term: "Sovereign Risk",
     category: "sovereign",
     definition:
-      "Sovereign risk is the risk that a national government will default on its debt obligations or restructure them on terms unfavourable to creditors. It is assessed using a combination of fiscal metrics (debt/GDP, fiscal balance), external metrics (current account, foreign reserves), and market-based signals (CDS spreads, bond yield spreads versus safe havens). Axiom's Sovereign page provides a traffic-light risk dashboard for 8 major developed economies using World Bank indicators.",
+      "Sovereign risk is the risk that a national government will default on its debt obligations or restructure them on terms unfavourable to creditors. It is assessed using a combination of fiscal metrics (debt/GDP, fiscal balance), external metrics (current account, foreign reserves), and market-based signals (CDS spreads, bond yield spreads versus safe havens). EconoSift's Sovereign page provides a traffic-light risk dashboard for 8 major developed economies using World Bank indicators.",
     related: ["debt-to-gdp", "current-account", "fiscal-balance", "traffic-light"],
   },
   {
@@ -2934,7 +2934,7 @@ export const TERMS: WikiTerm[] = [
     term: "Fiscal Balance (% of GDP)",
     category: "sovereign",
     definition:
-      "The fiscal balance is government revenue minus expenditure, as a percentage of GDP. A negative fiscal balance is a deficit — the government is borrowing to cover the gap. Persistent large deficits (>3% of GDP) add to the debt stock each year. A positive balance (surplus) is rare and signals fiscal discipline. Fiscal balance is a key World Bank indicator in Axiom's sovereign risk panel.",
+      "The fiscal balance is government revenue minus expenditure, as a percentage of GDP. A negative fiscal balance is a deficit — the government is borrowing to cover the gap. Persistent large deficits (>3% of GDP) add to the debt stock each year. A positive balance (surplus) is rare and signals fiscal discipline. Fiscal balance is a key World Bank indicator in EconoSift's sovereign risk panel.",
     related: ["debt-to-gdp", "sovereign-risk", "country-risk"],
   },
   {
@@ -2942,7 +2942,7 @@ export const TERMS: WikiTerm[] = [
     term: "Foreign Reserves Growth",
     category: "sovereign",
     definition:
-      "Foreign reserves are central bank holdings of foreign currencies, gold, and SDRs used to back liabilities and influence exchange rate policy. Reserves growth (year-over-year) indicates whether a country is building or depleting its external buffers. Declining reserves — especially in emerging markets — is a classic warning sign of impending currency or debt crisis. It is one of the six KPIs in Axiom's sovereign risk panel.",
+      "Foreign reserves are central bank holdings of foreign currencies, gold, and SDRs used to back liabilities and influence exchange rate policy. Reserves growth (year-over-year) indicates whether a country is building or depleting its external buffers. Declining reserves — especially in emerging markets — is a classic warning sign of impending currency or debt crisis. It is one of the six KPIs in EconoSift's sovereign risk panel.",
     related: ["sovereign-risk", "current-account", "central-bank"],
   },
   {
@@ -2950,7 +2950,7 @@ export const TERMS: WikiTerm[] = [
     term: "Traffic-Light System (Risk)",
     category: "sovereign",
     definition:
-      "The traffic-light system classifies sovereign risk indicators as Green (safe), Yellow (watch), or Red (warning) based on predefined thresholds. For example, Debt/GDP > 100% might be Yellow, > 150% Red. The system provides an intuitive visual dashboard: a country with all greens is in strong fiscal health; multiple reds signal serious concerns. Axiom's Sovereign page uses traffic lights for 6 KPIs across 8 countries.",
+      "The traffic-light system classifies sovereign risk indicators as Green (safe), Yellow (watch), or Red (warning) based on predefined thresholds. For example, Debt/GDP > 100% might be Yellow, > 150% Red. The system provides an intuitive visual dashboard: a country with all greens is in strong fiscal health; multiple reds signal serious concerns. EconoSift's Sovereign page uses traffic lights for 6 KPIs across 8 countries.",
     related: ["sovereign-risk", "country-risk", "composite-score-sovereign"],
   },
   {
@@ -2958,7 +2958,7 @@ export const TERMS: WikiTerm[] = [
     term: "Spread vs US (Sovereign Yield Spread)",
     category: "sovereign",
     definition:
-      "The spread vs US is a country's 10-year government bond yield minus the US 10-year Treasury yield. It measures the credit risk premium markets demand for holding that country's debt instead of US debt. Germany and Japan often have negative spreads (their bonds yield less than US Treasuries). Widening spreads — particularly for Italy, Spain, or emerging markets — signal rising sovereign stress. Axiom's Sovereign page calculates and ranks spreads for 8 major economies.",
+      "The spread vs US is a country's 10-year government bond yield minus the US 10-year Treasury yield. It measures the credit risk premium markets demand for holding that country's debt instead of US debt. Germany and Japan often have negative spreads (their bonds yield less than US Treasuries). Widening spreads — particularly for Italy, Spain, or emerging markets — signal rising sovereign stress. EconoSift's Sovereign page calculates and ranks spreads for 8 major economies.",
     related: ["sovereign-risk", "foreign-10y", "yield-10y", "country-risk"],
   },
   {
@@ -2978,7 +2978,7 @@ export const TERMS: WikiTerm[] = [
     term: "Pooled OLS",
     category: "econlab",
     definition:
-      "Pooled Ordinary Least Squares is a regression technique that estimates a single equation using panel data — combining cross-sectional (multiple countries) and time-series (multiple years) observations into one dataset. It treats all observations as independent, ignoring country-specific fixed effects. While simple, it can suffer from omitted variable bias if country-specific factors are important. Axiom's Econometric Lab implements pooled OLS using numpy + scipy (no statsmodels dependency).",
+      "Pooled Ordinary Least Squares is a regression technique that estimates a single equation using panel data — combining cross-sectional (multiple countries) and time-series (multiple years) observations into one dataset. It treats all observations as independent, ignoring country-specific fixed effects. While simple, it can suffer from omitted variable bias if country-specific factors are important. EconoSift's Econometric Lab implements pooled OLS using numpy + scipy (no statsmodels dependency).",
     related: ["dependent-variable", "independent-variable", "coefficient", "r-squared-econ"],
   },
   {
@@ -2986,7 +2986,7 @@ export const TERMS: WikiTerm[] = [
     term: "Dependent Variable (Y)",
     category: "econlab",
     definition:
-      "The dependent variable is the outcome being explained or predicted in a regression model. In Axiom's Econometric Lab, the user selects Y from available World Bank indicators (e.g., GDP Growth, Inflation, Unemployment). The regression estimates how changes in the independent variable(s) are associated with changes in the dependent variable.",
+      "The dependent variable is the outcome being explained or predicted in a regression model. In EconoSift's Econometric Lab, the user selects Y from available World Bank indicators (e.g., GDP Growth, Inflation, Unemployment). The regression estimates how changes in the independent variable(s) are associated with changes in the dependent variable.",
     related: ["independent-variable", "pooled-ols", "coefficient"],
   },
   {
@@ -3018,7 +3018,7 @@ export const TERMS: WikiTerm[] = [
     term: "t-Statistic (t-Stat)",
     category: "econlab",
     definition:
-      "The t-statistic = Coefficient / Standard Error. It tests the null hypothesis that the true coefficient is zero (no relationship). As a rule of thumb, |t| > 2.0 is statistically significant at the 95% confidence level. The t-stat is the most commonly reported test statistic in regression output. Axiom's Econometric Lab computes t-statistics using numpy linear algebra and scipy.stats.t for p-values.",
+      "The t-statistic = Coefficient / Standard Error. It tests the null hypothesis that the true coefficient is zero (no relationship). As a rule of thumb, |t| > 2.0 is statistically significant at the 95% confidence level. The t-stat is the most commonly reported test statistic in regression output. EconoSift's Econometric Lab computes t-statistics using numpy linear algebra and scipy.stats.t for p-values.",
     related: ["p-value", "coefficient", "standard-error", "significance-stars"],
   },
   {
@@ -3066,7 +3066,7 @@ export const TERMS: WikiTerm[] = [
     term: "BIC (Bayesian Information Criterion)",
     category: "econlab",
     definition:
-      "BIC = k·ln(n) − 2·ln(L̂). Like AIC, it balances fit vs complexity, but BIC's penalty for additional parameters grows with the sample size (n), making it more conservative — BIC favours simpler models than AIC for large datasets. Lower BIC is better. Both AIC and BIC are reported in Axiom's Econometric Lab regression output.",
+      "BIC = k·ln(n) − 2·ln(L̂). Like AIC, it balances fit vs complexity, but BIC's penalty for additional parameters grows with the sample size (n), making it more conservative — BIC favours simpler models than AIC for large datasets. Lower BIC is better. Both AIC and BIC are reported in EconoSift's Econometric Lab regression output.",
     related: ["aic", "adjusted-r-squared", "r-squared-econ", "pooled-ols"],
   },
   {
@@ -3074,7 +3074,7 @@ export const TERMS: WikiTerm[] = [
     term: "Residuals",
     category: "econlab",
     definition:
-      "Residuals are the differences between actual Y values and the model's predicted Y values: eᵢ = Yᵢ − Ŷᵢ. They represent what the model cannot explain. A good regression model has residuals that are randomly scattered around zero with no discernible pattern. Patterns in residuals — like a funnel shape or curvature — indicate model misspecification. Axiom's Econometric Lab provides a residual scatter plot for visual diagnosis.",
+      "Residuals are the differences between actual Y values and the model's predicted Y values: eᵢ = Yᵢ − Ŷᵢ. They represent what the model cannot explain. A good regression model has residuals that are randomly scattered around zero with no discernible pattern. Patterns in residuals — like a funnel shape or curvature — indicate model misspecification. EconoSift's Econometric Lab provides a residual scatter plot for visual diagnosis.",
     related: ["pooled-ols", "r-squared-econ", "ssr"],
   },
   {
@@ -3082,7 +3082,7 @@ export const TERMS: WikiTerm[] = [
     term: "LinAlgError / Singular Matrix",
     category: "econlab",
     definition:
-      "A singular matrix error occurs in regression when the independent variables are perfectly or near-perfectly collinear — meaning one X can be expressed as a linear combination of the others. This makes the design matrix non-invertible and the coefficients undefined. In practice, this happens when variables are redundant (e.g., including both 'Total Population' and 'Urban Population' when they are nearly proportional). Axiom's Econometric Lab detects and flags near-singular design matrices.",
+      "A singular matrix error occurs in regression when the independent variables are perfectly or near-perfectly collinear — meaning one X can be expressed as a linear combination of the others. This makes the design matrix non-invertible and the coefficients undefined. In practice, this happens when variables are redundant (e.g., including both 'Total Population' and 'Urban Population' when they are nearly proportional). EconoSift's Econometric Lab detects and flags near-singular design matrices.",
     related: ["pooled-ols", "multicollinearity", "coefficient"],
   },
 
@@ -3094,7 +3094,7 @@ export const TERMS: WikiTerm[] = [
     term: "Choropleth Map",
     category: "atlas",
     definition:
-      "A choropleth map is a thematic map where geographic regions (countries) are shaded or coloured in proportion to a statistical variable. Darker or more intense colours represent higher values. Axiom's Atlas page uses a choropleth world map to display 6 macro indicators — GDP Growth, Inflation, Unemployment, Debt/GDP, Current Account, and GDP Per Capita — across ~200 countries, with colour coding from cool (low) to warm (high).",
+      "A choropleth map is a thematic map where geographic regions (countries) are shaded or coloured in proportion to a statistical variable. Darker or more intense colours represent higher values. EconoSift's Atlas page uses a choropleth world map to display 6 macro indicators — GDP Growth, Inflation, Unemployment, Debt/GDP, Current Account, and GDP Per Capita — across ~200 countries, with colour coding from cool (low) to warm (high).",
     related: ["atlas-indicators", "regional-blocs", "year-slider", "kpi-strip"],
   },
   {
@@ -3102,7 +3102,7 @@ export const TERMS: WikiTerm[] = [
     term: "Atlas Indicators (6)",
     category: "atlas",
     definition:
-      "Axiom's Atlas page maps 6 key macroeconomic indicators using World Bank data: GDP Growth (annual %), Inflation (CPI, annual %), Unemployment (% of labour force), Debt/GDP (central government debt as % of GDP), Current Account (% of GDP), and GDP Per Capita (current US$). These six indicators provide a comprehensive cross-section of a country's economic health — growth, prices, labour, fiscal, external, and prosperity.",
+      "EconoSift's Atlas page maps 6 key macroeconomic indicators using World Bank data: GDP Growth (annual %), Inflation (CPI, annual %), Unemployment (% of labour force), Debt/GDP (central government debt as % of GDP), Current Account (% of GDP), and GDP Per Capita (current US$). These six indicators provide a comprehensive cross-section of a country's economic health — growth, prices, labour, fiscal, external, and prosperity.",
     related: ["choropleth", "atlas", "world-bank"],
   },
   {
@@ -3110,7 +3110,7 @@ export const TERMS: WikiTerm[] = [
     term: "Regional Blocs",
     category: "atlas",
     definition:
-      "Axiom's Atlas allows filtering by predefined regional groupings: G7 (the 7 largest advanced economies), G20 (major advanced and emerging economies), Eurozone (the 20 euro-using EU members), and Emerging Markets. Filtering to a bloc highlights just those countries on the map and recalculates the KPI strip and Top-10/Bottom-10 rankings accordingly.",
+      "EconoSift's Atlas allows filtering by predefined regional groupings: G7 (the 7 largest advanced economies), G20 (major advanced and emerging economies), Eurozone (the 20 euro-using EU members), and Emerging Markets. Filtering to a bloc highlights just those countries on the map and recalculates the KPI strip and Top-10/Bottom-10 rankings accordingly.",
     related: ["atlas", "choropleth", "g7", "g20"],
   },
   {
@@ -3146,7 +3146,7 @@ export const TERMS: WikiTerm[] = [
     term: "Macro Event (Economic Calendar)",
     category: "calendar",
     definition:
-      "A macro event is a scheduled economic data release — such as CPI, NFP, GDP, FOMC decisions, ISM PMI, or retail sales — displayed on Axiom's Calendar page. Each event is tagged by country, date, impact level (1–3 stars), and source (FRED or Finnhub). Macro events are the primary drivers of short-term market volatility, and traders monitor the calendar to anticipate and position for key releases.",
+      "A macro event is a scheduled economic data release — such as CPI, NFP, GDP, FOMC decisions, ISM PMI, or retail sales — displayed on EconoSift's Calendar page. Each event is tagged by country, date, impact level (1–3 stars), and source (FRED or Finnhub). Macro events are the primary drivers of short-term market volatility, and traders monitor the calendar to anticipate and position for key releases.",
     related: ["impact-level", "fred-calendar", "finnhub-calendar", "earnings-event"],
   },
   {
@@ -3154,7 +3154,7 @@ export const TERMS: WikiTerm[] = [
     term: "Earnings Event",
     category: "calendar",
     definition:
-      "An earnings event is a company's scheduled quarterly earnings report, displayed on the Calendar with the ticker, reporting time (BMO — before market open, or AMC — after market close), EPS estimate, and actual EPS (once reported). Earnings events are the most important recurring catalysts for individual stocks. Axiom sources earnings dates from Finnhub and displays them alongside macro events on the unified Calendar page.",
+      "An earnings event is a company's scheduled quarterly earnings report, displayed on the Calendar with the ticker, reporting time (BMO — before market open, or AMC — after market close), EPS estimate, and actual EPS (once reported). Earnings events are the most important recurring catalysts for individual stocks. EconoSift sources earnings dates from Finnhub and displays them alongside macro events on the unified Calendar page.",
     related: ["bmo-amc", "eps-estimate-actual", "surprise-pct", "macro-event"],
   },
   {
@@ -3162,7 +3162,7 @@ export const TERMS: WikiTerm[] = [
     term: "Dividend Event (Ex-Dividend Date)",
     category: "calendar",
     definition:
-      "The ex-dividend date (ex-date) is the first day a stock trades without the right to receive its upcoming dividend. To receive the dividend, an investor must purchase the stock before the ex-date. On the ex-date, the stock price typically drops by approximately the dividend amount (all else equal). Axiom's Calendar page lists upcoming ex-dividend dates sourced from Finnhub.",
+      "The ex-dividend date (ex-date) is the first day a stock trades without the right to receive its upcoming dividend. To receive the dividend, an investor must purchase the stock before the ex-date. On the ex-date, the stock price typically drops by approximately the dividend amount (all else equal). EconoSift's Calendar page lists upcoming ex-dividend dates sourced from Finnhub.",
     related: ["dividend-yield", "calendar", "earnings-event"],
   },
   {
@@ -3170,7 +3170,7 @@ export const TERMS: WikiTerm[] = [
     term: "Impact Level (1–3 Stars)",
     category: "calendar",
     definition:
-      "Each macro event on Axiom's Calendar is assigned an impact rating of 1 to 3 stars, reflecting its typical market-moving significance. ⭐⭐⭐ events — NFP, FOMC decisions, CPI — consistently move markets. ⭐⭐ events — retail sales, industrial production, PPI — are significant but less consistently disruptive. ⭐ events — smaller country releases, secondary indicators — typically have limited market impact. The rating helps users prioritise which events to watch.",
+      "Each macro event on EconoSift's Calendar is assigned an impact rating of 1 to 3 stars, reflecting its typical market-moving significance. ⭐⭐⭐ events — NFP, FOMC decisions, CPI — consistently move markets. ⭐⭐ events — retail sales, industrial production, PPI — are significant but less consistently disruptive. ⭐ events — smaller country releases, secondary indicators — typically have limited market impact. The rating helps users prioritise which events to watch.",
     related: ["macro-event", "calendar", "fred-calendar"],
   },
   {
@@ -3194,7 +3194,7 @@ export const TERMS: WikiTerm[] = [
     term: "Surprise %",
     category: "calendar",
     definition:
-      "Surprise % = (Actual EPS − Estimated EPS) / |Estimated EPS| × 100. A surprise of +10% means the company beat estimates by 10%. Consistently positive earnings surprises are a hallmark of high-quality companies with conservative guidance. Large negative surprises often trigger sharp sell-offs and analyst downgrades. Axiom tracks earnings surprises on both the Calendar and Markets (Analyst) pages.",
+      "Surprise % = (Actual EPS − Estimated EPS) / |Estimated EPS| × 100. A surprise of +10% means the company beat estimates by 10%. Consistently positive earnings surprises are a hallmark of high-quality companies with conservative guidance. Large negative surprises often trigger sharp sell-offs and analyst downgrades. EconoSift tracks earnings surprises on both the Calendar and Markets (Analyst) pages.",
     related: ["eps-estimate-actual", "beat-miss-inline", "earnings-event"],
   },
   {
@@ -3210,7 +3210,7 @@ export const TERMS: WikiTerm[] = [
     term: "FRED Calendar",
     category: "calendar",
     definition:
-      "The FRED (Federal Reserve Economic Data) calendar provides release dates for US economic data published by the Federal Reserve, BLS, BEA, Census Bureau, and other US statistical agencies. Axiom uses the FRED API to populate the Calendar with US macro event dates — including CPI, NFP, GDP, FOMC meetings, and more. A valid FRED_API_KEY is required for this feature.",
+      "The FRED (Federal Reserve Economic Data) calendar provides release dates for US economic data published by the Federal Reserve, BLS, BEA, Census Bureau, and other US statistical agencies. EconoSift uses the FRED API to populate the Calendar with US macro event dates — including CPI, NFP, GDP, FOMC meetings, and more. A valid FRED_API_KEY is required for this feature.",
     related: ["macro-event", "calendar", "fred", "finnhub-calendar"],
   },
 
@@ -3222,7 +3222,7 @@ export const TERMS: WikiTerm[] = [
     term: "Treemap (Squarified)",
     category: "treemap",
     definition:
-      "A treemap is a data visualisation that displays hierarchical data as nested rectangles — each rectangle's area is proportional to a quantitative variable. Axiom's Treemap page applies this to stock market indices: each box represents a stock, the box area is proportional to log(market cap), the colour represents return over the selected period (green for positive, red for negative), and boxes are grouped by GICS sector. The squarified algorithm produces rectangles as close to squares as possible, improving readability.",
+      "A treemap is a data visualisation that displays hierarchical data as nested rectangles — each rectangle's area is proportional to a quantitative variable. EconoSift's Treemap page applies this to stock market indices: each box represents a stock, the box area is proportional to log(market cap), the colour represents return over the selected period (green for positive, red for negative), and boxes are grouped by GICS sector. The squarified algorithm produces rectangles as close to squares as possible, improving readability.",
     related: ["area-market-cap", "color-return", "sector-grouping"],
   },
   {
@@ -3230,7 +3230,7 @@ export const TERMS: WikiTerm[] = [
     term: "Area = log(Market Cap)",
     category: "treemap",
     definition:
-      "On Axiom's Treemap, each stock's box area is determined by the logarithm of its market capitalisation, not its raw market cap. This log scaling prevents mega-cap stocks (Apple, $3T+) from completely dominating the map while still making larger companies visibly larger than smaller ones. Without log scaling, a handful of large companies would fill most of the treemap, making the rest invisible.",
+      "On EconoSift's Treemap, each stock's box area is determined by the logarithm of its market capitalisation, not its raw market cap. This log scaling prevents mega-cap stocks (Apple, $3T+) from completely dominating the map while still making larger companies visibly larger than smaller ones. Without log scaling, a handful of large companies would fill most of the treemap, making the rest invisible.",
     related: ["treemap", "color-return", "market-cap"],
   },
   {
@@ -3246,7 +3246,7 @@ export const TERMS: WikiTerm[] = [
     term: "Sector Grouping (Treemap)",
     category: "treemap",
     definition:
-      "The treemap groups stocks by GICS sector, with each sector in a clearly delineated region. This hierarchical organisation reveals sector-level patterns: are all tech stocks green, or is the sector's performance being carried by just one giant? The grouping can be toggled to industry-level drill-down for finer granularity. Axiom supports S&P 500, Nasdaq 100, and Dow 30 treemap views.",
+      "The treemap groups stocks by GICS sector, with each sector in a clearly delineated region. This hierarchical organisation reveals sector-level patterns: are all tech stocks green, or is the sector's performance being carried by just one giant? The grouping can be toggled to industry-level drill-down for finer granularity. EconoSift supports S&P 500, Nasdaq 100, and Dow 30 treemap views.",
     related: ["treemap", "area-market-cap", "spdr-sector-etfs", "industry-drill-down"],
   },
 
@@ -3258,7 +3258,7 @@ export const TERMS: WikiTerm[] = [
     term: "Stress Scenario (Historical)",
     category: "stress",
     definition:
-      "A stress scenario replays a portfolio through an actual historical crisis to estimate potential losses. Axiom offers four scenarios: the 2008 Financial Crisis (peak-to-trough ~2007–2009), the COVID Crash (Feb–Mar 2020), the 2022 Rate Hike cycle (Fed tightening), and the Dot-Com Bust (2000–2002). Each scenario applies the actual daily returns from that crisis period to the current portfolio weights, showing what the maximum drawdown and total loss would have been.",
+      "A stress scenario replays a portfolio through an actual historical crisis to estimate potential losses. EconoSift offers four scenarios: the 2008 Financial Crisis (peak-to-trough ~2007–2009), the COVID Crash (Feb–Mar 2020), the 2022 Rate Hike cycle (Fed tightening), and the Dot-Com Bust (2000–2002). Each scenario applies the actual daily returns from that crisis period to the current portfolio weights, showing what the maximum drawdown and total loss would have been.",
     related: ["stress-testing", "monte-carlo-risk", "maximum-drawdown", "var"],
   },
   {
@@ -3298,7 +3298,7 @@ export const TERMS: WikiTerm[] = [
     term: "Simulation Count (Monte Carlo)",
     category: "stress",
     definition:
-      "The simulation count is the number of random paths generated in a Monte Carlo simulation. More simulations produce more stable and reliable estimates. Axiom uses 10,000 simulations by default for portfolio Monte Carlo analysis, which is sufficient for most practical purposes. Higher counts (100K+) reduce sampling error but increase computation time. For options pricing, the count is adjusted via the 🔴 Run Analysis button.",
+      "The simulation count is the number of random paths generated in a Monte Carlo simulation. More simulations produce more stable and reliable estimates. EconoSift uses 10,000 simulations by default for portfolio Monte Carlo analysis, which is sufficient for most practical purposes. Higher counts (100K+) reduce sampling error but increase computation time. For options pricing, the count is adjusted via the 🔴 Run Analysis button.",
     related: ["monte-carlo-risk", "monte-carlo-portfolio", "horizon"],
   },
   {
@@ -3306,7 +3306,7 @@ export const TERMS: WikiTerm[] = [
     term: "Horizon (Days, Monte Carlo)",
     category: "stress",
     definition:
-      "The horizon is the forward-looking time period — in trading days — over which Monte Carlo simulations project portfolio values. A 1-year (252-day) horizon with 10,000 simulations generates 10,000 possible 1-year portfolio outcomes. Shorter horizons produce narrower distributions; longer horizons produce wider, more uncertain distributions. The horizon is user-selectable on Axiom's Risk page.",
+      "The horizon is the forward-looking time period — in trading days — over which Monte Carlo simulations project portfolio values. A 1-year (252-day) horizon with 10,000 simulations generates 10,000 possible 1-year portfolio outcomes. Shorter horizons produce narrower distributions; longer horizons produce wider, more uncertain distributions. The horizon is user-selectable on EconoSift's Risk page.",
     related: ["monte-carlo-risk", "monte-carlo-portfolio", "simulation-count"],
   },
   {
@@ -3322,7 +3322,7 @@ export const TERMS: WikiTerm[] = [
     term: "Monte Carlo Distribution",
     category: "stress",
     definition:
-      "The Monte Carlo distribution is the histogram of all simulated portfolio outcomes — typically displayed as a bell-shaped (or skewed) curve. It provides a full picture of risk beyond single-point estimates like VaR. The shape reveals asymmetry (skew) and tail thickness (kurtosis). Axiom plots the distribution on the Portfolio and Risk pages, allowing investors to visualise the range of possible outcomes rather than relying on a single expected value.",
+      "The Monte Carlo distribution is the histogram of all simulated portfolio outcomes — typically displayed as a bell-shaped (or skewed) curve. It provides a full picture of risk beyond single-point estimates like VaR. The shape reveals asymmetry (skew) and tail thickness (kurtosis). EconoSift plots the distribution on the Portfolio and Risk pages, allowing investors to visualise the range of possible outcomes rather than relying on a single expected value.",
     related: ["monte-carlo-risk", "monte-carlo-portfolio", "var", "realized-skewness"],
   },
 
@@ -3342,7 +3342,7 @@ export const TERMS: WikiTerm[] = [
     term: "Return Periods (1D / 1W / 1M / 3M / 6M / 1Y / 2Y / 5Y)",
     category: "misc",
     definition:
-      "Return periods define the lookback window for calculating performance. 1D = daily return, 1W = weekly (5 trading days), 1M = monthly (~21 days), 3M = quarterly, 6M = semi-annual, 1Y = annual (252 days), 2Y and 5Y for longer-term analysis. Each period reveals different aspects of performance — shorter periods capture momentum and news reactions; longer periods capture structural trends and compounding effects. Axiom offers multiple period selectors across its pages.",
+      "Return periods define the lookback window for calculating performance. 1D = daily return, 1W = weekly (5 trading days), 1M = monthly (~21 days), 3M = quarterly, 6M = semi-annual, 1Y = annual (252 days), 2Y and 5Y for longer-term analysis. Each period reveals different aspects of performance — shorter periods capture momentum and news reactions; longer periods capture structural trends and compounding effects. EconoSift offers multiple period selectors across its pages.",
     related: ["ytd", "annualised-return", "rolling-metrics"],
   },
   {
@@ -3350,7 +3350,7 @@ export const TERMS: WikiTerm[] = [
     term: "Sparkline",
     category: "misc",
     definition:
-      "A sparkline is a small, word-sized inline chart — typically a simplified line chart without axes or labels — that shows the general shape of price movement over time. Axiom uses sparklines in the Screener results tables and Watchlist to give an at-a-glance sense of recent price action without the visual weight of a full chart. They are data-rich but design-minimal, following Edward Tufte's 'data-ink ratio' philosophy.",
+      "A sparkline is a small, word-sized inline chart — typically a simplified line chart without axes or labels — that shows the general shape of price movement over time. EconoSift uses sparklines in the Screener results tables and Watchlist to give an at-a-glance sense of recent price action without the visual weight of a full chart. They are data-rich but design-minimal, following Edward Tufte's 'data-ink ratio' philosophy.",
     related: ["normalised-price", "screener", "price-chart"],
   },
   {
@@ -3358,7 +3358,7 @@ export const TERMS: WikiTerm[] = [
     term: "Cached Data",
     category: "misc",
     definition:
-      "Cached data in Axiom refers to responses stored in a two-tier system — memory (fast, ephemeral) and SQLite WAL-mode database (persistent, survives restarts) — with a 60-minute TTL. When a request is made, the cache is checked first; if valid cached data exists, it is returned instantly without making an external API call. If expired or absent, the data is fetched fresh and cached. This dramatically reduces external API calls and improves response times.",
+      "Cached data in EconoSift refers to responses stored in a two-tier system — memory (fast, ephemeral) and SQLite WAL-mode database (persistent, survives restarts) — with a 60-minute TTL. When a request is made, the cache is checked first; if valid cached data exists, it is returned instantly without making an external API call. If expired or absent, the data is fetched fresh and cached. This dramatically reduces external API calls and improves response times.",
     related: ["sqlite", "stale-cache", "hybrid-cache"],
   },
   {
@@ -3366,7 +3366,7 @@ export const TERMS: WikiTerm[] = [
     term: "Compute Tiers (🟢 🟡 🔴)",
     category: "misc",
     definition:
-      "Axiom classifies computations into three tiers by cost: 🟢 Green (auto-compute on page load — e.g., price charts, basic ratios, KPIs); 🟡 Yellow (triggered by a 'Calculate' button — e.g., GARCH, cointegration, Black-Litterman); 🔴 Red (heavy computation triggered by 'Run Analysis' — e.g., Monte Carlo options pricing, full-universe momentum deciles). This tiered system ensures fast page loads while still providing access to compute-intensive analyses on demand.",
+      "EconoSift classifies computations into three tiers by cost: 🟢 Green (auto-compute on page load — e.g., price charts, basic ratios, KPIs); 🟡 Yellow (triggered by a 'Calculate' button — e.g., GARCH, cointegration, Black-Litterman); 🔴 Red (heavy computation triggered by 'Run Analysis' — e.g., Monte Carlo options pricing, full-universe momentum deciles). This tiered system ensures fast page loads while still providing access to compute-intensive analyses on demand.",
     related: ["garch", "cointegration", "monte-carlo-risk", "black-litterman"],
   },
   {
@@ -3374,7 +3374,7 @@ export const TERMS: WikiTerm[] = [
     term: "Stale Cache",
     category: "misc",
     definition:
-      "A stale cache entry is cached data older than the TTL (60 minutes) but still present — it may be served immediately while a background refresh is triggered. If cache is older than 24 hours, it is considered severely stale and triggers a synchronous refresh. The staleness concept allows Axiom to balance data freshness with responsiveness: slightly stale data served instantly is often better than waiting for a fresh fetch.",
+      "A stale cache entry is cached data older than the TTL (60 minutes) but still present — it may be served immediately while a background refresh is triggered. If cache is older than 24 hours, it is considered severely stale and triggers a synchronous refresh. The staleness concept allows EconoSift to balance data freshness with responsiveness: slightly stale data served instantly is often better than waiting for a fresh fetch.",
     related: ["cached-data", "sqlite", "hybrid-cache"],
   },
   {
@@ -3382,7 +3382,7 @@ export const TERMS: WikiTerm[] = [
     term: "SQLite (WAL Mode)",
     category: "misc",
     definition:
-      "SQLite is the embedded database engine used by Axiom for persistent caching, job scheduling metadata, and daily price/quote/macro storage. WAL (Write-Ahead Logging) mode enables concurrent reads while a write is in progress, dramatically improving performance for read-heavy workloads. SQLite was chosen because it is serverless, requires zero configuration, stores the entire database in a single file, and is more than capable of handling Axiom's data volumes.",
+      "SQLite is the embedded database engine used by EconoSift for persistent caching, job scheduling metadata, and daily price/quote/macro storage. WAL (Write-Ahead Logging) mode enables concurrent reads while a write is in progress, dramatically improving performance for read-heavy workloads. SQLite was chosen because it is serverless, requires zero configuration, stores the entire database in a single file, and is more than capable of handling EconoSift's data volumes.",
     related: ["cached-data", "hybrid-cache", "stale-cache"],
   },
   {
@@ -3390,7 +3390,7 @@ export const TERMS: WikiTerm[] = [
     term: "FRED (Federal Reserve Economic Data)",
     category: "misc",
     definition:
-      "FRED is the Federal Reserve Bank of St. Louis's online database of over 800,000 economic time series — the primary source for US macroeconomic data at Axiom. It provides CPI, GDP, NFP, industrial production, interest rates, yield curve data, and thousands more series via a free API (API key required). FRED data is considered authoritative and is updated in near real-time as government agencies release reports.",
+      "FRED is the Federal Reserve Bank of St. Louis's online database of over 800,000 economic time series — the primary source for US macroeconomic data at EconoSift. It provides CPI, GDP, NFP, industrial production, interest rates, yield curve data, and thousands more series via a free API (API key required). FRED data is considered authoritative and is updated in near real-time as government agencies release reports.",
     related: ["fred-calendar", "world-bank", "yfinance"],
   },
   {
@@ -3398,7 +3398,7 @@ export const TERMS: WikiTerm[] = [
     term: "Finnhub",
     category: "misc",
     definition:
-      "Finnhub is a third-party financial data API providing real-time stock quotes, company news, earnings calendars, economic events, insider transactions, SEC filings, and analyst estimates. Axiom uses Finnhub to supplement yfinance and FRED data for calendar events, news feeds, and institutional ownership data. A free-tier API key supports limited requests; the Axiom user's FINNHUB_API_KEY is configured in the environment.",
+      "Finnhub is a third-party financial data API providing real-time stock quotes, company news, earnings calendars, economic events, insider transactions, SEC filings, and analyst estimates. EconoSift uses Finnhub to supplement yfinance and FRED data for calendar events, news feeds, and institutional ownership data. A free-tier API key supports limited requests; the EconoSift user's FINNHUB_API_KEY is configured in the environment.",
     related: ["fred", "yfinance", "finnhub-calendar", "calendar"],
   },
   {
@@ -3406,7 +3406,7 @@ export const TERMS: WikiTerm[] = [
     term: "World Bank API",
     category: "misc",
     definition:
-      "The World Bank API provides free access to global development indicators covering ~200 countries from 1960 to present — GDP, inflation, population, education, health, infrastructure, and hundreds more. It is the primary data source for Axiom's Atlas page, Country Risk panel, and Econometric Lab. Data is accessed via pandas-datareader and does not require an API key. The World Bank's indicator coverage varies by country and year — gaps are common for smaller/less-developed nations.",
+      "The World Bank API provides free access to global development indicators covering ~200 countries from 1960 to present — GDP, inflation, population, education, health, infrastructure, and hundreds more. It is the primary data source for EconoSift's Atlas page, Country Risk panel, and Econometric Lab. Data is accessed via pandas-datareader and does not require an API key. The World Bank's indicator coverage varies by country and year — gaps are common for smaller/less-developed nations.",
     related: ["fred", "atlas", "country-risk", "econ-lab"],
   },
   {
@@ -3414,7 +3414,7 @@ export const TERMS: WikiTerm[] = [
     term: "yfinance",
     category: "misc",
     definition:
-      "yfinance is the Python library that provides Axiom with free access to Yahoo Finance data — historical prices, fundamentals, analyst estimates, options chains, and more. It works by querying Yahoo's publicly available API endpoints. While freely available, it is subject to rate limiting (Axiom handles this with 401 retry logic and caching) and occasional schema changes. yfinance is reliable enough for a self-hosted analytics platform but should not be used for real-time trading.",
+      "yfinance is the Python library that provides EconoSift with free access to Yahoo Finance data — historical prices, fundamentals, analyst estimates, options chains, and more. It works by querying Yahoo's publicly available API endpoints. While freely available, it is subject to rate limiting (EconoSift handles this with 401 retry logic and caching) and occasional schema changes. yfinance is reliable enough for a self-hosted analytics platform but should not be used for real-time trading.",
     related: ["fred", "finnhub", "cached-data", "pandas-datareader"],
   },
   {
@@ -3422,7 +3422,7 @@ export const TERMS: WikiTerm[] = [
     term: "pandas-datareader",
     category: "misc",
     definition:
-      "pandas-datareader is a Python library that provides a unified interface for reading data from various internet sources — FRED, World Bank, OECD, and others — directly into pandas DataFrames. Axiom uses it extensively in macro services to fetch FRED series and World Bank indicators. It abstracts away the differences between source APIs, providing a consistent .read() interface.",
+      "pandas-datareader is a Python library that provides a unified interface for reading data from various internet sources — FRED, World Bank, OECD, and others — directly into pandas DataFrames. EconoSift uses it extensively in macro services to fetch FRED series and World Bank indicators. It abstracts away the differences between source APIs, providing a consistent .read() interface.",
     related: ["fred", "world-bank", "yfinance", "oecd"],
   },
   {
@@ -3430,7 +3430,7 @@ export const TERMS: WikiTerm[] = [
     term: "OECD Data",
     category: "misc",
     definition:
-      "The OECD (Organisation for Economic Co-operation and Development) publishes economic data for its 38 member countries — GDP, inflation, employment, trade, and more. Axiom uses OECD central bank policy rate series (via FRED's OECD-sourced data) for G10 carry calculations and CB policy tracking. OECD data is generally high quality with consistent methodology across countries, making it ideal for cross-country comparisons.",
+      "The OECD (Organisation for Economic Co-operation and Development) publishes economic data for its 38 member countries — GDP, inflation, employment, trade, and more. EconoSift uses OECD central bank policy rate series (via FRED's OECD-sourced data) for G10 carry calculations and CB policy tracking. OECD data is generally high quality with consistent methodology across countries, making it ideal for cross-country comparisons.",
     related: ["fred", "world-bank", "g10-currencies", "central-bank"],
   },
   {
@@ -3438,7 +3438,7 @@ export const TERMS: WikiTerm[] = [
     term: "Ken French Data Library",
     category: "misc",
     definition:
-      "The Ken French Data Library, maintained by Dartmouth professor Kenneth French, is the authoritative source for Fama-French factor returns — Mkt-RF, SMB, HML, RMW, CMA, and the risk-free rate — updated daily. The data is freely available as CSV files. Axiom downloads these files to compute Fama-French 3-factor and 5-factor attribution for portfolios and individual stocks. The library also provides industry portfolio returns and momentum factor data.",
+      "The Ken French Data Library, maintained by Dartmouth professor Kenneth French, is the authoritative source for Fama-French factor returns — Mkt-RF, SMB, HML, RMW, CMA, and the risk-free rate — updated daily. The data is freely available as CSV files. EconoSift downloads these files to compute Fama-French 3-factor and 5-factor attribution for portfolios and individual stocks. The library also provides industry portfolio returns and momentum factor data.",
     related: ["fama-french", "smb", "hml", "rmw", "cma"],
   },
 ];

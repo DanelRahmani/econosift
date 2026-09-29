@@ -7,7 +7,7 @@ import { Card, Skeleton } from "@/components/ui";
 import { fmtNum, fmtPct } from "@/lib/format";
 import { ValuationKpiPanel } from "@/components/markets/ValuationKpiPanel";
 import { ValuationModelsGrid } from "@/components/markets/ValuationModelsGrid";
-import { AxiomGauge } from "@/components/markets/AxiomGauge";
+import { EconoSiftGauge } from "@/components/markets/EconoSiftGauge";
 import { AnalystPanel } from "@/components/markets/AnalystPanel";
 import { SnowflakeChart } from "@/components/markets/SnowflakeChart";
 
@@ -82,9 +82,9 @@ export function ValuationEngine({
         <div className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
-              <h3 className="text-sm font-semibold mb-3 text-text-secondary">Axiom Fair Value</h3>
-              <AxiomGauge
-                axiom={data.valuation.axiomFairValue}
+              <h3 className="text-sm font-semibold mb-3 text-text-secondary">EconoSift Composite Fair Value</h3>
+              <EconoSiftGauge
+                composite={data.valuation.axiomFairValue}
                 spotPrice={data.valuation.spotPrice}
                 currency={data.valuation.currency}
               />

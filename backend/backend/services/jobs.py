@@ -1,4 +1,4 @@
-﻿"""Background scheduler jobs for Axiom Finance.
+"""Background scheduler jobs for EconoSift.
 
 APScheduler-based daily jobs that pre-fetch data into the SQLite persistence
 layer.  DB imports are deferred (lazy) to avoid circular imports at module load

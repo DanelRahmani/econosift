@@ -1,8 +1,21 @@
-# Axiom Finance Alpha 0.4
+# EconoSift
 
-A self-hosted, Dockerised financial analytics platform covering the full investment research stack — from macroeconomics to options pricing, portfolio optimisation to financial term dictionary.
+![EconoSift logo](frontend/public/econosift-logo-light.png)
 
-**No paid APIs required.** Optional free [FRED API key](https://fred.stlouisfed.org/docs/api/api_key.html) for richer US macro data, [Finnhub API key](https://finnhub.io/) for earnings and insider transactions, and [Gemini API key](https://aistudio.google.com/apikey) for AI-powered company, macro, and dashboard summaries.
+**An open-source, self-hosted research workbench for macroeconomics and financial markets.** EconoSift combines global economic data, quantitative analysis, portfolio and risk tools, and optional AI-assisted summaries in one application.
+
+[![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](LICENSE) · [Releases](https://github.com/DanelRahmani/econosift/releases) · [Report an issue](https://github.com/DanelRahmani/econosift/issues)
+
+EconoSift is built for independent research and runs on your own machine or server. No paid data APIs are required. Optional [FRED](https://fred.stlouisfed.org/docs/api/api_key.html) and [Finnhub](https://finnhub.io/) keys add coverage, while an optional [Gemini API key](https://aistudio.google.com/apikey) enables AI-generated company, macro, and dashboard summaries.
+
+### Explore
+
+- **Macro:** compare countries and explore inflation, growth, employment, fiscal, energy, trade, FX, and financial conditions data.
+- **Markets:** screen equities, review company fundamentals and valuation models, and inspect technical and options analytics.
+- **Quant research:** test portfolio strategies, study cross-asset relationships, and run econometric, factor, momentum, and carry analyses.
+- **Portfolio and risk:** analyze allocation, attribution, drawdowns, volatility, stress scenarios, and options exposures.
+
+Run it with Docker Compose or install the native Windows or Linux desktop build. See [Quick Start](#-quick-start) and [Desktop App](#-desktop-app) below.
 
 ---
 
@@ -47,18 +60,20 @@ A self-hosted, Dockerised financial analytics platform covering the full investm
 
 ## 🎨 Theme
 
-Axiom Finance includes a built-in light/dark theme toggle (persisted to `localStorage`).
+EconoSift includes a built-in light/dark theme toggle (persisted to `localStorage`).
 
 | Token | Light | Dark |
 |-------|-------|------|
 | Background | Pure white (`#ffffff`) | Greyish-black (`#0c0c0e`) |
 | Card surface | Near-white (`rgb(248,248,251)`) | Dark grey (`rgb(22,22,26)`) |
-| Accent | Deep maroon (`#6b0f1a`) | Crimson (`#c4394a`) |
+| Accent | Deep navy (`#142A43`) | Muted teal (`#2F8F83`) |
+| Secondary accent | Muted teal (`#2F8F83`) | Light teal (`#54AEA1`) |
+| Warning highlight | Warm amber (`#D99A36`) | Warm amber (`#D99A36`) |
 | Text | Charcoal (`rgb(15,15,20)`) | Near-white (`rgb(242,242,247)`) |
 
-The maroon/crimson accent is the Axiom brand signature — it provides a distinctive pop against the neutral grey backgrounds in both themes. All chart palettes, tooltips, borders, and secondary text tokens are driven by CSS variables, so they automatically adapt when toggling themes (Recharts tooltips/axes/legends included, for readability in dark mode).
+The EconoSift palette uses deep navy and muted teal, with restrained amber for warnings and highlights. The dark-mode logo switches to teal and amber details with a near-white wordmark for contrast. All chart palettes, tooltips, borders, and secondary text tokens are driven by CSS variables, so they adapt when toggling themes.
 
-**Custom theme maker.** Beyond the light/dark base themes, **Admin → Appearance** lets you pick your own **Primary** and **Accent** brand colours. They override the `--primary` / `--primary-light` CSS variables on top of either theme, are saved per-device to `localStorage`, and are re-applied before first paint (no flash). "Reset to default" restores the Axiom maroon/crimson.
+**Custom theme maker.** Beyond the light/dark base themes, **Admin → Appearance** lets you pick your own **Primary** and **Accent** colours. They override the `--primary` / `--primary-light` CSS variables on top of either theme, are saved per-device to `localStorage`, and are re-applied before first paint. "Reset to default" restores the EconoSift navy/teal palette.
 
 ---
 
@@ -81,8 +96,8 @@ The maroon/crimson accent is the Axiom brand signature — it provides a distinc
 ## 🚀 Quick Start
 
 ```bash
-git clone https://github.com/your-username/axiomfinance.git
-cd axiomfinance
+git clone https://github.com/DanelRahmani/econosift.git
+cd econosift
 
 cp .env.example .env   # optional: add FRED_API_KEY + FINNHUB_API_KEY (both have free tiers)
 docker compose up -d    # builds and starts everything
@@ -101,28 +116,32 @@ docker compose down     # stop everything
 
 ## 🖥️ Desktop App (v1.0.0) — Windows & Linux
 
-Axiom Finance ships as a **native desktop app** for Windows and Linux — no Docker required. A [Tauri](https://tauri.app/) v2 shell hosts the static Next.js frontend and spawns the FastAPI backend (frozen with PyInstaller) as a local child process on `127.0.0.1:8000`. App data (SQLite DB, settings, `.env` API keys) lives in the OS app-data dir (`%APPDATA%/AxiomFinance` on Windows, `~/.local/share/AxiomFinance` on Linux). macOS packaging is deferred and is not part of the release build.
+EconoSift ships as a **native desktop app** for Windows and Linux — no Docker required. A [Tauri](https://tauri.app/) v2 shell hosts the static Next.js frontend and spawns the FastAPI backend (frozen with PyInstaller) as a local child process on `127.0.0.1:8000`. New installs use `%APPDATA%/EconoSift` on Windows and `~/.local/share/EconoSift` on Linux; existing Axiom Finance data directories are reused on upgrade. macOS packaging is deferred and is not part of the release build.
 
 | OS | Installer | Notes |
 |----|-----------|-------|
-| **Windows** | NSIS `*-setup.exe` | Published via Git LFS at `releases/AxiomFinance-1.0.0-x64-setup.exe`. |
+| **Windows** | NSIS `*-setup.exe` | Attached to the GitHub Release after both platform builds succeed. |
 | **Linux** | `*.deb` (Debian/Ubuntu, amd64) | AppImage is not shipped — it can't be bundled on GitHub's runners (see `ACTIVE_ISSUES.md` P3-13). |
 
-- **Install:** download the installer for your OS (from the CI artifacts / release) and run it. A splash screen appears while the analysis engine warms up, then the dashboard loads live data. Add optional FRED / Finnhub / Gemini API keys from the in-app **Admin** page — no rebuild needed, just restart.
+- **Install:** download the installer for your OS from the repository's GitHub Releases and run it. Every successful `PRODUCTION` build publishes a numbered prerelease; version tags (`v*`) publish stable releases. A splash screen appears while the analysis engine warms up, then the dashboard loads live data. Add optional FRED / Finnhub / Gemini API keys from the in-app **Admin** page — no rebuild needed, just restart.
 - **Build from source (Windows):**
   ```powershell
-  # one-time: Python venv + deps, Rust (stable-msvc), VS C++ Build Tools, Node
+# one-time: Python venv + deps, Rust (stable-msvc), VS C++ Build Tools, Node
   powershell -ExecutionPolicy Bypass -File desktop\build-windows.ps1
   ```
-  Produces `desktop/src-tauri/target/release/bundle/nsis/Axiom Finance_<ver>_x64-setup.exe`.
-- **CI:** `.github/workflows/build-desktop.yml` builds Windows and Linux installers on native `windows-latest` and `ubuntu-latest` runners (freeze → stage → `tauri build`) and uploads them as artifacts. PyInstaller can't cross-compile, so each OS freezes its own backend on its own runner.
+  Produces `desktop/src-tauri/target/release/bundle/nsis/EconoSift_<ver>_x64-setup.exe`.
+- **CI:** `.github/workflows/build-desktop.yml` builds Windows and Linux installers on native `windows-latest` and `ubuntu-latest` runners (freeze → stage → `tauri build`). It uploads Actions artifacts and publishes the installers to a GitHub Release after both platform builds succeed. PyInstaller can't cross-compile, so each OS freezes its own backend on its own runner.
 - **Releasing:** `main` is feature development (no installers). Cut a desktop build with **Actions ▸ "Promote main → PRODUCTION"**, which merges `main` into `PRODUCTION` and triggers the Windows/Linux build. See [`TAURI_BUILD.md`](./TAURI_BUILD.md) for the full flow and the contracts a `main` feature must respect to stay packageable.
 
 See [`desktop/README.md`](./desktop/README.md) for architecture and build details, and [`TAURI_BUILD.md`](./TAURI_BUILD.md) for the desktop release process.
 
+**Upgrade compatibility:** New desktop installs use an `EconoSift` app-data directory. Existing installs continue using their `AxiomFinance` data directory when it is present, so SQLite data and saved API keys are reused. The existing `axiomfinance.db` filename and legacy API response keys are retained for compatibility.
+
 ---
 
 ## 📡 API Endpoints
+
+Existing `/api/...` route paths, request parameters, and response keys are preserved. In particular, `axiomFairValue` and `axiomIndex` remain legacy JSON field names so existing clients continue to work; the in-app labels use EconoSift branding.
 
 The backend serves under `/api` (proxied by Nginx). Key endpoint groups:
 
@@ -347,7 +366,7 @@ Without API keys, the platform gracefully degrades — using World Bank, IMF, an
 
 ## 🔒 Security model
 
-**Axiom has no authentication, by design.** It is a single-user, self-hosted
+**EconoSift has no authentication, by design.** It is a single-user, self-hosted
 research tool, so there are no accounts, sessions, or roles.
 
 That makes two things load-bearing:
@@ -360,7 +379,7 @@ That makes two things load-bearing:
   to loopback alone would not be enough: a web page you visit in your browser can
   reach `127.0.0.1`, and `PUT /api/admin/config` writes API keys to `.env`. The
   allowlist stops an arbitrary site from preflighting that request. Set
-  `AXIOM_CORS_ORIGINS` (comma-separated) to add origins when tunnelling.
+  `ECONOSIFT_CORS_ORIGINS` (comma-separated; legacy `AXIOM_CORS_ORIGINS` remains supported) to add origins when tunnelling.
 
 Do not expose this app to the internet without putting authentication in front
 of it.
@@ -382,4 +401,6 @@ docker compose build frontend && docker compose up -d --force-recreate frontend
 
 ## 📝 License
 
-MIT
+EconoSift is free and open-source software, released under the **GNU Affero General Public License v3.0**. See [LICENSE](LICENSE) for the full terms. If you run a modified version of EconoSift for users over a network, the AGPL requires you to offer those users the corresponding source code.
+
+The EconoSift name and logos identify the upstream project and are not granted for use as a way to imply endorsement by the project. The software license does not grant trademark rights.

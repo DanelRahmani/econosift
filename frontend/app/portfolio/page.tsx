@@ -26,7 +26,8 @@ import { ScenarioTab } from "@/components/portfolio/ScenarioTab";
 import { TransactionLog } from "@/components/portfolio/TransactionLog";
 import { WalkthroughBanner } from "@/components/WalkthroughBanner";
 
-const LS_KEY = "axiom_portfolio";
+const LS_KEY = "econosift_portfolio";
+const LEGACY_LS_KEY = "axiom_portfolio";
 
 const DEFAULT_HOLDINGS: Holding[] = [
   { ticker: "AAPL", weight: 40 },
@@ -43,10 +44,13 @@ type Tab = (typeof TABS)[number];
 
 function loadFromStorage(): Holding[] {
   try {
-    const raw = localStorage.getItem(LS_KEY);
+    const raw = localStorage.getItem(LS_KEY) ?? localStorage.getItem(LEGACY_LS_KEY);
     if (!raw) return DEFAULT_HOLDINGS;
     const parsed = JSON.parse(raw) as Holding[];
-    if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      if (!localStorage.getItem(LS_KEY)) localStorage.setItem(LS_KEY, JSON.stringify(parsed));
+      return parsed;
+    }
   } catch {
     // ignore
   }

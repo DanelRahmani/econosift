@@ -1,4 +1,11 @@
-# Changelog — Axiom Finance
+# Changelog — EconoSift
+
+## 2026-09-29 — EconoSift rebrand
+
+- Updated the product name, interface identity, logos, app theme, documentation, desktop/package identifiers, and release workflow artifact labels to EconoSift.
+- Kept API route paths, request parameters, and response keys unchanged, including the legacy `axiomFairValue` and `axiomIndex` keys.
+- Added browser-storage compatibility migration and preserved existing desktop app-data directories and the `axiomfinance.db` filename for upgrades.
+- Historical entries below describe the app and artifacts as they existed before the rebrand.
 
 > Concise build history. See commits for details.
 > All phases shipped via Docker Compose on a self-hosted Windows machine.

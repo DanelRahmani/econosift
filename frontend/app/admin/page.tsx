@@ -359,7 +359,7 @@ function AppearanceSection() {
           onClick={reset}
           className="px-3 py-1.5 rounded-lg text-sm font-medium border border-border text-text-secondary hover:text-text-primary hover:bg-surface-alt transition-colors"
         >Reset to default</button>
-        {!valid && <span className="text-xs text-danger">Enter valid 6-digit hex colours (e.g. #6b0f1a).</span>}
+        {!valid && <span className="text-xs text-danger">Enter valid 6-digit hex colours (e.g. #142A43).</span>}
       </div>
     </Card>
   );

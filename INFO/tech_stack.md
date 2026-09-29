@@ -1,8 +1,8 @@
-# Axiom Finance — Tech Stack (Phases 0–31)
+# EconoSift — Tech Stack (Phases 0–31)
 
 ## Overview
 
-Axiom Finance is a self-hosted financial analytics dashboard. The system is split into a Python backend API and a Next.js frontend, connected through an Nginx reverse proxy, all orchestrated with Docker Compose.
+EconoSift is a self-hosted financial analytics dashboard. The system is split into a Python backend API and a Next.js frontend, connected through an Nginx reverse proxy, all orchestrated with Docker Compose.
 
 ---
 

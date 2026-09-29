@@ -3,7 +3,7 @@
 import { Card, SemiGauge, chartPalette } from "@/components/ui";
 import { useTheme } from "@/components/ThemeProvider";
 import { fmtPrice, fmtPct, currencySymbol } from "@/lib/format";
-import type { AxiomFairValue } from "@/lib/types";
+import type { CompositeFairValue } from "@/lib/types";
 
 const VERDICT_COLORS: Record<string, string> = {
   "Significantly Undervalued": "#16a34a",
@@ -22,36 +22,36 @@ function upsideToGaugeValue(upsidePct: number | null): number {
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
-export function AxiomGauge({
-  axiom,
+export function EconoSiftGauge({
+  composite,
   spotPrice,
   currency,
 }: {
-  axiom: AxiomFairValue;
+  composite: CompositeFairValue;
   spotPrice: number | null;
   currency: string;
 }) {
   const { theme } = useTheme();
   const sym = currencySymbol(currency);
-  const verdictColor = VERDICT_COLORS[axiom.verdict] ?? "#8a6770";
+  const verdictColor = VERDICT_COLORS[composite.verdict] ?? "#8a6770";
   const isInsufficient =
-    axiom.verdict === "Insufficient Data" || axiom.value === null;
+    composite.verdict === "Insufficient Data" || composite.value === null;
 
-  const gaugeValue = isInsufficient ? 50 : upsideToGaugeValue(axiom.upsidePct);
+  const gaugeValue = isInsufficient ? 50 : upsideToGaugeValue(composite.upsidePct);
   const gaugeColor = isInsufficient ? "#8a6770" : verdictColor;
 
   // Upside% sign colour
   const upsideColor =
-    axiom.upsidePct === null
+    composite.upsidePct === null
       ? "#8a6770"
-      : axiom.upsidePct > 0.02
+      : composite.upsidePct > 0.02
       ? "#16a34a"
-      : axiom.upsidePct < -0.02
+      : composite.upsidePct < -0.02
       ? "#c4394a"
       : "#d97706";
 
   // Weights breakdown — sort descending by weight
-  const weights = Object.entries(axiom.weightsUsed ?? {}).sort(
+  const weights = Object.entries(composite.weightsUsed ?? {}).sort(
     ([, a], [, b]) => b - a
   );
 
@@ -83,14 +83,14 @@ export function AxiomGauge({
           <>
             {/* Verdict */}
             <p className="text-sm font-semibold" style={{ color: verdictColor }}>
-              {axiom.verdict}
+              {composite.verdict}
             </p>
 
             {/* Fair value vs spot */}
             <div className="flex items-center justify-center gap-3 text-sm">
               <span className="text-text-secondary text-xs">Fair Value</span>
               <span className="font-mono font-semibold text-text-primary">
-                {fmtPrice(axiom.value, sym)}
+                {fmtPrice(composite.value, sym)}
               </span>
             </div>
             {spotPrice !== null && (
@@ -101,13 +101,13 @@ export function AxiomGauge({
             )}
 
             {/* Upside % */}
-            {axiom.upsidePct !== null && (
+            {composite.upsidePct !== null && (
               <p
                 className="text-lg font-bold font-mono"
                 style={{ color: upsideColor }}
               >
-                {axiom.upsidePct >= 0 ? "+" : ""}
-                {fmtPct(axiom.upsidePct * 100, 1)} upside
+                {composite.upsidePct >= 0 ? "+" : ""}
+                {fmtPct(composite.upsidePct * 100, 1)} upside
               </p>
             )}
           </>
@@ -132,7 +132,7 @@ export function AxiomGauge({
                     className="h-full rounded-full"
                     style={{
                       width: `${Math.min(100, weight * 100)}%`,
-                      backgroundColor: "#c4394a",
+                      backgroundColor: "#2F8F83",
                     }}
                   />
                 </div>

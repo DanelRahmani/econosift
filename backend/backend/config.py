@@ -12,13 +12,14 @@ load_dotenv()
 # ── Data directory (OS-appropriate for desktop app, configurable for Docker) ──
 
 def _default_data_dir() -> Path:
-    """Return the OS-standard app data directory for Axiom Finance.
+    """Return the OS-standard app data directory for EconoSift.
 
     Order of precedence:
-    1. AXIOM_DATA_DIR env var (set by Tauri shell in desktop mode)
-    2. Platform-appropriate default (e.g. %APPDATA%/AxiomFinance on Windows)
+    1. ECONOSIFT_DATA_DIR, then the legacy AXIOM_DATA_DIR
+    2. Existing EconoSift directory, then the legacy Axiom Finance directory,
+       then the new EconoSift default
     """
-    env_dir = os.getenv("AXIOM_DATA_DIR")
+    env_dir = os.getenv("ECONOSIFT_DATA_DIR") or os.getenv("AXIOM_DATA_DIR")
     if env_dir:
         return Path(env_dir)
 
@@ -28,7 +29,13 @@ def _default_data_dir() -> Path:
         base = Path.home() / "Library" / "Application Support"
     else:
         base = Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local" / "share"))
-    return base / "AxiomFinance"
+    current = base / "EconoSift"
+    legacy = base / "AxiomFinance"
+    if current.exists():
+        return current
+    if legacy.exists():
+        return legacy
+    return current
 
 
 DATA_DIR = _default_data_dir()

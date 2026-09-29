@@ -14,7 +14,7 @@ interface CountryRate {
 
 /**
  * Valuation tab: shared discount rate selector at the top, then the Phase 1
- * valuation engine (8 models + Axiom composite + fundamentals + analyst data)
+ * valuation engine (8 models + EconoSift composite + fundamentals + analyst data)
  * and interactive two-stage DCF panel below.
  */
 export function ValuationTab({

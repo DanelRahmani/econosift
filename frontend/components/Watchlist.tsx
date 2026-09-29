@@ -6,8 +6,10 @@ import type { Quote } from "@/lib/types";
 import { Card } from "@/components/ui";
 import { fmtPct, fmtPrice, currencySymbol } from "@/lib/format";
 
-const STORAGE_KEY = "axiom-watchlist";
-const ALERTS_KEY = "axiom-watchlist-alerts";
+const STORAGE_KEY = "econosift-watchlist";
+const LEGACY_STORAGE_KEY = "axiom-watchlist";
+const ALERTS_KEY = "econosift-watchlist-alerts";
+const LEGACY_ALERTS_KEY = "axiom-watchlist-alerts";
 
 interface Props {
   onSelect?: (ticker: string) => void;
@@ -31,10 +33,18 @@ export function Watchlist({ onSelect }: Props) {
 
   useEffect(() => {
     try {
-      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
-      if (Array.isArray(saved)) setTickers(saved);
-      const savedAlerts = JSON.parse(localStorage.getItem(ALERTS_KEY) || "{}");
-      if (savedAlerts && typeof savedAlerts === "object") setAlerts(savedAlerts);
+      const savedRaw = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(LEGACY_STORAGE_KEY);
+      const saved = JSON.parse(savedRaw || "[]");
+      if (Array.isArray(saved)) {
+        setTickers(saved);
+        if (savedRaw && !localStorage.getItem(STORAGE_KEY)) localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
+      }
+      const alertsRaw = localStorage.getItem(ALERTS_KEY) ?? localStorage.getItem(LEGACY_ALERTS_KEY);
+      const savedAlerts = JSON.parse(alertsRaw || "{}");
+      if (savedAlerts && typeof savedAlerts === "object" && !Array.isArray(savedAlerts)) {
+        setAlerts(savedAlerts);
+        if (alertsRaw && !localStorage.getItem(ALERTS_KEY)) localStorage.setItem(ALERTS_KEY, JSON.stringify(savedAlerts));
+      }
     } catch {}
   }, []);
 
@@ -47,7 +57,7 @@ export function Watchlist({ onSelect }: Props) {
     const msg = `${ticker} is ${a.dir} ${a.price} — now ${price.toFixed(2)}`;
     try {
       if ("Notification" in window && Notification.permission === "granted") {
-        new Notification("Axiom price alert", { body: msg });
+        new Notification("EconoSift price alert", { body: msg });
       }
     } catch {}
   }

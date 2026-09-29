@@ -1,7 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
 /**
- * Playwright e2e config for Axiom Finance frontend.
+ * Playwright e2e config for EconoSift frontend.
  * Boots the Next.js dev server and runs specs in tests/e2e.
  * Backend is expected at http://localhost:8000 (set NEXT_PUBLIC_API_BASE
  * or run docker-compose for full-stack flows).

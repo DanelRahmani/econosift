@@ -27,8 +27,8 @@ interface Props {
 
 export function SnowflakeMini({ scores, overallScore, size = 100 }: Props) {
   const { theme } = useTheme();
-  const gridColor = theme === "dark" ? "#32171c" : "#ecdcdf";
-  const fillColor = theme === "dark" ? "#c4394a" : "#6b0f1a";
+  const gridColor = theme === "dark" ? "#183e3b" : "#e0ecea";
+  const fillColor = theme === "dark" ? "#2F8F83" : "#142A43";
 
   const radarData = AXES.map((label, i) => ({
     axis: label,

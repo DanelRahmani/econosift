@@ -148,7 +148,7 @@ async def dcf(
 async def full(ticker: str):
     """Full valuation bundle (compute tier: runs on page load).
 
-    Combines the 8-model valuation engine + Axiom composite, extended
+    Combines the 8-model valuation engine + EconoSift composite, extended
     fundamentals (Piotroski / Beneish / Ohlson / DuPont / ROIC / CCC), and
     analyst data (price targets, consensus, surprises, estimates).
     """

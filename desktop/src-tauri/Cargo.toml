@@ -1,13 +1,13 @@
 [package]
-name = "axiom-finance"
+name = "econosift"
 version = "1.0.0"
-description = "Axiom Finance Desktop App"
-authors = ["Axiom Finance"]
+description = "EconoSift Desktop App"
+authors = ["EconoSift"]
 edition = "2021"
 rust-version = "1.77"
 
 [lib]
-name = "axiom_finance_lib"
+name = "econosift_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

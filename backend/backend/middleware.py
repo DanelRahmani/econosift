@@ -1,4 +1,4 @@
-"""Custom ASGI middleware for Axiom Finance."""
+"""Custom ASGI middleware for EconoSift."""
 from __future__ import annotations
 
 import logging

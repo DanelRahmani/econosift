@@ -1,8 +1,8 @@
 # -*- mode: python ; coding: utf-8 -*-
 """
-PyInstaller build spec for Axiom Finance backend (Windows, onedir).
+PyInstaller build spec for EconoSift backend (Windows, onedir).
 
-Produces `dist/axiom-backend/axiom-backend.exe` + `_internal/` folder that the
+Produces `dist/econosift-backend/econosift-backend.exe` + `_internal/` folder that the
 Tauri app bundles as a `resources` directory and spawns at startup.
 
 Usage:
@@ -81,7 +81,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,          # onedir: binaries collected by COLLECT below
-    name="axiom-backend",
+    name="econosift-backend",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -102,5 +102,5 @@ coll = COLLECT(
     strip=False,
     upx=False,
     upx_exclude=[],
-    name="axiom-backend",
+    name="econosift-backend",
 )

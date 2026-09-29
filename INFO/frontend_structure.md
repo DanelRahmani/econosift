@@ -1,4 +1,4 @@
-# Axiom Finance — Frontend File Structure
+# EconoSift — Frontend File Structure
 
 > **Last updated:** 2026-06-29 — reflects all phases through Phase 31.
 > Pages: 24 · Components: 118 · Library files: 8
@@ -68,7 +68,7 @@ frontend/
 │   │
 │   ├── dashboard/              # BreadthBar, FearGreedGauge, GlobalIndices, TopMovers
 │   ├── markets/                # 26 files: PriceChart, QuoteCards, ValuationTab/Engine/ModelsGrid/KpiPanel,
-│   │                           #   DcfPanel, SnowflakeChart/Mini, AxiomGauge, TechnicalsTab, RatiosTab,
+│   │                           #   DcfPanel, SnowflakeChart/Mini, EconoSiftGauge, TechnicalsTab, RatiosTab,
 │   │                           #   RiskMetricsTable, CorrelationMatrix, FxRatesPanel, AnalystPanel,
 │   │                           #   InstitutionalHolders, InsiderActivity, NewsFeed, SectorHeatmap,
 │   │                           #   Treemap, RankingsTab, ScreenerTab, PortfolioTab, TabSkeleton,

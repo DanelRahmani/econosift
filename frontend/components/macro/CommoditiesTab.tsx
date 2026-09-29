@@ -95,9 +95,9 @@ export function CommoditiesTab() {
     date: pt.date.slice(0, 7),
     "Gold/Oil Ratio": pt.value,
   }));
-  const axiomData = (data.axiomIndex ?? []).map((pt) => ({
+  const commodityIndexData = (data.axiomIndex ?? []).map((pt) => ({
     date: pt.date.slice(0, 7),
-    "Axiom Commodity Index": pt.value,
+    "EconoSift Commodity Index": pt.value,
   }));
 
   return (
@@ -185,22 +185,22 @@ export function CommoditiesTab() {
         </Card>
       )}
 
-      {/* Axiom Commodity Index */}
-      {axiomData.length > 0 && (
+      {/* EconoSift Commodity Index */}
+      {commodityIndexData.length > 0 && (
         <Card className="p-4">
-          <h3 className="font-semibold mb-1">Axiom Commodity Index</h3>
+          <h3 className="font-semibold mb-1">EconoSift Commodity Index</h3>
           <p className="text-xs text-text-secondary mb-3">
             Equal-weighted basket of major commodities, indexed to 100 at inception.
           </p>
           <ResponsiveContainer width="100%" height={220}>
-            <AreaChart data={axiomData}>
+            <AreaChart data={commodityIndexData}>
               <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
               <XAxis dataKey="date" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
               <YAxis tick={{ fontSize: 11 }} />
               <Tooltip formatter={(v: number) => [v?.toFixed(1), "Index"]} />
               <Area
                 type="monotone"
-                dataKey="Axiom Commodity Index"
+                dataKey="EconoSift Commodity Index"
                 stroke="#10b981"
                 fill="#10b981"
                 fillOpacity={0.25}
