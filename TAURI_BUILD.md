@@ -5,8 +5,7 @@ This repo ships **two ways** from one codebase:
 - **Web / Docker** — the normal FastAPI + Next.js app you develop on `main`.
 - **Desktop** — the same app wrapped in a [Tauri](https://tauri.app/) v2 shell
   (`desktop/`) that spawns the PyInstaller-frozen backend as a local child
-  process. Windows and Linux installers are built by CI; macOS packaging is
-  deferred.
+  process. CI builds Windows, Linux, and Apple Silicon macOS installers.
 
 This file explains (1) what a feature on `main` must respect so it stays
 packageable as a desktop app, and (2) how to cut a desktop release.
@@ -58,7 +57,7 @@ If a change respects these four, it will package for desktop with no extra work.
 builds are cut from `PRODUCTION`:
 
 ```
-develop on main  ──►  Promote to PRODUCTION (one click)  ──►  Windows + Linux Tauri build
+develop on main  ──►  Promote to PRODUCTION (one click)  ──►  Windows + Linux + Apple Silicon macOS Tauri builds
 ```
 
 **To release:**
@@ -67,15 +66,16 @@ develop on main  ──►  Promote to PRODUCTION (one click)  ──►  Window
 2. Go to **Actions ▸ "Promote main → PRODUCTION" ▸ Run workflow**.
    - It merges `main` into `PRODUCTION`, pushes, and then triggers the build.
    - (Equivalent by hand: `git push origin main:PRODUCTION` when it fast-forwards.)
-3. **Actions ▸ "Build Windows and Linux Desktop"** runs on `PRODUCTION` and produces:
+3. **Actions ▸ "Build Windows, Linux, and macOS Desktop"** runs on `PRODUCTION` and produces:
 
    | OS | Artifact | Notes |
    |----|----------|-------|
    | Windows | NSIS `*-setup.exe` | |
    | Linux | `*.deb` (amd64) | AppImage not shipped — see `ACTIVE_ISSUES.md` P3-13 |
+   | macOS | `*_aarch64.dmg` | Apple Silicon only; unsigned and not notarized, so Gatekeeper may require first-launch approval |
 
    The workflow uploads them as run artifacts and then publishes a numbered
-   prerelease with both installers attached to GitHub Releases. Tagging a `v*`
+   prerelease with all installers attached to GitHub Releases. Tagging a `v*`
    release publishes a stable GitHub Release instead.
 
 **Versioning:** bump the version in `desktop/src-tauri/tauri.conf.json` before
@@ -85,7 +85,7 @@ using the workflow run number.
 ### Workflows involved
 
 - `.github/workflows/promote-to-production.yml` — the manual promote button.
-- `.github/workflows/build-desktop.yml` — the Windows/Linux matrix build (freeze backend
+- `.github/workflows/build-desktop.yml` — the Windows/Linux/macOS matrix build (freeze backend
   → stage into Tauri resources → `tauri build`). Triggers on push to
   `PRODUCTION`, on `v*` tags, and via manual dispatch.
 

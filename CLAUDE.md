@@ -54,9 +54,9 @@ The original `claude_plan.md` roadmap (Phases 0–12) is fully delivered, as is 
 
 > **After completing each phase, add a one-line entry to [`CHANGELOG.md`](./CHANGELOG.md)** with phase number, date, and concise description of what was shipped.
 
-### Windows and Linux Desktop Package (Tauri) — v1.0.0
+### Windows, Linux, and Apple Silicon Desktop Packages (Tauri) — v1.0.0
 
-Alongside the Docker deployment, EconoSift ships as a native Windows and Linux desktop app (`desktop/`); macOS packaging is deferred. A Tauri v2 Rust shell hosts the static Next.js export and spawns the FastAPI backend — frozen with PyInstaller **onedir** (`backend/build.spec`, `collect_all()` over the full dependency stack) — as a child process on `127.0.0.1:8000`. App data uses `ECONOSIFT_DATA_DIR` and falls back to `AXIOM_DATA_DIR`; existing Axiom Finance data directories are reused so upgrades retain the SQLite database and settings. Build Windows with `desktop/build-windows.ps1`; CI builds NSIS and Debian installers on native runners via `.github/workflows/build-desktop.yml`. See [`desktop/README.md`](./desktop/README.md) for build steps and DESK-01/DESK-02 in [`ACTIVE_ISSUES.md`](./ACTIVE_ISSUES.md) for known caveats.
+Alongside the Docker deployment, EconoSift ships as a native Windows, Linux, and Apple Silicon macOS desktop app (`desktop/`). A Tauri v2 Rust shell hosts the static Next.js export and spawns the FastAPI backend — frozen with PyInstaller **onedir** (`backend/build.spec`, `collect_all()` over the full dependency stack) — as a child process on `127.0.0.1:8000`. App data uses `ECONOSIFT_DATA_DIR` and falls back to `AXIOM_DATA_DIR`; existing Axiom Finance data directories are reused so upgrades retain the SQLite database and settings. Build Windows with `desktop/build-windows.ps1`; CI builds NSIS, Debian, and Apple Silicon DMG installers on native runners via `.github/workflows/build-desktop.yml`. The macOS DMG is unsigned and not notarized, so it may require Gatekeeper approval on first launch. See [`desktop/README.md`](./desktop/README.md) for build steps and DESK-01/DESK-02 in [`ACTIVE_ISSUES.md`](./ACTIVE_ISSUES.md) for known caveats.
 
 ### Module Maps
 

@@ -1,5 +1,11 @@
 # Changelog — EconoSift
 
+## 2026-09-30 — Apple Silicon desktop release builds
+
+- Added a native Apple Silicon macOS DMG build to the desktop release workflow and attach it alongside the Windows and Linux installers on GitHub Releases.
+- Updated desktop release documentation and linked the repository landing page directly to published installers.
+- The macOS DMG is unsigned and not notarized, so it may require Gatekeeper approval on first launch.
+
 ## 2026-09-29 — EconoSift rebrand
 
 - Updated the product name, interface identity, logos, app theme, documentation, desktop/package identifiers, and release workflow artifact labels to EconoSift.
