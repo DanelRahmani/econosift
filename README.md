@@ -1,8 +1,21 @@
-# EconoSift Alpha 0.4
+# EconoSift
 
-A self-hosted, Dockerised financial analytics platform covering the full investment research stack — from macroeconomics to options pricing, portfolio optimisation to financial term dictionary.
+![EconoSift logo](frontend/public/econosift-logo-light.png)
 
-**No paid APIs required.** Optional free [FRED API key](https://fred.stlouisfed.org/docs/api/api_key.html) for richer US macro data, [Finnhub API key](https://finnhub.io/) for earnings and insider transactions, and [Gemini API key](https://aistudio.google.com/apikey) for AI-powered company, macro, and dashboard summaries.
+**An open-source, self-hosted research workbench for macroeconomics and financial markets.** EconoSift combines global economic data, quantitative analysis, portfolio and risk tools, and optional AI-assisted summaries in one application.
+
+[![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](LICENSE) · [Releases](https://github.com/DanelRahmani/econosift/releases) · [Report an issue](https://github.com/DanelRahmani/econosift/issues)
+
+EconoSift is built for independent research and runs on your own machine or server. No paid data APIs are required. Optional [FRED](https://fred.stlouisfed.org/docs/api/api_key.html) and [Finnhub](https://finnhub.io/) keys add coverage, while an optional [Gemini API key](https://aistudio.google.com/apikey) enables AI-generated company, macro, and dashboard summaries.
+
+### Explore
+
+- **Macro:** compare countries and explore inflation, growth, employment, fiscal, energy, trade, FX, and financial conditions data.
+- **Markets:** screen equities, review company fundamentals and valuation models, and inspect technical and options analytics.
+- **Quant research:** test portfolio strategies, study cross-asset relationships, and run econometric, factor, momentum, and carry analyses.
+- **Portfolio and risk:** analyze allocation, attribution, drawdowns, volatility, stress scenarios, and options exposures.
+
+Run it with Docker Compose or install the native Windows or Linux desktop build. See [Quick Start](#-quick-start) and [Desktop App](#-desktop-app) below.
 
 ---
 
@@ -388,4 +401,6 @@ docker compose build frontend && docker compose up -d --force-recreate frontend
 
 ## 📝 License
 
-MIT
+EconoSift is free and open-source software, released under the **GNU Affero General Public License v3.0**. See [LICENSE](LICENSE) for the full terms. If you run a modified version of EconoSift for users over a network, the AGPL requires you to offer those users the corresponding source code.
+
+The EconoSift name and logos identify the upstream project and are not granted for use as a way to imply endorsement by the project. The software license does not grant trademark rights.
