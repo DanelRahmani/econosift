@@ -24,7 +24,7 @@ function KpiCard({ label, value, unit = "%", sub, sig }: {
   return (
     <Card className="p-4">
       <div className="text-xs text-text-secondary">{label}</div>
-      <div className={`text-2xl font-bold mt-1 ${sig ? signalColor(sig) : ""}`}>
+      <div className={`text-2xl font-bold mt-1 ${sig && value != null ? signalColor(sig) : ""}`}>
         {value != null ? `${value.toFixed(1)}${unit}` : "—"}
       </div>
       {sub && <div className="text-xs text-text-secondary mt-0.5">{sub}</div>}
@@ -71,13 +71,13 @@ export function EnergyTab() {
       {/* CO2 per capita */}
       {countries.length > 0 && (
         <Card className="p-4">
-          <h3 className="font-semibold mb-1">CO₂ Emissions per Capita (metric tons)</h3>
+          <h3 className="font-semibold mb-1">CO₂ Emissions per Capita (t CO₂e, excl. land use)</h3>
           <p className="text-xs text-text-secondary mb-3">
             Green &lt;5t · Yellow 5–10t · Red &gt;10t
           </p>
           <ResponsiveContainer width="100%" height={Math.max(300, countries.length * 24)}>
             <BarChart
-              data={countries.map((c) => ({ name: c.name, value: c.kpis.co2PerCapita ?? 0, sig: c.kpis.co2Signal }))}
+              data={countries.filter((c) => c.kpis.co2PerCapita != null).map((c) => ({ name: c.name, value: c.kpis.co2PerCapita, sig: c.kpis.co2Signal }))}
               layout="vertical" margin={{ left: 80, right: 40 }}
             >
               <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
@@ -87,7 +87,7 @@ export function EnergyTab() {
               <ReferenceLine x={5} stroke="#10b981" strokeDasharray="4 4" />
               <ReferenceLine x={10} stroke="#f59e0b" strokeDasharray="4 4" />
               <Bar dataKey="value" radius={[0, 4, 4, 0]}>
-                {(countries.map((c) => {
+                {(countries.filter((c) => c.kpis.co2PerCapita != null).map((c) => {
                   const color = c.kpis.co2Signal === "red" ? "#ef4444" : c.kpis.co2Signal === "yellow" ? "#f59e0b" : "#10b981";
                   return <Cell key={c.iso2} fill={color} fillOpacity={0.8} />;
                 }) as any)}
@@ -106,7 +106,7 @@ export function EnergyTab() {
           </p>
           <ResponsiveContainer width="100%" height={Math.max(300, countries.length * 24)}>
             <BarChart
-              data={countries.map((c) => ({ name: c.name, value: c.kpis.renewableShare ?? 0, sig: c.kpis.renewableSignal }))}
+              data={countries.filter((c) => c.kpis.renewableShare != null).map((c) => ({ name: c.name, value: c.kpis.renewableShare, sig: c.kpis.renewableSignal }))}
               layout="vertical" margin={{ left: 80, right: 40 }}
             >
               <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
@@ -116,7 +116,7 @@ export function EnergyTab() {
               <ReferenceLine x={30} stroke="#10b981" strokeDasharray="4 4" />
               <ReferenceLine x={15} stroke="#f59e0b" strokeDasharray="4 4" />
               <Bar dataKey="value" radius={[0, 4, 4, 0]}>
-                {(countries.map((c) => {
+                {(countries.filter((c) => c.kpis.renewableShare != null).map((c) => {
                   const color = c.kpis.renewableSignal === "red" ? "#ef4444" : c.kpis.renewableSignal === "yellow" ? "#f59e0b" : "#10b981";
                   return <Cell key={c.iso2} fill={color} fillOpacity={0.8} />;
                 }) as any)}
@@ -135,7 +135,7 @@ export function EnergyTab() {
           </p>
           <ResponsiveContainer width="100%" height={Math.max(300, countries.length * 24)}>
             <BarChart
-              data={countries.map((c) => ({ name: c.name, value: c.kpis.energyImports ?? 0, sig: c.kpis.energyImportsSignal }))}
+              data={countries.filter((c) => c.kpis.energyImports != null).map((c) => ({ name: c.name, value: c.kpis.energyImports, sig: c.kpis.energyImportsSignal }))}
               layout="vertical" margin={{ left: 80, right: 40 }}
             >
               <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
@@ -146,7 +146,7 @@ export function EnergyTab() {
               <ReferenceLine x={20} stroke="#10b981" strokeDasharray="4 4" />
               <ReferenceLine x={50} stroke="#f59e0b" strokeDasharray="4 4" />
               <Bar dataKey="value" radius={[0, 4, 4, 0]}>
-                {(countries.map((c) => {
+                {(countries.filter((c) => c.kpis.energyImports != null).map((c) => {
                   const color = c.kpis.energyImportsSignal === "red" ? "#ef4444" : c.kpis.energyImportsSignal === "yellow" ? "#f59e0b" : "#10b981";
                   return <Cell key={c.iso2} fill={color} fillOpacity={0.8} />;
                 }) as any)}
@@ -165,7 +165,7 @@ export function EnergyTab() {
           </p>
           <ResponsiveContainer width="100%" height={Math.max(300, countries.length * 24)}>
             <BarChart
-              data={countries.map((c) => ({ name: c.name, value: c.kpis.fossilRentsTotal ?? 0, sig: c.kpis.fossilRentsSignal }))}
+              data={countries.filter((c) => c.kpis.fossilRentsTotal != null).map((c) => ({ name: c.name, value: c.kpis.fossilRentsTotal, sig: c.kpis.fossilRentsSignal }))}
               layout="vertical" margin={{ left: 80, right: 40 }}
             >
               <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
@@ -175,7 +175,7 @@ export function EnergyTab() {
               <ReferenceLine x={2} stroke="#10b981" strokeDasharray="4 4" />
               <ReferenceLine x={10} stroke="#f59e0b" strokeDasharray="4 4" />
               <Bar dataKey="value" radius={[0, 4, 4, 0]}>
-                {(countries.map((c) => {
+                {(countries.filter((c) => c.kpis.fossilRentsTotal != null).map((c) => {
                   const color = c.kpis.fossilRentsSignal === "red" ? "#ef4444" : c.kpis.fossilRentsSignal === "yellow" ? "#f59e0b" : "#10b981";
                   return <Cell key={c.iso2} fill={color} fillOpacity={0.8} />;
                 }) as any)}

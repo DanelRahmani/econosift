@@ -109,7 +109,7 @@ async def get_trade_data() -> dict:
     top_surplus_val = countries_out[0]["kpis"]["tradeBalance"] if top_surplus else None
 
     return {
-        "asOf": str(datetime.now().date()),
+        "asOf": atlas_service.stamp_periods(countries_out),
         "source": "World Bank",
         "countries": countries_out,
         "summary": {

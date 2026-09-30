@@ -1,4 +1,5 @@
 import type {
+  CountryRate,
   PricesResponse, Quote, RiskResponse, ValuationResponse, RatiosResponse,
   SearchResult, Indicator, Country, MacroResponse, FxResponse,
   PortfolioResponse, SectorsResponse, RelStrengthResponse, ScreenerResponse,
@@ -56,7 +57,10 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 async function get<T>(path: string): Promise<T> {
   const res = await fetch(`${API_BASE}/api${path}`, { cache: "no-store" });
   if (!res.ok) {
-    throw new Error(`API ${path} failed: ${res.status}`);
+    // Surface the server's reason (FastAPI `detail`) so a page can say *why*
+    // data is missing instead of a bare status code.
+    const detail = await res.json().then((b) => (typeof b?.detail === "string" ? b.detail : null)).catch(() => null);
+    throw new Error(detail ?? `API ${path} failed: ${res.status}`);
   }
   return res.json() as Promise<T>;
 }
@@ -199,7 +203,7 @@ export const api = {
       `&wacc=${p.wacc}&stage1_years=${p.stage1_years}`),
 
   riskFreeRates: () =>
-    get<{ rates: { name: string; riskFreeRate: number; erp: number }[] }>("/valuation/risk-free-rates"),
+    get<{ rates: CountryRate[] }>("/valuation/risk-free-rates"),
 
   fxRates: (base: string) =>
     get<FxRatesResponse>(`/market/fx-rates?base=${encodeURIComponent(base)}`),

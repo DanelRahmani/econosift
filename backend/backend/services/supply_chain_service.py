@@ -61,13 +61,11 @@ async def get_supply_chain_data() -> dict:
 
         # Composite score: average of food + fuel import dependency
         # Higher = more vulnerable. Range: 0–100 (both are % of imports).
+        # Both shares are required: a single share passed off as the average
+        # of two is not comparable with the other countries' scores.
         composite: float | None = None
         if food_val is not None and fuel_val is not None:
             composite = round((food_val + fuel_val) / 2, 1)
-        elif food_val is not None:
-            composite = round(food_val, 1)
-        elif fuel_val is not None:
-            composite = round(fuel_val, 1)
 
         countries_out.append({
             "iso2": iso2,
@@ -75,6 +73,10 @@ async def get_supply_chain_data() -> dict:
             "compositeScore": composite,
             "foodImports": food_val,
             "fuelImports": fuel_val,
+            "periods": {
+                "foodImports": max(food_map) if food_map else None,
+                "fuelImports": max(fuel_map) if fuel_map else None,
+            },
         })
 
     countries_out.sort(
@@ -82,8 +84,10 @@ async def get_supply_chain_data() -> dict:
         reverse=True,
     )
 
+    years = [y for c in countries_out for y in c["periods"].values() if y]
+
     return {
-        "asOf": str(datetime.now().date()),
+        "asOf": str(max(years)) if years else None,
         "source": "World Bank",
         "methodology": "Composite = (food_import_share + fuel_import_share) / 2. Higher = more vulnerable to trade disruption.",
         "countries": countries_out,

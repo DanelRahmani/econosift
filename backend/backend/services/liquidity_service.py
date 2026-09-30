@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import date
 
 import pandas as pd
 
@@ -76,7 +75,8 @@ def _compute_net_liquidity(data: dict[str, list[dict]], spx_pts: list[dict]) -> 
     spx = _weekly_series(spx_pts, 1.0)
 
     return {
-        "asOf": str(date.today()),
+        # Date of the latest Fed balance-sheet (H.4.1) observation.
+        "asOf": max((p["date"] for p in data.get("WALCL", []) if p.get("value") is not None), default=None),
         "kpis": {
             "netLiquidity": net_latest,
             "netLiquidity4wChange": change_4w,

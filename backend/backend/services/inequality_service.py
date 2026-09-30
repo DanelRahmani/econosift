@@ -1,7 +1,12 @@
 """Inequality & Development service — Phase 29.
 
 Cross-country inequality indicators: Gini coefficient, income shares,
-poverty headcount ratios at $2.15/$3.65/$6.85/day, GDP per capita.
+poverty headcount ratios, GDP per capita.
+
+The World Bank re-based its poverty lines to 2021 PPP in June 2025: the series
+behind ``poverty_215`` / ``poverty_365`` / ``poverty_685`` (SI.POV.DDAY / LMIC /
+UMIC) now measure $3.00 / $4.20 / $8.30 a day. The keys keep their old names
+for API compatibility; labels must use the new lines.
 """
 from __future__ import annotations
 
@@ -64,7 +69,7 @@ async def get_inequality_data() -> dict:
     from ..config import iso2_to_iso3, COUNTRY_NAMES
 
     countries_out = []
-    for iso2 in INEQUALITY_COUNTRIES:
+    for iso2 in INEQ_COUNTRIES:
         iso3 = iso2_to_iso3(iso2)
         name = COUNTRY_NAMES.get(iso2, iso2)
 
@@ -105,7 +110,7 @@ async def get_inequality_data() -> dict:
     high_gini = sum(1 for c in countries_out if c["kpis"]["giniSignal"] == "red")
 
     return {
-        "asOf": str(datetime.now().date()),
+        "asOf": atlas_service.stamp_periods(countries_out),
         "source": "World Bank",
         "countries": countries_out,
         "summary": {

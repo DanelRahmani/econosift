@@ -248,9 +248,9 @@ export function HousingTab() {
           </p>
           <ResponsiveContainer width="100%" height={320}>
             <BarChart
-              data={globalHousing.countries.map((c) => ({
+              data={globalHousing.countries.filter((c) => c.yoyChange != null).map((c) => ({
                 name: c.name,
-                yoy: c.yoyChange ?? 0,
+                yoy: c.yoyChange,
               }))}
               layout="vertical"
               margin={{ left: 80, right: 40 }}
@@ -260,7 +260,7 @@ export function HousingTab() {
               <YAxis type="category" interval={0} dataKey="name" tick={{ fontSize: 11 }} width={90} tickFormatter={shortCountryName} />
               <Tooltip formatter={(v: number) => [`${v?.toFixed(2)}%`, "YoY Change"]} />
               <Bar dataKey="yoy" radius={[0, 4, 4, 0]}>
-                {(globalHousing.countries.map((c) => (
+                {(globalHousing.countries.filter((c) => c.yoyChange != null).map((c) => (
                   <Cell
                     key={c.iso2}
                     fill={(c.yoyChange ?? 0) >= 0 ? "#10b981" : "#ef4444"}

@@ -36,7 +36,7 @@ INDICATOR_MAP = {
     "vulnerable_emp": "SL.EMP.VULN.ZS",
     "gdp_per_worker": "SL.GDP.PCAP.EM.KD",
     # Energy & Climate (Phase 28)
-    "co2_per_capita": "EN.ATM.CO2E.PC",
+    "co2_per_capita": "EN.GHG.CO2.PC.CE.AR5",
     "renewable_share": "EG.FEC.RNEW.ZS",
     "energy_imports": "EG.IMP.CONS.ZS",
     "oil_rents": "NY.GDP.PETR.RT.ZS",
@@ -52,7 +52,7 @@ INDICATOR_MAP = {
     # Inequality & Development (Phase 29)
     "gini": "SI.POV.GINI",
     "income_top10": "SI.DST.10TH.10",
-    "income_bottom40": "SI.DST.FRST.20",
+    "income_bottom20": "SI.DST.FRST.20",  # lowest 20% share (was mis-keyed bottom40)
     "poverty_215": "SI.POV.DDAY",
     "poverty_365": "SI.POV.LMIC",
     "poverty_685": "SI.POV.UMIC",
@@ -61,7 +61,6 @@ INDICATOR_MAP = {
     "fuel_imports": "TM.VAL.FUEL.ZS.UN",
     # Business Dynamism (Phase 30)
     "new_business_density": "IC.BUS.NDNS.ZS",
-    "startup_time": "IC.REG.DURS",
     # Demographics (Phase 30)
     "age_dependency": "SP.POP.DPND",
     "urbanization": "SP.URB.TOTL.IN.ZS",
@@ -69,11 +68,17 @@ INDICATOR_MAP = {
 }
 
 
+# Series that live outside World Development Indicators (wbgapi's default
+# database). 32 = Global Financial Development, last updated 2022, so these
+# end in 2021.
+WB_DATABASE: dict[str, int] = {"GFDD.SI.01": 32}
+
+
 def _fetch_sync(series_id: str, iso3_list: list[str], start: int, end: int) -> dict:
     import wbgapi as wb
     df = wb.data.DataFrame(
         series_id, economy=iso3_list, time=range(start, end + 1),
-        labels=False, skipBlanks=True,
+        labels=False, skipBlanks=True, db=WB_DATABASE.get(series_id),
     )
     return _parse(df)
 

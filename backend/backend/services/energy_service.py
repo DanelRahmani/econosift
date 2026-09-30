@@ -122,7 +122,7 @@ async def get_energy_data() -> dict:
     high_co2 = sum(1 for c in countries_out if c["kpis"]["co2Signal"] == "red")
 
     return {
-        "asOf": str(datetime.now().date()),
+        "asOf": atlas_service.stamp_periods(countries_out),
         "source": "World Bank",
         "countries": countries_out,
         "summary": {

@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from datetime import date
 
 from ..cache import cached, async_cached
 
@@ -20,7 +21,7 @@ INDICATORS: list[dict] = [
     {"id": "gdp_growth",     "label": "GDP Growth (annual %)",          "unit": "%",  "goodDirection": "high"},
     {"id": "inflation",      "label": "Inflation, CPI (annual %)",      "unit": "%",  "goodDirection": "low"},
     {"id": "unemployment",   "label": "Unemployment Rate",               "unit": "%",  "goodDirection": "low"},
-    {"id": "debt_gdp",       "label": "Government Debt (% of GDP)",     "unit": "%",  "goodDirection": "low"},
+    {"id": "debt_gdp",       "label": "General Government Debt (% of GDP)", "unit": "%",  "goodDirection": "low"},
     {"id": "current_account","label": "Current Account (% of GDP)",     "unit": "%",  "goodDirection": "neutral"},
     {"id": "gdp_per_capita", "label": "GDP per Capita (constant US$)",  "unit": "US$","goodDirection": "high"},
     {"id": "gini",           "label": "Gini Coefficient (0=equal, 100=unequal)", "unit": "", "goodDirection": "low"},
@@ -59,7 +60,7 @@ _WB_CODES: dict[str, str] = {
     "vulnerable_emp":  "SL.EMP.VULN.ZS",
     "gdp_per_worker":  "SL.GDP.PCAP.EM.KD",
     # Energy & Climate (Phase 28)
-    "co2_per_capita":  "EN.ATM.CO2E.PC",
+    "co2_per_capita":  "EN.GHG.CO2.PC.CE.AR5",
     "renewable_share": "EG.FEC.RNEW.ZS",
     "energy_imports":  "EG.IMP.CONS.ZS",
     "oil_rents":       "NY.GDP.PETR.RT.ZS",
@@ -76,7 +77,7 @@ _WB_CODES: dict[str, str] = {
     # Inequality (Phase 29)
     "gini":            "SI.POV.GINI",
     "income_top10":    "SI.DST.10TH.10",
-    "income_bottom40": "SI.DST.FRST.20",
+    "income_bottom20": "SI.DST.FRST.20",  # lowest 20% share (was mis-keyed bottom40)
     "poverty_215":     "SI.POV.DDAY",
     "poverty_365":     "SI.POV.LMIC",
     "poverty_685":     "SI.POV.UMIC",
@@ -85,7 +86,6 @@ _WB_CODES: dict[str, str] = {
     "fuel_imports":    "TM.VAL.FUEL.ZS.UN",
     # Business Dynamism (Phase 30)
     "new_business_density": "IC.BUS.NDNS.ZS",
-    "startup_time": "IC.REG.DURS",
     # Demographics (Phase 30)
     "age_dependency": "SP.POP.DPND",
     "urbanization": "SP.URB.TOTL.IN.ZS",
@@ -100,6 +100,18 @@ _IMF_CODES: dict[str, str] = {
     "debt_gdp":        "GGXWDG_NGDP",
     "current_account": "BCA_NGDPD",
     "gdp_per_capita":  "NGDPDPC",
+    "fiscal_balance":  "GGXCNL_NGDP",
+}
+
+# How World Bank and IMF WEO series combine per indicator (default: World
+# Bank first, IMF fills gaps). The two do not always measure the same thing:
+#   gdp_per_capita — WB is constant US$, WEO NGDPDPC is *current* US$: never mix.
+#   debt_gdp — WB GC.DOD.TOTL.GD.ZS is *central* government debt and sparse;
+#     WEO GGXWDG_NGDP is general government gross debt, the standard
+#     cross-country measure, so it leads and WB only fills gaps.
+_MERGE_POLICY: dict[str, str] = {
+    "gdp_per_capita": "wb_only",
+    "debt_gdp": "imf_first",
 }
 
 # ---------------------------------------------------------------------------
@@ -224,6 +236,7 @@ def _wb_fetch_sync(series_id: str, start: int, end: int) -> dict[str, dict[int, 
     """Call wbgapi for all economies and return {iso3: {year: value}}."""
     import wbgapi as wb
     import pandas as pd
+    from ..sources.source_worldbank import WB_DATABASE
 
     df = wb.data.DataFrame(
         series_id,
@@ -231,6 +244,7 @@ def _wb_fetch_sync(series_id: str, start: int, end: int) -> dict[str, dict[int, 
         time=range(start, end + 1),
         labels=False,
         skipBlanks=True,
+        db=WB_DATABASE.get(series_id),
     )
     out: dict[str, dict[int, float]] = {}
     if df is None or df.empty:
@@ -273,8 +287,46 @@ def _wb_bulk_sync(indicator: str, start: int, end: int) -> dict[str, dict[int, f
     return out
 
 
-@async_cached("atlas_wb_timeline")
+def stamp_periods(countries: list[dict]) -> str | None:
+    """Date a country-comparison payload by its data, not by today.
+
+    Sets, on each country row, ``periods`` (KPI -> date of the latest point in
+    that KPI's ``history`` series) and ``latestYear`` (the row's newest year),
+    and returns the newest year overall for the payload's ``asOf``. Annual
+    World Bank series lag by one to five years, and by different amounts per
+    indicator, so a single "today" stamp presented years-old data as current.
+    """
+    newest: int | None = None
+    for c in countries:
+        periods = {k: pts[-1]["date"] for k, pts in (c.get("history") or {}).items() if pts}
+        years = [int(str(p)[:4]) for p in periods.values()]
+        c["periods"] = periods
+        c["latestYear"] = max(years) if years else None
+        if years:
+            newest = max(newest or 0, max(years))
+    return str(newest) if newest else None
+
+
+def _int_year_keys(data: dict) -> dict[str, dict[int, float]]:
+    """Restore int year keys after a round-trip through the SQLite cache tier.
+
+    JSON object keys are always strings, so a cached ``{iso3: {2020: v}}``
+    comes back as ``{iso3: {"2020": v}}`` after a restart — and every
+    ``year in series`` lookup with an int year then silently misses.
+    """
+    return {c: {int(y): v for y, v in years.items()} for c, years in (data or {}).items()}
+
+
 async def _wb_timeline(indicator: str, start: int, end: int) -> dict[str, dict[int, float]]:
+    return _int_year_keys(await _wb_timeline_cached(indicator, start, end))
+
+
+async def _imf_timeline(indicator: str, start: int, end: int) -> dict[str, dict[int, float]]:
+    return _int_year_keys(await _imf_timeline_cached(indicator, start, end))
+
+
+@async_cached("atlas_wb_timeline")
+async def _wb_timeline_cached(indicator: str, start: int, end: int) -> dict[str, dict[int, float]]:
     series_id = _WB_CODES.get(indicator)
     if not series_id:
         return {}
@@ -333,7 +385,7 @@ def _imf_fetch_sync(weo_code: str, start: int, end: int) -> dict[str, dict[int, 
 
 
 @async_cached("atlas_imf_timeline")
-async def _imf_timeline(indicator: str, start: int, end: int) -> dict[str, dict[int, float]]:
+async def _imf_timeline_cached(indicator: str, start: int, end: int) -> dict[str, dict[int, float]]:
     weo_code = _IMF_CODES.get(indicator)
     if not weo_code:
         return {}
@@ -406,6 +458,12 @@ async def get_timeline(indicator: str, start: int = 2000, end: int = 2024) -> di
         _wb_timeline(indicator, start, end),
         _imf_timeline(indicator, start, end),
     )
+    policy = _MERGE_POLICY.get(indicator, "wb_first")
+    if policy == "wb_only":
+        imf_data = {}
+    # WEO values for the current year onward are projections, not data.
+    this_year = date.today().year
+    imf_data = {c: {y: v for y, v in yrs.items() if y < this_year} for c, yrs in imf_data.items()}
 
     all_years = list(range(start, end + 1))
     countries_out: list[dict] = []
@@ -415,14 +473,15 @@ async def get_timeline(indicator: str, start: int = 2000, end: int = 2024) -> di
         wb_country = wb_data.get(iso3, {})
         imf_country = imf_data.get(iso3, {})
 
+        first, second = ((imf_country, wb_country) if policy == "imf_first"
+                         else (wb_country, imf_country))
         values: dict[str, float | None] = {}
+        imf_years: list[int] = []
         for y in all_years:
-            if y in wb_country:
-                values[str(y)] = wb_country[y]
-            elif y in imf_country:
-                values[str(y)] = imf_country[y]
-            else:
-                values[str(y)] = None
+            src = first if y in first else (second if y in second else None)
+            values[str(y)] = src[y] if src is not None else None
+            if src is imf_country and src is not None:
+                imf_years.append(y)
 
         countries_out.append({
             "iso3":    iso3,
@@ -430,6 +489,8 @@ async def get_timeline(indicator: str, start: int = 2000, end: int = 2024) -> di
             "name":    country["name"],
             "regions": country["regions"],
             "values":  values,
+            # Years supplied by IMF WEO rather than the World Bank.
+            **({"imfYears": imf_years} if imf_years else {}),
         })
 
     return {

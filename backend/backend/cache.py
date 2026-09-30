@@ -60,15 +60,20 @@ def _make_key(args, kwargs) -> tuple:
 
 
 def _is_empty_result(result) -> bool:
-    """Default predicate: treat None and empty containers as 'no data'.
+    """Default predicate: treat None, empty containers and failure envelopes
+    as 'no data'.
 
     Empty/failed results must never be cached — otherwise a transient source
     failure (or a fetch made before API keys were entered) poisons the cache
-    permanently, since the persistent tier survives restarts.
+    permanently, since the persistent tier survives restarts. A dict carrying
+    a truthy ``error`` key or ``status == "unavailable"`` is a failure envelope
+    even though it is non-empty.
     """
     if result is None:
         return True
     if isinstance(result, (dict, list, tuple, set, str)) and len(result) == 0:
+        return True
+    if isinstance(result, dict) and (result.get("error") or result.get("status") == "unavailable"):
         return True
     return False
 
@@ -327,7 +332,8 @@ def clear_all(name: str | None = None) -> dict:
 
     Pass ``name`` to flush a single cache; ``None`` flushes everything. Used by
     the Admin "Clear cache & re-warm" action to purge poisoned/empty entries.
-    Returns ``{"entries": <db rows deleted>, "memory_caches": <caches cleared>}``.
+    Returns ``{"entries": <db rows deleted>, "memory_caches": <caches cleared>}``,
+    plus ``"error"`` when the SQLite tier could not be flushed.
     """
     mem_cleared = 0
     for cname, c in list(_caches.items()):
@@ -339,6 +345,7 @@ def clear_all(name: str | None = None) -> dict:
             hc._memory.clear()
 
     entries = 0
+    result: dict = {}
     try:
         from backend.database import SessionLocal
         from backend.db_models import CacheEntry
@@ -351,7 +358,10 @@ def clear_all(name: str | None = None) -> dict:
             db.commit()
         finally:
             db.close()
-    except Exception:
-        pass
+    except Exception as exc:
+        # The persistent rows are still there and will be served again, so a
+        # failed flush (e.g. SQLite locked by a running job) must not read as
+        # a successful one.
+        result["error"] = f"persistent cache not cleared: {exc}"
 
-    return {"entries": entries, "memory_caches": mem_cleared}
+    return {"entries": entries, "memory_caches": mem_cleared, **result}

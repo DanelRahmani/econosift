@@ -324,10 +324,10 @@ function EarningsSurprisesSection({
 
   const recent = [...surprises].slice(-8).reverse();
 
-  const barData = recent.map((s) => ({
-    date: s.date,
-    surprise: s.surprisePct ?? 0,
-  }));
+  // Quarters without a reported surprise are left out rather than drawn as 0%.
+  const barData = recent.flatMap((s) =>
+    s.surprisePct == null ? [] : [{ date: s.date, surprise: s.surprisePct }],
+  );
 
   return (
     <div>

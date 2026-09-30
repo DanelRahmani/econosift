@@ -38,10 +38,15 @@ def _fetch_yf_short(ticker: str) -> dict | None:
         days = info.get("shortRatio")  # days to cover
         if days is not None:
             days = round(float(days), 2)
+        # Yahoo reports the FINRA settlement date as an epoch; the data is
+        # ~2 weeks old, so stamping today's date would overstate freshness.
+        settle = info.get("dateShortInterest")
+        settlement_date = (datetime.utcfromtimestamp(settle).date().isoformat()
+                           if isinstance(settle, (int, float)) and settle > 0 else None)
         return {
             "shortPercent": si_pct,
             "daysToCover": days,
-            "settlementDate": str(datetime.now().date()),
+            "settlementDate": settlement_date,
         }
     except Exception as exc:
         log.debug("yfinance short interest failed for %s: %s", ticker, exc)
@@ -140,7 +145,7 @@ async def get_short_interest(ticker: str | None = None, universe: str | None = N
             "daysToCover": days,
             "squeezeScore": squeeze,
             "sector": sector,
-            "asOf": r.get("settlementDate") or str(datetime.now().date()),
+            "asOf": r.get("settlementDate"),
         })
 
     # Sort by short % of float descending
@@ -173,7 +178,9 @@ async def get_short_interest(ticker: str | None = None, universe: str | None = N
     ]
 
     return {
-        "asOf": str(datetime.now().date()),
+        # Latest exchange settlement date among the tickers (published twice a
+        # month, about two weeks in arrears).
+        "asOf": max((i["asOf"] for i in items if i.get("asOf")), default=None),
         "source": "yfinance",
         "items": items,
         "mostShorted": most_shorted,

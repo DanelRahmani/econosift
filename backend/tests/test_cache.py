@@ -307,6 +307,48 @@ def test_nonempty_result_is_cached():
     assert calls["n"] == 1  # cached after first compute
 
 
+@pytest.mark.parametrize("envelope", [
+    {"error": "upstream timeout", "rows": []},
+    {"status": "unavailable", "advancing": None},
+])
+def test_failure_envelope_is_not_cached(envelope):
+    """A non-empty failure envelope must not be cached (audit D-01)."""
+    from backend import cache as cache_mod
+
+    calls = {"n": 0}
+
+    @cache_mod.cached(f"test_failure_skip_{len(envelope)}_{next(iter(envelope))}")
+    def fn():
+        calls["n"] += 1
+        return envelope
+
+    with patch.object(cache_mod.HybridCache, "_set_in_db"), \
+         patch.object(cache_mod.HybridCache, "_get_from_db", return_value=None):
+        fn()
+        fn()
+
+    assert calls["n"] == 2
+
+
+def test_null_error_key_is_still_cached():
+    """``"error": None`` marks success and must stay cacheable."""
+    from backend import cache as cache_mod
+
+    calls = {"n": 0}
+
+    @cache_mod.cached("test_null_error_cached")
+    def fn():
+        calls["n"] += 1
+        return {"rows": [1], "error": None}
+
+    with patch.object(cache_mod.HybridCache, "_set_in_db"), \
+         patch.object(cache_mod.HybridCache, "_get_from_db", return_value=None):
+        fn()
+        fn()
+
+    assert calls["n"] == 1
+
+
 def test_custom_skip_if_predicate():
     """A custom skip_if can flag domain-specific 'empty' payloads."""
     from backend import cache as cache_mod

@@ -148,7 +148,7 @@ async def get_fiscal_data() -> dict:
     adverse_count = sum(1 for c in countries_out if c["kpis"]["adverseDynamics"])
 
     return {
-        "asOf": str(datetime.now().date()),
+        "asOf": atlas_service.stamp_periods(countries_out),
         "source": "World Bank",
         "countries": countries_out,
         "summary": {

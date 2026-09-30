@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import math
-from datetime import date
 
 import pandas as pd
 
@@ -82,7 +81,10 @@ def fx_rates(base: str = "USD") -> dict:
         inv_tickers = tuple(f"{ccy}{base}=X" for ccy in empty_ccys)
         inv_frame = yfs.get_close_frame(inv_tickers, "1y")
 
-    as_of = date.today().isoformat()
+    # Date of the latest quote actually received, not of the request.
+    last_bars = [f.dropna(how="all").index[-1] for f in (frame, inv_frame)
+                 if f is not None and not f.dropna(how="all").empty]
+    as_of = max(last_bars).strftime("%Y-%m-%d") if last_bars else None
     pairs: list[dict] = []
 
     for ccy in _QUOTE_CCYS:

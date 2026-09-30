@@ -206,7 +206,7 @@ async def get_fx_macro_link() -> dict:
             "bestLagCorrelation": best["correlation"],
             "rollingCorrelation": {
                 "dates": [str(d.date()) for d in roll_corr.index],
-                "values": [round(float(v), 4) if not np.isnan(v) else 0.0 for v in roll_corr.values],
+                "values": [round(float(v), 4) if not np.isnan(v) else None for v in roll_corr.values],
             },
             "series": series,
         })

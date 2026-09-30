@@ -123,7 +123,7 @@ async def get_labor_data() -> dict:
     high_red = sum(1 for c in countries_out if c["kpis"]["youthUnempSignal"] == "red")
 
     return {
-        "asOf": str(datetime.now().date()),
+        "asOf": atlas_service.stamp_periods(countries_out),
         "source": "World Bank",
         "countries": countries_out,
         "summary": {

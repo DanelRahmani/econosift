@@ -343,9 +343,9 @@ export function FinancialConditions() {
           </p>
           <ResponsiveContainer width="100%" height={300}>
             <BarChart
-              data={creditGaps.countries.map((c) => ({
+              data={creditGaps.countries.filter((c) => c.latestGap != null).map((c) => ({
                 name: c.name,
-                gap: c.latestGap ?? 0,
+                gap: c.latestGap,
                 signal: c.signal,
               }))}
               layout="vertical"
@@ -358,7 +358,7 @@ export function FinancialConditions() {
               <ReferenceLine x={10} stroke="#ef4444" strokeDasharray="4 4" label="BIS threshold" />
               <ReferenceLine x={2} stroke="#f59e0b" strokeDasharray="4 4" />
               <Bar dataKey="gap" radius={[0, 4, 4, 0]}>
-                {(creditGaps.countries.map((c) => {
+                {(creditGaps.countries.filter((c) => c.latestGap != null).map((c) => {
                   const color = c.signal === "red" ? "#ef4444" : c.signal === "yellow" ? "#f59e0b" : "#10b981";
                   return <Cell key={c.iso2} fill={color} fillOpacity={0.8} />;
                 }) as any)}

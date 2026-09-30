@@ -9,7 +9,6 @@ real-time Sahm rule indicator (SAHMREALTIME) for context.
 from __future__ import annotations
 
 import logging
-from datetime import date
 
 import numpy as np
 import pandas as pd
@@ -202,7 +201,7 @@ def _compute_recession(data: dict[str, list[dict]]) -> dict:
     prob12m = prob_history[-1]["value"] if prob_history else None
 
     return {
-        "asOf": str(date.today()),
+        "asOf": prob_history[-1]["date"] if prob_history else None,
         "kpis": {
             "prob12m": prob12m,
             "sahm": _latest(sahm_pts),

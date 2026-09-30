@@ -24,7 +24,7 @@ function KpiCard({ label, value, unit = "%", sub, sig }: {
   return (
     <Card className="p-4">
       <div className="text-xs text-text-secondary">{label}</div>
-      <div className={`text-2xl font-bold mt-1 ${sig ? signalColor(sig) : ""}`}>
+      <div className={`text-2xl font-bold mt-1 ${sig && value != null ? signalColor(sig) : ""}`}>
         {value != null ? `${value > 0 ? "+" : ""}${value.toFixed(1)}${unit}` : "—"}
       </div>
       {sub && <div className="text-xs text-text-secondary mt-0.5">{sub}</div>}
@@ -79,7 +79,7 @@ export function FiscalTab() {
           </p>
           <ResponsiveContainer width="100%" height={380}>
             <BarChart
-              data={countries.map((c) => ({ name: c.name, value: c.kpis.debtGdp ?? 0, sig: c.kpis.debtGdpSignal }))}
+              data={countries.filter((c) => c.kpis.debtGdp != null).map((c) => ({ name: c.name, value: c.kpis.debtGdp, sig: c.kpis.debtGdpSignal }))}
               layout="vertical" margin={{ left: 80, right: 40 }}
             >
               <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
@@ -89,7 +89,7 @@ export function FiscalTab() {
               <ReferenceLine x={60} stroke="#f59e0b" strokeDasharray="4 4" />
               <ReferenceLine x={90} stroke="#ef4444" strokeDasharray="4 4" />
               <Bar dataKey="value" radius={[0, 4, 4, 0]}>
-                {(countries.map((c) => {
+                {(countries.filter((c) => c.kpis.debtGdp != null).map((c) => {
                   const color = c.kpis.debtGdpSignal === "red" ? "#ef4444" : c.kpis.debtGdpSignal === "yellow" ? "#f59e0b" : "#10b981";
                   return <Cell key={c.iso2} fill={color} fillOpacity={0.8} />;
                 }) as any)}
@@ -108,7 +108,7 @@ export function FiscalTab() {
           </p>
           <ResponsiveContainer width="100%" height={380}>
             <BarChart
-              data={countries.map((c) => ({ name: c.name, value: c.kpis.fiscalBalance ?? 0, sig: c.kpis.fiscalBalanceSignal }))}
+              data={countries.filter((c) => c.kpis.fiscalBalance != null).map((c) => ({ name: c.name, value: c.kpis.fiscalBalance, sig: c.kpis.fiscalBalanceSignal }))}
               layout="vertical" margin={{ left: 80, right: 40 }}
             >
               <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
@@ -119,7 +119,7 @@ export function FiscalTab() {
               <ReferenceLine x={-3} stroke="#f59e0b" strokeDasharray="4 4" label="Maastricht" />
               <ReferenceLine x={-6} stroke="#ef4444" strokeDasharray="4 4" />
               <Bar dataKey="value" radius={[0, 4, 4, 0]}>
-                {(countries.map((c) => {
+                {(countries.filter((c) => c.kpis.fiscalBalance != null).map((c) => {
                   const color = c.kpis.fiscalBalanceSignal === "red" ? "#ef4444" : c.kpis.fiscalBalanceSignal === "yellow" ? "#f59e0b" : "#10b981";
                   return <Cell key={c.iso2} fill={color} fillOpacity={0.8} />;
                 }) as any)}
@@ -138,7 +138,7 @@ export function FiscalTab() {
           </p>
           <ResponsiveContainer width="100%" height={380}>
             <BarChart
-              data={countries.map((c) => ({ name: c.name, value: c.kpis.taxRevenue ?? 0, sig: c.kpis.taxRevenueSignal }))}
+              data={countries.filter((c) => c.kpis.taxRevenue != null).map((c) => ({ name: c.name, value: c.kpis.taxRevenue, sig: c.kpis.taxRevenueSignal }))}
               layout="vertical" margin={{ left: 80, right: 40 }}
             >
               <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
@@ -148,7 +148,7 @@ export function FiscalTab() {
               <ReferenceLine x={15} stroke="#f59e0b" strokeDasharray="4 4" />
               <ReferenceLine x={25} stroke="#10b981" strokeDasharray="4 4" />
               <Bar dataKey="value" radius={[0, 4, 4, 0]}>
-                {(countries.map((c) => {
+                {(countries.filter((c) => c.kpis.taxRevenue != null).map((c) => {
                   const color = c.kpis.taxRevenueSignal === "red" ? "#ef4444" : c.kpis.taxRevenueSignal === "yellow" ? "#f59e0b" : "#10b981";
                   return <Cell key={c.iso2} fill={color} fillOpacity={0.8} />;
                 }) as any)}

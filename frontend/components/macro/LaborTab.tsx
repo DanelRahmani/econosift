@@ -24,7 +24,7 @@ function KpiCard({ label, value, unit = "%", sub, sig }: {
   return (
     <Card className="p-4">
       <div className="text-xs text-text-secondary">{label}</div>
-      <div className={`text-2xl font-bold mt-1 ${sig ? signalColor(sig) : ""}`}>
+      <div className={`text-2xl font-bold mt-1 ${sig && value != null ? signalColor(sig) : ""}`}>
         {value != null ? `${value.toFixed(1)}${unit}` : "—"}
       </div>
       {sub && <div className="text-xs text-text-secondary mt-0.5">{sub}</div>}
@@ -79,7 +79,7 @@ export function LaborTab() {
           </p>
           <ResponsiveContainer width="100%" height={Math.max(300, countries.length * 24)}>
             <BarChart
-              data={countries.map((c) => ({ name: c.name, value: c.kpis.lfpr ?? 0, sig: c.kpis.lfprSignal }))}
+              data={countries.filter((c) => c.kpis.lfpr != null).map((c) => ({ name: c.name, value: c.kpis.lfpr, sig: c.kpis.lfprSignal }))}
               layout="vertical" margin={{ left: 80, right: 40 }}
             >
               <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
@@ -89,7 +89,7 @@ export function LaborTab() {
               <ReferenceLine x={65} stroke="#10b981" strokeDasharray="4 4" />
               <ReferenceLine x={55} stroke="#f59e0b" strokeDasharray="4 4" />
               <Bar dataKey="value" radius={[0, 4, 4, 0]}>
-                {(countries.map((c) => {
+                {(countries.filter((c) => c.kpis.lfpr != null).map((c) => {
                   const color = c.kpis.lfprSignal === "red" ? "#ef4444" : c.kpis.lfprSignal === "yellow" ? "#f59e0b" : "#10b981";
                   return <Cell key={c.iso2} fill={color} fillOpacity={0.8} />;
                 }) as any)}
@@ -108,7 +108,7 @@ export function LaborTab() {
           </p>
           <ResponsiveContainer width="100%" height={Math.max(300, countries.length * 24)}>
             <BarChart
-              data={countries.map((c) => ({ name: c.name, value: c.kpis.youthUnemp ?? 0, sig: c.kpis.youthUnempSignal }))}
+              data={countries.filter((c) => c.kpis.youthUnemp != null).map((c) => ({ name: c.name, value: c.kpis.youthUnemp, sig: c.kpis.youthUnempSignal }))}
               layout="vertical" margin={{ left: 80, right: 40 }}
             >
               <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
@@ -118,7 +118,7 @@ export function LaborTab() {
               <ReferenceLine x={10} stroke="#10b981" strokeDasharray="4 4" />
               <ReferenceLine x={20} stroke="#f59e0b" strokeDasharray="4 4" />
               <Bar dataKey="value" radius={[0, 4, 4, 0]}>
-                {(countries.map((c) => {
+                {(countries.filter((c) => c.kpis.youthUnemp != null).map((c) => {
                   const color = c.kpis.youthUnempSignal === "red" ? "#ef4444" : c.kpis.youthUnempSignal === "yellow" ? "#f59e0b" : "#10b981";
                   return <Cell key={c.iso2} fill={color} fillOpacity={0.8} />;
                 }) as any)}
@@ -137,7 +137,7 @@ export function LaborTab() {
           </p>
           <ResponsiveContainer width="100%" height={Math.max(300, countries.length * 24)}>
             <BarChart
-              data={countries.map((c) => ({ name: c.name, value: c.kpis.empPopRatio ?? 0, sig: c.kpis.empPopRatioSignal }))}
+              data={countries.filter((c) => c.kpis.empPopRatio != null).map((c) => ({ name: c.name, value: c.kpis.empPopRatio, sig: c.kpis.empPopRatioSignal }))}
               layout="vertical" margin={{ left: 80, right: 40 }}
             >
               <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
@@ -147,7 +147,7 @@ export function LaborTab() {
               <ReferenceLine x={60} stroke="#10b981" strokeDasharray="4 4" />
               <ReferenceLine x={50} stroke="#f59e0b" strokeDasharray="4 4" />
               <Bar dataKey="value" radius={[0, 4, 4, 0]}>
-                {(countries.map((c) => {
+                {(countries.filter((c) => c.kpis.empPopRatio != null).map((c) => {
                   const color = c.kpis.empPopRatioSignal === "red" ? "#ef4444" : c.kpis.empPopRatioSignal === "yellow" ? "#f59e0b" : "#10b981";
                   return <Cell key={c.iso2} fill={color} fillOpacity={0.8} />;
                 }) as any)}
@@ -166,7 +166,7 @@ export function LaborTab() {
           </p>
           <ResponsiveContainer width="100%" height={Math.max(300, countries.length * 24)}>
             <BarChart
-              data={countries.map((c) => ({ name: c.name, value: c.kpis.vulnerableEmp ?? 0, sig: c.kpis.vulnerableEmpSignal }))}
+              data={countries.filter((c) => c.kpis.vulnerableEmp != null).map((c) => ({ name: c.name, value: c.kpis.vulnerableEmp, sig: c.kpis.vulnerableEmpSignal }))}
               layout="vertical" margin={{ left: 80, right: 40 }}
             >
               <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
@@ -176,7 +176,7 @@ export function LaborTab() {
               <ReferenceLine x={10} stroke="#10b981" strokeDasharray="4 4" />
               <ReferenceLine x={30} stroke="#f59e0b" strokeDasharray="4 4" />
               <Bar dataKey="value" radius={[0, 4, 4, 0]}>
-                {(countries.map((c) => {
+                {(countries.filter((c) => c.kpis.vulnerableEmp != null).map((c) => {
                   const color = c.kpis.vulnerableEmpSignal === "red" ? "#ef4444" : c.kpis.vulnerableEmpSignal === "yellow" ? "#f59e0b" : "#10b981";
                   return <Cell key={c.iso2} fill={color} fillOpacity={0.8} />;
                 }) as any)}

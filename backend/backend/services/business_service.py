@@ -6,7 +6,6 @@ a business (days), and historical Doing Business scores.
 """
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 from datetime import datetime
@@ -72,10 +71,10 @@ async def get_business_data() -> dict:
     start, end = 2010, cur_year - 1
 
     # Fetch World Bank indicators
-    wb_density, wb_startup = await asyncio.gather(
-        atlas_service._wb_timeline("new_business_density", start, end),
-        atlas_service._wb_timeline("startup_time", start, end),
-    )
+    wb_density = await atlas_service._wb_timeline("new_business_density", start, end)
+    # "Time to start a business" (IC.REG.DURS) came from Doing Business, which
+    # the World Bank discontinued in 2021 and has since archived: no source.
+    wb_startup: dict = {}
 
     universe = atlas_service._country_universe()
     iso3_to_name = {c["iso3"]: c["name"] for c in universe}
@@ -130,8 +129,9 @@ async def get_business_data() -> dict:
     db_scores_all = [c["kpis"]["doingBusinessScore"] for c in countries_out if c["kpis"]["doingBusinessScore"] is not None]
 
     return {
-        "asOf": str(datetime.now().date()),
+        "asOf": atlas_service.stamp_periods(countries_out),
         "source": "World Bank",
+        "unavailable": {"startupTime": "Discontinued by the World Bank (Doing Business, 2021)"},
         "countries": countries_out,
         "summary": {
             "avgBusinessDensity": round(sum(density_values) / len(density_values), 2) if density_values else None,

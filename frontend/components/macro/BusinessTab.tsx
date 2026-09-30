@@ -24,7 +24,7 @@ function KpiCard({ label, value, unit = "", sub, sig }: {
   return (
     <Card className="p-4">
       <div className="text-xs text-text-secondary">{label}</div>
-      <div className={`text-2xl font-bold mt-1 ${sig ? signalColor(sig) : ""}`}>
+      <div className={`text-2xl font-bold mt-1 ${sig && value != null ? signalColor(sig) : ""}`}>
         {value != null
           ? unit === "%" ? `${value.toFixed(2)}${unit}` : `${value.toFixed(1)}${unit}`
           : "—"}
@@ -67,7 +67,8 @@ export function BusinessTab() {
           sub={`${summary.totalCountries} countries`} />
         <KpiCard label="Avg Days to Start Business" value={summary.avgStartupDays}
           unit=" days"
-          sig={summary.avgStartupDays != null && summary.avgStartupDays < 5 ? "green" : summary.avgStartupDays != null && summary.avgStartupDays < 20 ? "yellow" : "red"} />
+          sig={summary.avgStartupDays != null && summary.avgStartupDays < 5 ? "green" : summary.avgStartupDays != null && summary.avgStartupDays < 20 ? "yellow" : "red"}
+          sub={summary.avgStartupDays == null ? data.unavailable?.startupTime : undefined} />
         <KpiCard label="Avg Doing Business Score" value={summary.avgDoingBusinessScore}
           unit="/100"
           sig={summary.avgDoingBusinessScore != null && summary.avgDoingBusinessScore >= 75 ? "green" : summary.avgDoingBusinessScore != null && summary.avgDoingBusinessScore >= 60 ? "yellow" : "red"}
@@ -84,7 +85,7 @@ export function BusinessTab() {
           </p>
           <ResponsiveContainer width="100%" height={380}>
             <BarChart
-              data={countries.map((c) => ({ name: c.name, value: c.kpis.newBusinessDensity ?? 0, sig: c.kpis.newBusinessDensitySignal }))}
+              data={countries.filter((c) => c.kpis.newBusinessDensity != null).map((c) => ({ name: c.name, value: c.kpis.newBusinessDensity, sig: c.kpis.newBusinessDensitySignal }))}
               layout="vertical" margin={{ left: 80, right: 40 }}
             >
               <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
@@ -94,7 +95,7 @@ export function BusinessTab() {
               <ReferenceLine x={2} stroke="#ef4444" strokeDasharray="4 4" />
               <ReferenceLine x={5} stroke="#10b981" strokeDasharray="4 4" />
               <Bar dataKey="value" radius={[0, 4, 4, 0]}>
-                {(countries.map((c) => {
+                {(countries.filter((c) => c.kpis.newBusinessDensity != null).map((c) => {
                   const color = c.kpis.newBusinessDensitySignal === "red" ? "#ef4444" : c.kpis.newBusinessDensitySignal === "yellow" ? "#f59e0b" : "#10b981";
                   return <Cell key={c.iso2} fill={color} fillOpacity={0.8} />;
                 }) as any)}
@@ -105,7 +106,7 @@ export function BusinessTab() {
       )}
 
       {/* Startup Time Bar Chart */}
-      {countries.length > 0 && (
+      {countries.some((c) => c.kpis.startupTime != null) && (
         <Card className="p-4">
           <h3 className="font-semibold mb-1">Time to Start a Business (days)</h3>
           <p className="text-xs text-text-secondary mb-3">
@@ -113,7 +114,7 @@ export function BusinessTab() {
           </p>
           <ResponsiveContainer width="100%" height={380}>
             <BarChart
-              data={countries.map((c) => ({ name: c.name, value: c.kpis.startupTime ?? 0, sig: c.kpis.startupTimeSignal }))}
+              data={countries.filter((c) => c.kpis.startupTime != null).map((c) => ({ name: c.name, value: c.kpis.startupTime, sig: c.kpis.startupTimeSignal }))}
               layout="vertical" margin={{ left: 80, right: 40 }}
             >
               <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
@@ -123,7 +124,7 @@ export function BusinessTab() {
               <ReferenceLine x={5} stroke="#10b981" strokeDasharray="4 4" />
               <ReferenceLine x={20} stroke="#ef4444" strokeDasharray="4 4" />
               <Bar dataKey="value" radius={[0, 4, 4, 0]}>
-                {(countries.map((c) => {
+                {(countries.filter((c) => c.kpis.startupTime != null).map((c) => {
                   const color = c.kpis.startupTimeSignal === "red" ? "#ef4444" : c.kpis.startupTimeSignal === "yellow" ? "#f59e0b" : "#10b981";
                   return <Cell key={c.iso2} fill={color} fillOpacity={0.8} />;
                 }) as any)}
