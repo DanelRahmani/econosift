@@ -56,9 +56,20 @@ def patch_universe(monkeypatch):
         constituents, "get_constituents",
         lambda index="sp500": [{"symbol": s, "name": f"{s} Corp", "sector": "Tech"} for s in syms],
     )
-    monkeypatch.setattr(breadth_service.yfs, "get_close_frame", lambda s, p: frame)
+    monkeypatch.setattr(breadth_service.yfs, "get_ohlc_frame", lambda s, p, **kw: _as_ohlc(frame))
     monkeypatch.setattr(movers_service.yfs, "get_close_frame", lambda s, p: frame)
     return frame
+
+
+def _as_ohlc(close: pd.DataFrame, high: pd.DataFrame | None = None,
+             low: pd.DataFrame | None = None) -> dict[str, pd.DataFrame]:
+    """{symbol: OHLC frame} as returned by yfinance_service.get_ohlc_frame."""
+    high = close if high is None else high
+    low = close if low is None else low
+    return {
+        c: pd.DataFrame({"Open": close[c], "High": high[c], "Low": low[c], "Close": close[c]}).dropna()
+        for c in close.columns
+    }
 
 
 class TestBreadth:
@@ -97,12 +108,54 @@ class TestBreadth:
         assert len(b["cumulativeAdLine"]) <= 90
         assert all({"date", "value"} <= set(p) for p in b["cumulativeAdLine"])
 
-    def test_empty_frame_safe(self, monkeypatch):
+    def test_empty_frame_is_unavailable_not_zero(self, monkeypatch):
+        """Audit D-02: a failed download must read as unknown, never as 0."""
         from backend.services import breadth_service
-        monkeypatch.setattr(breadth_service.yfs, "get_close_frame", lambda s, p: pd.DataFrame())
+        monkeypatch.setattr(breadth_service.yfs, "get_ohlc_frame", lambda s, p, **kw: {})
         monkeypatch.setattr(breadth_service.constituents, "constituent_symbols", lambda i="sp500": ["AAA"])
         b = breadth_service.breadth("sp500")
-        assert b["total"] == 0 and b["advancing"] == 0
+        assert b["status"] == "unavailable"
+        assert b["total"] is None and b["advancing"] is None and b["newHighs"] is None
+
+    def test_in_progress_session_is_dropped(self, monkeypatch, patch_universe):
+        """While NYSE is open, today's partial bar must not define asOf."""
+        from datetime import datetime
+        from backend.services import breadth_service
+        last = patch_universe.index[-1]
+        monkeypatch.setattr(breadth_service, "_now_ny",
+                            lambda: datetime(last.year, last.month, last.day, 11, 0,
+                                             tzinfo=breadth_service._NY))
+        b = breadth_service.breadth("sp500")
+        assert b["asOf"] == patch_universe.index[-2].strftime("%Y-%m-%d")
+
+    def test_stale_member_excluded_from_session_counts(self, monkeypatch, patch_universe):
+        """A member with no bar on the as-of session contributes nothing."""
+        from backend.services import breadth_service
+        frame = patch_universe.copy()
+        frame.loc[frame.index[-1], "BBB"] = np.nan  # BBB did not print last session
+        # 3 of 4 printed = 75% < 90% coverage, so pad the universe.
+        for k in range(8):
+            frame[f"PAD{k}"] = np.linspace(10, 20, len(frame))
+        monkeypatch.setattr(breadth_service.yfs, "get_ohlc_frame", lambda s, p, **kw: _as_ohlc(frame))
+        monkeypatch.setattr(breadth_service.constituents, "constituent_symbols",
+                            lambda i="sp500": list(frame.columns))
+        b = breadth_service.breadth("sp500")
+        assert b["asOf"] == frame.index[-1].strftime("%Y-%m-%d")
+        assert b["newLows"] == 0      # BBB's stale bar is not a "new low today"
+        assert b["declining"] == 0    # and it is not counted as declining
+
+    def test_new_highs_use_intraday_high(self, monkeypatch, patch_universe):
+        """A close below the prior high still counts if the intraday high reached it."""
+        from backend.services import breadth_service
+        close = patch_universe.copy()
+        close["EEE"] = [100.0] * (len(close) - 1) + [99.0]
+        high = close.copy()
+        high.loc[high.index[-1], "EEE"] = 101.0  # traded through the prior high
+        monkeypatch.setattr(breadth_service.yfs, "get_ohlc_frame", lambda s, p, **kw: _as_ohlc(close, high=high))
+        monkeypatch.setattr(breadth_service.constituents, "constituent_symbols",
+                            lambda i="sp500": list(close.columns))
+        b = breadth_service.breadth("sp500")
+        assert b["newHighs"] == 4  # AAA, CCC, DDD + EEE via intraday high
 
 
 class TestMovers:
@@ -189,3 +242,82 @@ class TestFearGreedHelpers:
     def test_percentile_score_too_short(self):
         from backend.services.feargreed_service import _percentile_score
         assert _percentile_score(pd.Series([1, 2, 3])) is None
+
+
+class TestFearGreedAlignment:
+    """Audit P2-24 / C-21: headline and history must agree and be dated."""
+
+    def _patch(self, monkeypatch, hy_lag_days: int = 0):
+        from backend.services import feargreed_service as fg
+        idx = _bdays(120)
+        as_of = idx[-1]
+        rng = np.random.default_rng(7)
+
+        def mk(offset=0):
+            return pd.Series(rng.uniform(10, 90, len(idx)), index=idx).iloc[: len(idx) - offset]
+
+        monkeypatch.setattr(fg.breadth_service, "breadth_internals", lambda i="sp500": {
+            "summation": pd.Series(np.cumsum(rng.normal(size=len(idx))), index=idx),
+            "highsLows": pd.DataFrame({"highs": rng.integers(0, 40, len(idx)),
+                                       "lows": rng.integers(1, 40, len(idx))}, index=idx),
+            "asOf": as_of,
+        })
+        monkeypatch.setattr(fg, "_sp_momentum", lambda a: mk())
+        monkeypatch.setattr(fg, "_vix", lambda a: mk())
+        monkeypatch.setattr(fg, "_stocks_vs_bonds", lambda a: mk())
+        monkeypatch.setattr(fg, "_hy_spread", lambda a: mk(hy_lag_days))
+        monkeypatch.setattr(fg, "_put_call", lambda: {"score": None, "ratio": None, "historyDays": None, "asOf": None})
+        return fg, as_of
+
+    def test_headline_equals_last_history_point(self, monkeypatch):
+        fg, as_of = self._patch(monkeypatch)
+        out = fg.fear_greed()
+        assert out["asOf"] == as_of.strftime("%Y-%m-%d")
+        assert out["history"][-1]["date"] == out["asOf"]
+        assert out["history"][-1]["value"] == pytest.approx(out["index"], abs=0.11)
+        assert all(s["asOf"] == out["asOf"] for s in out["signals"] if s["score"] is not None)
+
+    def test_lagging_signal_is_dated_and_flagged_stale(self, monkeypatch):
+        fg, _ = self._patch(monkeypatch, hy_lag_days=6)
+        out = fg.fear_greed()
+        hy = next(s for s in out["signals"] if s["key"] == "hySpread")
+        assert hy["stale"] is True
+        assert hy["asOf"] < out["asOf"]
+
+
+class TestPutCallHistory:
+    """Audit L-01: put/call is ranked against its own history, not a fixed band."""
+
+    def _run(self, monkeypatch, ratio, hist):
+        from backend.services import feargreed_service as fg, snapshots
+        monkeypatch.setattr(fg, "_put_call_ratio", lambda: ratio)
+        monkeypatch.setattr(snapshots, "record", lambda *a, **k: None)
+        monkeypatch.setattr(snapshots, "history", lambda *a, **k: [(None, v) for v in hist])
+        return fg._put_call()
+
+    def test_structurally_high_ratio_is_not_pinned_to_zero(self, monkeypatch):
+        # SPY OI P/C lives around 2-2.5; a median day must score near 50.
+        hist = list(np.linspace(1.9, 2.7, 100))
+        out = self._run(monkeypatch, 2.3, hist)
+        assert 40 <= out["score"] <= 60
+
+    def test_insufficient_history_is_none_not_zero(self, monkeypatch):
+        out = self._run(monkeypatch, 2.4, [2.4] * 10)
+        assert out["score"] is None and out["historyDays"] == 10 and out["ratio"] == 2.4
+
+    def test_zero_open_interest_is_missing_not_a_ratio(self, monkeypatch):
+        # Pre-market, Yahoo reports 0 open interest on every contract: that
+        # must read as "no data", never as a put/call ratio of 0.0.
+        import sys
+        import types
+        from backend.services import feargreed_service as fg
+
+        def ticker(put_oi):
+            chain = types.SimpleNamespace(calls=pd.DataFrame({"openInterest": [100.0]}),
+                                          puts=pd.DataFrame({"openInterest": [put_oi]}))
+            return types.SimpleNamespace(options=["2026-10-16"], option_chain=lambda e: chain)
+
+        monkeypatch.setitem(sys.modules, "yfinance", types.SimpleNamespace(Ticker=lambda s: ticker(0.0)))
+        assert fg._put_call_ratio() is None
+        monkeypatch.setitem(sys.modules, "yfinance", types.SimpleNamespace(Ticker=lambda s: ticker(230.0)))
+        assert fg._put_call_ratio() == pytest.approx(2.3)

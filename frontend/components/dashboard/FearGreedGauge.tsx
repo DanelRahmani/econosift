@@ -67,14 +67,23 @@ export function FearGreedGauge() {
       <div className="mt-3 space-y-1.5">
         {data.signals.map((s) => (
           <div key={s.key} className="flex items-center gap-2 text-xs">
-            <span className="w-40 shrink-0 text-text-muted truncate">{s.label}</span>
+            <span
+              className="w-40 shrink-0 text-text-muted truncate"
+              title={s.asOf ? `Observation: ${s.asOf}${s.aligned === false ? " (live snapshot)" : ""}` : undefined}
+            >
+              {s.label}
+              {s.stale && <span className="ml-1 text-warning" title={`Stale — last observation ${s.asOf}`}>⚠</span>}
+              {s.aligned === false && s.score !== null && <span className="ml-1 text-text-muted">· live</span>}
+            </span>
             <div className="flex-1 h-1.5 rounded-full bg-surface-alt overflow-hidden">
               {s.score !== null && (
                 <div className="h-full rounded-full" style={{ width: `${s.score}%`, backgroundColor: scoreColor(s.score) }} />
               )}
             </div>
             <span className="w-20 shrink-0 text-right font-mono text-text-secondary">
-              {s.score === null ? "n/a" : `${s.score.toFixed(0)} · ${String(s.label_text ?? "")}`}
+              {s.score === null
+                ? <span title={s.note ?? "No data"}>{s.note ? "building" : "n/a"}</span>
+                : `${s.score.toFixed(0)} · ${String(s.label_text ?? "")}`}
             </span>
           </div>
         ))}

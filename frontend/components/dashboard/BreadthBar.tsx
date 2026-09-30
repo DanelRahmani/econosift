@@ -28,7 +28,7 @@ export function BreadthBar({ index = "sp500" }: { index?: string }) {
   }, [index]);
 
   if (loading && !data) return <Skeleton className="h-20" />;
-  if (!data || data.total === 0)
+  if (!data || data.status === "unavailable" || !data.total)
     return (
       <div className="card text-text-muted text-sm">Breadth data unavailable.</div>
     );
@@ -53,7 +53,7 @@ export function BreadthBar({ index = "sp500" }: { index?: string }) {
       <div className="mb-4">
         <div className="flex justify-between text-xs mb-1">
           <span className="text-success font-mono">{adv} advancing</span>
-          <span className="text-text-muted">{data.unchanged} unch.</span>
+          <span className="text-text-muted">{data.unchanged ?? "—"} unch.</span>
           <span className="text-danger font-mono">{dec} declining</span>
         </div>
         <div className="h-2.5 w-full rounded-full overflow-hidden bg-danger/40 flex">
@@ -62,8 +62,8 @@ export function BreadthBar({ index = "sp500" }: { index?: string }) {
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        <Kpi label="New Highs" value={data.newHighs} tone="up" />
-        <Kpi label="New Lows" value={data.newLows} tone="down" />
+        <Kpi label="New Highs" value={data.newHighs ?? "—"} tone="up" />
+        <Kpi label="New Lows" value={data.newLows ?? "—"} tone="down" />
         <Kpi label="% > SMA50" value={pct(data.pctAboveSma50)} tone={tone(data.pctAboveSma50)} />
         <Kpi label="% > SMA200" value={pct(data.pctAboveSma200)} tone={tone(data.pctAboveSma200)} />
         <Kpi

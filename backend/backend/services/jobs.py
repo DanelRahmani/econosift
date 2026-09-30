@@ -350,6 +350,36 @@ def refresh_bulk_data() -> None:
 
 
 # ---------------------------------------------------------------------------
+# Job: record_daily_snapshots
+# ---------------------------------------------------------------------------
+
+def record_daily_snapshots() -> None:
+    """Record the day's SPY put/call ratio and IV30 for tracked tickers.
+
+    These metrics are ranked against their own recorded history, which would
+    otherwise only grow on days someone opens the page. IV30 is recorded for
+    SPY and every ticker that already has a history (i.e. has been viewed).
+    """
+    job_id = log_job_start("record_daily_snapshots")
+    try:
+        from . import feargreed_service, options_engine, snapshots
+        rows = 0
+        if feargreed_service._put_call().get("ratio") is not None:
+            rows += 1
+        for ticker in sorted(set(snapshots.keys("iv30")) | {"SPY"}):
+            try:
+                if options_engine.get_iv_metrics(ticker).get("ivHistoryDays"):
+                    rows += 1
+            except Exception as exc:
+                logger.warning("record_daily_snapshots: IV30 for %s failed: %s", ticker, exc)
+        log_job_success(job_id, rows)
+        logger.info("record_daily_snapshots: %d snapshots", rows)
+    except Exception as exc:
+        logger.error("record_daily_snapshots failed: %s", exc)
+        log_job_failure(job_id, str(exc))
+
+
+# ---------------------------------------------------------------------------
 # Scheduler startup
 # ---------------------------------------------------------------------------
 
@@ -403,6 +433,14 @@ def start_scheduler():
             refresh_bulk_data,
             CronTrigger(day_of_week="sun", hour=4, minute=0),
             id="refresh_bulk_data",
+            max_instances=1,
+            replace_existing=True,
+        )
+        scheduler.add_job(
+            record_daily_snapshots,
+            # After the US close, whatever timezone the scheduler runs in.
+            CronTrigger(day_of_week="mon-fri", hour=16, minute=30, timezone="America/New_York"),
+            id="record_daily_snapshots",
             max_instances=1,
             replace_existing=True,
         )

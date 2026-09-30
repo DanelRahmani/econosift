@@ -7,14 +7,25 @@ is unavailable is dropped rather than guessed, so the index degrades gracefully
 
 Signals:
   1. S&P 500 vs 125-day SMA  (momentum z-score)
-  2. New Highs / New Lows ratio (from breadth)
+  2. New Highs / New Lows ratio (from breadth, intraday 52-week extremes)
   3. McClellan Summation Index percentile
   4. Put/Call OI ratio (SPY options, inverted)
   5. VIX percentile (inverted)
   6. Stocks vs Bonds 20-day relative return (SPY − TLT)
   7. HY credit spread BAMLH0A0HYM2 percentile (inverted)
+
+Date alignment (audit P2-24 / C-21): every series is cut at the breadth
+``asOf`` session so no signal uses data from a later session, and each signal
+reports the date of the observation it actually used. The headline and the
+90-day history use identical definitions (rolling 252-session percentiles),
+so the last history point equals the mean of the time-series signals. The
+put/call signal is a live options snapshot with no history; it is part of
+the headline only and flagged as not session-aligned.
 """
 from __future__ import annotations
+
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 import numpy as np
 import pandas as pd
@@ -23,6 +34,11 @@ from ..cache import cached
 from ..config import FRED_API_KEY
 from . import yfinance_service as yfs
 from . import breadth_service
+
+_WINDOW = 252
+# A signal whose latest observation is more than this many business days
+# older than the as-of session is flagged stale (FRED OAS lags ~1 day).
+_STALE_BDAYS = 3
 
 
 def _clip(x: float) -> float:
@@ -39,6 +55,16 @@ def _percentile_score(series: pd.Series, *, invert: bool = False) -> float | Non
     return _clip(100.0 - pct if invert else pct)
 
 
+def _rolling_pct(s: pd.Series, *, invert: bool = False, min_periods: int = 60) -> pd.Series:
+    """Rolling 252-session percentile rank of each value within its window."""
+    s = s.dropna()
+    if s.empty:
+        return pd.Series(dtype=float)
+    pct = s.rolling(_WINDOW, min_periods=min_periods).apply(
+        lambda w: (w <= w[-1]).mean() * 100.0, raw=True)
+    return (100.0 - pct) if invert else pct
+
+
 def _label(score: float) -> str:
     if score < 25:
         return "Extreme Fear"
@@ -51,145 +77,169 @@ def _label(score: float) -> str:
     return "Extreme Greed"
 
 
-def _sp_momentum() -> tuple[float | None, pd.Series]:
-    frame = yfs.get_close_frame(("^GSPC",), "2y")
-    if frame is None or frame.empty or "^GSPC" not in frame.columns:
-        return None, pd.Series(dtype=float)
-    s = frame["^GSPC"].dropna()
+def _cut(s: pd.Series, as_of: pd.Timestamp | None) -> pd.Series:
+    """Series observations on or before the as-of session, tz-naive dates."""
+    s = s.dropna()
+    if s.empty:
+        return s
+    idx = pd.to_datetime(s.index)
+    s.index = (idx.tz_localize(None) if idx.tz is not None else idx).normalize()
+    return s.loc[:as_of] if as_of is not None else s
+
+
+def _closes(symbols: tuple[str, ...], period: str, as_of) -> dict[str, pd.Series]:
+    frame = yfs.get_close_frame(symbols, period)
+    if frame is None or frame.empty:
+        return {}
+    return {s: _cut(frame[s], as_of) for s in symbols if s in frame.columns}
+
+
+def _sp_momentum(as_of) -> pd.Series:
+    s = _closes(("^GSPC",), "2y", as_of).get("^GSPC", pd.Series(dtype=float))
     if len(s) < 150:
-        return None, pd.Series(dtype=float)
-    sma = s.rolling(125).mean()
-    gap = (s / sma - 1.0).dropna()
-    z = (gap - gap.rolling(252, min_periods=60).mean()) / gap.rolling(252, min_periods=60).std()
-    score_series = (50.0 + z * 20.0).clip(0, 100)
-    cur = score_series.dropna()
-    return (round(float(cur.iloc[-1]), 1) if len(cur) else None), score_series
+        return pd.Series(dtype=float)
+    gap = (s / s.rolling(125).mean() - 1.0).dropna()
+    z = (gap - gap.rolling(_WINDOW, min_periods=60).mean()) / gap.rolling(_WINDOW, min_periods=60).std()
+    return (50.0 + z * 20.0).clip(0, 100).dropna()
 
 
-def _vix() -> tuple[float | None, pd.Series]:
-    frame = yfs.get_close_frame(("^VIX",), "2y")
-    if frame is None or frame.empty or "^VIX" not in frame.columns:
-        return None, pd.Series(dtype=float)
-    s = frame["^VIX"].dropna()
-    # Rolling inverted percentile for the history series.
-    roll = s.rolling(252, min_periods=60).apply(
-        lambda w: 100.0 - (w <= w.iloc[-1]).mean() * 100.0, raw=False)
-    return _percentile_score(s, invert=True), roll
+def _vix(as_of) -> pd.Series:
+    s = _closes(("^VIX",), "2y", as_of).get("^VIX", pd.Series(dtype=float))
+    return _rolling_pct(s, invert=True).dropna()
 
 
-def _stocks_vs_bonds() -> tuple[float | None, pd.Series]:
-    frame = yfs.get_close_frame(("SPY", "TLT"), "1y")
-    if frame is None or frame.empty or "SPY" not in frame.columns or "TLT" not in frame.columns:
-        return None, pd.Series(dtype=float)
-    spy = frame["SPY"].dropna()
-    tlt = frame["TLT"].dropna()
-    rel = (spy.pct_change(20) - tlt.pct_change(20)).dropna()
+def _stocks_vs_bonds(as_of) -> pd.Series:
+    c = _closes(("SPY", "TLT"), "1y", as_of)
+    if "SPY" not in c or "TLT" not in c:
+        return pd.Series(dtype=float)
+    rel = (c["SPY"].pct_change(20) - c["TLT"].pct_change(20)).dropna()
     # Map a ±10% relative move to the full 0–100 range.
-    score_series = (50.0 + rel * 500.0).clip(0, 100)
-    cur = score_series.dropna()
-    return (round(float(cur.iloc[-1]), 1) if len(cur) else None), score_series
+    return (50.0 + rel * 500.0).clip(0, 100)
 
 
-def _hy_spread() -> tuple[float | None, pd.Series]:
+def _hy_spread(as_of) -> pd.Series:
     if not FRED_API_KEY:
-        return None, pd.Series(dtype=float)
+        return pd.Series(dtype=float)
     try:
         from fredapi import Fred
-        fred = Fred(api_key=FRED_API_KEY)
-        s = fred.get_series("BAMLH0A0HYM2", observation_start="2022-01-01")
-        s = pd.Series(s).dropna()
-        s.index = pd.to_datetime(s.index)
+        s = pd.Series(Fred(api_key=FRED_API_KEY).get_series(
+            "BAMLH0A0HYM2", observation_start="2022-01-01"))
     except Exception:
-        return None, pd.Series(dtype=float)
-    if len(s) < 60:
-        return None, pd.Series(dtype=float)
-    roll = s.rolling(252, min_periods=60).apply(
-        lambda w: 100.0 - (w <= w.iloc[-1]).mean() * 100.0, raw=False)
-    return _percentile_score(s, invert=True), roll
+        return pd.Series(dtype=float)
+    return _rolling_pct(_cut(s, as_of), invert=True).dropna()
 
 
-def _put_call() -> float | None:
-    """SPY total put/call open-interest ratio, inverted to a 0–100 score.
+def _highs_lows(hl: pd.DataFrame) -> pd.Series:
+    if hl is None or hl.empty:
+        return pd.Series(dtype=float)
+    denom = (hl["highs"] + hl["lows"]).replace(0, np.nan)
+    return (hl["highs"] / denom * 100.0).dropna()
 
-    High put/call (hedging) → fear → low score. Best-effort: yfinance options
-    can be slow or empty, so failures simply drop this signal.
-    """
+
+_PCR_MIN_HISTORY = 60
+
+
+def _put_call_ratio() -> float | None:
+    """SPY total put/call open-interest ratio over the nearest 3 expiries."""
     try:
         import yfinance as yf
         t = yf.Ticker("SPY")
-        exps = (t.options or [])[:3]
-        put_oi = call_oi = 0
-        for e in exps:
+        put_oi = call_oi = 0.0
+        for e in (t.options or [])[:3]:
             chain = t.option_chain(e)
             call_oi += float(chain.calls["openInterest"].fillna(0).sum())
             put_oi += float(chain.puts["openInterest"].fillna(0).sum())
-        if call_oi <= 0:
-            return None
-        ratio = put_oi / call_oi
-        # Typical put/call OI ~0.8–1.6; map inverted into 0–100.
-        return _clip(100.0 - (ratio - 0.7) / (1.7 - 0.7) * 100.0)
+        # Open interest reads 0 before the exchanges publish it each morning;
+        # that is "not yet available", not a ratio of zero.
+        return put_oi / call_oi if call_oi > 0 and put_oi > 0 else None
     except Exception:
         return None
 
 
-def _highs_lows(breadth_snap: dict) -> float | None:
-    hi = breadth_snap.get("newHighs")
-    lo = breadth_snap.get("newLows")
-    if hi is None or lo is None or (hi + lo) == 0:
-        return None
-    return _clip(hi / (hi + lo) * 100.0)
+def _put_call() -> dict:
+    """Put/call signal scored against its own recorded history.
+
+    SPY is the market's main hedging vehicle, so its open-interest put/call
+    ratio sits structurally around 2–2.5; a fixed 0.7–1.7 band (the previous
+    mapping) pinned the score at 0 permanently (audit L-01). No free source
+    publishes the history, so each day's ratio is recorded and today's value
+    is ranked (inverted: more hedging = more fear) once enough sessions exist.
+    """
+    from . import snapshots
+    ratio = _put_call_ratio()
+    today = datetime.now(ZoneInfo("America/New_York")).date()
+    if ratio is None:
+        return {"score": None, "ratio": None, "historyDays": None, "asOf": None}
+    snapshots.record("spy_pcr_oi", "SPY", ratio, today)
+    hist = [v for _, v in snapshots.history("spy_pcr_oi", "SPY", _WINDOW)]
+    score = None
+    if len(hist) >= _PCR_MIN_HISTORY:
+        score = _clip(100.0 - float(np.mean(np.array(hist) <= ratio)) * 100.0)
+    return {"score": score, "ratio": round(ratio, 3), "historyDays": len(hist),
+            "asOf": today.isoformat()}
+
+
+def _signal(key: str, label: str, series: pd.Series, as_of) -> dict:
+    """Headline entry for a time-series signal: its value on the latest
+    observation at or before ``as_of``, with that observation's date."""
+    s = series.dropna()
+    if s.empty:
+        return {"key": key, "label": label, "score": None, "asOf": None, "stale": None}
+    obs = s.index[-1]
+    stale = bool(as_of is not None and len(pd.bdate_range(obs, as_of)) - 1 > _STALE_BDAYS)
+    return {"key": key, "label": label, "score": round(float(s.iloc[-1]), 1),
+            "asOf": obs.strftime("%Y-%m-%d"), "stale": stale}
 
 
 @cached("feargreed")
 def fear_greed() -> dict:
-    breadth_snap = breadth_service.breadth("sp500")
     internals = breadth_service.breadth_internals("sp500")
+    as_of = internals.get("asOf")
 
-    sp_score, sp_series = _sp_momentum()
-    vix_score, vix_series = _vix()
-    svb_score, svb_series = _stocks_vs_bonds()
-    hy_score, hy_series = _hy_spread()
-
-    summation = internals.get("summation", pd.Series(dtype=float))
-    mcc_score = _percentile_score(summation)
-    mcc_series = summation.rolling(252, min_periods=40).apply(
-        lambda w: (w <= w.iloc[-1]).mean() * 100.0, raw=False) if len(summation) else pd.Series(dtype=float)
-
-    signals = [
-        {"key": "spMomentum", "label": "S&P 500 vs 125-day SMA", "score": sp_score},
-        {"key": "highLow", "label": "New Highs / Lows", "score": _highs_lows(breadth_snap)},
-        {"key": "mcclellan", "label": "McClellan Summation", "score": mcc_score},
-        {"key": "putCall", "label": "Put/Call Ratio", "score": _put_call()},
-        {"key": "vix", "label": "Volatility (VIX)", "score": vix_score},
-        {"key": "stocksBonds", "label": "Stocks vs Bonds", "score": svb_score},
-        {"key": "hySpread", "label": "Junk Bond Demand", "score": hy_score},
-    ]
+    series = {
+        "spMomentum": ("S&P 500 vs 125-day SMA", _sp_momentum(as_of)),
+        "highLow": ("New Highs / Lows", _highs_lows(internals.get("highsLows"))),
+        "mcclellan": ("McClellan Summation", _rolling_pct(internals.get("summation", pd.Series(dtype=float)), min_periods=40)),
+        "vix": ("Volatility (VIX)", _vix(as_of)),
+        "stocksBonds": ("Stocks vs Bonds", _stocks_vs_bonds(as_of)),
+        "hySpread": ("Junk Bond Demand", _hy_spread(as_of)),
+    }
+    signals = [_signal(k, label, s, as_of) for k, (label, s) in series.items()]
+    pc = _put_call()
+    signals.insert(3, {
+        "key": "putCall", "label": "Put/Call Ratio",
+        "score": round(pc["score"], 1) if pc["score"] is not None else None,
+        # Live options snapshot at fetch time — not aligned to the session.
+        "asOf": pc["asOf"], "stale": None, "aligned": False,
+        "raw": pc["ratio"], "historyDays": pc["historyDays"],
+        **({"note": f"Building history ({pc['historyDays']}/{_PCR_MIN_HISTORY} sessions)"}
+           if pc["ratio"] is not None and pc["score"] is None else {}),
+    })
     for s in signals:
         s["label_text"] = _label(s["score"]) if s["score"] is not None else None
-        if s["score"] is not None:
-            s["score"] = round(float(s["score"]), 1)
 
     avail = [s["score"] for s in signals if s["score"] is not None]
     index = round(float(np.mean(avail)), 1) if avail else None
 
-    # 90-day history: mean of the time-series-able signals per day.
-    hist_frame = pd.concat(
-        [s.rename(k) for k, s in (
-            ("sp", sp_series), ("vix", vix_series),
-            ("svb", svb_series), ("hy", hy_series), ("mcc", mcc_series))
-         if s is not None and len(s)],
-        axis=1,
-    ) if any(len(s) for s in (sp_series, vix_series, svb_series, hy_series, mcc_series)) else pd.DataFrame()
+    # 90-session history: mean of the time-series signals per session, with
+    # a lagging series (FRED OAS) carried forward at most _STALE_BDAYS days.
+    frame = pd.concat({k: s for k, (_, s) in series.items() if len(s)}, axis=1)
     history: list[dict] = []
-    if not hist_frame.empty:
-        composite = hist_frame.mean(axis=1).dropna().tail(90)
+    if not frame.empty:
+        frame = frame.sort_index().ffill(limit=_STALE_BDAYS)
+        if as_of is not None:
+            frame = frame.loc[:as_of]
+        composite = frame.mean(axis=1).dropna().tail(90)
         history = [{"date": d.strftime("%Y-%m-%d"), "value": round(float(v), 1)}
                    for d, v in composite.items()]
 
     return {
+        **({"status": "unavailable"} if not avail else {}),
         "index": index,
         "label": _label(index) if index is not None else None,
-        "asOf": breadth_snap.get("asOf"),
+        "asOf": as_of.strftime("%Y-%m-%d") if as_of is not None else None,
         "signals": signals,
         "history": history,
+        "historyExcludes": ["putCall"],
+        "signalCount": len(avail),
     }
