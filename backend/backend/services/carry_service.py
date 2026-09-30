@@ -13,6 +13,7 @@ from datetime import date, timedelta
 import numpy as np
 import pandas as pd
 
+from .. import provenance as pv
 from ..cache import cached
 from . import rates_service
 from . import yfinance_service as yfs
@@ -108,9 +109,13 @@ def _resolve_policy_rate_series(start: str) -> tuple[dict[str, pd.Series], dict[
     return out, sources
 
 
-def _resolve_policy_rates(start: str) -> tuple[dict[str, float], dict[str, str]]:
-    """Latest policy rate per currency (%), and the FRED id that resolved."""
+def _resolve_policy_rates(start: str, observed: dict[str, str] | None = None) -> tuple[dict[str, float], dict[str, str]]:
+    """Latest policy rate per currency (%), and the FRED id that resolved.
+
+    If ``observed`` is given it is filled with CCY -> date of the latest observation."""
     series, sources = _resolve_policy_rate_series(start)
+    if observed is not None:
+        observed.update({ccy: str(s.index[-1])[:10] for ccy, s in series.items()})
     return {ccy: round(float(s.iloc[-1]), 4) for ccy, s in series.items()}, sources
 
 
@@ -126,6 +131,19 @@ def _compute_fx_vol(close: pd.DataFrame, ticker: str, min_rows: int = 20) -> flo
         return None
     vol = float(log_rets.std() * math.sqrt(252) * 100)
     return round(vol, 4) if math.isfinite(vol) else None
+
+
+def _rate_ref(ccy: str, sid: str, observed: str | None) -> dict:
+    """FRED ref for the rate series that resolved for ``ccy``."""
+    interbank = sid.startswith("IR3TIB01")
+    primary = _POLICY_RATE_SERIES[ccy][0]
+    note = None
+    if sid != primary:
+        note = f"Primary series {primary} was missing or stale, so {sid} stood in."
+    return pv.fred(
+        sid, f"{ccy} short-term interest rate" + (" (3-month interbank, not a policy rate)" if interbank else ""),
+        units="% p.a.", frequency="daily" if sid.startswith("ECB") else "monthly", observed=observed,
+        flags=("proxy",) if interbank else (), note=note)
 
 
 def _metrics_from_series(cum: pd.Series) -> dict:
@@ -182,7 +200,8 @@ def get_carry_table(period: str = "3y") -> dict:
     try:
         # 5-year start to ensure we have recent observations
         start = (date.today() - timedelta(days=5 * 365)).strftime("%Y-%m-%d")
-        rates, sources = _resolve_policy_rates(start)
+        rate_obs: dict[str, str] = {}
+        rates, sources = _resolve_policy_rates(start, rate_obs)
 
         usd_rate = rates.get("USD")
         if usd_rate is None:
@@ -234,11 +253,32 @@ def get_carry_table(period: str = "3y") -> dict:
                 d = last_idx[-1]
                 as_of = str(d.date()) if hasattr(d, "date") else str(d)[:10]
 
-        return {
+        fx_input = pv.ref("yahoo", None, "Daily adjusted close of the G10 pairs quoted as USD per unit of currency",
+                          units="USD per unit", frequency="daily", observed=as_of if not close.empty else None)
+        prov: dict = {
+            "*": pv.derived("Carry = foreign short-term rate - US rate (percentage points), with FX spot and volatility "
+                            "from Yahoo pairs", [fx_input, "usdRate"], title="G10 FX carry table", observed=as_of),
+            "usdRate": _rate_ref("USD", sources["USD"], rate_obs.get("USD")),
+        }
+        for r in rows:
+            c = r["ccy"]
+            pair = _fx_ticker(c)
+            prov[f"rows.{c}.foreignRate"] = _rate_ref(c, sources[c], rate_obs.get(c))
+            prov[f"rows.{c}.spot"] = pv.yahoo(
+                pair, f"{c}/USD spot (last close)", units="USD per unit", frequency="daily",
+                observed=pv.last_date(close[pair]) if pair in close.columns else None)
+            prov[f"rows.{c}.carry"] = pv.derived("foreignRate - usdRate (percentage points)",
+                                                 [f"rows.{c}.foreignRate", "usdRate"], title="Carry")
+            prov[f"rows.{c}.fxVol"] = pv.derived(
+                f"sample std of daily log returns of {pair} over the requested period × √252 × 100 (percent)",
+                [f"rows.{c}.spot"], title="FX volatility")
+            prov[f"rows.{c}.volAdjCarry"] = pv.derived("carry ÷ fxVol", [f"rows.{c}.carry", f"rows.{c}.fxVol"],
+                                                       title="Vol-adjusted carry")
+        return pv.attach({
             "asOf": as_of,
             "usdRate": _clean(usd_rate),
             "rows": rows,
-        }
+        }, prov)
     except Exception as exc:
         log.exception("get_carry_table failed: %s", exc)
         return {"error": str(exc), "asOf": str(date.today()), "usdRate": None, "rows": []}
@@ -267,7 +307,7 @@ def get_carry_backtest(period: str = "3y") -> dict:
         # the whole history (look-ahead), and earned FX moves only — never
         # the interest differential that is the point of a carry trade (C-06).
         start = (date.today() - timedelta(days=8 * 365)).strftime("%Y-%m-%d")
-        rate_series, _ = _resolve_policy_rate_series(start)
+        rate_series, rate_sources = _resolve_policy_rate_series(start)
         if "USD" not in rate_series:
             return {**_EMPTY, "error": "USD policy rate unavailable"}
         ccys = [c for c in _NON_USD_CCYS if c in rate_series]
@@ -354,11 +394,39 @@ def get_carry_backtest(period: str = "3y") -> dict:
 
         metrics = _metrics_from_series(cum_strategy)
 
-        return {
+        obs = series_records[-1]["date"] if series_records else None
+        fx_input = pv.ref("yahoo", None, "Daily adjusted close of the G10 pairs quoted as USD per unit of currency",
+                          units="USD per unit", frequency="daily", observed=pv.last_date(close))
+        rate_inputs = [_rate_ref(c, rate_sources[c], str(rate_series[c].index[-1])[:10]) for c in ["USD"] + ccys]
+        if dxy_close is not None:
+            bench_ref = pv.yahoo(dxy_sym, "US dollar index proxy, daily close", frequency="daily",
+                                 observed=pv.last_date(dxy_close),
+                                 flags=("proxy",) if dxy_sym == "UUP" else (),
+                                 note="UUP (an ETF) stands in for the dollar index." if dxy_sym == "UUP" else None)
+        else:
+            bench_ref = pv.derived("flat 100 line: neither DX-Y.NYB nor UUP returned data, so there is no benchmark",
+                                   [], title="Benchmark unavailable", flags=("fallback",))
+        prov = {
+            "*": pv.derived(
+                "Walk-forward carry strategy: each month start, rank the 7 non-USD G10 currencies by (foreign - USD "
+                "policy rate) known then (rates lagged one month), go long the top 3 and short the bottom 3 at 1/3 "
+                "each; daily return = FX return ± carry ÷ 100 ÷ 252", rate_inputs + [fx_input],
+                title="G10 carry backtest", observed=obs),
+            "series": pv.derived("base-100 compounding of the daily strategy return", ["*"], title="Strategy value",
+                                 observed=obs),
+            "series.benchmark": bench_ref,
+            "legs": pv.derived("the top-3 (long) and bottom-3 (short) currencies at the last month start", ["*"],
+                               title="Current legs", observed=obs),
+            "metrics": pv.derived(
+                "in percent: cagr = (final ÷ first)^(252/n) - 1; vol = std of daily log returns × √252; sharpe = mean "
+                "daily return × 252 ÷ vol (no risk-free deduction); maxDrawdown = worst value ÷ running peak - 1",
+                ["series"], title="Strategy statistics", observed=obs),
+        }
+        return pv.attach({
             "series": series_records,
             "legs": {"long": long_ccys, "short": short_ccys},
             "metrics": metrics,
-        }
+        }, prov)
     except Exception as exc:
         log.exception("get_carry_backtest failed: %s", exc)
         return {**_EMPTY, "error": str(exc)}

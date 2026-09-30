@@ -76,7 +76,7 @@ class TestTreemapService:
     def test_payload_top_level_keys(self, patch_all):
         from backend.services.treemap_service import treemap
         result = treemap("sp500", "1d")
-        assert set(result.keys()) == {"index", "period", "asOf", "stocks"}
+        assert set(result.keys()) == {"index", "period", "asOf", "stocks", "provenance"}
 
     def test_index_and_period_echoed(self, patch_all):
         from backend.services.treemap_service import treemap

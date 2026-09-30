@@ -14,6 +14,7 @@ import math
 
 import pandas as pd
 
+from .. import provenance as pv
 from ..cache import cached
 from . import constituents
 from . import yfinance_service as yfs
@@ -176,4 +177,38 @@ def treemap(index: str = "sp500", period: str = "1d") -> dict:
             "low52":         low52,
         })
 
-    return {"index": index, "period": period, "asOf": as_of, "stocks": stocks}
+    return pv.attach({"index": index, "period": period, "asOf": as_of, "stocks": stocks},
+                     _provenance(period, as_of))
+
+
+
+_RETURN_FORMULA = {
+    "1d": "(last close / previous close − 1) × 100",
+    "ytd": "(last close / first close on or after 1 January − 1) × 100",
+    "1w": "(last close / first close of the 1-month download window − 1) × 100",
+    "1m": "(last close / first close of the 3-month download window − 1) × 100",
+    "3m": "(last close / first close of the 6-month download window − 1) × 100",
+    "1y": "(last close / first close of the 2-year download window − 1) × 100",
+}
+
+
+def _provenance(period: str, as_of: str | None) -> dict:
+    """``stocks.<field>`` keys (one per tile field, the same for every stock) and the payload default."""
+    closes = pv.ref("yahoo", None, "Daily adjusted close of each member", units="price, split- and "
+                    "dividend-adjusted", frequency="daily", observed=as_of)
+    members = pv.ref("wikipedia", None, "Index constituents with GICS sector and sub-industry")
+    return {
+        "*": pv.derived("per-stock price, return, market cap and 52-week range for the index members",
+                        [closes, members], title="Index treemap", observed=as_of),
+        "stocks.price": closes,
+        "stocks.changePercent": pv.derived(
+            _RETURN_FORMULA[period], [closes], title=f"Return, period {period}", observed=as_of,
+            note="For 1w, 1m, 3m and 1y the base is the first close of the whole download window, which spans "
+                 "a longer time than the label." if period in ("1w", "1m", "3m", "1y") else None),
+        "stocks.marketCap": pv.yahoo(None, "fast_info.market_cap (current market capitalisation)", units="USD"),
+        "stocks.high52": pv.derived("highest close of the last 252 sessions (the price if no history)", [closes],
+                                    title="52-week high", observed=as_of),
+        "stocks.low52": pv.derived("lowest close of the last 252 sessions (the price if no history)", [closes],
+                                   title="52-week low", observed=as_of),
+        "stocks.name": members, "stocks.sector": members, "stocks.industry": members,
+    }

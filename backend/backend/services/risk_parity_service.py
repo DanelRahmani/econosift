@@ -14,6 +14,7 @@ import numpy as np
 import pandas as pd
 from scipy.optimize import minimize
 
+from .. import provenance as pv
 from . import yfinance_service as yfs
 from ..cache import cached
 
@@ -155,6 +156,19 @@ def _portfolio_metrics(daily_ret: pd.Series) -> dict:
     }
 
 
+def _weights_provenance(px: pd.DataFrame, weights_formula: str, title: str, note: str | None = None) -> dict:
+    src = pv.ref("yahoo", None, "Daily adjusted close of the requested tickers",
+                 units="price (split/dividend adjusted)", frequency="daily", observed=pv.last_date(px),
+                 note=f"Tickers with fewer than {_MIN_OBS} observations are dropped (listed in 'missing').")
+    est = "σ and Σ are the annualised (×252) volatility and covariance of daily log returns"
+    return {
+        "*": pv.derived(f"{weights_formula}; {est}", [src], title=title, note=note),
+        "riskContrib": pv.derived(
+            "pctContrib_i = w_i·(Σw)_i ÷ σ_p, divided by the sum over assets (so it adds to 1); " + est,
+            [src], title="Risk contribution"),
+    }
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -189,11 +203,11 @@ def inverse_vol_weights(tickers: tuple[str, ...], period: str = "3y") -> dict:
 
     cov = log_ret.cov().values * TRADING_DAYS
 
-    return {
+    return pv.attach({
         "weights": _weights_rows(valid_cols, w),
         "riskContrib": _build_risk_contrib_rows(valid_cols, w, cov),
         "missing": missing,
-    }
+    }, _weights_provenance(px_clean, "weight_i = (1/σ_i) ÷ Σ_j (1/σ_j)", "Inverse-volatility weights"))
 
 
 @cached("rp_erc")
@@ -220,11 +234,16 @@ def erc_weights(tickers: tuple[str, ...], period: str = "3y") -> dict:
 
     w = _erc_optimize(vols, cov)
 
-    return {
+    return pv.attach({
         "weights": _weights_rows(valid_cols, w),
         "riskContrib": _build_risk_contrib_rows(valid_cols, w, cov),
         "missing": missing,
-    }
+    }, _weights_provenance(
+        px_clean,
+        "SLSQP minimisation of Σ_i Σ_j (RC_i − RC_j)², RC_i = w_i·(Σw)_i, subject to Σw = 1 and w ≥ 0, "
+        "warm-started at the inverse-volatility weights", "Equal-risk-contribution weights",
+        note="If the optimiser does not converge the inverse-volatility weights are returned instead; the "
+             "response does not say when that happened."))
 
 
 @cached("rp_backtest")
@@ -360,7 +379,31 @@ def risk_parity_backtest(
     strat_simple = strategy_ret_series.reindex(aligned.index)
     bench_simple = bench_ret_series.reindex(aligned.index)
 
-    return {
+    obs = series_out[-1]["date"] if series_out else None
+    assets = pv.ref("yahoo", None, "Daily adjusted close of the requested tickers",
+                    units="price (split/dividend adjusted)", frequency="daily", observed=obs,
+                    note=f"Tickers with fewer than {_MIN_OBS} observations are dropped (listed in 'missing').")
+    spy_only = bench_px.empty or len(bench_px) < 2
+    bench_src = pv.ref("yahoo", None, "Daily adjusted close of SPY and AGG", units="price (split/dividend adjusted)",
+                       frequency="daily", observed=obs,
+                       flags=("fallback",) if spy_only else (),
+                       note="SPY or AGG data was missing, so SPY alone stands in for the 60/40 mix." if spy_only else None)
+    stats = ("cagr = (Π(1+r))^(252/n) − 1; vol = std of daily log(1+r) × √252; sharpe = mean daily return × 252 ÷ vol "
+             "(risk-free rate taken as 0); maxDrawdown = worst cumulative value ÷ running peak − 1")
+    prov = {
+        "*": pv.derived(
+            f"Monthly-rebalanced {mode} risk-parity backtest: at each month start the weights are re-estimated from "
+            f"all history before that date (equal weights until {_MIN_OBS} observations exist) and held for the "
+            "month; compared with a 60% SPY / 40% AGG mix rebalanced daily", [assets, bench_src],
+            title="Risk-parity backtest", observed=obs),
+        "series": pv.derived("base-100 compounding of the daily strategy and benchmark returns", ["*"],
+                             title="Cumulative value", observed=obs),
+        "finalWeights": pv.derived("the weights estimated at the last month start", ["*"], title="Final weights",
+                                   observed=obs),
+        "metrics.strategy": pv.derived(stats, [assets], title="Strategy statistics", observed=obs),
+        "metrics.benchmark": pv.derived(stats, [bench_src], title="Benchmark statistics", observed=obs),
+    }
+    return pv.attach({
         "series": series_out,
         "finalWeights": (
             [{"ticker": asset_cols[i], "weight": _clean(float(final_w[i]))} for i in range(len(asset_cols))]
@@ -372,4 +415,4 @@ def risk_parity_backtest(
             "benchmark": _portfolio_metrics(bench_simple),
         },
         "missing": missing,
-    }
+    }, prov)

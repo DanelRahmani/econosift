@@ -15,6 +15,7 @@ import asyncio
 import logging
 from datetime import datetime
 
+from .. import provenance as pv
 from ..cache import async_cached
 from . import atlas_service
 from ..sources import source_bis
@@ -57,6 +58,50 @@ def _signal_color(flags: int) -> str:
     elif flags >= 3:
         return "yellow"
     return "green"
+
+
+def _provenance(countries: list[dict], cur_year: int) -> dict:
+    """Source map for the currency-crisis checklist (see provenance.py)."""
+    codes = atlas_service._WB_CODES
+    checklist = ("One flag per breach: current account < -5% of GDP, inflation > 10%, short-term debt > 15% "
+                 "of external debt, debt > 90% of GDP, reserves down > 10% YoY, real FX > 15% above its "
+                 "5-year average. compositeScore = flags; red >= 5, yellow >= 3, else green.")
+    prov: dict = {
+        "*": pv.derived(checklist, title="Currency-crisis checklist"),
+        "summary": pv.derived("count of countries per signal colour", ["*"], title="Signal counts"),
+    }
+    wb_kpis = (
+        ("currentAccount", "current_account", "Current account balance (% of GDP)", "% of GDP", ""),
+        ("inflation", "inflation", "Inflation, consumer prices (annual %)", "% per year", ""),
+        ("shortTermDebt", "short_term_debt", "Short-term debt (% of total external debt)",
+         "% of external debt", ""),
+        ("debtGdp", "debt_gdp", "Central government debt (% of GDP)", "% of GDP",
+         "Central-government debt, not general government."),
+    )
+    for c in countries:
+        row = f"countries.{c['iso2']}"
+        per = c["periods"]
+        prov[row] = pv.derived(checklist, title=f"{c['name']} currency-crisis flags")
+        for kpi, key, title, units, note in wb_kpis:
+            yr = per.get(kpi)
+            prov[f"{row}.kpis.{kpi}"] = pv.ref(
+                "worldbank", codes[key], title, units=units, frequency="annual",
+                observed=str(yr) if yr else None,
+                flags=["stale"] if yr and yr < cur_year - 3 else [], note=note or None)
+        yr = per.get("reservesDecline")
+        prov[f"{row}.kpis.reservesDecline"] = pv.derived(
+            "-(latest total reserves - previous available year) / previous x 100; positive = reserves falling. "
+            "Total reserves include gold and are in current US$, so valuation moves count.",
+            [pv.ref("worldbank", codes["reserves_total"], "Total reserves incl. gold (current US$)",
+                    units="current US$", frequency="annual", observed=str(yr) if yr else None)],
+            title="Reserves decline (% YoY)", observed=str(yr) if yr else None)
+        fx = per.get("fxOvervaluation")
+        prov[f"{row}.kpis.fxOvervaluation"] = pv.derived(
+            f"(latest monthly REER - mean of the last {_REER_WINDOW} months) / mean x 100",
+            [pv.ref("bis", "WS_EER", "Real effective exchange rate, broad basket (CPI-based)",
+                    units="index, 2020=100", frequency="monthly", observed=fx)],
+            title="Real FX overvaluation vs 5-year average", observed=fx)
+    return prov
 
 
 @async_cached("currency_crisis")
@@ -194,7 +239,7 @@ async def get_currency_crisis() -> dict:
 
     wb_years = [y for c in countries_out for y in c["periods"].values() if isinstance(y, int)]
 
-    return {
+    return pv.attach({
         # Latest World Bank data year in use; per-KPI periods are on each row.
         "asOf": str(max(wb_years)) if wb_years else None,
         "source": "World Bank (WDI) / BIS real effective exchange rates",
@@ -207,4 +252,4 @@ async def get_currency_crisis() -> dict:
             "greenCount": len(countries_out) - red_count - yellow_count,
             "totalCountries": len(countries_out),
         },
-    }
+    }, _provenance(countries_out, cur_year))

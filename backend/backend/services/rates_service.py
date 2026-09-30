@@ -9,6 +9,7 @@ from datetime import date, timedelta
 import pandas as pd
 import requests
 
+from .. import provenance as pv
 from ..cache import async_cached
 from ..config import FRED_API_KEY
 
@@ -30,6 +31,25 @@ YIELD_SERIES = [
     "BAMLH0A0HYM2",
     "BAMLC0A0CM",
 ]
+
+# (title, frequency) of each YIELD_SERIES entry, for the provenance map.
+_YIELD_META = {
+    "FEDFUNDS": ("Effective federal funds rate", "monthly"),
+    "DGS3MO": ("Market yield on US Treasury securities at 3-month constant maturity", "daily"),
+    "DGS2": ("Market yield on US Treasury securities at 2-year constant maturity", "daily"),
+    "DGS5": ("Market yield on US Treasury securities at 5-year constant maturity", "daily"),
+    "DGS7": ("Market yield on US Treasury securities at 7-year constant maturity", "daily"),
+    "DGS10": ("Market yield on US Treasury securities at 10-year constant maturity", "daily"),
+    "DGS20": ("Market yield on US Treasury securities at 20-year constant maturity", "daily"),
+    "DGS30": ("Market yield on US Treasury securities at 30-year constant maturity", "daily"),
+    "T5YIE": ("5-year breakeven inflation rate", "daily"),
+    "T10YIE": ("10-year breakeven inflation rate", "daily"),
+    "DFII10": ("Market yield on US Treasury securities at 10-year constant maturity, inflation-indexed",
+               "daily"),
+    "MORTGAGE30US": ("30-year fixed rate mortgage average in the United States (Freddie Mac)", "weekly"),
+    "BAMLH0A0HYM2": ("ICE BofA US High Yield Index option-adjusted spread", "daily"),
+    "BAMLC0A0CM": ("ICE BofA US Corporate Index option-adjusted spread", "daily"),
+}
 
 # NY Fed ACM term-structure decomposition (data file, not the paper — the
 # previous URL pointed at the Staff Report 340 PDF, so this panel was always
@@ -155,6 +175,66 @@ def _compute_taylor_rule(
         return {"implied": [], "actual": [], "output_gap": []}
 
 
+def taylor_rule_provenance(fred: dict[str, pd.Series], tr: dict,
+                           keys: tuple[str, str, str] = ("taylor_rule.implied", "taylor_rule.actual",
+                                                         "taylor_rule.output_gap"),
+                           default_key: str | None = None) -> dict:
+    """Provenance for ``_compute_taylor_rule`` output: the ``(implied, actual,
+    output gap)`` series are filed under ``keys`` (a caller that reshapes the
+    series, e.g. ``/macro/taylor-rule``, passes its own keys). ``default_key``,
+    if given, also receives the implied-rate ref (for a ``"*"`` default).
+    Returns ``{}`` when the rule could not be computed."""
+    if not tr.get("implied"):
+        return {}
+
+    def src(sid: str, title: str, freq: str) -> dict:
+        return pv.fred(sid, title, frequency=freq, observed=pv.last_date(fred[sid]) if sid in fred else None)
+
+    cpi = src("CPIAUCSL", "Consumer price index for all urban consumers, all items", "monthly")
+    gdp = src("GDPC1", "Real gross domestic product", "quarterly")
+    pot = src("GDPPOT", "Real potential gross domestic product (CBO)", "quarterly")
+    ff = src("FEDFUNDS", "Effective federal funds rate", "monthly")
+    ff["units"] = "%"
+    implied = pv.derived(
+        "0.5 + pi + 0.5 x (pi - 2) + 0.5 x output gap, clipped to -5..25; pi = 12-month % change of CPIAUCSL, "
+        "output gap = (GDPC1 - GDPPOT) / GDPPOT x 100 (quarterly, carried forward to months)",
+        [cpi, gdp, pot], title="Taylor-rule implied policy rate (%)", observed=tr["implied"][-1]["date"])
+    gap = pv.derived("(GDPC1 - GDPPOT) / GDPPOT x 100, quarterly values carried forward to months",
+                     [gdp, pot], title="Output gap (% of potential)", observed=tr["output_gap"][-1]["date"])
+    prov = {keys[0]: implied, keys[1]: ff, keys[2]: gap}
+    if default_key:
+        prov[default_key] = implied
+    return prov
+
+
+def _provenance(fred_data: dict[str, pd.Series], fred_long: dict[str, pd.Series],
+                taylor_rule: dict, acm: dict) -> dict:
+    """Per-series keys ``yields.<id>`` / ``history.<id>``, the two spreads, the
+    Taylor-rule series and the NY Fed ACM decomposition."""
+    prov: dict = {"*": pv.ref("fred", None, "Federal Reserve Economic Data", units="%")}
+    for sid, (title, freq) in _YIELD_META.items():
+        if sid in fred_data:
+            r = pv.fred(sid, title, units="%", frequency=freq, observed=pv.last_date(fred_data[sid]))
+            prov[f"yields.{sid}"] = prov[f"history.{sid}"] = r
+    if "yields.DGS10" in prov and "yields.DGS2" in prov:
+        prov["spread_2y10y"] = pv.derived("DGS10 - DGS2 (latest observations)",
+                                          ["yields.DGS10", "yields.DGS2"], title="10y-2y Treasury spread")
+    if "yields.DGS10" in prov and "yields.DGS3MO" in prov:
+        prov["spread_3m10y"] = pv.derived("DGS10 - DGS3MO (latest observations)",
+                                          ["yields.DGS10", "yields.DGS3MO"], title="10y-3m Treasury spread")
+        prov["inverted"] = pv.derived("true when spread_3m10y < 0", ["spread_3m10y"],
+                                      title="Yield curve inverted (10y-3m)")
+    prov.update(taylor_rule_provenance(fred_long, taylor_rule))
+    if acm.get("expectations"):
+        prov["acm.expectations"] = pv.ref(
+            "nyfed", "ACMRNY10", "ACM 10-year risk-neutral yield (expectations component)", units="%",
+            frequency="monthly", observed=acm["expectations"][-1]["date"], url=ACM_URL)
+        prov["acm.term_premium"] = pv.ref(
+            "nyfed", "ACMTP10", "ACM 10-year term premium", units="%", frequency="monthly",
+            observed=acm["term_premium"][-1]["date"] if acm.get("term_premium") else None, url=ACM_URL)
+    return prov
+
+
 def _get_rates_data_sync() -> dict:
     today = date.today()
     five_years_ago = (today - timedelta(days=5 * 365)).strftime("%Y-%m-%d")
@@ -206,7 +286,7 @@ def _get_rates_data_sync() -> dict:
         if len(last_idx):
             as_of = str(last_idx[-1].date())
 
-    return {
+    result = {
         "asOf": as_of,
         "yields": yields,
         "spread_2y10y": spread_2y10y,
@@ -216,6 +296,7 @@ def _get_rates_data_sync() -> dict:
         "taylor_rule": taylor_rule,
         "acm": acm,
     }
+    return pv.attach(result, _provenance(fred_data, fred_long, taylor_rule, acm)) if fred_data else result
 
 
 @async_cached("rates_data")

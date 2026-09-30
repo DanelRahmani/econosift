@@ -20,6 +20,7 @@ import pandas as pd
 import requests
 import yfinance as yf
 
+from .. import provenance as pv
 from ..cache import cached
 from ..config import FINNHUB_API_KEY, FRED_API_KEY
 from ..services import constituents as _constituents
@@ -344,10 +345,33 @@ def ipo_events(start: str, end: str) -> list[dict]:
     return out
 
 
+def _provenance() -> dict:
+    """Source map for the calendar (see provenance.py). Events carry no per-row source,
+    so each category maps to the providers it is built from."""
+    no_key = None if FINNHUB_API_KEY else "No Finnhub API key is configured, so this feed is empty."
+    macro = [pv.ref("econosift", None, "Central-bank meeting dates (bundled cb_meetings.json)",
+                    note="A static list shipped with the app; the file records no upstream source and is "
+                         "not refreshed from a live feed.")]
+    macro.append(pv.ref("finnhub", "/calendar/economic", "Finnhub economic calendar", note=no_key))
+    return {
+        "*": pv.derived("Merged from the macro, earnings, dividends and ipos feeds below, filtered to the "
+                        "requested date range", title="Economic calendar"),
+        "macro": macro,
+        "earnings": pv.ref("yahoo", None, "Earnings dates, EPS estimates and reported EPS per index "
+                           "constituent (yfinance earnings_dates)",
+                           note="surprisePct is Yahoo's Surprise(%) column; beatMiss is computed here by "
+                                "comparing reported with estimated EPS."),
+        "dividends": pv.ref("yahoo", None, "Ex-dividend date and dividend rate per index constituent "
+                            "(yfinance info)",
+                            note="'amount' is Yahoo's annual dividendRate, not the per-payment amount."),
+        "ipos": pv.ref("finnhub", "/calendar/ipo", "Finnhub IPO calendar", note=no_key),
+    }
+
+
 @cached("calendar")
 def calendar(index: str, start: str, end: str) -> dict:
     """Aggregate all four event streams into a single calendar response."""
-    return {
+    return pv.attach({
         "index": index,
         "start": start,
         "end": end,
@@ -360,4 +384,4 @@ def calendar(index: str, start: str, end: str) -> dict:
             "fred": bool(FRED_API_KEY),
             "cbMeetings": True,
         },
-    }
+    }, _provenance())

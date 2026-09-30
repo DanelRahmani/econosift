@@ -10,8 +10,10 @@ import asyncio
 import logging
 from datetime import datetime
 
+from .. import provenance as pv
 from ..cache import async_cached
 from . import atlas_service
+from .fiscal_service import wb_country_provenance
 
 log = logging.getLogger(__name__)
 
@@ -49,6 +51,32 @@ def _latest(year_map: dict[int, float]) -> float | None:
 
 def _to_timeseries(year_map: dict[int, float]) -> list[dict]:
     return [{"date": str(y), "value": v} for y, v in sorted(year_map.items())]
+
+
+_WB_SPECS = [
+    ("lfpr", "SL.TLF.CACT.ZS",
+     "Labor force participation rate, total (% of population ages 15+, modeled ILO estimate)",
+     "% of population 15+"),
+    ("youthUnemp", "SL.UEM.1524.ZS",
+     "Unemployment, youth total (% of labor force ages 15-24, modeled ILO estimate)", "% of labor force 15-24"),
+    ("empPopRatio", "SL.EMP.TOTL.SP.ZS",
+     "Employment to population ratio, 15+, total (modeled ILO estimate)", "% of population 15+"),
+    ("vulnerableEmp", "SL.EMP.VULN.ZS",
+     "Vulnerable employment, total (% of total employment, modeled ILO estimate)", "% of employment"),
+    ("gdpPerWorker", "SL.GDP.PCAP.EM.KD", "GDP per person employed (constant PPP $)", "constant PPP $"),
+]
+
+
+def _provenance(countries: list[dict]) -> dict:
+    prov = wb_country_provenance(countries, _WB_SPECS)
+    prov["kpis.productivityGrowth"] = pv.derived(
+        "(latest GDP per person employed / previous available observation - 1) x 100",
+        ["kpis.gdpPerWorker"], title="Productivity growth")
+    prov["summary"] = pv.derived(
+        "simple mean (avgLfpr, avgYouthUnemp) or count (highYouthUnempCount: youth unemployment above 20%) "
+        "of the countries' latest KPI values",
+        ["kpis.lfpr", "kpis.youthUnemp"], title="Cross-country summary")
+    return prov
 
 
 @async_cached("labor_data")
@@ -122,7 +150,7 @@ async def get_labor_data() -> dict:
     with_yu = [c["kpis"]["youthUnemp"] for c in countries_out if c["kpis"]["youthUnemp"] is not None]
     high_red = sum(1 for c in countries_out if c["kpis"]["youthUnempSignal"] == "red")
 
-    return {
+    result = {
         "asOf": atlas_service.stamp_periods(countries_out),
         "source": "World Bank",
         "countries": countries_out,
@@ -133,3 +161,4 @@ async def get_labor_data() -> dict:
             "totalCountries": len(countries_out),
         },
     }
+    return pv.attach(result, _provenance(countries_out))

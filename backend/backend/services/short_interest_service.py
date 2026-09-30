@@ -9,6 +9,7 @@ import asyncio
 import logging
 from datetime import datetime
 
+from .. import provenance as pv
 from ..cache import async_cached
 from ..config import FINNHUB_API_KEY
 
@@ -177,13 +178,38 @@ async def get_short_interest(ticker: str | None = None, universe: str | None = N
         for s, vals in sorted(sector_agg.items(), key=lambda x: sum(x[1]) / len(x[1]), reverse=True)
     ]
 
-    return {
+    as_of = max((i["asOf"] for i in items if i.get("asOf")), default=None)
+    return pv.attach({
         # Latest exchange settlement date among the tickers (published twice a
         # month, about two weeks in arrears).
-        "asOf": max((i["asOf"] for i in items if i.get("asOf")), default=None),
+        "asOf": as_of,
         "source": "yfinance",
         "items": items,
         "mostShorted": most_shorted,
         "squeezeCandidates": squeeze_candidates,
         "sectorSummary": sector_summary,
-    }
+    }, _provenance(as_of, {"items": items, "mostShorted": most_shorted,
+                           "squeezeCandidates": squeeze_candidates}))
+
+
+def _provenance(as_of: str | None, groups: dict[str, list[dict]]) -> dict:
+    """Per-ticker Yahoo short-interest refs under items / mostShorted / squeezeCandidates."""
+    prov: dict = {"*": pv.ref(
+        "yahoo", None, "Short interest (shortPercentOfFloat, shortRatio, dateShortInterest)",
+        frequency="semi-monthly", observed=as_of,
+        note="Exchange-reported short interest as republished by Yahoo, about two weeks in arrears; "
+             "each ticker carries its own settlement date.")}
+    prov["sectorSummary"] = pv.derived(
+        "mean / max of shortFloat over the tickers in each sector; sector comes from a hard-coded ticker map",
+        ["*"], title="Sector short-interest summary", observed=as_of)
+    squeeze = pv.derived("shortFloat (%) × max(daysToCover, 0.1)", ["*"], title="Squeeze score (heuristic)")
+    sector = pv.ref("econosift", None, "Sector label from a hard-coded ticker map (\"Other\" if unmapped)")
+    for group, rows in groups.items():
+        for i in rows:
+            t = i["ticker"]
+            prov[f"{group}.{t}"] = pv.yahoo(t, "Short interest: % of float short and days to cover",
+                                            units="% of float; days", frequency="semi-monthly",
+                                            observed=i.get("asOf"))
+            prov[f"{group}.{t}.squeezeScore"] = squeeze
+            prov[f"{group}.{t}.sector"] = sector
+    return prov

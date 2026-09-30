@@ -15,6 +15,7 @@ import pandas as pd
 from scipy import optimize
 from scipy.stats import norm
 
+from .. import provenance as pv
 from ..cache import async_cached
 from ..config import FRED_API_KEY
 from . import macro_expansion_service as mes
@@ -234,6 +235,50 @@ def _compute_recession(data: dict[str, list[dict]]) -> dict:
     }
 
 
+def _provenance(data: dict[str, list[dict]], result: dict) -> dict:
+    def last(sid: str) -> str | None:
+        pts = [p for p in data.get(sid, []) if p.get("value") is not None]
+        return pts[-1]["date"] if pts else None
+
+    spread = pv.fred("T10Y3M", "10-year minus 3-month Treasury constant maturity spread", units="%",
+                     frequency="daily", observed=last("T10Y3M"))
+    usrec = pv.fred("USREC", "NBER recession indicator (1 = recession)", frequency="monthly",
+                    observed=last("USREC"))
+    smoothed = pv.fred("RECPROUSM156N", "Smoothed US recession probabilities", units="%", frequency="monthly",
+                       observed=last("RECPROUSM156N"))
+    sahm = pv.fred("SAHMREALTIME", "Real-time Sahm rule recession indicator", units="percentage points",
+                   frequency="monthly", observed=last("SAHMREALTIME"))
+    monthly_spread = pv.derived("monthly mean of daily T10Y3M", [spread], title="10y-3m spread, monthly mean",
+                                observed=(result.get("history", {}).get("spread") or [{}])[-1].get("date"))
+    prob = pv.derived(
+        "Phi(alpha + beta x spread) x 100, spread = monthly mean of T10Y3M; alpha, beta fitted once by maximum-"
+        "likelihood probit over the whole sample against USREC shifted 12 months ahead (in-sample)",
+        [monthly_spread, usrec], title="12-month-ahead recession probability (in-sample)",
+        observed=result.get("asOf"))
+    realtime = pv.derived(
+        "same probit, refitted each month using only observations whose 12-month-ahead outcome was already "
+        "known, then applied to that month's spread (walk-forward)", [monthly_spread, usrec],
+        title="12-month-ahead recession probability (real-time refit)",
+        observed=((result.get("history", {}).get("probabilityRealtime") or [{}])[-1]).get("date"))
+    return {
+        "*": prob,
+        "kpis.prob12m": prob, "history.probability": prob,
+        "kpis.prob12mRealtime": realtime, "history.probabilityRealtime": realtime,
+        "kpis.sahm": sahm, "history.sahm": sahm,
+        "kpis.spreadPct": spread,
+        "history.spread": monthly_spread,
+        "kpis.monthsInverted": pv.derived("count of consecutive most recent months whose monthly mean spread "
+                                          "is below 0", [monthly_spread], title="Months inverted",
+                                          observed=result.get("asOf")),
+        "kpis.smoothedProb": smoothed, "history.smoothedProb": smoothed,
+        "recessions": pv.derived("months where USREC = 1, grouped into start/end episodes", [usrec],
+                                 title="NBER recession episodes"),
+        "model": pv.derived("maximum-likelihood probit fit of USREC (12 months ahead) on the monthly mean "
+                            "10y-3m spread; nObs = months used", [monthly_spread, usrec],
+                            title="Probit coefficients"),
+    }
+
+
 @async_cached("recession_probability")
 async def get_recession_probability() -> dict:
     """NY-Fed-style 12-month-ahead recession probability from the 10y-3m spread."""
@@ -241,4 +286,5 @@ async def get_recession_probability() -> dict:
         return {"error": "FRED API key required"}
 
     data = await mes.fetch_fred_series(_SERIES, start=_START)
-    return _compute_recession(data)
+    result = _compute_recession(data)
+    return pv.attach(result, _provenance(data, result)) if result else result

@@ -11,6 +11,7 @@ import json
 import logging
 from pathlib import Path
 
+from .. import provenance as pv
 from ..cache import cached
 
 logger = logging.getLogger(__name__)
@@ -269,6 +270,33 @@ def _extract_sections(entry: dict) -> list[dict]:
     return sections
 
 
+def _provenance(sections: list[dict], rest_titles: set[str], fb_titles: set[str], aircraft: bool) -> dict:
+    """Source map for a country profile (see provenance.py). Sections are keyed by title."""
+    rest = pv.ref("other", None, "REST Countries dataset (mledoze/countries)",
+                  url="https://github.com/mledoze/countries",
+                  note="Names, codes, borders, currencies and languages; a static file downloaded by the app.")
+    rest["providerName"] = "REST Countries (mledoze/countries)"
+    fb = pv.ref("factbook", None, "CIA World Factbook country profile",
+                note="From a downloaded snapshot of the factbook/factbook.json GitHub mirror; the snapshot date "
+                     "is not recorded, and multi-year fields show their latest year without naming it.")
+    prov: dict = {"*": rest}
+    for sec in sections:
+        title = sec["title"]
+        in_fb, in_rest = title in fb_titles, title in rest_titles
+        if in_fb and in_rest:
+            prov[f"sections.{title}"] = [dict(fb), dict(rest)]
+        elif in_fb:
+            prov[f"sections.{title}"] = dict(fb)
+        elif in_rest:
+            ref = dict(rest)
+            if aircraft and title == "International Codes":
+                ref["note"] = rest["note"] + " The civil aircraft registration prefix comes from the CIA World Factbook."
+                prov[f"sections.{title}"] = [ref, dict(fb)]
+            else:
+                prov[f"sections.{title}"] = ref
+    return prov
+
+
 def get_country_list() -> list[dict]:
     """Return [{iso2, iso3, name, flag, region}] for all ~260 countries."""
     data = _load_data()
@@ -294,12 +322,18 @@ def get_country_profile(iso2: str) -> dict | None:
     iso3 = (entry.get("cca3") or entry.get("ISO3") or "").upper()
 
     sections = _extract_sections(entry)
+    rest_titles = {s["title"] for s in sections}
+    if "People & Society" in rest_titles:
+        rest_titles.add("People and Society")  # merged into the factbook section of that name
+    fb_titles: set[str] = set()
+    aircraft = False
 
     # Try to merge in CIA Factbook data
     try:
         from .factbook_profiles_service import get_factbook_profile, _load_factbook_file, _extract_field, ISO2_TO_GEC as FB_ISO2
         fb_sections = get_factbook_profile(iso2)
         if fb_sections:
+            fb_titles = {s["title"] for s in fb_sections}
             # Merge duplicates: REST Geography → factbook Geography, REST People → factbook People
             fb_by_title = {s["title"]: s for s in fb_sections}
             rest_by_title = {s["title"]: s for s in sections}
@@ -347,6 +381,7 @@ def get_country_profile(iso2: str) -> dict | None:
                     for s in sections:
                         if s["title"] == "International Codes":
                             s["fields"].append({"label": "Civil Aircraft Reg", "value": ac})
+                            aircraft = True
                             break
     except Exception:
         pass
@@ -375,7 +410,7 @@ def get_country_profile(iso2: str) -> dict | None:
         if isinstance(fra, dict):
             french_name = fra.get("common", "")
 
-    return {
+    return pv.attach({
         "iso2": iso2,
         "iso3": iso3,
         "name": str(name),
@@ -386,4 +421,4 @@ def get_country_profile(iso2: str) -> dict | None:
         "continent": str(region),  # region is the continent in REST Countries
         "borders": border_iso2s,
         "sections": sections,
-    }
+    }, _provenance(sections, rest_titles, fb_titles, aircraft))

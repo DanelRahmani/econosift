@@ -10,6 +10,7 @@ from datetime import date
 import pandas as pd
 import requests
 
+from .. import provenance as pv
 from ..cache import async_cached
 
 log = logging.getLogger(__name__)
@@ -221,6 +222,30 @@ def _cot_failed(result) -> bool:
             or not result.get("contracts"))
 
 
+def _provenance(as_of: str) -> dict:
+    """Row fields are keyed ``contracts.<field>`` (one source for every contract)."""
+    src = pv.ref("cftc", None, "Commitments of Traders, legacy report, futures only", frequency="weekly",
+                 observed=as_of, note="Socrata open-data API (publicreporting.cftc.gov, dataset 6dca-aqww), "
+                                      "falling back to the annual deacotYYYY.zip archives; as_of is the newest "
+                                      "report date across contracts.")
+    net = pv.derived("non-commercial long - non-commercial short futures contracts, at the latest report date",
+                     [src], title="Net speculator position (contracts)", observed=as_of)
+    return {
+        "*": src,
+        "contracts.net_speculator": net,
+        "contracts.history": net,
+        "contracts.cot_index": pv.derived(
+            "(latest net position - lowest of the last 52 weekly reports) / (highest - lowest) x 100; empty "
+            "when the 52-week range is flat", ["contracts.net_speculator"], title="COT index (52-week)",
+            observed=as_of),
+        "contracts.open_interest": pv.derived("total open interest (all), latest report date", [src],
+                                              title="Open interest (contracts)", observed=as_of),
+        "contracts.net_commercial": pv.derived(
+            "not populated: the legacy report's commercial split is not read, so this is always 0",
+            title="Net commercial position", flags=("fallback",)),
+    }
+
+
 @async_cached("cot_data", skip_if=_cot_failed)
 async def get_cot_data() -> dict:
     """Download and parse CFTC COT data for 6 key futures contracts."""
@@ -235,12 +260,12 @@ async def get_cot_data() -> dict:
         ]
         if latest_dates:
             as_of = max(latest_dates)
-        return {
+        return pv.attach({
             "asOf": as_of,
             "contracts": contracts,
             "source": "CFTC",
             "error": None,
-        }
+        }, _provenance(as_of))
     except Exception as exc:
         log.warning("get_cot_data failed: %s", exc)
         return {

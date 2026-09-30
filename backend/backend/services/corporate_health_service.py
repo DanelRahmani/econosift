@@ -13,6 +13,7 @@ from datetime import date
 import pandas as pd
 import yfinance as yf
 
+from .. import provenance as pv
 from ..cache import cached
 from . import constituents
 
@@ -498,8 +499,10 @@ def get_corporate_health(ticker: str) -> dict:
         piotroski_data = _piotroski(fin, bs, cf, fin_q, bs_q, cf_q)
 
         beneish_data = _beneish(fin, bs, cf, fin_q, bs_q, cf_q)
+        # Fiscal year end of the latest annual statements the scores use.
+        fy_end = str(fin.columns[0])[:10] if len(fin.columns) else None
 
-        return {
+        return pv.attach({
             "ticker": ticker,
             "name": info.get("shortName") or info.get("longName") or ticker,
             "sector": sector or None,
@@ -508,11 +511,38 @@ def get_corporate_health(ticker: str) -> dict:
             "altmanZ": z_data,
             "piotroski": piotroski_data,
             "beneish": beneish_data,
-            "asOf": None,
-        }
+            "asOf": fy_end,
+        }, _health_provenance(ticker, fy_end, bool(fin_q is not None or bs_q is not None or cf_q is not None)))
     except Exception as exc:
         logger.warning("corporate_health failed for %s: %s", ticker, exc)
         return {"ticker": ticker, "error": str(exc)}
+
+
+def _health_provenance(ticker: str, fy_end: str | None, quarterly_fallback: bool) -> dict:
+    statements = pv.yahoo(ticker, "Annual income statement, balance sheet and cash-flow statement",
+                          frequency="annual", observed=fy_end,
+                          note=("The prior year is taken from quarterly statements where Yahoo "
+                                "publishes only one annual column.") if quarterly_fallback else None)
+    market_cap = pv.yahoo(ticker, "info.marketCap (market value of equity)")
+    return {
+        "*": statements,
+        "price": pv.yahoo(ticker, "info.currentPrice (else regularMarketPrice)"),
+        "altmanZ": pv.derived(
+            "Z = 1.2·(working capital/TA) + 1.4·(retained earnings/TA) + 3.3·(EBIT/TA) "
+            "+ 0.6·(market cap/total liabilities) + 1.0·(sales/TA); Safe > 2.99, Distress ≤ 1.81; "
+            "null if any input is missing",
+            [statements, market_cap], title="Altman Z-Score (1968, public manufacturers)", observed=fy_end),
+        "piotroski": pv.derived(
+            "one point per criterion met: ROA > 0, OCF > 0, ΔROA > 0, OCF > net income, Δleverage < 0, "
+            "Δcurrent ratio > 0, no new shares, Δgross margin > 0, Δasset turnover > 0; criteria "
+            "without a prior year are not scored (maxScore shrinks)",
+            [statements], title="Piotroski F-Score", observed=fy_end),
+        "beneish": pv.derived(
+            "M = −4.84 + 0.920·DSRI + 0.528·GMI + 0.404·AQI + 0.892·SGI + 0.115·DEPI − 0.172·SGAI "
+            "+ 4.679·TATA − 0.327·LVGI; missing indexes take their neutral value 1.0 (at most two, "
+            "TATA required); M > −2.22 flags likely manipulation",
+            [statements], title="Beneish M-Score", observed=fy_end),
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -767,4 +797,17 @@ def get_earnings_quality(universe: str = "dow") -> dict:
     if not result:
         return {}
     result["universe"] = universe
-    return result
+    statements = pv.ref("yahoo", None, f"Latest two annual statements of each {universe} member",
+                        frequency="annual", note="Fiscal year ends differ by company.")
+    members_ref = pv.ref("wikipedia", None, f"Current {universe} constituents")
+    return pv.attach(result, {
+        "*": pv.derived("Sloan (1996) accruals screen over the index members", [statements, members_ref],
+                        title="Earnings quality"),
+        "rows": pv.derived(
+            "accrual ratio = (net income − operating cash flow) / average total assets; cash conversion = "
+            "OCF / net income (net income > 0); NOA growth = YoY change in (TA − cash) − (TL − debt); "
+            "quality score 0–100 from those three; flag = accrual ratio in the universe's top decile",
+            [statements], title="Per-company earnings quality"),
+        "kpis": pv.derived("medians and share flagged across the companies with data", ["rows"],
+                           title="Universe summary"),
+    })

@@ -49,6 +49,7 @@ def test_unrecognised_label_keeps_adapter_wording():
     r = pv.label_to_ref("Some Statistics Office")
     assert r["provider"] == "other" and r["providerName"] == "Some Statistics Office"
     assert pv.label_to_ref("World Bank (WDI)", series="NY.GDP.MKTP.KD.ZG")["provider"] == "worldbank"
+    assert pv.label_to_ref("Frankfurter (ECB FX data)")["provider"] == "frankfurter"
 
 
 # ---------------------------------------------------------------------------
@@ -68,6 +69,12 @@ def test_attach_keeps_keys_the_result_already_carries():
     out = pv.attach(inner, {"v": pv.yahoo("^TNX"), "*": pv.yahoo("AAPL")})
     assert out["provenance"]["v"]["provider"] == "fred"
     assert out["provenance"]["*"]["provider"] == "yahoo"
+
+
+def test_attach_keeps_aliases_and_drops_malformed_entries():
+    out = pv.attach({}, {"a": pv.fred("DGS10"), "b": "a", "c": 3, "d": [pv.fred("DGS2"), "x"]})
+    assert out["provenance"]["b"] == "a"
+    assert "c" not in out["provenance"] and "d" not in out["provenance"]
 
 
 def test_attach_stamps_every_ref_in_a_list_and_passes_non_dicts_through():

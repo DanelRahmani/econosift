@@ -15,8 +15,10 @@ import asyncio
 import logging
 from datetime import datetime
 
+from .. import provenance as pv
 from ..cache import async_cached
 from . import atlas_service
+from .fiscal_service import wb_country_provenance
 
 log = logging.getLogger(__name__)
 
@@ -32,6 +34,19 @@ def _latest(year_map: dict[int, float]) -> float | None:
     if not year_map:
         return None
     return year_map[max(year_map)]
+
+
+def _provenance(countries: list[dict]) -> dict:
+    """Row fields sit directly on each ``countries`` row, so keys are ``countries.<field>``."""
+    prov = wb_country_provenance(countries, [
+        ("foodImports", "TM.VAL.FOOD.ZS.UN", "Food imports (% of merchandise imports)", "% of merchandise imports"),
+        ("fuelImports", "TM.VAL.FUEL.ZS.UN", "Fuel imports (% of merchandise imports)", "% of merchandise imports"),
+    ], prefixes=("countries.",))
+    prov["countries.compositeScore"] = pv.derived(
+        "(food import share + fuel import share) / 2, only when both shares exist; each share is its own "
+        "latest available year",
+        ["countries.foodImports", "countries.fuelImports"], title="Supply chain vulnerability score")
+    return prov
 
 
 @async_cached("supply_chain_vulnerability")
@@ -86,7 +101,7 @@ async def get_supply_chain_data() -> dict:
 
     years = [y for c in countries_out for y in c["periods"].values() if y]
 
-    return {
+    result = {
         "asOf": str(max(years)) if years else None,
         "source": "World Bank",
         "methodology": "Composite = (food_import_share + fuel_import_share) / 2. Higher = more vulnerable to trade disruption.",
@@ -97,3 +112,4 @@ async def get_supply_chain_data() -> dict:
             "lowestRisk": countries_out[-1]["compositeScore"] if countries_out else None,
         },
     }
+    return pv.attach(result, _provenance(countries_out))

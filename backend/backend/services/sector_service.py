@@ -10,6 +10,7 @@ from datetime import date
 import numpy as np
 import yfinance as yf
 
+from .. import provenance as pv
 from ..cache import cached
 from . import yfinance_service as yfs
 from . import regime_service
@@ -121,7 +122,20 @@ def get_sector_returns() -> dict:
             rows.append({"ticker": etf, "sector": sector, "changePercent": ret, "vsSpy": vs_spy})
         periods[period_key] = rows
 
-    return {"periods": periods}
+    as_of = pv.last_date(frame)
+    closes = pv.ref("yahoo", None, "Daily adjusted close of the 11 sector SPDR ETFs and SPY", frequency="daily",
+                    units="price, split- and dividend-adjusted", observed=as_of)
+    prov: dict = {"*": pv.derived("sector ETF returns over trading-day windows, and the difference from SPY",
+                                  [closes], title="Sector returns", observed=as_of)}
+    for period_key, n_days, is_ytd in period_defs:
+        base = ("first close on or after 1 January" if is_ytd else f"close {n_days} trading days earlier"
+                if period_key != "1y" else "first close of the 1-year window")
+        prov[f"periods.{period_key}"] = pv.derived(f"(last close / {base} − 1) × 100 for each sector ETF",
+                                                   [closes], title=f"Sector ETF return, {period_key}", observed=as_of)
+        prov[f"periods.{period_key}.vsSpy"] = pv.derived(
+            f"sector ETF return − SPY return over the same window ({base})", [closes],
+            title=f"Return vs SPY, {period_key}", observed=as_of)
+    return pv.attach({"periods": periods}, prov)
 
 
 @cached("sector_fundamentals")
@@ -255,12 +269,41 @@ def get_sector_rotation() -> dict:
             "phaseRank": rank_map.get(r["sector"]),
         })
 
-    return {
+    return pv.attach({
         "phase": implied_phase,
         "confidence": confidence,
         "regimePhase": regime_phase,
         "regimeQuadrant": regime_quadrant,
         "sectors": sectors_out,
+    }, _rotation_provenance())
+
+
+def _rotation_provenance() -> dict:
+    etfs = pv.ref("yahoo", None, "Daily adjusted close of the 11 sector SPDR ETFs and SPY", frequency="daily")
+    ranks = pv.derived("3-month return of each sector ETF minus SPY's, ranked highest first", [etfs],
+                       title="Sector ranking")
+    return {
+        "*": pv.derived("sector leadership ranked by 3-month return vs SPY, matched to four economic phases",
+                        [etfs], title="Sector rotation"),
+        "sectors": ranks,
+        "sectors.return3m": pv.derived("(last close / close 63 trading days earlier − 1) × 100", [etfs],
+                                       title="3-month return"),
+        "sectors.aum": pv.yahoo(None, "info.totalAssets of each sector ETF", units="USD"),
+        "phase": pv.derived(
+            "for each phase (Early, Mid, Late, Recession) score = Σ over its four hard-coded leader sectors of "
+            "(4 − position) × (11 − rank + 1), rank = 3-month vs-SPY rank; the highest-scoring phase wins",
+            [ranks], title="Implied cycle phase"),
+        "confidence": pv.derived("winning phase score / highest phase score × 100", ["phase"],
+                                 title="Phase confidence",
+                                 note="The winner is the highest score, so this is 100 whenever any phase scores."),
+        "regimeQuadrant": pv.derived(
+            "US macro quadrant: real GDP growth (year over year) vs 2.0% and CPI inflation (year over year) vs 2.5%",
+            [pv.fred("GDPC1", "Real gross domestic product", frequency="quarterly"),
+             pv.fred("CPIAUCSL", "Consumer price index, all urban consumers", frequency="monthly")],
+            title="US macro regime quadrant"),
+        "regimePhase": pv.derived("regime quadrant mapped to a phase: Goldilocks → Mid, Overheating → Late, "
+                                  "Slowdown → Recession, Stagflation → Late", ["regimeQuadrant"],
+                                  title="Phase implied by the macro regime"),
     }
 
 

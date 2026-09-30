@@ -23,6 +23,7 @@ from typing import Any
 
 import pandas as pd
 
+from .. import provenance as pv
 from ..cache import cached
 from ..config import FRED_API_KEY
 from .bulk_data_service import DATA_DIR as _BULK_DIR
@@ -275,6 +276,53 @@ def _fetch_japan(start_year: int) -> tuple[pd.Series, pd.Series, str]:
     return gdp_q, cpi_q, source
 
 
+def _provenance(country: str, series: list[dict], gdp_q: pd.Series, cpi_q: pd.Series,
+                gdp_thr: float, cpi_thr: float) -> dict:
+    """``series.<field>`` and ``current.<field>`` share one ref per input; the source depends on the country."""
+    def obs(field: str) -> str | None:
+        dates = [r["date"] for r in series if r[field] is not None]
+        return dates[-1] if dates else None
+
+    yoy = "% change against the same quarter one year earlier"
+    if country == "US":
+        gdp = pv.fred("GDPC1", "Real gross domestic product", units="% YoY", frequency="quarterly",
+                      observed=obs("gdpGrowth"), transform=yoy)
+        cpi = pv.fred("CPIAUCSL", "Consumer price index for all urban consumers, all items", units="% YoY",
+                      frequency="monthly", observed=obs("cpiInflation"),
+                      transform="12-month % change of the monthly index; a quarter takes its last month")
+    elif country in ("EZ", "EA"):
+        gdp = pv.ref("eurostat", "namq_10_gdp", "Real GDP, euro area (EA20), chain-linked volumes, seasonally and "
+                     "calendar adjusted", units="% YoY", frequency="quarterly", observed=obs("gdpGrowth"),
+                     transform=yoy)
+        cpi = pv.ref("eurostat", "prc_hicp_minr", "HICP all items, annual rate of change, euro area (EA)",
+                     units="% YoY", frequency="monthly", observed=obs("cpiInflation"),
+                     transform="a quarter takes its last month")
+    elif country == "JP":
+        gdp = pv.fred("JPNRGDPEXP", "Real gross domestic product for Japan", units="% YoY", frequency="quarterly",
+                      observed=obs("gdpGrowth"), transform=yoy)
+        cpi = pv.ref("bis", "WS_LONG_CPI", "Consumer prices, Japan, year-on-year", units="% YoY",
+                     frequency="monthly", observed=obs("cpiInflation"), transform="a quarter takes its last month")
+    else:
+        gdp = pv.ref("worldbank", "NY.GDP.MKTP.KD.ZG", "GDP growth", units="annual %", frequency="annual",
+                     observed=obs("gdpGrowth"), note="Annual value dated 31 December and shown on the quarterly axis.")
+        cpi = pv.ref("worldbank", "FP.CPI.TOTL.ZG", "Inflation, consumer prices", units="annual %",
+                     frequency="annual", observed=obs("cpiInflation"),
+                     note="Annual value dated 31 December and shown on the quarterly axis.")
+    prov: dict = {}
+    if not gdp_q.empty:
+        prov["series.gdpGrowth"] = prov["current.gdpGrowth"] = gdp
+    if not cpi_q.empty:
+        prov["series.cpiInflation"] = prov["current.cpiInflation"] = cpi
+    inputs = [k for k in ("series.gdpGrowth", "series.cpiInflation") if k in prov]
+    quadrant = pv.derived(
+        f"growth vs {gdp_thr:g}% and inflation vs {cpi_thr:g}%: growth >= and inflation < = Goldilocks; both >= = "
+        "Overheating; both < = Slowdown; growth < and inflation >= = Stagflation; none when either is missing",
+        inputs, title="Macro regime quadrant")
+    prov["series.quadrant"] = prov["current.quadrant"] = quadrant
+    prov["*"] = [prov[k] for k in ("series.gdpGrowth", "series.cpiInflation") if k in prov]
+    return prov
+
+
 # ---------------------------------------------------------------------------
 # Main public function.
 # ---------------------------------------------------------------------------
@@ -363,7 +411,7 @@ def regime_series(
     # unclassified; reporting it as "current" showed no regime at all.
     current = next((p for p in reversed(series) if p["quadrant"] is not None), None)
 
-    return {
+    result = {
         "country": country,
         "thresholds": {"gdp": gdp_thr, "cpi": cpi_thr},
         "series": series,
@@ -372,3 +420,4 @@ def regime_series(
         "asOf": current["date"] if current else None,
         "note": note,
     }
+    return pv.attach(result, _provenance(country, series, gdp_q, cpi_q, gdp_thr, cpi_thr)) if series else result

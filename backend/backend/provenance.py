@@ -27,6 +27,8 @@ so add a key only where its source differs from its parent's):
 * ``listField.<id>`` — one row of a list, keyed by the row's natural id
   (``symbol``, ``ticker``, ``iso2``, ``key`` ...), never by array index;
   ``listField.<id>.<field>`` when fields of a row differ in source.
+* A value may be another key's name (a string) instead of a ref: "same
+  source as that key". It avoids repeating a ref for fields that share it.
 
 Rules for writing refs:
 
@@ -39,9 +41,12 @@ Rules for writing refs:
 """
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
 
 from . import cache
+
+log = logging.getLogger(__name__)
 
 # provider id -> (display name, homepage, series URL template or None).
 # ``{id}`` in a template is replaced by the series id.
@@ -111,8 +116,16 @@ def attach(result, prov: dict):
         return result
     merged = {**prov, **(result.get("provenance") or {})}
     stamp = _fetched_at()
-    for value in merged.values():
-        for r in (value if isinstance(value, list) else [value]):
+    for key, value in list(merged.items()):
+        if isinstance(value, str):
+            continue  # alias of another key
+        refs = value if isinstance(value, list) else [value]
+        if not refs or not all(isinstance(r, dict) for r in refs):
+            # A malformed entry must not break the response it describes.
+            log.warning("provenance: dropping malformed entry %r", key)
+            del merged[key]
+            continue
+        for r in refs:
             r.setdefault("fetchedAt", stamp)
     return {**result, "provenance": merged}
 
@@ -190,9 +203,10 @@ def label_to_ref(source_label: str, *, series: str | None = None, **kw) -> dict:
     mapping in one place instead of scattering provider ids through them.
     """
     low = source_label.lower()
-    for needle, provider in (("fred", "fred"), ("world bank", "worldbank"), ("imf", "imf"),
-                             ("ecb", "ecb"), ("db.nomics", "dbnomics"),
-                             ("frankfurter", "frankfurter"), ("bis", "bis")):
+    # Most specific first: "Frankfurter (ECB FX data)" is Frankfurter, not the ECB.
+    for needle, provider in (("frankfurter", "frankfurter"), ("db.nomics", "dbnomics"),
+                             ("fred", "fred"), ("world bank", "worldbank"), ("imf", "imf"),
+                             ("ecb", "ecb"), ("bis", "bis")):
         if needle in low:
             return ref(provider, series, source_label, **kw)
     # Unrecognised label: keep the adapter's own wording rather than guess.

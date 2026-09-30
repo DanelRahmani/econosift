@@ -20,6 +20,7 @@ import numpy as np
 import pandas as pd
 import requests
 
+from .. import provenance as pv
 from ..cache import cached
 from .metrics import _clean
 
@@ -506,4 +507,19 @@ def get_factor_regime() -> dict:
     if raw is None or raw.empty:
         return {}
     monthly = raw.drop(columns=["RF"], errors="ignore").astype(float) / 100.0
-    return _compute_factor_regime(monthly)
+    result = _compute_factor_regime(monthly)
+    if not result:
+        return result
+    data = pv.ref("kenfrench", "F-F_Research_Data_5_Factors_2x3 + F-F_Momentum_Factor",
+                  "Fama-French 5 factors (2x3) and momentum, monthly returns", units="% per month",
+                  frequency="monthly", observed=result["asOf"])
+    return pv.attach(result, {
+        "*": data,
+        "factors": pv.derived("compounded factor return over the last 1 / 3 / 12 months; momRank = rank by "
+                              "12-month return (1 = best)", [data], title="Factor returns"),
+        "kpis": pv.derived("leading factor = best 3-month return; regime = Risk-On if Mkt-RF 3-month return > 0, "
+                           "else Risk-Off, plus the best 3-month style factor", ["factors"],
+                           title="Factor regime"),
+        "cumulative": pv.derived("growth of $1 from compounding monthly factor returns, last 120 months", [data],
+                                 title="Cumulative factor returns"),
+    })

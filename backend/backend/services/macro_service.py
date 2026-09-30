@@ -3,7 +3,8 @@ from __future__ import annotations
 
 import asyncio
 
-from ..config import EUROZONE, INDICATOR_UNITS
+from .. import provenance as pv
+from ..config import EUROZONE, INDICATOR_UNITS, INDICATORS
 from ..models import SeriesResult
 from ..sources import (
     source_fred, source_worldbank, source_ecb, source_imf,
@@ -98,6 +99,56 @@ def get_unit(indicator: str) -> str:
     return INDICATOR_UNITS.get(indicator, "")
 
 
+def _series_id(label: str, indicator: str, iso2: str) -> tuple[str | None, str | None, str | None]:
+    """(series id, transform, url) of the provider that ``label`` names, for this indicator and country."""
+    annual = "annual mean of the source series (complete years only)"
+    yoy = "% change of the annual mean (complete years only)"
+    if label in (source_fred.SOURCE_LABEL, source_datareader.SOURCE_LABEL):
+        mapping = source_fred.INDICATOR_MAP.get(indicator)
+        return (mapping[0], yoy if mapping[1] == "yoy" else annual, None) if mapping else (None, None, None)
+    if label == source_worldbank.SOURCE_LABEL:
+        return source_worldbank.INDICATOR_MAP.get(indicator), None, None
+    if label == source_imf.SOURCE_LABEL:
+        return source_imf.INDICATOR_MAP.get(indicator), None, None
+    if label.startswith("ECB"):
+        key = (f"ICP.M.{source_ecb.ECB_COUNTRY.get(iso2)}.N.000000.4.ANR" if indicator == "inflation"
+               else source_ecb.POLICY_RATE_KEY)
+        return key, annual, f"https://data.ecb.europa.eu/data/datasets/{key.split('.')[0]}/{key}"
+    if label == source_dbnomics.SOURCE_LABEL:
+        method = source_dbnomics._METHOD.get(indicator, "mean")
+        return source_dbnomics._series_path(indicator, iso2), yoy if method == "yoy" else annual, None
+    return None, None, None
+
+
+def data_provenance(indicator: str, series: list[SeriesResult]) -> dict:
+    """Provenance for a ``get_macro_data`` result (a bare list, so the router attaches this).
+
+    ``series.<ISO2>`` lists one ref per provider that actually supplied points for that country (the
+    waterfall mixes providers by year); IMF projection years carry the ``estimate`` flag. Points also carry
+    their own ``src`` / ``estimate``.
+    """
+    prov: dict = {"*": pv.derived(
+        "annual series merged per country and year from the highest-priority provider that has that year "
+        "(FRED, pandas-datareader, ECB, World Bank, IMF WEO, DB.nomics); each point keeps its provider in `src`",
+        title=next((i["label"] for i in INDICATORS if i["id"] == indicator), indicator))}
+    for s in series:
+        refs = []
+        for label in dict.fromkeys(p["src"] for p in s["data"] if p.get("src")):
+            pts = [p for p in s["data"] if p["src"] == label]
+            est = any(p.get("estimate") for p in pts)
+            if label == source_frankfurter.SOURCE_LABEL:
+                refs.append(pv.ref("frankfurter", None, label, units=get_unit(indicator), observed=pts[-1]["year"]))
+                continue
+            sid, transform, url = _series_id(label, indicator, s["country"])
+            refs.append(pv.label_to_ref(
+                label, series=sid, units=get_unit(indicator), frequency="annual", observed=pts[-1]["year"],
+                transform=transform, url=url, flags=("estimate",) if est else (),
+                note="Includes IMF projection years (points flagged `estimate`)." if est else None))
+        if refs:
+            prov[f"series.{s['country']}"] = refs
+    return prov
+
+
 # Headline indicators shown on the country comparison snapshot. All are well
 # covered by World Bank (fast); avoiding IMF-only series keeps the cards snappy.
 SNAPSHOT_INDICATORS = [
@@ -130,10 +181,18 @@ async def get_snapshot(countries: list[str], year: int) -> dict:
                     values[s["country"]] = {"value": latest["value"], "year": latest["year"]}
         by_indicator[ind] = values
 
-    return {
+    labels = {i["id"]: i["label"] for i in INDICATORS}
+    prov: dict = {"*": pv.ref("worldbank", None, "World Development Indicators", frequency="annual")}
+    for ind in SNAPSHOT_INDICATORS:
+        years = [v["year"] for v in by_indicator.get(ind, {}).values()]
+        prov[f"indicators.{ind}"] = pv.ref(
+            "worldbank", source_worldbank.INDICATOR_MAP.get(ind), labels.get(ind, ind), units=get_unit(ind),
+            frequency="annual", observed=max(years) if years else None,
+            note="Latest year available per country; each value carries its own `year`.")
+    return pv.attach({
         "countries": countries,
         "indicators": [
             {"id": ind, "unit": get_unit(ind), "values": by_indicator.get(ind, {})}
             for ind in SNAPSHOT_INDICATORS
         ],
-    }
+    }, prov)

@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+from .. import provenance as pv
 from ..database import SessionLocal
 from ..db_models import AiSummary
 from ..services import ai_service
@@ -97,8 +98,13 @@ def _save(summary_type: str, context_key: str, model: str, prompt: str, text: st
                 pass
 
 
-def _response(summary_type: str, context_key: str, model: str, text: str, cached: bool) -> dict:
-    return {
+_AI_NOTE = ("Written by the language model from its own training knowledge: EconoSift sends it no "
+            "market or macro data, so any figures, dates and the sources it lists are unverified.")
+
+
+def _response(summary_type: str, context_key: str, model: str, text: str, cached: bool,
+              generated_at: datetime | None = None) -> dict:
+    out = {
         "summary_type": summary_type,
         "context_key": context_key,
         "summary_text": text,
@@ -106,6 +112,15 @@ def _response(summary_type: str, context_key: str, model: str, text: str, cached
         "created_at": _utcnow().isoformat(),
         "cached": cached,
     }
+    if text.startswith("Error:"):
+        return out
+    # ``generated_at`` is when a cached summary was actually written.
+    observed = generated_at.date().isoformat() if generated_at else None
+    stale = summary_type == "dashboard" and generated_at is not None and generated_at.date() < _utcnow().date()
+    return pv.attach(out, {"*": pv.ref(
+        "gemini", model, f"AI-generated {summary_type} summary", observed=observed,
+        flags=["stale"] if stale else [],
+        note=_AI_NOTE + (" This daily briefing was generated on an earlier day." if stale else ""))})
 
 
 # ─── Endpoints ───────────────────────────────────────────────────────────────
@@ -120,7 +135,7 @@ async def ai_company(body: CompanyRequest):
     if not body.force_regenerate:
         cached = await asyncio.to_thread(_cached_lookup, "company", ticker)
         if cached and cached.summary_text and not cached.summary_text.startswith("Error:"):
-            return _response("company", ticker, cached.model_used, cached.summary_text, True)
+            return _response("company", ticker, cached.model_used, cached.summary_text, True, cached.created_at)
 
     prompt = ai_service.build_company_prompt(ticker)
     result = await ai_service.generate_summary(prompt, body.model)
@@ -139,7 +154,7 @@ async def ai_macro(body: MacroRequest):
     if not body.force_regenerate:
         cached = await asyncio.to_thread(_cached_lookup, "macro", context_key)
         if cached and cached.summary_text and not cached.summary_text.startswith("Error:"):
-            return _response("macro", context_key, cached.model_used, cached.summary_text, True)
+            return _response("macro", context_key, cached.model_used, cached.summary_text, True, cached.created_at)
 
     prompt = ai_service.build_macro_prompt(iso_list)
     result = await ai_service.generate_summary(prompt, body.model)
@@ -152,7 +167,7 @@ async def ai_dashboard(body: DashboardRequest):
     if not body.force_regenerate:
         cached = await asyncio.to_thread(_cached_lookup, "dashboard", "daily")
         if cached and cached.summary_text and not cached.summary_text.startswith("Error:"):
-            return _response("dashboard", "daily", cached.model_used, cached.summary_text, True)
+            return _response("dashboard", "daily", cached.model_used, cached.summary_text, True, cached.created_at)
 
     prompt = ai_service.build_dashboard_prompt()
     result = await ai_service.generate_summary(prompt, body.model)
@@ -177,4 +192,6 @@ async def ai_history(summary_type: str, context_key: str):
             ]
 
     items = await asyncio.to_thread(_fetch)
-    return {"items": [i.model_dump() for i in items]}
+    return pv.attach({"items": [i.model_dump() for i in items]}, {"*": pv.ref(
+        "gemini", None, "Previously generated AI summaries",
+        note=_AI_NOTE + " Each item names its model in model_used and its generation time in created_at.")})

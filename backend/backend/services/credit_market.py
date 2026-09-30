@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 
+from .. import provenance as pv
 from ..cache import async_cached
 from . import macro_expansion_service as mes
 
@@ -37,6 +38,58 @@ def _signal(value: float | None, tight: float, wide: float) -> str:
     return "normal"
 
 
+def _last_obs(series: list[dict]) -> str | None:
+    for pt in reversed(series):
+        if pt.get("value") is not None:
+            return str(pt["date"])[:10]
+    return None
+
+
+def _provenance(data: dict) -> dict:
+    """Source map for the credit pulse (see provenance.py)."""
+    obs = {sid: _last_obs(data.get(sid, [])) for sid in _SERIES}
+    prov: dict = {"*": pv.ref("fred", None, "ICE BofA credit spreads and US funding rates", frequency="daily")}
+    fields = {
+        "ig_oas": ("BAMLC0A0CM", "ICE BofA US Corporate Index option-adjusted spread (investment grade)"),
+        "hy_oas": ("BAMLH0A0HYM2", "ICE BofA US High Yield Index option-adjusted spread"),
+        "bbb_spread": ("BAMLC0A4CBBB", "ICE BofA BBB US Corporate Index option-adjusted spread"),
+    }
+    for key, (sid, title) in fields.items():
+        for block in ("current", "history"):
+            prov[f"{block}.{key}"] = pv.fred(sid, title, units="percentage points", frequency="daily",
+                                             observed=obs[sid])
+    both = [d for d in (obs["SOFR"], obs["DTB3"]) if d]
+    older = min(both) if len(both) == 2 else None
+    prov["current.funding_spread"] = pv.derived(
+        "SOFR - DTB3 (secured overnight financing rate minus 3-month T-bill secondary-market rate), "
+        "latest value of each", [pv.fred("SOFR", "Secured Overnight Financing Rate", units="percent",
+                                        frequency="daily", observed=obs["SOFR"]),
+                                 pv.fred("DTB3", "3-month Treasury bill secondary-market rate",
+                                         units="percent", frequency="daily", observed=obs["DTB3"])],
+        title="Funding spread", observed=older)
+    prov["history.funding_spread"] = pv.derived(
+        "TEDRATE where it exists (to Jan 2022), otherwise SOFR - DTB3 on dates where both exist. "
+        "The two definitions differ, so the series is spliced, not continuous.",
+        [pv.fred("TEDRATE", "TED spread (3-month LIBOR minus 3-month T-bill)", units="percent",
+                 frequency="daily", observed=obs["TEDRATE"], flags=["stale"],
+                 note="Discontinued with LIBOR in January 2022."),
+         pv.fred("SOFR", "Secured Overnight Financing Rate", units="percent", frequency="daily",
+                 observed=obs["SOFR"]),
+         pv.fred("DTB3", "3-month Treasury bill secondary-market rate", units="percent",
+                 frequency="daily", observed=obs["DTB3"])],
+        title="Funding spread history", observed=older)
+    ratio_dates = [d for d in (obs["BAMLH0A0HYM2"], obs["BAMLC0A0CM"]) if d]
+    ratio_obs = min(ratio_dates) if len(ratio_dates) == 2 else None
+    prov["current.hy_ig_ratio"] = pv.derived(
+        "HY OAS / IG OAS", ["current.hy_oas", "current.ig_oas"], title="HY to IG spread ratio",
+        observed=ratio_obs)
+    prov["signals"] = pv.derived(
+        "ig_oas: tight < 0.8, wide > 2.0 (pp); hy_oas: tight < 3.0, wide > 7.0 (pp); "
+        "stress = HY OAS > 7.0 or funding spread > 0.5. Thresholds are approximate fixed norms.",
+        ["current.ig_oas", "current.hy_oas", "current.funding_spread"], title="Credit signals")
+    return prov
+
+
 @async_cached("credit_pulse")
 async def get_credit_pulse() -> dict:
     data = await _fetch_series()
@@ -69,7 +122,7 @@ async def get_credit_pulse() -> dict:
             fund_hist.append({"date": d, "value": round(sv - dtb3_map[d], 4)})
     fund_hist.sort(key=lambda x: x["date"])
 
-    return {
+    return pv.attach({
         "current": {
             "ig_oas": ig_cur,
             "hy_oas": hy_cur,
@@ -91,4 +144,4 @@ async def get_credit_pulse() -> dict:
                 or (fund_spread is not None and fund_spread > 0.5)
             ),
         },
-    }
+    }, _provenance(data))

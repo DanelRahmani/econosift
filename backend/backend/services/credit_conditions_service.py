@@ -28,6 +28,7 @@ import logging
 import httpx
 import pandas as pd
 
+from .. import provenance as pv
 from ..cache import async_cached
 from ..config import FRED_API_KEY
 from . import macro_expansion_service as mes
@@ -132,6 +133,59 @@ def _is_empty(result: dict) -> bool:
     return all(kpis.get(k) is None for k in ("sofr_iorb", "sloos_ci", "ebp", "anfci"))
 
 
+def _provenance(data: dict[str, list[dict]], ebp_rows: list[dict], sofr_iorb: list[dict], sloos: list[dict],
+                nfci: list[dict], anfci: list[dict]) -> dict:
+    """``kpis.<k>`` / ``history.<k>`` share a ref; ``signals.<k>`` are threshold rules."""
+    def last(pts: list[dict]) -> str | None:
+        return pts[-1]["date"] if pts else None
+
+    def fred(sid: str, title: str, pts: list[dict], freq: str, units: str | None = None) -> dict:
+        return pv.fred(sid, title, units=units, frequency=freq, observed=last(_clean(pts)))
+
+    sofr = fred("SOFR", "Secured Overnight Financing Rate", data.get("SOFR", []), "daily", "%")
+    iorb = fred("IORB", "Interest rate on reserve balances", data.get("IORB", []), "daily", "%")
+    ioer = fred("IOER", "Interest rate on excess reserves", data.get("IOER", []), "daily", "%")
+    spread = pv.derived(
+        "SOFR - administered floor on dates where both exist; the floor is IORB, and IOER before IORB's first "
+        "observation (percentage points)", [sofr, iorb, ioer],
+        title="SOFR - IORB (reserve scarcity)", observed=last(sofr_iorb))
+    ebp_src = pv.ref("fedboard", None, "Excess bond premium and GZ credit spread (Gilchrist-Zakrajsek)",
+                     frequency="monthly", url=_EBP_URL,
+                     observed=ebp_rows[-1]["date"] if ebp_rows else None,
+                     note="Monthly CSV published by the Federal Reserve Board (not on FRED).")
+    ebp = dict(ebp_src, title="Excess bond premium", series="ebp")
+    gz = dict(ebp_src, title="GZ credit spread", series="gz_spread")
+    prob = dict(ebp_src, title="Recession probability implied by the GZ model", series="est_prob")
+    sl = fred("DRTSCILM", "Net percentage of domestic banks tightening standards for C&I loans to large and "
+              "middle-market firms (SLOOS)", sloos, "quarterly", "net % of banks")
+    nf = fred("NFCI", "Chicago Fed National Financial Conditions Index", nfci, "weekly", "index (0 = average)")
+    an = fred("ANFCI", "Chicago Fed Adjusted National Financial Conditions Index", anfci, "weekly",
+              "index (0 = average)")
+    prov = {
+        "*": pv.ref("fred", None, "Federal Reserve Economic Data"),
+        "kpis.sofr_iorb": spread, "history.sofr_iorb": spread,
+        "kpis.sloos_ci": sl, "history.sloos_ci": sl,
+        "kpis.ebp": ebp, "history.ebp": ebp,
+        "kpis.gz_spread": gz, "history.gz_spread": gz,
+        "kpis.gz_recession_prob": prob, "history.gz_recession_prob": prob,
+        "kpis.nfci": nf, "history.nfci": nf,
+        "kpis.anfci": an, "history.anfci": an,
+        "signals.sofr_iorb": pv.derived(
+            f"'stress' when the latest SOFR - IORB exceeds {_SOFR_IORB_STRESS} percentage points, else 'normal'",
+            ["kpis.sofr_iorb"], title="Reserve-scarcity signal"),
+        "signals.sloos_ci": pv.derived(
+            f"'stress' when net % tightening exceeds {_SLOOS_TIGHT:g}, else 'normal'", ["kpis.sloos_ci"],
+            title="Lending-standards signal"),
+        "signals.ebp": pv.derived(
+            f"'stress' when the excess bond premium exceeds {_EBP_STRESS}, else 'normal'", ["kpis.ebp"],
+            title="Excess-bond-premium signal"),
+        "signals.anfci": pv.derived(
+            f"'stress' when ANFCI exceeds {_NFCI_TIGHT:g}, else 'normal'", ["kpis.anfci"],
+            title="Financial-conditions signal"),
+    }
+    return prov
+
+
 @async_cached("credit_conditions", skip_if=_is_empty)
 async def get_credit_conditions() -> dict:
     """Reserve scarcity, lending standards, excess bond premium, NFCI/ANFCI."""
@@ -161,7 +215,7 @@ async def get_credit_conditions() -> dict:
     anfci_v = _latest(anfci)
     gz_prob_v = _latest(gz_prob)
 
-    return {
+    result = {
         "kpis": {
             "sofr_iorb": sofr_iorb_v,
             "sloos_ci": sloos_v,
@@ -199,3 +253,4 @@ async def get_credit_conditions() -> dict:
             "nfci": "FRED NFCI / ANFCI — Chicago Fed, weekly",
         },
     }
+    return pv.attach(result, _provenance(data, ebp_rows, sofr_iorb, sloos, nfci, anfci))

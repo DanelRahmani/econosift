@@ -334,7 +334,7 @@ class TestCalendarTopLevel:
         monkeypatch.setattr(cs, "get_constituents", lambda idx: [])
 
         result = calendar_service.calendar("dow", _START, _END)
-        expected_keys = {"index", "start", "end", "macro", "earnings", "dividends", "ipos", "sources"}
+        expected_keys = {"index", "start", "end", "macro", "earnings", "dividends", "ipos", "sources", "provenance"}
         assert set(result.keys()) == expected_keys
 
     def test_calendar_echoes_params(self, monkeypatch):

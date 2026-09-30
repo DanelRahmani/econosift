@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 from scipy.optimize import minimize
 
+from .. import provenance as pv
 from . import metrics
 from .advanced_risk import (
     _series_to_points,
@@ -417,7 +418,7 @@ def ff_attribution_portfolio(
     if factors is None or factors.empty:
         return {"error": "factor data unavailable"}
 
-    from .fama_french import _FF3_COLS, _FF5_COLS
+    from .fama_french import _FF3_COLS, _FF5_COLS, _FF3_URL, _FF5_URL
     factor_cols_all = _FF5_COLS if model == "5" else _FF3_COLS
     factor_cols = [c for c in factor_cols_all if c != "RF"]
     if not all(c in factors.columns for c in factor_cols + ["RF"]):
@@ -452,14 +453,38 @@ def ff_attribution_portfolio(
         for i, name in enumerate(factor_names)
     ]
 
-    return {
+    obs = pv.last_date(merged)
+    px = pv.ref("yahoo", None, "Daily adjusted close of the requested tickers",
+                units="price (split/dividend adjusted)", frequency="daily", observed=pv.last_date(port_ret))
+    kf = pv.ref("kenfrench",
+                "F-F_Research_Data_5_Factors_2x3_daily" if model == "5" else "F-F_Research_Data_Factors_daily",
+                f"Fama/French {model}-factor daily returns and the one-month T-bill rate (RF)",
+                units="decimal daily return (the source file is in percent; divided by 100)", frequency="daily",
+                url=_FF5_URL if model == "5" else _FF3_URL)
+    reg = ("OLS of the portfolio's daily simple return minus Ken French RF on the daily factor returns, with an "
+           f"intercept, over the {len(merged)} dates both series share")
+    prov: dict = {
+        "*": pv.derived(f"Fama-French {model}-factor regression of the portfolio: " + reg, [px, kf],
+                        title="Fama-French attribution", observed=obs),
+        "alpha": pv.derived("intercept of the regression (daily)", ["*"], title="Alpha (daily)", observed=obs),
+        "annAlpha": pv.derived("daily alpha × 252", ["alpha"], title="Alpha (annualised)", observed=obs),
+        "rSquared": pv.derived("1 − residual sum of squares ÷ total sum of squares", ["*"], title="R²", observed=obs),
+        "nObs": pv.derived("count of dates shared by the portfolio and factor series", ["*"], title="Observations",
+                           observed=obs),
+    }
+    for f in factors_out:
+        prov[f"factors.{f['name']}.loading"] = pv.derived("regression coefficient on this factor", ["*"],
+                                                          title=f"{f['name']} loading", observed=obs)
+        prov[f"factors.{f['name']}.tStat"] = pv.derived("coefficient ÷ its OLS standard error", ["*"],
+                                                        title=f"{f['name']} t-statistic", observed=obs)
+    return pv.attach({
         "model": model,
         "alpha": _clean(alpha_daily),
         "annAlpha": _clean(ann_alpha),
         "factors": factors_out,
         "rSquared": _clean(ols["r_squared"]),
         "nObs": int(len(merged)),
-    }
+    }, prov)
 
 
 def efficient_frontier(

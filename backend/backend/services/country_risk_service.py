@@ -10,6 +10,7 @@ import asyncio
 import logging
 from datetime import datetime
 
+from .. import provenance as pv
 from ..cache import async_cached
 from . import atlas_service
 
@@ -98,6 +99,53 @@ def _latest(year_map: dict, min_year: int = 2018) -> tuple[float | None, int | N
     return int_map[yr], yr
 
 
+def _provenance(rows: list[dict]) -> dict:
+    """Default source per indicator (``indicators.<key>``) plus a per-country
+    override (``countries.<ISO3>.indicators.<key>``) wherever a row's
+    ``sources`` records that a different provider filled the cell."""
+    def wb(code: str, title: str, units: str) -> dict:
+        return pv.ref("worldbank", code, title, units=units, frequency="annual")
+
+    imf_debt = pv.ref("imf", "GGXWDG_NGDP", "General government gross debt", units="% of GDP", frequency="annual",
+                      note="Leads; where the IMF has no value the row falls back to World Bank central "
+                           "government debt (see that country's own key). The most recent years can be IMF "
+                           "staff estimates.")
+    imf_fisc = pv.ref("imf", "GGXCNL_NGDP", "General government net lending/borrowing", units="% of GDP",
+                      frequency="annual")
+    prov = {
+        "*": pv.ref("worldbank", None, "World Development Indicators", frequency="annual",
+                    note="Latest year since 2018 per country and indicator; only the debt year is recorded "
+                         "(row `year`)."),
+        "indicators.debt_gdp": imf_debt,
+        "indicators.current_account": wb("BN.CAB.XOKA.GD.ZS", "Current account balance", "% of GDP"),
+        "indicators.inflation": wb("FP.CPI.TOTL.ZG", "Inflation, consumer prices", "annual %"),
+        "indicators.fiscal_balance": wb(
+            "GC.BAL.CASH.GD.ZS", "Cash surplus/deficit", "% of GDP"),
+        "indicators.reserves_growth": pv.derived(
+            "(latest total reserves - previous available year's total reserves) / |previous| x 100",
+            [wb("FI.RES.TOTL.CD", "Total reserves (includes gold, current US$)", "current US$")],
+            title="Reserves growth"),
+        "indicators.unemployment": wb("SL.UEM.TOTL.ZS", "Unemployment, total (modeled ILO estimate)",
+                                      "% of labor force"),
+        "signals": pv.derived(
+            "traffic light from fixed thresholds in `thresholds` applied to the indicator value",
+            ["indicators.debt_gdp", "indicators.current_account", "indicators.inflation",
+             "indicators.fiscal_balance", "indicators.reserves_growth", "indicators.unemployment"],
+            title="Traffic-light signals"),
+    }
+    for row in rows:
+        src = row.get("sources") or {}
+        year = str(row["year"]) if row.get("year") else None
+        if str(src.get("debt_gdp", "")).startswith("World Bank"):
+            prov[f"countries.{row['iso3']}.indicators.debt_gdp"] = pv.ref(
+                "worldbank", "GC.DOD.TOTL.GD.ZS", "Central government debt, total", units="% of GDP",
+                frequency="annual", observed=year,
+                note="Central (not general) government debt.")
+        if str(src.get("fiscal_balance", "")).startswith("IMF"):
+            prov[f"countries.{row['iso3']}.indicators.fiscal_balance"] = dict(imf_fisc)
+    return prov
+
+
 @async_cached("country_risk")
 async def get_country_risk(countries: tuple[str, ...] | None = None) -> dict:
     cur_year = datetime.now().year
@@ -177,8 +225,8 @@ async def get_country_risk(countries: tuple[str, ...] | None = None) -> dict:
 
     result.sort(key=lambda row: row["name"])
 
-    return {
+    return pv.attach({
         "countries":  result,
         "thresholds": {k: {kk: vv for kk, vv in v.items() if kk != "bounds"}
                        for k, v in THRESHOLDS.items()},
-    }
+    }, _provenance(result))

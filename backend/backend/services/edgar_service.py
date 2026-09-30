@@ -6,6 +6,7 @@ import logging
 import time
 from datetime import date, timedelta
 
+from .. import provenance as pv
 from ..cache import async_cached
 
 log = logging.getLogger(__name__)
@@ -201,11 +202,36 @@ def _fetch_form4_sync(ticker: str, max_transactions: int | None = 50) -> dict:
         return {"ticker": ticker, "transactions": [], "error": str(exc)}
 
 
+def _form4_provenance(ticker: str, result: dict) -> dict:
+    dates = [t["date"] for t in result["transactions"] if t.get("date")]
+    filings = pv.ref(
+        "sec_edgar", ticker, "Form 4 filings, last 90 days, non-derivative table", frequency="event",
+        observed=max(dates) if dates else None,
+        flags=("partial",) if result.get("truncated") else (),
+        note="Open-market purchases (code P) and sales (code S) only; observed is the latest transaction date."
+             + (" The list is capped at 50 transactions." if result.get("truncated") else ""))
+    return {
+        "*": filings,
+        "transactions.transactionType": pv.derived("transaction code P = Buy, S = Sell", [filings],
+                                                   title="Buy / Sell classification"),
+        "transactions.totalValue": pv.derived("shares × price per share (blank if either is missing)", [filings],
+                                              title="Transaction value"),
+    }
+
+
 @async_cached("13f")
 async def get_13f_holders(ticker: str) -> dict:
     """Fetch top 13F institutional holders for a ticker."""
     try:
-        return await asyncio.to_thread(_fetch_13f_sync, ticker)
+        result = await asyncio.to_thread(_fetch_13f_sync, ticker)
+        if not result.get("error"):
+            result = pv.attach(result, {"*": pv.ref(
+                "sec_edgar", ticker, "Form 13F-HR information table, most recent filing",
+                units="shares; value in USD (reported value × 1000)", frequency="quarterly",
+                observed=result.get("asOf"),
+                note="observed is the filing date; the report period ends up to 45 days earlier. "
+                     "Holdings listed are those in the 13F-HR filings made under this ticker's SEC company record.")})
+        return result
     except Exception as exc:
         log.warning("get_13f_holders async error for %s: %s", ticker, exc)
         return {
@@ -221,7 +247,10 @@ async def get_13f_holders(ticker: str) -> dict:
 async def get_form4_insiders(ticker: str) -> dict:
     """Fetch recent Form 4 insider transactions (last 90 days) for a ticker."""
     try:
-        return await asyncio.to_thread(_fetch_form4_sync, ticker)
+        result = await asyncio.to_thread(_fetch_form4_sync, ticker)
+        if not result.get("error"):
+            result = pv.attach(result, _form4_provenance(ticker, result))
+        return result
     except Exception as exc:
         log.warning("get_form4_insiders async error for %s: %s", ticker, exc)
         return {"ticker": ticker, "transactions": [], "error": str(exc)}

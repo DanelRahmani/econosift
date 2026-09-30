@@ -5,6 +5,7 @@ import logging
 import math
 from datetime import date
 
+from .. import provenance as pv
 from .metrics import _clean
 
 log = logging.getLogger(__name__)
@@ -287,3 +288,61 @@ def two_stage_dcf(
         "sensitivity": sensitivity,
         "asOf": as_of,
     }
+
+
+def _assumption(text: str) -> dict:
+    """A user-supplied or model-default assumption rather than observed data."""
+    r = pv.ref("other", None, text)
+    r["providerName"] = "Assumption (request parameter or model default)"
+    return r
+
+
+def provenance(sym: str, result: dict, root: str = "", *, growth=None, wacc=None) -> dict:
+    """Provenance for a successful :func:`two_stage_dcf` result.
+
+    Keys sit under ``root`` (``""`` = the response root). ``growth`` / ``wacc`` are
+    provenance keys or refs for those inputs when they are not plain request parameters.
+    """
+    def k(*parts: str) -> str:
+        return ".".join(p for p in (root, *parts) if p) or "*"
+
+    inp = result.get("inputs") or {}
+    from_ccy, rate = inp.get("statementCurrency"), inp.get("fxRate")
+    to_ccy = result.get("currency")
+    converted = bool(from_ccy and to_ccy and from_ccy != to_ccy and rate not in (None, 1.0))
+    fx = [pv.yahoo(f"{from_ccy}{to_ccy}=X", f"Latest close, {from_ccy} to {to_ccy}", frequency="daily")] if converted else []
+    conv = f" × FX rate ({from_ccy}→{to_ccy})" if converted else ""
+
+    fcf = pv.yahoo(sym, "info.freeCashflow: trailing-twelve-month levered free cash flow (Yahoo)")
+    prov = {
+        k("inputs", "ttmFcf"): pv.derived(f"Yahoo freeCashflow{conv}", [fcf, *fx], title="Free cash flow used")
+        if converted else fcf,
+        k("inputs", "shares"): pv.yahoo(
+            sym, "info.sharesOutstanding",
+            note="Replaced by marketCap / price when the two disagree by more than 5x."),
+        k("inputs", "netDebt"): pv.derived(
+            f"(info.totalDebt − info.totalCash, a missing one counted as 0){conv}",
+            [pv.yahoo(sym, "info.totalDebt"), pv.yahoo(sym, "info.totalCash"), *fx], title="Net debt"),
+        k("inputs", "fcfGrowth"): growth or _assumption("Stage-1 free-cash-flow growth (fcf_growth parameter)"),
+        k("inputs", "terminalGrowth"): _assumption("Terminal growth rate (terminal_growth parameter)"),
+        k("inputs", "wacc"): wacc or _assumption("Discount rate (wacc parameter)"),
+        k("inputs", "stage1Years"): _assumption("Length of stage 1 in years (stage1_years parameter)"),
+        k("spotPrice"): pv.yahoo(sym, "info.currentPrice (else regularMarketPrice)", units=to_ccy),
+    }
+    prov[k()] = pv.derived(
+        "Σ FCF₀(1+g)ᵗ/(1+w)ᵗ for t = 1…N  +  FCF_N(1+gₜ)/(w−gₜ)/(1+w)ᴺ, minus net debt, divided by shares "
+        "(g = stage-1 growth, w = discount rate, gₜ = terminal growth, N = stage-1 years)",
+        [k("inputs", n) for n in ("ttmFcf", "netDebt", "shares", "fcfGrowth", "terminalGrowth", "wacc", "stage1Years")],
+        title="Two-stage DCF intrinsic value per share",
+        note="Levered FCF is discounted at the WACC (an approximation).")
+    prov[k("upsidePct")] = pv.derived("(intrinsic value − spot price) / spot price", [k(), k("spotPrice")],
+                                      title="Upside vs spot price")
+    prov[k("scenarios")] = pv.derived(
+        "Bear: growth −3pp, discount rate +1pp; Base: as given; Bull: growth +3pp, discount rate −1pp "
+        "(never below terminal growth + 0.5pp); each re-runs the two-stage DCF",
+        [k()], title="DCF scenarios")
+    prov[k("sensitivity")] = pv.derived(
+        "7×7 grid re-running the DCF: growth = base + (−3…+3) × 1pp down the rows, discount rate = "
+        "base + (−3…+3) × 0.5pp across; blank where the discount rate ≤ terminal growth",
+        [k()], title="DCF sensitivity grid")
+    return prov

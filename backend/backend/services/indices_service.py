@@ -82,9 +82,10 @@ def global_indices() -> dict:
         rows.append(row)
 
     regions = ["Americas", "EMEA", "Asia-Pacific"]
-    prov: dict = {"*": pv.ref("yahoo", None, "Index levels, daily close", frequency="daily", observed=as_of,
+    prov: dict = {"*": pv.ref("yahoo", None, "Index levels, latest daily bar", frequency="daily", observed=as_of,
                               note="Markets close at different times; each index carries its own session date.")}
     for r in rows:
-        prov[f"indices.{r['symbol']}"] = pv.yahoo(r["symbol"], f"{r['name']} — daily close",
-                                                  frequency="daily", observed=r["asOf"])
+        prov[f"indices.{r['symbol']}"] = pv.yahoo(
+            r["symbol"], f"{r['name']} — latest daily bar", frequency="daily", observed=r["asOf"],
+            note="The last trade while that market's session is open.")
     return pv.attach({"asOf": as_of, "regions": regions, "indices": rows}, prov)

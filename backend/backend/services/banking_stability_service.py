@@ -9,6 +9,7 @@ import asyncio
 import logging
 from datetime import datetime
 
+from .. import provenance as pv
 from ..cache import async_cached
 from . import atlas_service
 from ..sources import source_bis
@@ -49,6 +50,40 @@ def _banking_signal(npl: float | None, cap: float | None, zscore: float | None,
     elif flags >= 1:
         return "yellow"
     return "green"
+
+
+def _provenance(countries: list[dict], cur_year: int) -> dict:
+    """Source map for the banking-stability dashboard (see provenance.py)."""
+    codes = atlas_service._WB_CODES
+    rule = ("One flag each for NPL ratio > 5%, bank capital < 6, bank Z-score < 10 and BIS credit gap > 10pp; "
+            "red at 3+ flags, yellow at 1-2, green at none.")
+    prov: dict = {
+        "*": pv.derived(rule, title="Banking-stability flags"),
+        "summary": pv.derived("count of countries per signal colour", ["*"], title="Signal counts"),
+    }
+    wb_kpis = (
+        ("nplRatio", "npl_ratio", "Bank nonperforming loans to gross loans (%)", "% of gross loans", None),
+        ("capitalAdequacy", "bank_capital", "Bank capital to assets ratio (%)", "% of assets", None),
+        ("bankZscore", "bank_zscore", "Bank Z-score", "Z-score",
+         "From the Global Financial Development database, last updated in 2022 (data to 2021)."),
+        ("domesticCreditGrowth", "domestic_credit", "Claims on other sectors of the domestic economy (% of GDP)",
+         "% of GDP",
+         "This is a level (% of GDP), not a growth rate, despite the field name."),
+    )
+    for c in countries:
+        row = f"countries.{c['iso2']}"
+        per = c["periods"]
+        prov[row] = pv.derived(rule, title=f"{c['name']} banking-stability flags")
+        for kpi, key, title, units, note in wb_kpis:
+            yr = per.get(kpi)
+            prov[f"{row}.kpis.{kpi}"] = pv.ref(
+                "worldbank", codes[key], title, units=units, frequency="annual",
+                observed=str(yr) if yr else None,
+                flags=["stale"] if yr and yr < cur_year - 3 else [], note=note)
+        prov[f"{row}.kpis.creditGap"] = pv.ref(
+            "bis", "WS_CREDIT_GAP", "Credit-to-GDP gap, private non-financial sector (actual minus trend)",
+            units="percentage points of GDP", frequency="quarterly", observed=per.get("creditGap"))
+    return prov
 
 
 @async_cached("banking_stability")
@@ -121,7 +156,7 @@ async def get_banking_stability() -> dict:
     npl_years = [c["periods"]["nplRatio"] for c in countries_out if c["periods"]["nplRatio"]]
     zs_years = [c["periods"]["bankZscore"] for c in countries_out if c["periods"]["bankZscore"]]
 
-    return {
+    return pv.attach({
         "asOf": str(max(npl_years)) if npl_years else None,
         "zscoreYear": max(zs_years) if zs_years else None,
         "source": "World Bank (WDI, Global Financial Development) / BIS",
@@ -132,4 +167,4 @@ async def get_banking_stability() -> dict:
             "greenCount": len(countries_out) - red_count - yellow_count,
             "totalCountries": len(countries_out),
         },
-    }
+    }, _provenance(countries_out, cur_year))

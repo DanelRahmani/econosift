@@ -13,15 +13,19 @@ import math
 from datetime import date
 from typing import Any
 
+from .. import provenance as pv
 from .metrics import _clean
 from .discount_rates import (
     wacc as compute_wacc,
     cost_of_equity,
     detect_country,
+    load_erp,
     load_sector_multiples,
     risk_free_rate,
+    risk_free_rate_is_fallback,
 )
 from . import dcf_engine
+from . import yfinance_service as yfs
 
 
 # ---------------------------------------------------------------------------
@@ -649,3 +653,175 @@ def valuation_models(
         "statementFx": ctx.bundle.get("_fx"),
         "asOf": date.today().isoformat(),
     }
+
+
+# ---------------------------------------------------------------------------
+# Provenance
+# ---------------------------------------------------------------------------
+
+def provenance(bundle: dict, result: dict, beta: float | None, root: str = "valuation") -> dict:
+    """Provenance keys (under ``root``) for a :func:`valuation_models` result."""
+    def k(*parts: str) -> str:
+        return ".".join(p for p in (root, *parts) if p)
+
+    sym = result.get("ticker") or bundle.get("ticker") or ""
+    info: dict = bundle.get("info") or {}
+    w: dict = result.get("wacc") or {}
+    ccy = result.get("currency")
+
+    def y(field: str, **kw) -> dict:
+        return pv.yahoo(sym, f"info.{field}", **kw)
+
+    fx = result.get("statementFx") or {}
+    fx_note = (f"Statement-currency figures (debt, cash, EBITDA, cash flow) are converted from {fx['from']} to "
+               f"{fx['to']} at the latest Yahoo FX rate ({fx['rate']})."
+               if fx.get("rate") not in (None, 1.0) and fx.get("from") != fx.get("to") else None)
+    prov: dict = {
+        k(): pv.derived(
+            "eight valuation models, a CAPM-implied value and a weighted composite, from Yahoo fundamentals "
+            "and the discount-rate inputs below", [k("wacc"), k("growthInput")],
+            title="Valuation engine", note=fx_note),
+        k("spotPrice"): y("currentPrice (else regularMarketPrice)", units=ccy),
+        k("currency"): y("currency"),
+    }
+
+    # -- discount rate ------------------------------------------------------
+    rf_fallback = risk_free_rate_is_fallback()
+    prov[k("wacc", "riskFree")] = pv.fred(
+        "DGS10", "US 10-year Treasury constant-maturity yield", units="decimal (FRED percent / 100)",
+        frequency="daily", flags=("fallback",) if rf_fallback else (),
+        note="The US 10-year yield is used for every listing country."
+             + (" FRED could not be read, so the hard-coded 4% stands in." if rf_fallback else ""))
+    country = w.get("country") or "United States"
+    erp_data = load_erp()
+    countries = erp_data.get("countries") or {}
+    entry = countries.get(country)
+    as_of = erp_data.get("asOf")
+    observed = as_of if isinstance(as_of, str) and as_of[:2] == "20" else None
+    if entry is not None and _clean(entry.get("erp")) is not None:
+        erp_ref = pv.ref("damodaran", "ctryprem", f"Total equity risk premium, {country}", units="decimal",
+                         frequency="annual", observed=observed, url=erp_data.get("sourceUrl"))
+    elif _clean(erp_data.get("matureMarketERP")) is not None:
+        erp_ref = pv.ref("damodaran", "ctryprem", f"Mature-market equity risk premium (no row for {country})",
+                         units="decimal", frequency="annual", observed=observed, url=erp_data.get("sourceUrl"),
+                         flags=("proxy",))
+    else:
+        erp_ref = pv.derived("hard-coded 5% equity risk premium", title="Equity risk premium", flags=("fallback",))
+    prov[k("wacc", "erp")] = erp_ref
+    prov[k("wacc", "country")] = pv.derived(
+        "country of the listing: info.exchange code, else keywords in info.fullExchangeName, else info.country "
+        "if it is in the ERP table, else United States", [y("exchange"), y("fullExchangeName"), y("country")],
+        title="Country used for the equity risk premium")
+    prov[k("wacc", "beta")] = (
+        pv.derived("cov(r, r_benchmark) / var(r_benchmark) of 2 years of daily log returns",
+                   [pv.yahoo(sym, "Daily adjusted close, 2y", frequency="daily"),
+                    pv.yahoo(yfs.benchmark_for(sym), "Benchmark daily adjusted close, 2y", frequency="daily")],
+                   title="Beta used in CAPM", note="Computed here, not Yahoo's info.beta.")
+        if beta is not None else
+        pv.derived("beta = 1.0 (no beta could be computed)", title="Beta used in CAPM", flags=("fallback",)))
+    prov[k("wacc", "costOfEquity")] = pv.derived("risk-free rate + beta × equity risk premium (CAPM)",
+                                                 [k("wacc", "riskFree"), k("wacc", "beta"), k("wacc", "erp")],
+                                                 title="Cost of equity")
+    kd, rf = w.get("costOfDebt"), w.get("riskFree")
+    if kd is not None and rf is not None and abs(kd - (rf + 0.02)) < 1e-12:
+        prov[k("wacc", "costOfDebt")] = pv.derived(
+            "risk-free rate + 2% credit spread", [k("wacc", "riskFree")], title="Cost of debt", flags=("fallback",),
+            note="Used because interest expense / total debt was missing or outside 1%-15%.")
+    else:
+        prov[k("wacc", "costOfDebt")] = pv.derived(
+            "|interest expense| / total debt (info, else statements), accepted between 1% and 15%",
+            [y("interestExpense"), y("totalDebt")], title="Cost of debt")
+    etr = _clean(info.get("effectiveTaxRate"))
+    if etr is not None and 0.0 < etr < 0.6:
+        prov[k("wacc", "taxRate")] = y("effectiveTaxRate", units="decimal")
+    elif entry is not None and _clean(entry.get("taxRate")) is not None:
+        prov[k("wacc", "taxRate")] = pv.ref(
+            "damodaran", "ctryprem", f"Statutory corporate tax rate, {country}", units="decimal",
+            frequency="annual", observed=observed, url=erp_data.get("sourceUrl"),
+            note="Used because Yahoo's effectiveTaxRate was missing or outside 0-60%.")
+    else:
+        prov[k("wacc", "taxRate")] = pv.derived("hard-coded 21% US statutory rate", title="Tax rate",
+                                                flags=("fallback",))
+    debt = [y("marketCap"), y("totalDebt")]
+    prov[k("wacc", "weightEquity")] = pv.derived("market cap / (market cap + total debt)", debt,
+                                                 title="Equity weight")
+    prov[k("wacc", "weightDebt")] = pv.derived("total debt / (market cap + total debt)", debt, title="Debt weight")
+    prov[k("wacc", "wacc")] = pv.derived(
+        "equity weight × cost of equity + debt weight × cost of debt × (1 − tax rate); equals the cost of equity "
+        "when market cap is missing; floored at 5%",
+        [k("wacc", n) for n in ("weightEquity", "costOfEquity", "weightDebt", "costOfDebt", "taxRate")],
+        title="WACC")
+
+    # -- growth ---------------------------------------------------------------
+    src = (result.get("growthInput") or {}).get("source")
+    cap = "capped to -10%...+15% a year"
+    if src == "consensus forward EPS":
+        prov[k("growthInput")] = pv.derived(f"forwardEps / trailingEps − 1, {cap}",
+                                            [y("forwardEps"), y("trailingEps")], title="Growth rate used")
+    elif src == "revenue growth (latest quarter YoY)":
+        prov[k("growthInput")] = pv.derived(
+            f"info.revenueGrowth (latest quarter versus the same quarter a year earlier), {cap}",
+            [y("revenueGrowth")], title="Growth rate used")
+    else:
+        prov[k("growthInput")] = pv.derived(
+            "5% a year: neither forward EPS growth nor revenue growth was available", title="Growth rate used",
+            flags=("fallback",))
+
+    # -- models ---------------------------------------------------------------
+    net_debt = pv.derived("(info.totalDebt, else balance-sheet Total Debt) − info.totalCash; a missing one counts as 0",
+                          [y("totalDebt"), y("totalCash")], title="Net debt")
+    shares = y("sharesOutstanding", note="Replaced by marketCap / price when the two disagree by more than 5x.")
+    eps, growth, ke = y("trailingEps"), k("growthInput"), k("wacc", "costOfEquity")
+    m_aaa = k("models", "Graham Formula", "detail", "aaaYieldPct")
+    prov[m_aaa] = pv.fred(
+        "AAA", "Moody's seasoned Aaa corporate bond yield", units="%", frequency="monthly",
+        note="The code substitutes 5.0 when FRED cannot be read; the response does not say whether that happened.")
+    sm = load_sector_multiples()
+    sector = info.get("sector")
+    m_mult = k("models", "EV/EBITDA Comps", "detail", "sectorMultiple")
+    prov[m_mult] = pv.ref("damodaran", "vebitda", f"Median EV/EBITDA, {sector} sector", units="x",
+                          observed=sm.get("asOf"), url=sm.get("sourceUrl"),
+                          note="Static snapshot bundled with the app: median of Damodaran's US industry multiples "
+                               "mapped to sectors.")
+    formulas = {
+        "DDM (Gordon Growth)": ("D1 / (ke − g), D1 = dividendRate × (1 + g), g = growth capped at ke − 0.5pp",
+                                [y("dividendRate"), ke, growth]),
+        "Graham Formula": ("EPS × (8.5 + 2g) × 4.4 / Y, g = growth in percent (0-20), Y = Aaa corporate yield in percent",
+                           [eps, growth, m_aaa]),
+        "Graham Number": ("√(22.5 × EPS × book value per share)", [eps, y("bookValue")]),
+        "Peter Lynch / PEG": ("EPS × growth in percent (capped at 20): fair P/E equals the growth rate",
+                              [eps, growth]),
+        "EV/EBITDA Comps": ("(sector EV/EBITDA × EBITDA − net debt) / shares", [y("ebitda"), m_mult, net_debt, shares]),
+        "Residual Income (RIM)": (
+            "book value per share + Σ(t = 1…5) (ROE − ke) × book_(t−1) / (1 + ke)^t, "
+            "book grows by ROE × (1 − payout ratio) a year; no terminal value",
+            [y("bookValue"), y("returnOnEquity"), ke, y("payoutRatio")]),
+        "EPV (Earnings Power Value)": (
+            "(EBIT × (1 − tax rate) / WACC − net debt) / shares; tax rate 21% if unavailable",
+            [y("ebit (else statement EBIT / Operating Income)"), k("wacc", "taxRate"), k("wacc", "wacc"), net_debt,
+             shares]),
+    }
+    for m in result.get("models") or []:
+        name = m.get("model")
+        if name == "DCF (Two-Stage)":
+            d = (m.get("detail") or {}).get("inputs")
+            if d:
+                sub = dcf_engine.provenance(sym, {"inputs": d, "currency": ccy}, k("models", name, "detail"),
+                                            growth=growth, wacc=k("wacc", "wacc"))
+                prov.update(sub)
+                prov[k("models", name)] = sub[k("models", name, "detail")]
+        elif name in formulas:
+            formula, inputs = formulas[name]
+            prov[k("models", name)] = pv.derived(formula, inputs, title=name)
+    prov[k("capmImplied")] = pv.derived("forward EPS (trailing EPS if missing) / cost of equity",
+                                        [y("forwardEps"), eps, ke], title="CAPM-implied value")
+    prov[k("axiomFairValue")] = pv.derived(
+        "weighted mean of the models that produced a value, weights renormalised: DCF 30%, EV/EBITDA 20%, RIM 15%, "
+        "EPV 15%, Graham Formula 10%, Lynch 5%, DDM 5% (Graham Number and CAPM-implied carry no weight)",
+        [k("models", mm["model"]) for mm in result.get("models") or []], title="Composite fair value")
+    prov[k("axiomFairValue", "upsidePct")] = pv.derived("(composite value − spot price) / spot price",
+                                                        [k("axiomFairValue"), k("spotPrice")], title="Upside")
+    prov[k("axiomFairValue", "verdict")] = pv.derived(
+        "upside > 25% Significantly Undervalued; > 10% Undervalued; > −10% Fairly Valued; > −25% Overvalued; "
+        "otherwise Significantly Overvalued", [k("axiomFairValue", "upsidePct")], title="Verdict")
+    return prov

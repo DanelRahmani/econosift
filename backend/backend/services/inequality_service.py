@@ -14,8 +14,10 @@ import asyncio
 import logging
 from datetime import datetime
 
+from .. import provenance as pv
 from ..cache import async_cached
 from . import atlas_service
+from .fiscal_service import wb_country_provenance
 
 log = logging.getLogger(__name__)
 
@@ -52,6 +54,25 @@ def _latest(year_map: dict[int, float]) -> float | None:
 
 def _to_timeseries(year_map: dict[int, float]) -> list[dict]:
     return [{"date": str(y), "value": v} for y, v in sorted(year_map.items())]
+
+
+_WB_SPECS = [
+    ("gini", "SI.POV.GINI", "Gini index", "index 0-100"),
+    ("incomeTop10", "SI.DST.10TH.10", "Income share held by highest 10%", "% of income"),
+    ("poverty215", "SI.POV.DDAY", "Poverty headcount ratio at $3.00 a day (2021 PPP)", "% of population"),
+    ("poverty365", "SI.POV.LMIC", "Poverty headcount ratio at $4.20 a day (2021 PPP)", "% of population"),
+]
+
+
+def _provenance(countries: list[dict]) -> dict:
+    prov = wb_country_provenance(countries, _WB_SPECS)
+    for field, *_ in _WB_SPECS:
+        prov[f"kpis.{field}"]["frequency"] = "irregular (household surveys)"
+    prov["summary"] = pv.derived(
+        "simple mean (avgGini, avgPoverty215) or count (highGiniCount: Gini above 45) of the countries' "
+        "latest KPI values",
+        ["kpis.gini", "kpis.poverty215"], title="Cross-country summary")
+    return prov
 
 
 @async_cached("inequality_data")
@@ -109,7 +130,7 @@ async def get_inequality_data() -> dict:
     with_p215 = [c["kpis"]["poverty215"] for c in countries_out if c["kpis"]["poverty215"] is not None]
     high_gini = sum(1 for c in countries_out if c["kpis"]["giniSignal"] == "red")
 
-    return {
+    result = {
         "asOf": atlas_service.stamp_periods(countries_out),
         "source": "World Bank",
         "countries": countries_out,
@@ -120,3 +141,4 @@ async def get_inequality_data() -> dict:
             "totalCountries": len(countries_out),
         },
     }
+    return pv.attach(result, _provenance(countries_out))

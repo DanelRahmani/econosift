@@ -12,6 +12,7 @@ from typing import Any
 import pandas as pd
 import yfinance as yf
 
+from .. import provenance as pv
 from ..cache import cached
 
 
@@ -264,3 +265,30 @@ def analyst_data(ticker: str) -> dict:
         "growthEstimates": growth_estimates,
         "asOf": date.today().isoformat(),
     }
+
+
+def provenance(result: dict, root: str = "analyst") -> dict:
+    """Provenance keys (under ``root``) for an :func:`analyst_data` result."""
+    def k(*parts: str) -> str:
+        return ".".join(p for p in (root, *parts) if p)
+
+    sym = result.get("ticker") or ""
+    dates = [e["date"] for e in result.get("earningsSurprises") or [] if e.get("date")]
+    prov: dict = {
+        k(): pv.yahoo(sym, "Analyst data: price targets, consensus, earnings surprises and estimates",
+                      note="Yahoo Finance aggregates these from contributing brokers."),
+        k("price"): pv.yahoo(sym, "info.currentPrice (else regularMarketPrice)", units=result.get("currency")),
+        k("priceTarget"): pv.yahoo(sym, "info.targetMeanPrice / targetHighPrice / targetLowPrice / targetMedianPrice "
+                                        "and numberOfAnalystOpinions", units=result.get("currency")),
+        k("priceTarget", "upsidePct"): pv.derived("(mean target price − current price) / current price",
+                                                  [k("priceTarget"), k("price")], title="Upside to mean target"),
+        k("consensus"): pv.yahoo(sym, "info.recommendationMean and recommendationKey"),
+        k("consensus", "history"): pv.yahoo(sym, "Ticker.recommendations: analyst rating counts by month",
+                                            frequency="monthly"),
+        k("earningsSurprises"): pv.yahoo(sym, "Ticker.earnings_dates: EPS estimate, reported EPS and surprise",
+                                         frequency="quarterly", observed=max(dates) if dates else None),
+        k("estimates"): pv.yahoo(sym, "Ticker.earnings_estimate and revenue_estimate; info.forwardEps, forwardPE, "
+                                      "revenueGrowth, earningsGrowth, earningsQuarterlyGrowth"),
+        k("growthEstimates"): pv.yahoo(sym, "Ticker.growth_estimates"),
+    }
+    return prov

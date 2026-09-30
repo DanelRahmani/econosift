@@ -12,6 +12,7 @@ import asyncio
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
+from .. import provenance as pv
 from ..services import risk_parity_service as rp
 from ..services import carry_service
 from ..services import momentum_service
@@ -234,7 +235,18 @@ def _run_backtest_sync(req: "BacktestRequest") -> dict:
         is_fundamental=meta["isFundamental"],
     )
     result["meta"] = meta
-    return result
+    price_ref = pv.ref("yahoo", None, f"Daily adjusted close of each {req.universe} member",
+                    frequency="daily", observed=pv.last_date(prices))
+    members = pv.ref("wikipedia", None, f"{req.universe} constituents"
+                     + (" as of each rebalance date (reconstructed from the change log)"
+                        if req.pointInTimeUniverse else " (current members, so survivorship-biased)"))
+    return pv.attach(result, {
+        "*": pv.derived(
+            f"each {req.rebalance} rebalance: rank members on the '{req.signal}' signal known at that date, "
+            f"form {req.nQuantiles} equal-weight quantile portfolios, hold to the next rebalance; "
+            f"{'top minus bottom quantile; ' if req.longShort else ''}costs {req.costBps} bps per unit turnover",
+            [price_ref, members], title="Signal backtest"),
+    })
 
 
 @router.post("/backtest")

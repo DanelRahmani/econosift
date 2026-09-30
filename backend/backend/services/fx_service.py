@@ -5,6 +5,7 @@ import math
 
 import pandas as pd
 
+from .. import provenance as pv
 from ..cache import cached
 from ..services import yfinance_service as yfs
 
@@ -144,8 +145,27 @@ def fx_rates(base: str = "USD") -> dict:
 
         pairs.append(entry)
 
-    return {
+    prov: dict = {"*": pv.ref("yahoo", None, f"{base} exchange rates, daily close", frequency="daily",
+                              observed=as_of,
+                              note="Each pair is dated by the latest bar received; see the pair rows.")}
+    for p in pairs:
+        if p["rate"] is None:
+            continue
+        ccy = p["quote"]
+        tk = f"{ccy}{base}=X" if p["inverted"] else f"{base}{ccy}=X"
+        src = inv_frame if p["inverted"] else frame
+        obs = pv.last_date(src[tk])
+        raw = pv.yahoo(tk, f"{tk.removesuffix('=X')} exchange rate, daily close", frequency="daily", observed=obs)
+        prov[f"pairs.{ccy}"] = (
+            pv.derived("1 / close of the inverse pair " + tk, [raw], title=f"{p['pair']} (inverted)", observed=obs)
+            if p["inverted"] else raw)
+        for key, n in _WINDOWS.items():
+            prov[f"pairs.{ccy}.{key}"] = pv.derived(
+                f"(latest close / close {n} trading bars earlier − 1) × 100 "
+                "(uses the whole history if fewer bars are available)",
+                [raw], title=f"{p['pair']} {key[6:]} change", observed=obs)
+    return pv.attach({
         "base": base,
         "asOf": as_of,
         "pairs": pairs,
-    }
+    }, prov)

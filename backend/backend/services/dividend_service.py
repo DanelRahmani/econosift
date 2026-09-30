@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 import yfinance as yf
 
+from .. import provenance as pv
 from ..cache import cached
 
 logger = logging.getLogger(__name__)
@@ -181,7 +182,7 @@ def get_dividend_analysis(ticker: str) -> dict:
                 ddm_value = ttm_div * (1 + ddm_growth) / (discount - ddm_growth)
                 ddm_value = round(ddm_value, 2)
 
-        return {
+        return pv.attach({
             "ticker": ticker,
             "name": name,
             "sector": sector or None,
@@ -202,7 +203,59 @@ def get_dividend_analysis(ticker: str) -> dict:
             "ddmUpsidePct": round((ddm_value / price - 1) * 100, 1) if ddm_value and price else None,
             "annualDividends": {str(y): round(v, 4) for y, v in sorted(annual_divs.items())},
             "asOf": last_div_date.strftime("%Y-%m-%d") if last_div_date is not None else None,
-        }
+        }, _provenance(ticker, last_div_date.strftime("%Y-%m-%d") if last_div_date is not None else None))
     except Exception as exc:
         logger.warning("dividend_analysis failed for %s: %s", ticker, exc)
         return {"ticker": ticker, "error": str(exc)}
+
+
+def _provenance(ticker: str, last_div: str | None) -> dict:
+    """Refs for /dividend/analysis: dividend history, TTM figures from Yahoo info, and the DDM inputs."""
+    from .discount_rates import risk_free_rate_is_fallback
+
+    hist = pv.yahoo(ticker, "Ticker.dividends: per-share dividend payments", frequency="event",
+                    units="currency per share", observed=last_div)
+    info = pv.yahoo(ticker, "Ticker.info: price, yield, EPS, shares, free cash flow")
+    rf_fallback = risk_free_rate_is_fallback()
+
+    def d(formula: str, inputs: list, title: str, **kw) -> dict:
+        return pv.derived(formula, inputs, title=title, **kw)
+
+    annual = "calendar-year sum of dividends; only complete years (the running year and the first year are dropped)"
+    rf = pv.fred("DGS10", "US 10-year Treasury constant-maturity yield", frequency="daily",
+                 flags=("fallback",) if rf_fallback else (),
+                 note="Hard-coded 4% used because FRED could not be read." if rf_fallback else None)
+    return {
+        "*": hist,
+        "price": pv.yahoo(ticker, "info.currentPrice (else regularMarketPrice)"),
+        "name": pv.yahoo(ticker, "info.shortName (else longName)"),
+        "sector": pv.yahoo(ticker, "info.sector"),
+        "dividendYield": pv.yahoo(ticker, "info.dividendYield", units="percent (0.98 = 0.98%)"),
+        "annualDividends": d(annual, [hist], title="Annual dividends per share"),
+        "latestAnnualDividend": d(annual + ", latest complete year", [hist], title="Latest annual dividend"),
+        "ttmDividend": d("sum of dividends paid in the last 365 days", [hist], title="Trailing-12-month dividend"),
+        "cagr5y": d("(latest annual dividend / annual dividend 5 years earlier)^(1/years) − 1, in percent",
+                    [hist], title="5-year dividend growth"),
+        "cagr10y": d("(latest annual dividend / annual dividend 10 years earlier)^(1/years) − 1, in percent",
+                     [hist], title="10-year dividend growth"),
+        "consecutiveGrowthYears": d("number of consecutive most recent years in which the annual dividend rose",
+                                    [hist], title="Consecutive years of dividend growth"),
+        "payoutRatio": d("trailing-12-month dividend / info.trailingEps (only if EPS > 0)", [hist, info],
+                         title="Payout ratio"),
+        "fcfPayoutRatio": d("trailing-12-month dividend × shares outstanding / free cash flow (info.freeCashflow, "
+                            "else the latest annual cash-flow statement; only if positive)", [hist, info],
+                            title="FCF payout ratio"),
+        "sustainabilityScore": d(
+            "50 + points for payout ratio (<50% +15, 50-70% +5, ≥70% −10, >100% a further −20), FCF payout (<60% "
+            "+15, <80% +5, else −10), 5-year growth (>8% +10, >3% +5, <0 −10) and streak (≥10 years +10, "
+            "≥5 +5); clipped to 0-100", ["payoutRatio", "fcfPayoutRatio", "cagr5y", "consecutiveGrowthYears"],
+            title="Dividend sustainability score"),
+        "sustainabilityLabel": d("score ≥ 70 Strong; ≥ 40 Adequate; else Weak", ["sustainabilityScore"],
+                                 title="Sustainability label"),
+        "ddmGrowthRate": d("5-year dividend growth, capped at risk-free rate + 2% and floored at 1%", ["cagr5y", rf],
+                           title="DDM growth rate"),
+        "ddmFairValue": d("TTM dividend × (1 + g) / (r − g), g = the DDM growth rate, r = US 10-year Treasury "
+                          "yield + 5% (a hard-coded equity risk premium)", ["ttmDividend", "ddmGrowthRate", rf],
+                          title="Dividend discount model value"),
+        "ddmUpsidePct": d("(DDM fair value / price − 1) × 100", ["ddmFairValue", "price"], title="DDM upside"),
+    }

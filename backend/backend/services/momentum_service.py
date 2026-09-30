@@ -21,6 +21,7 @@ from typing import Optional
 import numpy as np
 import pandas as pd
 
+from .. import provenance as pv
 from . import constituents
 from . import yfinance_service as yfs
 from ..cache import cached
@@ -46,6 +47,14 @@ _MIN_ROWS: dict[str, int] = {
     "6m":    127,
     "12m1m": 253,
 }
+
+_SIGNAL_FORMULAS = {
+    "1m": "close (latest) ÷ close 21 sessions earlier − 1",
+    "3m": "close (latest) ÷ close 63 sessions earlier − 1",
+    "6m": "close (latest) ÷ close 126 sessions earlier − 1",
+    "12m1m": "close 21 sessions ago ÷ close 252 sessions ago − 1 (skips the most recent month)",
+}
+_INDEX_NAMES = {"sp500": "S&P 500", "ndx": "Nasdaq-100", "dow": "Dow Jones Industrial Average"}
 
 _DEFAULT_UNIVERSE = "dow"
 _DEFAULT_SIGNAL   = "12m1m"
@@ -198,7 +207,15 @@ def get_momentum(universe: str = _DEFAULT_UNIVERSE, signal: str = _DEFAULT_SIGNA
     top    = [{"ticker": t, "momentum": _clean(r)} for t, r in sorted_desc[:20]]
     bottom = [{"ticker": t, "momentum": _clean(r)} for t, r in sorted_desc[-20:][::-1]]
 
-    return {
+    name = _INDEX_NAMES.get(universe, universe)
+    inputs = [
+        pv.ref("yahoo", None, f"Daily adjusted close of each {name} member", units="price (split/dividend adjusted)",
+               frequency="daily", observed=pv.last_date(frame)),
+        pv.ref("wikipedia", None, f"Current {name} constituents"),
+    ]
+    signal_formula = (f"{_SIGNAL_FORMULAS[signal]}, using each ticker's own last non-missing closes "
+                      "(trading-day offsets)")
+    return pv.attach({
         "universe": universe,
         "signal":   signal,
         "asOf":     date.today().isoformat(),
@@ -206,4 +223,14 @@ def get_momentum(universe: str = _DEFAULT_UNIVERSE, signal: str = _DEFAULT_SIGNA
         "top":      top,
         "bottom":   bottom,
         "missing":  missing,
-    }
+    }, {
+        "*": pv.derived(f"Cross-sectional momentum over today's {name} members: {signal_formula}", inputs,
+                        title=f"{name} momentum ranking", observed=pv.last_date(frame)),
+        "deciles": pv.derived("mean signal return of the tickers in each equal-count bucket by rank "
+                              "(decile 1 = weakest, up to 10 = strongest)", inputs, title="Momentum deciles",
+                              observed=pv.last_date(frame)),
+        "top": pv.derived(f"the 20 highest signal returns: {signal_formula}", inputs, title="Strongest momentum",
+                          observed=pv.last_date(frame)),
+        "bottom": pv.derived(f"the 20 lowest signal returns: {signal_formula}", inputs, title="Weakest momentum",
+                             observed=pv.last_date(frame)),
+    })

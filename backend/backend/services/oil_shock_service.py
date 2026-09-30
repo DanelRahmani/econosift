@@ -24,6 +24,7 @@ import logging
 import numpy as np
 import pandas as pd
 
+from .. import provenance as pv
 from ..cache import async_cached
 from ..config import FRED_API_KEY
 from . import macro_expansion_service as mes
@@ -165,6 +166,36 @@ def _is_empty(result: dict) -> bool:
     return not result or not result.get("available")
 
 
+def _provenance(data: dict[str, list[dict]], result: dict) -> dict:
+    def fred(sid: str, title: str, freq: str, units: str) -> dict:
+        pts = [p for p in data.get(sid, []) if p.get("value") is not None]
+        return pv.fred(sid, title, units=units, frequency=freq, observed=pts[-1]["date"] if pts else None)
+
+    inputs = [
+        fred("DCOILWTICO", "Crude oil prices: West Texas Intermediate (WTI), Cushing", "daily", "USD per barrel"),
+        fred("CPIAUCSL", "Consumer price index for all urban consumers, all items", "monthly", "index"),
+        fred("IGREA", "Kilian index of global real economic activity", "monthly", "index"),
+        fred("PCOPPUSDM", "Global price of copper", "monthly", "USD per metric ton"),
+    ]
+    latest_date = (result.get("latest") or {}).get("date")
+    decomposition = pv.derived(
+        "monthly means of each series; real WTI and real copper = price / CPI x 100; r_oil and r_copper = "
+        "100 x monthly log change; OLS r_oil = b0 + b1 x change in IGREA + b2 x r_copper; demand = "
+        "b1 x change in IGREA + b2 x r_copper; supply (oil-specific) = r_oil - b0 - demand",
+        inputs, title="Demand vs oil-specific decomposition of real WTI returns", observed=latest_date)
+    return {
+        "*": decomposition, "history": decomposition,
+        "latest": pv.derived("the last month of `history` (percent, log returns); dominant = the larger of "
+                             "|demand| and |supply|", ["history"], title="Latest month", observed=latest_date),
+        "trailing12m": pv.derived("sum of the last 12 months of `history` (percent, log returns)", ["history"],
+                                  title="Trailing 12-month attribution", observed=latest_date),
+        "regression": pv.derived(
+            "OLS coefficients, classical standard errors (no heteroskedasticity correction) and R-squared of the "
+            "regression above over the aligned monthly sample", inputs, title="Regression diagnostics",
+            observed=(result.get("regression") or {}).get("sampleEnd")),
+    }
+
+
 @async_cached("oil_shocks", skip_if=_is_empty)
 async def get_oil_shocks() -> dict:
     """Demand vs. oil-specific decomposition of real WTI returns."""
@@ -187,4 +218,4 @@ async def get_oil_shocks() -> dict:
         "news with anything the demand proxies do not span."
     )
     result["sources"] = "FRED: DCOILWTICO, CPIAUCSL, IGREA, PCOPPUSDM"
-    return result
+    return pv.attach(result, _provenance(data, result)) if result.get("available") else result

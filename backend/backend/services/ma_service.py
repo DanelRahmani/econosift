@@ -10,6 +10,7 @@ import logging
 import re
 from datetime import datetime, timedelta
 
+from .. import provenance as pv
 from ..cache import async_cached
 from ..config import FINNHUB_API_KEY
 
@@ -159,10 +160,24 @@ async def get_ma_data() -> dict:
         for k, v in sorted(monthly_volume.items())
     ]
 
-    return {
+    news = pv.ref("finnhub", "news?category=merger", "Merger-category market news (latest items)",
+                  url="https://finnhub.io/docs/api/market-news",
+                  note="Items are news articles, not a deal database.")
+    parsed = pv.derived(
+        "acquirer / target = the first two 1–5 letter upper-case words in the headline and summary; "
+        "value = the first '$N billion/million' in the text; sector from a fixed 40-ticker map, else 'Other'",
+        [news], title="Deals parsed from news text",
+        note="Parsed by pattern matching and not verified: names, values and sectors can be wrong.")
+    return pv.attach({
         "asOf": str(today),
         "source": "Finnhub",
         "deals": deals,
         "monthlyVolume": monthly_chart,
         "sectorHeatmap": sector_heatmap,
-    }
+    }, {
+        "*": parsed, "deals": parsed,
+        "monthlyVolume": pv.derived("count and summed parsed values of the news items per month", ["deals"],
+                                    title="Monthly deal volume"),
+        "sectorHeatmap": pv.derived("count and mean parsed value of the news items per guessed sector", ["deals"],
+                                    title="Deals by sector"),
+    })

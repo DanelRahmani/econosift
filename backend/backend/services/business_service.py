@@ -11,8 +11,10 @@ import logging
 from datetime import datetime
 from pathlib import Path
 
+from .. import provenance as pv
 from ..cache import async_cached
 from . import atlas_service
+from .fiscal_service import wb_country_provenance
 
 log = logging.getLogger(__name__)
 
@@ -62,6 +64,25 @@ def _load_doing_business() -> dict:
     except Exception as exc:
         log.warning("Failed to load doing_business.json: %s", exc)
         return {"countries": {}}
+
+
+def _provenance(countries: list[dict]) -> dict:
+    prov = wb_country_provenance(countries, [
+        ("newBusinessDensity", "IC.BUS.NDNS.ZS",
+         "New business density (new registrations per 1,000 people ages 15-64)", "per 1,000 people"),
+    ])
+    years = [str(c["periods"]["doingBusinessScore"]) for c in countries
+             if (c.get("periods") or {}).get("doingBusinessScore")]
+    db = pv.ref("worldbank", None, "Doing Business score (0-100)", units="score 0-100", frequency="annual",
+                observed=max(years) if years else None, flags=("stale",),
+                note="Bundled snapshot (backend/data/doing_business.json) of the World Bank Doing Business "
+                     "reports 2015-2019; the series was discontinued in 2021.")
+    prov["kpis.doingBusinessScore"] = prov["history.doingBusinessScore"] = db
+    prov["summary"] = pv.derived(
+        "simple mean of the countries' latest newBusinessDensity and doingBusinessScore values "
+        "(avgStartupDays has no data: the World Bank discontinued it)",
+        ["kpis.newBusinessDensity", "kpis.doingBusinessScore"], title="Cross-country summary")
+    return prov
 
 
 @async_cached("business_dynamism")
@@ -128,7 +149,7 @@ async def get_business_data() -> dict:
     startup_values = [c["kpis"]["startupTime"] for c in countries_out if c["kpis"]["startupTime"] is not None]
     db_scores_all = [c["kpis"]["doingBusinessScore"] for c in countries_out if c["kpis"]["doingBusinessScore"] is not None]
 
-    return {
+    result = {
         "asOf": atlas_service.stamp_periods(countries_out),
         "source": "World Bank",
         "unavailable": {"startupTime": "Discontinued by the World Bank (Doing Business, 2021)"},
@@ -140,3 +161,4 @@ async def get_business_data() -> dict:
             "totalCountries": len(countries_out),
         },
     }
+    return pv.attach(result, _provenance(countries_out))

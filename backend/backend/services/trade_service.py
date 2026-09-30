@@ -9,8 +9,10 @@ import asyncio
 import logging
 from datetime import datetime
 
+from .. import provenance as pv
 from ..cache import async_cached
 from . import atlas_service
+from .fiscal_service import wb_country_provenance
 
 log = logging.getLogger(__name__)
 
@@ -30,6 +32,29 @@ def _latest(year_map: dict[int, float]) -> float | None:
 def _to_timeseries(year_map: dict[int, float]) -> list[dict]:
     """Convert {year: value} to [{date, value}] for frontend."""
     return [{"date": str(y), "value": v} for y, v in sorted(year_map.items())]
+
+
+_WB_SPECS = [
+    ("exportsGdp", "NE.EXP.GNFS.ZS", "Exports of goods and services", "% of GDP"),
+    ("importsGdp", "NE.IMP.GNFS.ZS", "Imports of goods and services", "% of GDP"),
+    ("merchandiseTrade", "TG.VAL.TOTL.GD.ZS", "Merchandise trade", "% of GDP"),
+]
+
+
+def _provenance(countries: list[dict]) -> dict:
+    prov = wb_country_provenance(countries, _WB_SPECS)
+    for prefix in ("kpis.", "history."):
+        prov[f"{prefix}tradeBalance"] = pv.derived(
+            "exports (% of GDP) minus imports (% of GDP), in percentage points of GDP",
+            ["kpis.exportsGdp", "kpis.importsGdp"], title="Trade balance")
+    prov["kpis.tradeOpenness"] = pv.derived(
+        "exports (% of GDP) plus imports (% of GDP)", ["kpis.exportsGdp", "kpis.importsGdp"],
+        title="Trade openness")
+    prov["summary"] = pv.derived(
+        "simple mean of the countries' latest exports, imports and trade-balance values; top surplus = the "
+        "country with the largest positive trade balance",
+        ["kpis.exportsGdp", "kpis.importsGdp", "kpis.tradeBalance"], title="Cross-country summary")
+    return prov
 
 
 @async_cached("trade_flows")
@@ -108,7 +133,7 @@ async def get_trade_data() -> dict:
     top_surplus = countries_out[0]["name"] if countries_out and countries_out[0]["kpis"]["tradeBalance"] and countries_out[0]["kpis"]["tradeBalance"] > 0 else None
     top_surplus_val = countries_out[0]["kpis"]["tradeBalance"] if top_surplus else None
 
-    return {
+    result = {
         "asOf": atlas_service.stamp_periods(countries_out),
         "source": "World Bank",
         "countries": countries_out,
@@ -121,3 +146,4 @@ async def get_trade_data() -> dict:
             "totalCountries": len(countries_out),
         },
     }
+    return pv.attach(result, _provenance(countries_out))

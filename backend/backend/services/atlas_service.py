@@ -9,6 +9,7 @@ import asyncio
 import logging
 from datetime import date
 
+from .. import provenance as pv
 from ..cache import cached, async_cached
 
 logger = logging.getLogger(__name__)
@@ -414,6 +415,39 @@ def _timeline_all_null(result) -> bool:
     return True
 
 
+def _newest_year(by_country: dict) -> int | None:
+    """Newest year present in a ``{iso3: {year: value}}`` map."""
+    years = [y for yrs in by_country.values() for y in yrs]
+    return max(years) if years else None
+
+
+def _timeline_provenance(indicator: str, meta: dict, policy: str, wb_data: dict, imf_data: dict,
+                         countries: list[dict]) -> dict:
+    """Source map for an Atlas timeline (see provenance.py).
+
+    The value of each country/year is the World Bank figure, with IMF WEO filling
+    years the World Bank lacks (``imfYears``); ``debt_gdp`` leads with IMF instead.
+    """
+    wb_yr, imf_yr = _newest_year(wb_data), _newest_year(imf_data)
+    refs: list[dict] = []
+    wb_code = _WB_CODES.get(indicator)
+    if wb_code:
+        note = None
+        if indicator == "debt_gdp":
+            note = "This World Bank series is central-government debt; IMF general-government debt is used first."
+        refs.append(pv.ref("worldbank", wb_code, meta["label"], units=meta["unit"], frequency="annual",
+                           observed=str(wb_yr) if wb_yr else None, note=note))
+    imf_code = _IMF_CODES.get(indicator)
+    if imf_code and policy != "wb_only" and any(c.get("imfYears") for c in countries):
+        imf_ref = pv.ref(
+            "imf", imf_code, f"{meta['label']} (IMF WEO)", units=meta["unit"], frequency="annual",
+            observed=str(imf_yr) if imf_yr else None,
+            note="Supplies the years listed in each country's imfYears; WEO values for the current year "
+                 "onward (projections) are excluded.")
+        refs = [imf_ref] + refs if policy == "imf_first" else refs + [imf_ref]
+    return {"*": refs[0] if len(refs) == 1 else refs}
+
+
 @async_cached("atlas_timeline", skip_if=_timeline_all_null)
 async def get_timeline(indicator: str, start: int = 2000, end: int = 2024) -> dict:
     """Return full timeline for all countries for the given indicator."""
@@ -444,7 +478,7 @@ async def get_timeline(indicator: str, start: int = 2000, end: int = 2024) -> di
                 "regions": country["regions"],
                 "values": values,
             })
-        return {
+        return pv.attach({
             "indicator": indicator,
             "label": meta["label"],
             "unit": meta["unit"],
@@ -452,7 +486,14 @@ async def get_timeline(indicator: str, start: int = 2000, end: int = 2024) -> di
             "start": start,
             "end": end,
             "countries": countries_out,
-        }
+        }, {"*": pv.derived(
+            "Supply-chain vulnerability composite (food + fuel import dependency) from the supply-chain "
+            "service, placed on the end year only; earlier years are empty.",
+            [pv.ref("worldbank", _WB_CODES["food_imports"], "Food imports (% of merchandise imports)",
+                    units="%", frequency="annual"),
+             pv.ref("worldbank", _WB_CODES["fuel_imports"], "Fuel imports (% of merchandise imports)",
+                    units="%", frequency="annual")],
+            title=meta["label"])})
 
     wb_data, imf_data = await asyncio.gather(
         _wb_timeline(indicator, start, end),
@@ -493,7 +534,7 @@ async def get_timeline(indicator: str, start: int = 2000, end: int = 2024) -> di
             **({"imfYears": imf_years} if imf_years else {}),
         })
 
-    return {
+    return pv.attach({
         "indicator":     indicator,
         "label":         meta["label"],
         "unit":          meta["unit"],
@@ -501,7 +542,7 @@ async def get_timeline(indicator: str, start: int = 2000, end: int = 2024) -> di
         "start":         start,
         "end":           end,
         "countries":     countries_out,
-    }
+    }, _timeline_provenance(indicator, meta, policy, wb_data, imf_data, countries_out))
 
 
 async def get_snapshot(indicator: str, year: int) -> dict:
@@ -539,7 +580,18 @@ async def get_snapshot(indicator: str, year: int) -> dict:
     top    = [{"iso3": iso3, "name": name, "value": v} for name, iso3, v in sorted_desc[:10]]
     bottom = [{"iso3": iso3, "name": name, "value": v} for name, iso3, v in sorted_asc[:10]]
 
-    return {
+    # Same sources as the timeline it is sliced from, dated to the requested year.
+    src = timeline.get("provenance", {}).get("*")
+    prov: dict = {}
+    if src:
+        was_list = isinstance(src, list)
+        refs = [dict(r) if r.get("provider") == "derived" else dict(r, observed=str(year))
+                for r in (src if was_list else [src])]
+        prov["*"] = refs if was_list else refs[0]
+    prov["stats"] = pv.derived(
+        "avg = mean of the countries reporting a value; top/bottom = ten highest/lowest values; "
+        "count_reporting = countries with a value", ["*"], title="Snapshot statistics", observed=str(year))
+    return pv.attach({
         "indicator":       indicator,
         "unit":            meta["unit"],
         "year":            year,
@@ -550,7 +602,7 @@ async def get_snapshot(indicator: str, year: int) -> dict:
             "top":             top,
             "bottom":          bottom,
         },
-    }
+    }, prov)
 
 
 def get_indicators() -> dict:
