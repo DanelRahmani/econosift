@@ -30,6 +30,7 @@ from zoneinfo import ZoneInfo
 import numpy as np
 import pandas as pd
 
+from .. import provenance as pv
 from ..cache import cached
 from ..config import FRED_API_KEY
 from . import yfinance_service as yfs
@@ -233,7 +234,7 @@ def fear_greed() -> dict:
         history = [{"date": d.strftime("%Y-%m-%d"), "value": round(float(v), 1)}
                    for d, v in composite.items()]
 
-    return {
+    return pv.attach({
         **({"status": "unavailable"} if not avail else {}),
         "index": index,
         "label": _label(index) if index is not None else None,
@@ -242,4 +243,62 @@ def fear_greed() -> dict:
         "history": history,
         "historyExcludes": ["putCall"],
         "signalCount": len(avail),
+    }, _provenance(signals))
+
+
+def _provenance(signals: list[dict]) -> dict:
+    """Source of each signal (``signals.<key>``) and of the index built on them."""
+    obs = {s["key"]: s.get("asOf") for s in signals}
+    flags = {s["key"]: (("stale",) if s.get("stale") else ()) for s in signals}
+
+    def yahoo(sym: str, title: str, key: str) -> dict:
+        return pv.yahoo(sym, title, frequency="daily", observed=obs.get(key))
+
+    breadth_inputs = [
+        pv.ref("yahoo", None, "Daily high/low/close of each S&P 500 member",
+               units="price as traded", frequency="daily", observed=obs.get("highLow")),
+        pv.ref("wikipedia", None, "Current S&P 500 constituents"),
+    ]
+
+    def d(key: str, formula: str, inputs: list, title: str, **kw) -> dict:
+        return pv.derived(formula, inputs, title=title, observed=obs.get(key), flags=flags.get(key, ()), **kw)
+
+    prov = {
+        "signals.spMomentum": d(
+            "spMomentum", "50 + 20 × z-score (252 sessions) of close / 125-day SMA − 1, clipped to 0–100",
+            [yahoo("^GSPC", "S&P 500 index, daily close", "spMomentum")], "S&P 500 momentum"),
+        "signals.highLow": d(
+            "highLow", "new 52-week highs / (highs + lows) × 100 across S&P 500 members",
+            breadth_inputs, "New highs vs new lows"),
+        "signals.mcclellan": d(
+            "mcclellan", "percentile rank (252 sessions) of the McClellan Summation Index",
+            breadth_inputs, "McClellan Summation"),
+        "signals.putCall": d(
+            "putCall",
+            "100 − percentile rank of today's put/call open-interest ratio within its recorded history",
+            [pv.yahoo("SPY", "Put and call open interest, nearest 3 expiries", observed=obs.get("putCall")),
+             pv.ref("econosift", "spy_pcr_oi", "Daily record of the SPY put/call ratio", frequency="daily")],
+            "Put/call ratio",
+            note=f"Scored once {_PCR_MIN_HISTORY} sessions are recorded; no free source publishes this history."),
+        "signals.vix": d(
+            "vix", "100 − percentile rank (252 sessions) of the VIX close",
+            [yahoo("^VIX", "CBOE Volatility Index, daily close", "vix")], "Volatility"),
+        "signals.stocksBonds": d(
+            "stocksBonds", "50 + 500 × (20-session return of SPY − 20-session return of TLT), clipped to 0–100",
+            [yahoo("SPY", "SPDR S&P 500 ETF, daily adjusted close", "stocksBonds"),
+             yahoo("TLT", "iShares 20+ Year Treasury ETF, daily adjusted close", "stocksBonds")],
+            "Stocks vs bonds"),
+        "signals.hySpread": d(
+            "hySpread", "100 − percentile rank (252 sessions) of the high-yield option-adjusted spread",
+            [pv.fred("BAMLH0A0HYM2", "ICE BofA US High Yield Index Option-Adjusted Spread",
+                     units="%", frequency="daily", observed=obs.get("hySpread"))],
+            "Junk bond demand"),
     }
+    scored = [f"signals.{s['key']}" for s in signals if s.get("score") is not None]
+    index = pv.derived("equal-weighted mean of the signals that have a score", scored,
+                       title="Fear & Greed index (EconoSift's own; not CNN's)")
+    prov.update({"index": index, "label": index, "*": index,
+                 "history": pv.derived("per-session mean of the time-series signals (put/call excluded)",
+                                       [k for k in scored if k != "signals.putCall"],
+                                       title="Fear & Greed history")})
+    return prov

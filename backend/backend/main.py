@@ -5,8 +5,10 @@ import os
 import threading
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
+from . import cache
 
 from .middleware import DeduplicationMiddleware
 from .routers import (
@@ -36,7 +38,14 @@ async def lifespan(app: FastAPI):
         scheduler.shutdown(wait=False)
 
 
-app = FastAPI(title="EconoSift API", version="1.0.0", lifespan=lifespan)
+async def _start_fetch_log() -> None:
+    # Must be async: it runs in the request's own task, so the log it opens is
+    # the one the endpoint and its threads report cache reads to.
+    cache.start_fetch_log()
+
+
+app = FastAPI(title="EconoSift API", version="1.0.0", lifespan=lifespan,
+              dependencies=[Depends(_start_fetch_log)])
 
 # EconoSift has no authentication by design — it is a single-user, self-hosted app.
 # That makes the CORS policy load-bearing: with allow_origins=["*"] any page you

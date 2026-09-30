@@ -28,6 +28,7 @@ from zoneinfo import ZoneInfo
 import numpy as np
 import pandas as pd
 
+from .. import provenance as pv
 from ..cache import cached
 from . import yfinance_service as yfs
 from . import constituents
@@ -187,7 +188,7 @@ def breadth(index: str = "sp500") -> dict:
         return [{"date": d.strftime("%Y-%m-%d"), "value": round(float(v), 2)}
                 for d, v in s.items()]
 
-    return {
+    return pv.attach({
         "index": index,
         "asOf": as_of.strftime("%Y-%m-%d"),
         "session": "close",
@@ -208,6 +209,41 @@ def breadth(index: str = "sp500") -> dict:
             {"date": d.strftime("%Y-%m-%d"), "adv": int(r.adv), "dec": int(r.dec)}
             for d, r in ad.tail(90).iterrows()
         ],
+    }, _provenance(index, as_of.strftime("%Y-%m-%d")))
+
+
+_INDEX_NAMES = {"sp500": "S&P 500", "ndx": "Nasdaq-100", "dow": "Dow Jones Industrial Average"}
+
+
+def _provenance(index: str, as_of: str) -> dict:
+    name = _INDEX_NAMES.get(index, index)
+    inputs = [
+        pv.ref("yahoo", None, f"Daily open/high/low/close of each {name} member",
+               units="price as traded (split-adjusted, not dividend-adjusted)",
+               frequency="daily", observed=as_of),
+        pv.ref("wikipedia", None, f"Current {name} constituents"),
+    ]
+
+    def d(formula: str, title: str) -> dict:
+        return pv.derived(formula, inputs, title=title, observed=as_of)
+
+    adv = d("count of members whose close is above / below / equal to the previous session's close",
+            "Advancers, decliners, unchanged")
+    hilo = d("count of members whose session high (low) is the highest (lowest) of the trailing 252 sessions",
+             "New 52-week highs / lows")
+    return {
+        "*": d("breadth statistics over the index's current members, last completed session", f"{name} breadth"),
+        "advancing": adv, "declining": adv, "unchanged": adv, "total": adv, "advDeclHistory": adv,
+        "newHighs": hilo, "newLows": hilo,
+        "pctAboveSma50": d("share of members closing above their 50-session simple moving average",
+                           "% above 50-day SMA"),
+        "pctAboveSma200": d("share of members closing above their 200-session simple moving average",
+                            "% above 200-day SMA"),
+        "mcclellanOscillator": d("1000 × (EMA19 − EMA39) of (advancers − decliners) / (advancers + decliners)",
+                                 "McClellan Oscillator (ratio-adjusted)"),
+        "mcclellanSummation": d("running sum of the McClellan Oscillator from the start of the 2-year window",
+                                "McClellan Summation Index"),
+        "cumulativeAdLine": d("running sum of (advancers − decliners)", "Cumulative advance-decline line"),
     }
 
 
