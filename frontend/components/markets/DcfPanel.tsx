@@ -2,32 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import type { DcfResponse, DcfSensitivity } from "@/lib/types";
+import type { CountryRate, DcfResponse, DcfSensitivity } from "@/lib/types";
 import { Card, Skeleton } from "@/components/ui";
 import { fmtNum, fmtPct, fmtPrice, fmtLarge, currencySymbol } from "@/lib/format";
-
-// ── Regional discount rates ─────────────────────────────────────────────────
-interface CountryRate {
-  name: string;
-  riskFreeRate: number;
-  erp: number;
-}
-
-const DEFAULT_COUNTRY_RATES: CountryRate[] = [
-  { name: "United States", riskFreeRate: 0.04, erp: 0.05 },
-  { name: "Germany", riskFreeRate: 0.025, erp: 0.05 },
-  { name: "Japan", riskFreeRate: 0.01, erp: 0.05 },
-  { name: "United Kingdom", riskFreeRate: 0.04, erp: 0.05 },
-  { name: "Netherlands", riskFreeRate: 0.0275, erp: 0.05 },
-  { name: "France", riskFreeRate: 0.03, erp: 0.05 },
-  { name: "Switzerland", riskFreeRate: 0.01, erp: 0.05 },
-  { name: "Canada", riskFreeRate: 0.035, erp: 0.05 },
-  { name: "Australia", riskFreeRate: 0.04, erp: 0.05 },
-  { name: "China", riskFreeRate: 0.025, erp: 0.05 },
-  { name: "India", riskFreeRate: 0.065, erp: 0.08 },
-  { name: "Brazil", riskFreeRate: 0.10, erp: 0.08 },
-  { name: "Russia", riskFreeRate: 0.16, erp: 0.10 },
-];
 
 // ── Slider config ──────────────────────────────────────────────────────────
 interface Params {
@@ -91,7 +68,7 @@ export function DcfPanel({ tickers, sharedWacc = null }: { tickers: string[]; pe
   const [data, setData] = useState<DcfResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
-  const [countryRates, setCountryRates] = useState<CountryRate[]>(DEFAULT_COUNTRY_RATES);
+  const [countryRates, setCountryRates] = useState<CountryRate[]>([]);
   const [selectedCountry, setSelectedCountry] = useState<string>("");
 
   // Load live risk-free rates from backend

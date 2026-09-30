@@ -27,6 +27,10 @@ def _latest(year_map: dict[int, float]) -> float | None:
     return year_map[max(year_map)]
 
 
+def _latest_year(year_map: dict[int, float]) -> int | None:
+    return max(year_map) if year_map else None
+
+
 def _banking_signal(npl: float | None, cap: float | None, zscore: float | None,
                     credit_gap: float | None) -> str:
     flags = 0
@@ -97,6 +101,16 @@ async def get_banking_stability() -> dict:
                 "domesticCreditGrowth": dc_val,
                 "creditGap": cg_latest,
             },
+            # Observation period behind each KPI. The bank Z-score comes from
+            # the World Bank's Global Financial Development database, which
+            # was last updated in 2022 (data to 2021).
+            "periods": {
+                "nplRatio": _latest_year(npl_map),
+                "capitalAdequacy": _latest_year(cap_map),
+                "bankZscore": _latest_year(zs_map),
+                "domesticCreditGrowth": _latest_year(dc_map),
+                "creditGap": cg_pts[-1]["date"] if cg_pts else None,
+            },
         })
 
     countries_out.sort(key=lambda c: c["kpis"]["nplRatio"] or 0, reverse=True)
@@ -104,9 +118,13 @@ async def get_banking_stability() -> dict:
     red_count = sum(1 for c in countries_out if c["signal"] == "red")
     yellow_count = sum(1 for c in countries_out if c["signal"] == "yellow")
 
+    npl_years = [c["periods"]["nplRatio"] for c in countries_out if c["periods"]["nplRatio"]]
+    zs_years = [c["periods"]["bankZscore"] for c in countries_out if c["periods"]["bankZscore"]]
+
     return {
-        "asOf": str(datetime.now().date()),
-        "source": "World Bank / BIS",
+        "asOf": str(max(npl_years)) if npl_years else None,
+        "zscoreYear": max(zs_years) if zs_years else None,
+        "source": "World Bank (WDI, Global Financial Development) / BIS",
         "countries": countries_out,
         "summary": {
             "redCount": red_count,

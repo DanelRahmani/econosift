@@ -37,17 +37,17 @@ export function CurrencyCrisisPanel() {
         <Card className="p-4">
           <div className="text-xs text-text-secondary">Red Alerts</div>
           <div className="text-2xl font-bold text-danger">{summary.redCount}</div>
-          <div className="text-xs text-text-secondary mt-0.5">≥4 risk factors</div>
+          <div className="text-xs text-text-secondary mt-0.5">≥5 risk factors</div>
         </Card>
         <Card className="p-4">
           <div className="text-xs text-text-secondary">Yellow Warnings</div>
           <div className="text-2xl font-bold text-warning">{summary.yellowCount}</div>
-          <div className="text-xs text-text-secondary mt-0.5">2-3 risk factors</div>
+          <div className="text-xs text-text-secondary mt-0.5">3-4 risk factors</div>
         </Card>
         <Card className="p-4">
           <div className="text-xs text-text-secondary">Green / Stable</div>
           <div className="text-2xl font-bold text-success">{summary.greenCount}</div>
-          <div className="text-xs text-text-secondary mt-0.5">0-1 risk factors</div>
+          <div className="text-xs text-text-secondary mt-0.5">0-2 risk factors</div>
         </Card>
         <Card className="p-4">
           <div className="text-xs text-text-secondary">Countries</div>

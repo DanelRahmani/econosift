@@ -22,6 +22,7 @@ wikitextparser
 eurostat
 finnhub-python
 openpyxl
+xlrd>=2.0.1
 pyarrow
 pandas-ta
 pycountry

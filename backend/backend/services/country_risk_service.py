@@ -103,13 +103,18 @@ async def get_country_risk(countries: tuple[str, ...] | None = None) -> dict:
     cur_year = datetime.now().year
     start, end = 2018, cur_year - 1
 
-    wb_debt, wb_ca, wb_inf, wb_unemp, wb_fisc, wb_res = await asyncio.gather(
+    # IMF WEO fills countries the World Bank series miss (government debt and
+    # fiscal balance are sparse in WDI, e.g. Germany). ``end`` is last year,
+    # so WEO projections are never used as actuals.
+    wb_debt, wb_ca, wb_inf, wb_unemp, wb_fisc, wb_res, imf_debt, imf_fisc = await asyncio.gather(
         atlas_service._wb_timeline("debt_gdp",        start, end),
         atlas_service._wb_timeline("current_account", start, end),
         atlas_service._wb_timeline("inflation",       start, end),
         atlas_service._wb_timeline("unemployment",    start, end),
         asyncio.to_thread(_fetch_wb_sync, _NEW_WB_CODES["fiscal_balance"], start, end),
         asyncio.to_thread(_fetch_wb_sync, _NEW_WB_CODES["reserves_total"], start, end),
+        atlas_service._imf_timeline("debt_gdp",       start, end),
+        atlas_service._imf_timeline("fiscal_balance", start, end),
     )
 
     universe = atlas_service._country_universe()
@@ -120,11 +125,25 @@ async def get_country_risk(countries: tuple[str, ...] | None = None) -> dict:
         if countries and iso3 not in countries:
             continue
 
-        d_val, d_yr = _latest(wb_debt.get(iso3, {}))
+        # Debt: IMF general government gross debt leads (the standard
+        # cross-country measure); the World Bank series is *central*
+        # government debt and only fills gaps, labelled as such.
+        sources: dict[str, str] = {}
+        d_val, d_yr = _latest(imf_debt.get(iso3, {}))
+        if d_val is not None:
+            sources["debt_gdp"] = "IMF WEO GGXWDG_NGDP (general government)"
+        else:
+            d_val, d_yr = _latest(wb_debt.get(iso3, {}))
+            if d_val is not None:
+                sources["debt_gdp"] = "World Bank GC.DOD.TOTL.GD.ZS (central government)"
         ca_val, _   = _latest(wb_ca.get(iso3, {}))
         inf_val, _  = _latest(wb_inf.get(iso3, {}))
         un_val, _   = _latest(wb_unemp.get(iso3, {}))
         fb_val, _   = _latest(wb_fisc.get(iso3, {}))
+        if fb_val is None:
+            fb_val, _ = _latest(imf_fisc.get(iso3, {}))
+            if fb_val is not None:
+                sources["fiscal_balance"] = "IMF WEO GGXCNL_NGDP"
 
         rg_val: float | None = None
         res_map = wb_res.get(iso3, {})
@@ -152,6 +171,8 @@ async def get_country_risk(countries: tuple[str, ...] | None = None) -> dict:
             "year":       d_yr or (cur_year - 1),
             "indicators": indic,
             "signals":    signals,
+            # Indicators not from the World Bank, by key (default: WB WDI).
+            **({"sources": sources} if sources else {}),
         })
 
     result.sort(key=lambda row: row["name"])

@@ -8,18 +8,18 @@ import pandas as pd
 from ..cache import async_cached, cached
 from ..config import COUNTRY_NAMES
 from ..models import SeriesResult, make_series
+from ._annual import to_annual
 
-SOURCE_LABEL = "pandas-datareader"
+SOURCE_LABEL = "FRED (St. Louis Fed, via pandas-datareader)"
 
 # Same FRED series IDs as source_fred (US only).
 INDICATOR_MAP = {
-    "gdp_growth": ("A191RL1Q225SBEA", "mean"),
+    "gdp_growth": ("A191RL1A225NBEA", "mean"),
     "inflation": ("CPIAUCSL", "yoy"),
     "unemployment": ("UNRATE", "mean"),
     "interest_rate": ("FEDFUNDS", "mean"),
     "debt_gdp": ("GFDEGDQ188S", "mean"),
     "yield_10y": ("DGS10", "mean"),
-    "current_account": ("BOPGSTB", "sum"),
 }
 
 
@@ -31,20 +31,7 @@ def _fetch_sync(series_id: str, start: int) -> pd.Series:
 
 
 def _to_annual(s: pd.Series, method: str, start: int, end: int) -> list[tuple[int, float]]:
-    if s is None or len(s) == 0:
-        return []
-    s = s.dropna()
-    s.index = pd.to_datetime(s.index)
-    if method == "yoy":
-        annual = s.resample("YE").mean().pct_change() * 100.0
-    elif method == "sum":
-        annual = s.resample("YE").sum()
-    else:
-        annual = s.resample("YE").mean()
-    return sorted(
-        (ts.year, float(v)) for ts, v in annual.dropna().items()
-        if start <= ts.year <= end
-    )
+    return to_annual(s, method, start, end)
 
 
 @async_cached("dr_fetch")
@@ -57,7 +44,7 @@ async def fetch(indicator_key: str, countries: tuple[str, ...],
         return []
     series_id, method = mapping
     try:
-        s = await asyncio.to_thread(_fetch_sync, series_id, start)
+        s = await asyncio.to_thread(_fetch_sync, series_id, start - 1)
         points = _to_annual(s, method, start, end)
     except Exception:
         return []
@@ -68,17 +55,28 @@ async def fetch(indicator_key: str, countries: tuple[str, ...],
 
 @cached("famafrench")
 def fama_french() -> list[dict]:
-    """Annual means of Fama-French research factors."""
-    # Try bulk data first
+    """Annual Fama-French factor returns, in percent.
+
+    Both data paths return the same shape — ``{year, mkt_rf, smb, hml, rf}``
+    in percent. (The bulk-parquet path used to return *monthly* rows keyed
+    ``date`` in decimals while the live path returned annual rows keyed
+    ``year`` in percent — audit D-31.)
+    """
+    # Try bulk data first: monthly decimals → compounded calendar-year %.
+    # (Compounding the monthly spreads approximates Ken French's own annual
+    # table, which is built from annual portfolio returns.)
     try:
         from ..services.bulk_data_service import load_famafrench
         df = load_famafrench(2000)
         if df is not None and not df.empty:
-            # Build list of dicts matching the expected format
+            m = df.copy()
+            m["year"] = pd.to_datetime(m["date"].astype(str)).dt.year
+            cols = ["mkt_rf", "smb", "hml", "rf"]
+            full = m.groupby("year")[cols].count().min(axis=1) == 12  # complete years only
+            annual = (1.0 + m.set_index("year")[cols]).groupby(level=0).prod() - 1.0
             return [
-                {"date": r["date"], "mkt_rf": r["mkt_rf"],
-                 "smb": r["smb"], "hml": r["hml"], "rf": r["rf"]}
-                for _, r in df.iterrows()
+                {"year": int(y), **{c: round(float(r[c]) * 100.0, 4) for c in cols}}
+                for y, r in annual[full].iterrows()
             ]
     except Exception:
         pass

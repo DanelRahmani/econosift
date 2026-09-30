@@ -52,11 +52,9 @@ async def get_credit_pulse() -> dict:
     bbb_cur = _latest(bbb)
     sofr_v = _latest(sofr)
     dtb3_v = _latest(dtb3)
-    # Prefer live SOFR-DTB3; fall back to last TEDRATE observation
-    if sofr_v is not None and dtb3_v is not None:
-        fund_spread = round(sofr_v - dtb3_v, 4)
-    else:
-        fund_spread = _latest(ted)
+    # Live SOFR-DTB3 only. TEDRATE ended in Jan 2022 with LIBOR, so its last
+    # print must not stand in for a current reading (audit D-16).
+    fund_spread = round(sofr_v - dtb3_v, 4) if sofr_v is not None and dtb3_v is not None else None
 
     # Funding spread history: splice TEDRATE (pre-2023) + SOFR-DTB3 (post-2023)
     sofr_map = {pt["date"]: pt["value"] for pt in sofr if pt.get("value") is not None}

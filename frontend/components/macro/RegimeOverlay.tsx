@@ -44,7 +44,9 @@ export function RegimeOverlay() {
           <span className="opacity-60">(Q{data.quadrant})</span>
         </h3>
         <p className="text-xs opacity-80 mt-1">
-          Growth: {data.growth_signal} ({Z_LABEL(data.growth_z)}){" "}
+          <span title={data.growth_indicator ? `Growth input: ${data.growth_indicator}${data.metrics?.growth_as_of ? `, ${data.metrics.growth_as_of}` : ""}` : undefined}>
+            Growth: {data.growth_signal} ({Z_LABEL(data.growth_z)})
+          </span>{" "}
           · Inflation: {data.inflation_signal} ({cpiYoy != null ? `${cpiYoy}%` : "—"} YoY, {Z_LABEL(data.inflation_z)})
         </p>
         {data.metrics?.fed_funds != null && data.metrics?.yield_spread_2y10y != null && (

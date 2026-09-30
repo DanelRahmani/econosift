@@ -8,11 +8,19 @@ import { CHART_COLORS } from "@/lib/format";
 import { chartTooltipStyle, chartPalette } from "@/components/ui";
 import { useTheme } from "@/components/ThemeProvider";
 
-export function MacroChart({ data, forecast = [] }: { data: MacroResponse; forecast?: MacroSeries[] }) {
+export function MacroChart({ data, forecast: forecastProp = [] }: { data: MacroResponse; forecast?: MacroSeries[] }) {
   const { theme } = useTheme();
   const pal = chartPalette(theme);
-  const { series } = data;
-  if (!series.length || series.every((s) => s.data.length === 0)) {
+  // Projection points inside the main series (e.g. IMF WEO filling the current
+  // year) are drawn on the dashed forecast line, never as solid actuals.
+  const series = data.series.map((s) => ({ ...s, data: s.data.filter((d) => !d.estimate) }));
+  const forecast = [
+    ...forecastProp,
+    ...data.series
+      .filter((s) => s.data.some((d) => d.estimate) && !forecastProp.some((f) => f.country === s.country))
+      .map((s) => ({ ...s, data: s.data.filter((d) => d.estimate) })),
+  ];
+  if (!series.length || data.series.every((s) => s.data.length === 0)) {
     return <div className="text-text-muted text-sm">No data for this selection.</div>;
   }
 

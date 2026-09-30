@@ -116,7 +116,10 @@ export function BankingStabilityPanel() {
         {countries.length > 0 && (
           <Card className="p-4">
             <h3 className="font-semibold mb-1">Bank Z-Score (higher = more stable)</h3>
-            <p className="text-xs text-text-secondary mb-3">Green &gt;20 · Yellow 10–20 · Red &lt;10</p>
+            <p className="text-xs text-text-secondary mb-3">
+              Green &gt;20 · Yellow 10–20 · Red &lt;10
+              {data.zscoreYear != null && ` · latest published: ${data.zscoreYear} (World Bank GFDD)`}
+            </p>
             <ResponsiveContainer width="100%" height={Math.max(280, countries.length * 22)}>
               <BarChart
                 data={countries.filter(c => c.kpis.bankZscore != null).map(c => ({

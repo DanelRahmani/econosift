@@ -38,7 +38,12 @@ def _source_order(indicator: str, countries: tuple[str, ...]) -> list:
 
 
 def _merge(ranked_results: list[list[SeriesResult]]) -> list[SeriesResult]:
-    """Merge per country+year, preferring higher-ranked sources."""
+    """Merge per country+year, preferring higher-ranked sources.
+
+    Each point keeps the provider that supplied it; the series label lists
+    every provider actually used (previously the first provider's label was
+    applied to the whole series even when others filled gaps).
+    """
     merged: dict[str, dict] = {}
     for results in ranked_results:  # highest priority first
         for s in results:
@@ -46,24 +51,24 @@ def _merge(ranked_results: list[list[SeriesResult]]) -> list[SeriesResult]:
             entry = merged.setdefault(country, {
                 "country": country,
                 "countryName": s["countryName"],
-                "source_label": s["source_label"],
                 "_years": {},
             })
             for pt in s["data"]:
                 year = pt["year"]
                 if year not in entry["_years"]:
-                    entry["_years"][year] = pt["value"]
+                    entry["_years"][year] = {**pt, "src": pt.get("src") or s["source_label"]}
 
     out: list[SeriesResult] = []
     for country, entry in merged.items():
         years = entry.pop("_years")
-        data = [{"year": y, "value": v} for y, v in sorted(years.items())]
+        data = [years[y] for y in sorted(years)]
         if not data:
             continue
+        labels = list(dict.fromkeys(p["src"] for p in data))
         out.append({
             "country": country,
             "countryName": entry["countryName"],
-            "source_label": entry["source_label"],
+            "source_label": " + ".join(labels),
             "data": data,
         })
     return out

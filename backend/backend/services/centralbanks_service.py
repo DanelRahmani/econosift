@@ -91,9 +91,14 @@ async def get_centralbanks() -> dict:
         records = raw.get(sid, [])
         rate = _to_float(records[-1]["value"]) if records else None
         nxt_date, days = _next_meeting(cb, meetings)
+        # The picker falls back to a stale series when nothing fresh exists;
+        # date it and flag it so an old print is never read as current.
+        last_date = records[-1]["date"] if records else None
         current[cb] = {
             "rate":         round(rate, 4) if rate is not None else None,
             "series":       sid,
+            "asOf":         last_date,
+            "stale":        bool(last_date and (date.today() - date.fromisoformat(last_date[:10])).days > _MAX_STALE_DAYS),
             "next_meeting": nxt_date,
             "days_until":   days,
         }

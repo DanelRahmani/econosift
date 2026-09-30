@@ -10,6 +10,19 @@ from ..cache import async_cached
 
 log = logging.getLogger(__name__)
 
+_NO_IDENTITY = ("SEC EDGAR identity not configured — set EDGAR_IDENTITY "
+                "(\"Your Name you@example.com\") to enable insider and 13F data")
+
+
+def _edgar_ready() -> bool:
+    """Declare the SEC-required User-Agent identity; False if none is set."""
+    from ..config import EDGAR_IDENTITY
+    if not EDGAR_IDENTITY:
+        return False
+    from edgar import set_identity  # type: ignore[import]
+    set_identity(EDGAR_IDENTITY)
+    return True
+
 
 def _fetch_13f_sync(ticker: str) -> dict:
     try:
@@ -17,6 +30,8 @@ def _fetch_13f_sync(ticker: str) -> dict:
     except ImportError:
         return {"error": "edgartools not installed", "holders": [], "ticker": ticker, "asOf": None, "reportingLag": "45-day reporting lag"}
 
+    if not _edgar_ready():
+        return {"error": _NO_IDENTITY, "holders": [], "ticker": ticker, "asOf": None, "reportingLag": "45-day reporting lag"}
     try:
         company = Company(ticker)
         time.sleep(0.1)
@@ -77,12 +92,20 @@ def _fetch_13f_sync(ticker: str) -> dict:
         }
 
 
-def _fetch_form4_sync(ticker: str) -> dict:
+def _fetch_form4_sync(ticker: str, max_transactions: int | None = 50) -> dict:
+    """Open-market Form 4 purchases/sales filed in the last 90 days.
+
+    ``max_transactions`` caps the list for display; the insider aggregate
+    passes ``None`` so heavy sellers are not truncated at 50 rows, which
+    biased the market-wide buy/sell ratio upward (audit C-31).
+    """
     try:
         from edgar import Company  # type: ignore[import]
     except ImportError:
         return {"error": "edgartools not installed", "transactions": [], "ticker": ticker}
 
+    if not _edgar_ready():
+        return {"error": _NO_IDENTITY, "transactions": [], "ticker": ticker}
     try:
         company = Company(ticker)
         time.sleep(0.1)
@@ -93,7 +116,8 @@ def _fetch_form4_sync(ticker: str) -> dict:
         cutoff = date.today() - timedelta(days=90)
         transactions: list[dict] = []
 
-        for filing in filings[:100]:  # cap iterations
+        truncated = False
+        for filing in filings[:400]:  # newest first; the 90-day cutoff ends the loop
             try:
                 fd = filing.filing_date if hasattr(filing, "filing_date") else None
                 if fd is None:
@@ -161,16 +185,17 @@ def _fetch_form4_sync(ticker: str) -> dict:
                                 "totalValue": total,
                                 "date": tx_date,
                             })
-                            if len(transactions) >= 50:
+                            if max_transactions is not None and len(transactions) >= max_transactions:
                                 break
             except Exception as exc:
                 log.debug("Form4 filing parse error for %s: %s", ticker, exc)
                 continue
 
-            if len(transactions) >= 50:
+            if max_transactions is not None and len(transactions) >= max_transactions:
+                truncated = True
                 break
 
-        return {"ticker": ticker, "transactions": transactions[:50], "error": None}
+        return {"ticker": ticker, "transactions": transactions, "truncated": truncated, "error": None}
     except Exception as exc:
         log.warning("get_form4_insiders failed for %s: %s", ticker, exc)
         return {"ticker": ticker, "transactions": [], "error": str(exc)}

@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 def _form4_for_ticker(ticker: str, sector: str) -> list[dict]:
     """Fetch Form 4 transactions for a ticker and attach sector info."""
     try:
-        result = edgar_service._fetch_form4_sync(ticker)
+        result = edgar_service._fetch_form4_sync(ticker, max_transactions=None)
         time.sleep(0.15)  # rate-limit EDGAR
         transactions = result.get("transactions", [])
         for tx in transactions:
@@ -41,6 +41,8 @@ def get_insider_aggregate() -> dict:
     First run is slow (100+ seconds due to EDGAR rate limiting).
     Subsequent calls use cache.
     """
+    if not edgar_service._edgar_ready():
+        return {"error": edgar_service._NO_IDENTITY, "asOf": None}
     sp500 = constituents.get_constituents("sp500")
     if not sp500:
         return {"error": "No S&P 500 constituents available", "asOf": None}

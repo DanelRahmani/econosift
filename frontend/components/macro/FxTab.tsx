@@ -114,14 +114,15 @@ export function FxTab() {
           Purchasing Power Parity (PPP) Analysis
         </h3>
         <p className="text-xs text-text-secondary mb-4">
-          Based on OECD/IMF PPP estimates. Over/undervaluation relative to the
-          USD. A currency is overvalued if spot exceeds PPP.
+          World Bank ICP PPP conversion factors vs FRED daily spot. Over/under
+          % is always for the non-USD currency: positive means it buys more at
+          the market rate than PPP implies (overvalued vs the USD).
         </p>
         {pppLoading ? (
           <div className="h-32 animate-pulse bg-surface-alt rounded" />
-        ) : pppError || !ppp ? (
+        ) : pppError || !ppp || ppp.pairs.length === 0 ? (
           <p className="text-text-secondary text-sm">
-            PPP data unavailable — backend endpoint not yet implemented.
+            PPP data unavailable{ppp?.error ? ` — ${ppp.error}` : ""}.
           </p>
         ) : (
           <div className="overflow-x-auto">
@@ -133,6 +134,7 @@ export function FxTab() {
                   <th className="pb-2 pr-4 text-right">PPP Rate</th>
                   <th className="pb-2 pr-4 text-right">Over/Under %</th>
                   <th className="pb-2">Verdict</th>
+                  <th className="pb-2 pl-3 text-right">PPP year</th>
                 </tr>
               </thead>
               <tbody>
@@ -159,7 +161,15 @@ export function FxTab() {
                         ? `${pair.overvaluation >= 0 ? "+" : ""}${pair.overvaluation.toFixed(1)}%`
                         : "—"}
                     </td>
-                    <td className="py-2">{pppBadge(pair.overvaluation)}</td>
+                    <td className="py-2">
+                      {pair.currency && pair.overvaluation != null && (
+                        <span className="mr-1.5 font-mono text-xs text-text-secondary">{pair.currency}</span>
+                      )}
+                      {pppBadge(pair.overvaluation)}
+                    </td>
+                    <td className="py-2 pl-3 text-right text-xs text-text-muted" title={pair.pppBasis}>
+                      {pair.pppYear ?? "—"}
+                    </td>
                   </tr>
                 ))}
               </tbody>

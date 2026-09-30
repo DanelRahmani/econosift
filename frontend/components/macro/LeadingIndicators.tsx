@@ -167,7 +167,7 @@ export function LeadingIndicators() {
         <KpiCard
           label="CB LEI (YoY %)"
           value={kpis.lei}
-          sub="Conference Board Leading Economic Index"
+          sub={kpis.lei == null && data.unavailable?.lei ? data.unavailable.lei : "Conference Board Leading Economic Index"}
           color={kpis.lei != null && kpis.lei < 0 ? "text-danger" : "text-success"}
         />
         <KpiCard
@@ -185,7 +185,7 @@ export function LeadingIndicators() {
         <KpiCard
           label="ISM Manufacturing PMI"
           value={kpis.ismPmi}
-          sub={kpis.ismPmi != null ? (kpis.ismPmi >= 50 ? "Expanding" : "Contracting") : undefined}
+          sub={kpis.ismPmi != null ? (kpis.ismPmi >= 50 ? "Expanding" : "Contracting") : data.unavailable?.ismPmi}
           color={kpis.ismPmi != null && kpis.ismPmi < 50 ? "text-danger" : "text-success"}
         />
         <KpiCard

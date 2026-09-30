@@ -334,7 +334,7 @@ function YieldPageInner() {
           badge={us_curve.inverted ? "INVERTED" : undefined}
         />
         <KpiCard label="10Y Breakeven" value={fmt(breakevens["10y"] ?? null)} />
-        <KpiCard label="Term Premium (ACM)" value={fmt(term_premium.current)} />
+        <KpiCard label="10Y Term Premium (Kim-Wright)" value={fmt(term_premium.current)} />
       </div>
 
       {/* Tabs */}

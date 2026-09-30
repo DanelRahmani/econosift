@@ -70,6 +70,15 @@ def _pick_series(data: dict, candidates: tuple[str, ...]) -> list[dict]:
     return best_pts
 
 
+def _is_stale(pts: list[dict]) -> bool:
+    """True when the chosen series' last observation is past the cutoff
+    (the picker returns a stale series when no fresh one exists)."""
+    if not pts:
+        return False
+    last = datetime.strptime(pts[-1]["date"][:10], "%Y-%m-%d")
+    return (datetime.now(timezone.utc).replace(tzinfo=None) - last).days > _MAX_STALE_DAYS
+
+
 def _rate_n_months_ago(pts: list[dict], months: int) -> float | None:
     """Find the last value at or before `months` months before the final point."""
     if not pts:
@@ -132,6 +141,8 @@ async def get_policy_tracker() -> dict:
                 "change_3m": ch3,
                 "change_12m": ch12,
                 "stance": _stance(ch12),
+                "asOf": pts[-1]["date"][:10] if pts else None,
+                "stale": _is_stale(pts),
             }
         )
 

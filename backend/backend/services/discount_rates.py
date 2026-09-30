@@ -248,7 +248,7 @@ def tax_rate_for(info: dict, country: str) -> float:
 # Risk-free rate (US 10Y Treasury)
 # ---------------------------------------------------------------------------
 
-def _fetch_dgs10() -> float:
+def _fetch_dgs10() -> float | None:
     """Synchronously fetch the latest DGS10 from FRED via fredapi or pandas_datareader."""
     # Try fredapi first
     try:
@@ -280,13 +280,32 @@ def _fetch_dgs10() -> float:
     except Exception:
         pass
 
-    return 0.04  # Hard fallback: 4%
+    return None
+
+
+RISK_FREE_FALLBACK = 0.04
 
 
 @cached("rf10y")
-def risk_free_rate() -> float:
-    """US 10-Year Treasury yield as a decimal. Cached 60 min. Falls back to 0.04."""
+def _risk_free_rate_live() -> float | None:
+    """Live DGS10 as a decimal, or None — a failure is never cached."""
     return _fetch_dgs10()
+
+
+def risk_free_rate_is_fallback() -> bool:
+    """True when :func:`risk_free_rate` is serving the hard-coded fallback."""
+    return _risk_free_rate_live() is None
+
+
+def risk_free_rate() -> float:
+    """US 10-Year Treasury yield as a decimal. Cached 60 min.
+
+    Falls back to 4% when FRED is unreachable; the fallback is not cached, so
+    the live rate is retried on the next call instead of being pinned for an
+    hour (and persisted) as if it were real.
+    """
+    live = _risk_free_rate_live()
+    return live if live is not None else RISK_FREE_FALLBACK
 
 
 # ---------------------------------------------------------------------------

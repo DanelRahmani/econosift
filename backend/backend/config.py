@@ -60,6 +60,10 @@ else:
 FRED_API_KEY = os.getenv("FRED_API_KEY") or _settings.get("fred_api_key") or None
 FINNHUB_API_KEY = os.getenv("FINNHUB_API_KEY") or _settings.get("finnhub_api_key") or None
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or _settings.get("gemini_api_key") or None
+# SEC EDGAR fair-access policy requires every request to declare who is
+# calling ("Name contact@email"). Without it edgartools refuses to query and
+# the Insider / Form 4 / 13F views are empty.
+EDGAR_IDENTITY = os.getenv("EDGAR_IDENTITY") or _settings.get("edgar_identity") or None
 
 # ISO2 -> ISO3 for sources that need 3-letter codes (DBnomics OECD/BIS etc.)
 ISO2_TO_ISO3: dict[str, str] = {

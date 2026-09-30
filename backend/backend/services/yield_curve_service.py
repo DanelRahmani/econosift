@@ -67,12 +67,16 @@ _FOREIGN: dict[str, dict[str, str]] = {
     "ZA": {"name": "South Africa", "fred": "IRLTLT01ZAM156N"},
 }
 
+_TERM_PREMIUM_SERIES = "THREEFYTP10"
+
 _ALL_SERIES = tuple(
     [sid for _, sid, _ in _US_TENORS]
     + [sid for _, sid, _ in _REAL_TENORS]
     + list(_BREAKEVEN_SERIES.values())
     + [_FWD_BREAKEVEN_SERIES]
-    + ["ACMTP10"]
+    # 10y term premium: Kim-Wright (Fed Board) on FRED. "ACMTP10" is not a
+    # FRED series, so the ACM premium requested here was always empty (D-18).
+    + [_TERM_PREMIUM_SERIES]
     + [info["fred"] for info in _FOREIGN.values()]
 )
 _START = "2000-01-01"
@@ -166,11 +170,13 @@ async def get_yield_curves() -> dict:
         "history": fwd_be_hist[-500:],
     }
 
-    # ACM term premium
-    tp_hist = [p for p in data.get("ACMTP10", []) if p.get("value") is not None]
+    # 10y term premium (Kim-Wright, daily)
+    tp_hist = [p for p in data.get(_TERM_PREMIUM_SERIES, []) if p.get("value") is not None]
     term_premium = {
-        "current": _latest(data.get("ACMTP10", [])),
+        "current": _latest(data.get(_TERM_PREMIUM_SERIES, [])),
         "history": tp_hist[-120:],
+        "model": "Kim-Wright (Federal Reserve Board), FRED THREEFYTP10",
+        "asOf": tp_hist[-1]["date"][:10] if tp_hist else None,
     }
 
     # Legacy foreign_10y (backward compat)
@@ -204,7 +210,12 @@ async def get_yield_curves() -> dict:
         history = [{"date": p["date"][:10], "value": round(float(p["value"]), 4)} for p in history_vals[-60:]]
         global_yields.append({
             "iso2": iso2, "name": info["name"],
-            "yield_10y": nominal, "real_yield": real, "inflation": cpi,
+            # Monthly OECD average vs the daily US yield: dated so the lag is visible.
+            "yieldAsOf": history_vals[-1]["date"][:10] if history_vals else None,
+            # Ex-post: nominal minus the latest *annual* CPI (backward-looking),
+            # not a market (TIPS-style) real yield.
+            "yield_10y": nominal, "real_yield": real, "realYieldBasis": "ex-post (nominal − latest annual CPI)",
+            "inflation": cpi,
             "spread_vs_us": spread_us, "spread_vs_de": spread_de, "spread_vs_jp": spread_jp,
             "history": history,
         })

@@ -18,13 +18,14 @@ Quadrants:
 from __future__ import annotations
 
 import math
-import pathlib
 from datetime import date, datetime
 from typing import Any
 
 import pandas as pd
 
+from ..cache import cached
 from ..config import FRED_API_KEY
+from .bulk_data_service import DATA_DIR as _BULK_DIR
 
 GDP_THRESHOLD = 2.0   # % YoY real GDP growth
 CPI_THRESHOLD = 2.5   # % YoY CPI inflation
@@ -126,86 +127,58 @@ def _cpi_yoy_quarterly(start_year: int) -> pd.Series:
 # Eurozone best-effort via eurostat lib.
 # ---------------------------------------------------------------------------
 
+def _eurostat_row(code: str, filters: dict) -> pd.Series:
+    """One series from the Eurostat API as {period label: value}.
+
+    Filtered queries return a single row in a few seconds; the unfiltered
+    tables are hundreds of megabytes and took ~2 minutes, longer than the
+    proxy timeout, so the euro-area regime never loaded (audit D-42).
+    """
+    import eurostat  # type: ignore[import]
+
+    df = eurostat.get_data_df(code, filter_pars=filters)
+    if df is None or df.empty:
+        return pd.Series(dtype=float)
+    row = df.iloc[0]
+    vals = {str(c): float(row[c]) for c in df.columns
+            if str(c)[:1].isdigit() and pd.notna(row[c])}
+    return pd.Series(vals, dtype=float)
+
+
 def _fetch_eurozone(start_year: int) -> tuple[pd.Series, pd.Series, str]:
     """
     Returns (gdp_yoy_quarterly, cpi_yoy_quarterly, source_label).
     Returns empty series with a note on failure.
     """
-    try:
-        import eurostat  # type: ignore[import]
-    except ImportError:
-        return pd.Series(dtype=float), pd.Series(dtype=float), "eurostat lib not installed"
-
     gdp_q = pd.Series(dtype=float)
     cpi_q = pd.Series(dtype=float)
     source_parts: list[str] = []
+    since = str(start_year - 1)
 
-    # GDP: namq_10_gdp — quarterly real GDP, chain-linked volumes, seasonally adjusted
+    # GDP: namq_10_gdp — quarterly real GDP, chain-linked volumes, seasonally
+    # and calendar adjusted, euro area (20 countries).
     try:
-        df_gdp = eurostat.get_data_df("namq_10_gdp")
-        if df_gdp is not None and not df_gdp.empty:
-            # Filter: unit=CLV10_MEUR, s_adj=SCA, na_item=B1GQ, geo=EA20 or EA19
-            mask = (
-                (df_gdp.get("unit", pd.Series()) == "CLV10_MEUR") &
-                (df_gdp.get("s_adj", pd.Series()).isin(["SCA", "SA"])) &
-                (df_gdp.get("na_item", pd.Series()) == "B1GQ") &
-                (df_gdp.get("geo\\TIME_PERIOD", df_gdp.get("geo", pd.Series())).isin(["EA20", "EA19", "EA"]))
-            )
-            row = df_gdp[mask]
-            if row.empty:
-                raise ValueError("no matching EA GDP row")
-            # Time columns are like "2024-Q1"
-            time_cols = [c for c in row.columns if c and str(c)[0].isdigit()]
-            vals: dict[pd.Timestamp, float] = {}
-            for col in time_cols:
-                try:
-                    ts = pd.Period(col, freq="Q").to_timestamp(how="end")
-                    v = float(row[col].iloc[0])
-                    if not math.isnan(v):
-                        vals[ts] = v
-                except Exception:
-                    continue
-            if vals:
-                gdp_levels = pd.Series(vals).sort_index()
-                gdp_yoy = (gdp_levels / gdp_levels.shift(4) - 1.0) * 100.0
-                gdp_q = gdp_yoy.dropna()
-                source_parts.append("Eurostat namq_10_gdp")
+        levels = _eurostat_row("namq_10_gdp", {
+            "geo": ["EA20"], "unit": ["CLV10_MEUR"], "s_adj": ["SCA"], "na_item": ["B1GQ"],
+            "startPeriod": f"{since}-Q1"})
+        if not levels.empty:
+            levels.index = [pd.Period(q, freq="Q").to_timestamp(how="end").normalize() for q in levels.index]
+            levels = levels.sort_index()
+            gdp_q = ((levels / levels.shift(4) - 1.0) * 100.0).dropna()
+            source_parts.append("Eurostat namq_10_gdp (EA20, B1GQ, CLV10_MEUR, SCA)")
     except Exception:
         pass
 
-    # CPI: prc_hicp_midx — HICP monthly index, all items (CP00), EA
+    # CPI: prc_hicp_minr — HICP all items, annual rate of change, euro area.
+    # (prc_hicp_midx, the previous dataset, stopped at 2025-12 when Eurostat
+    # moved HICP to the 2018 COICOP classification.)
     try:
-        df_cpi = eurostat.get_data_df("prc_hicp_midx")
-        if df_cpi is not None and not df_cpi.empty:
-            coicop_col = "coicop" if "coicop" in df_cpi.columns else None
-            geo_col = next((c for c in df_cpi.columns if "geo" in c.lower()), None)
-            unit_col = "unit" if "unit" in df_cpi.columns else None
-
-            mask_cpi = pd.Series([True] * len(df_cpi), index=df_cpi.index)
-            if coicop_col:
-                mask_cpi &= df_cpi[coicop_col] == "CP00"
-            if unit_col:
-                mask_cpi &= df_cpi[unit_col] == "I15"
-            if geo_col:
-                mask_cpi &= df_cpi[geo_col].isin(["EA20", "EA19", "EA"])
-            row_cpi = df_cpi[mask_cpi]
-            if row_cpi.empty:
-                raise ValueError("no matching EA CPI row")
-            time_cols_c = [c for c in row_cpi.columns if c and str(c)[0].isdigit()]
-            cpi_vals: dict[pd.Timestamp, float] = {}
-            for col in time_cols_c:
-                try:
-                    ts = pd.Period(col, freq="M").to_timestamp(how="end")
-                    v = float(row_cpi[col].iloc[0])
-                    if not math.isnan(v):
-                        cpi_vals[ts] = v
-                except Exception:
-                    continue
-            if cpi_vals:
-                cpi_levels = pd.Series(cpi_vals).sort_index()
-                cpi_yoy = (cpi_levels / cpi_levels.shift(12) - 1.0) * 100.0
-                cpi_q = cpi_yoy.resample("QE").last().dropna()
-                source_parts.append("Eurostat prc_hicp_midx")
+        yoy = _eurostat_row("prc_hicp_minr", {
+            "geo": ["EA"], "coicop18": ["TOTAL"], "unit": ["RCH_A"], "startPeriod": f"{since}-01"})
+        if not yoy.empty:
+            yoy.index = [pd.Period(m, freq="M").to_timestamp(how="end").normalize() for m in yoy.index]
+            cpi_q = yoy.sort_index().resample("QE").last().dropna()
+            source_parts.append("Eurostat prc_hicp_minr (EA, TOTAL, RCH_A)")
     except Exception:
         pass
 
@@ -217,8 +190,10 @@ def _fetch_eurozone(start_year: int) -> tuple[pd.Series, pd.Series, str]:
 # World Bank bulk-data fallback — covers ~200 countries (annual)
 # ---------------------------------------------------------------------------
 
-_WB_GDP_PATH = pathlib.Path("/app/data/bulk/wb_gdp_growth.parquet")
-_WB_CPI_PATH = pathlib.Path("/app/data/bulk/wb_inflation.parquet")
+# The bulk directory differs between Docker and the desktop build; a
+# hard-coded container path left every non-US regime empty on desktop.
+_WB_GDP_PATH = _BULK_DIR / "wb_gdp_growth.parquet"
+_WB_CPI_PATH = _BULK_DIR / "wb_inflation.parquet"
 
 
 def _fetch_wb_country(iso2: str, start_year: int) -> tuple[pd.Series, pd.Series, str]:
@@ -283,21 +258,16 @@ def _fetch_japan(start_year: int) -> tuple[pd.Series, pd.Series, str]:
     except Exception:
         pass
 
-    # CPI: FRED JPNCPIALLMINMEI (Japan CPI, monthly)
+    # CPI: BIS consumer prices, year-on-year, monthly. (FRED's OECD series
+    # JPNCPIALLMINMEI stopped in June 2021, which left Japan with no regime.)
     try:
-        import pandas_datareader.data as web
-        df_cpi = web.DataReader(
-            "JPNCPIALLMINMEI",
-            "fred",
-            start=datetime(start_year - 1, 1, 1),
-            end=datetime.today(),
-        )
-        s_cpi = df_cpi.iloc[:, 0].dropna()
-        if len(s_cpi) > 12:
-            s_cpi.index = pd.to_datetime(s_cpi.index)
-            yoy = (s_cpi / s_cpi.shift(12) - 1.0) * 100.0
-            cpi_q = yoy.resample("QE").last().dropna()
-            source_parts.append("FRED JPNCPIALLMINMEI")
+        from ..sources import source_bis
+        pts = source_bis.cpi_yoy("JP", "M")
+        if pts:
+            yoy = pd.Series({pd.Period(p["date"], freq="M").to_timestamp(how="end").normalize(): p["value"]
+                             for p in pts}).sort_index()
+            cpi_q = yoy[yoy.index.year >= start_year - 1].resample("QE").last().dropna()
+            source_parts.append("BIS WS_LONG_CPI (JP, year-on-year)")
     except Exception:
         pass
 
@@ -309,6 +279,7 @@ def _fetch_japan(start_year: int) -> tuple[pd.Series, pd.Series, str]:
 # Main public function.
 # ---------------------------------------------------------------------------
 
+@cached("regime_series", skip_if=lambda r: not r.get("series"))
 def regime_series(
     country: str = "US",
     start_year: int = 2000,
@@ -321,11 +292,10 @@ def regime_series(
 
     Data sources (best available per country):
       US — FRED quarterly (GDPC1, CPIAUCSL)
-      EZ/EA — Eurostat quarterly (namq_10_gdp, prc_hicp_midx)
-      JP — FRED quarterly (JPNRGDPEXP, JPNCPIALLMINMEI)
+      EZ/EA — Eurostat quarterly (namq_10_gdp, prc_hicp_minr)
+      JP — FRED quarterly GDP (JPNRGDPEXP), BIS monthly CPI
       ALL OTHERS — World Bank annual (wb_gdp_growth, wb_inflation parquet)
     """
-    today_str = date.today().isoformat()
     note: str | None = None
     source_label = ""
 
@@ -354,22 +324,23 @@ def regime_series(
                 "series": [],
                 "current": None,
                 "source": source_label,
-                "asOf": today_str,
+                "asOf": None,
                 "note": f"No World Bank data for {country}.",
             }
 
     # --- Align to common quarterly index ------------------------------------
-    if not gdp_q.empty:
-        gdp_q.index = pd.to_datetime(gdp_q.index).normalize()
-    if not cpi_q.empty:
-        cpi_q.index = pd.to_datetime(cpi_q.index).normalize()
+    def _dated(x: pd.Series) -> pd.Series:
+        # An empty series has a non-datetime index; joining it with a dated
+        # one produced an object index and wiped the whole frame.
+        x = x.copy()
+        x.index = pd.to_datetime(x.index).normalize() if len(x) else pd.DatetimeIndex([])
+        return x
 
-    # Outer join on quarter-end dates; include only dates >= start_year
     start_ts = pd.Timestamp(f"{start_year}-01-01")
-    df = pd.DataFrame({"gdpGrowth": gdp_q, "cpiInflation": cpi_q})
-    if df.empty or not isinstance(df.index, pd.DatetimeIndex):
-        df = df.reindex(pd.DatetimeIndex([]))
-    df = df[df.index >= start_ts].sort_index()
+    df = pd.concat([_dated(gdp_q).rename("gdpGrowth"), _dated(cpi_q).rename("cpiInflation")], axis=1)
+    # Periods that have not ended yet are dropped: the in-progress quarter
+    # carried a quarter-end date for what was really a mid-quarter CPI print.
+    df = df[(df.index >= start_ts) & (df.index < pd.Timestamp(date.today()))].sort_index()
 
     # Drop rows where BOTH are NaN
     df = df.dropna(how="all")
@@ -387,7 +358,10 @@ def regime_series(
             "quadrant": quadrant,
         })
 
-    current = series[-1] if series else None
+    # The current regime is the latest period with both readings. GDP is
+    # published later than CPI, so the very last row is usually CPI-only and
+    # unclassified; reporting it as "current" showed no regime at all.
+    current = next((p for p in reversed(series) if p["quadrant"] is not None), None)
 
     return {
         "country": country,
@@ -395,6 +369,6 @@ def regime_series(
         "series": series,
         "current": current,
         "source": source_label,
-        "asOf": today_str,
+        "asOf": current["date"] if current else None,
         "note": note,
     }

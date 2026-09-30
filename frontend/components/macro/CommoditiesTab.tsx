@@ -108,7 +108,7 @@ export function CommoditiesTab() {
         <KpiCard label="Gold ($/oz)" value={kpis.gold} change={kpis.goldChange1d} unit="$" />
         <KpiCard label="Natural Gas ($/MMBtu)" value={kpis.natGas} unit="$" />
         <KpiCard label="Copper ($/lb)" value={kpis.copper} unit="$" />
-        <KpiCard label="Wheat ($/bu)" value={kpis.wheat} unit="$" />
+        <KpiCard label="Wheat (¢/bu)" value={kpis.wheat} />
       </div>
 
       {/* Commodities Table */}
@@ -140,7 +140,8 @@ export function CommoditiesTab() {
                       </div>
                     </td>
                     <td className="py-2 pr-4 text-right font-mono">
-                      {row.price != null ? `$${row.price.toFixed(2)}` : "—"}
+                      {row.price != null ? row.price.toFixed(2) : "—"}
+                      {row.unit && <div className="text-[10px] text-text-muted">{row.unit}</div>}
                     </td>
                     <td className="py-2 pr-4 text-right">{pct(row.change1d)}</td>
                     <td className="py-2 pr-4 text-right">{pct(row.change1w)}</td>
@@ -153,7 +154,7 @@ export function CommoditiesTab() {
           </div>
           {data.asOf && (
             <p className="text-xs text-text-secondary mt-3">
-              As of {data.asOf}
+              As of {data.asOf}{data.source ? ` · Source: ${data.source}` : ""}
             </p>
           )}
         </Card>

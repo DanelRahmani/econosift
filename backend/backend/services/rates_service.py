@@ -31,8 +31,11 @@ YIELD_SERIES = [
     "BAMLC0A0CM",
 ]
 
+# NY Fed ACM term-structure decomposition (data file, not the paper — the
+# previous URL pointed at the Staff Report 340 PDF, so this panel was always
+# "unavailable"; audit D-18). Legacy .xls, read with xlrd.
 ACM_URL = (
-    "https://www.newyorkfed.org/medialibrary/media/research/staff_reports/sr340.xls"
+    "https://www.newyorkfed.org/medialibrary/media/research/data_indicators/ACMTermPremium.xls"
 )
 
 
@@ -73,70 +76,25 @@ def _latest(s: pd.Series | None) -> float | None:
 
 
 def _download_acm_sync() -> dict:
-    """Download and parse NY Fed ACM term premium decomposition."""
+    """NY Fed ACM 10y decomposition: risk-neutral expected yield + term premium.
+
+    Monthly sheet; columns ACMRNY10 (expectations) and ACMTP10 (term premium),
+    both in percent.
+    """
     try:
-        resp = requests.get(ACM_URL, timeout=15)
+        resp = requests.get(ACM_URL, timeout=30)
         resp.raise_for_status()
-        content = resp.content
-        sheets = pd.read_excel(io.BytesIO(content), sheet_name=None, header=None)
-        # Find the sheet with the data — look for one with date-like first column
-        target_df: pd.DataFrame | None = None
-        for sheet_name, df in sheets.items():
-            # Use first row as header
-            df.columns = [str(c).strip().lower() for c in df.iloc[0]]
-            df = df.iloc[1:].reset_index(drop=True)
-            cols = df.columns.tolist()
-            # Look for expectation and term premium columns
-            has_exp = any("exp" in c or "ehy" in c for c in cols)
-            has_tp = any("tp" in c or "rterm" in c or "term" in c for c in cols)
-            if has_exp or has_tp:
-                target_df = df
-                break
-        if target_df is None:
-            # Try first sheet with numeric approach
-            first_sheet = list(sheets.values())[0]
-            first_sheet.columns = [str(c).strip().lower() for c in first_sheet.iloc[0]]
-            target_df = first_sheet.iloc[1:].reset_index(drop=True)
+        df = pd.read_excel(io.BytesIO(resp.content), sheet_name="ACM Monthly")
+        df["DATE"] = pd.to_datetime(df["DATE"], format="%d-%b-%Y", errors="coerce")
+        df = df.dropna(subset=["DATE"]).sort_values("DATE")
 
-        # Identify date column (first column or one containing "date" or "yyyy")
-        cols = target_df.columns.tolist()
-        date_col = cols[0]
-        # Find expectations column
-        exp_col = next(
-            (c for c in cols if "exp" in c and "10" in c),
-            next((c for c in cols if "exp" in c), None),
-        )
-        # Find term premium column
-        tp_col = next(
-            (c for c in cols if ("tp" in c or "rterm" in c or "term" in c) and "10" in c),
-            next(
-                (c for c in cols if "tp" in c or "rterm" in c),
-                None,
-            ),
-        )
-        if not exp_col or not tp_col:
-            return {"expectations": [], "term_premium": [], "source": "unavailable"}
+        def _pts(col: str) -> list[dict]:
+            return [{"date": str(d.date()), "value": round(float(v), 4)}
+                    for d, v in zip(df["DATE"], df[col]) if pd.notna(v)]
 
-        df_work = target_df[[date_col, exp_col, tp_col]].copy()
-        df_work.columns = ["date", "expectations", "term_premium"]
-        df_work = df_work.dropna(subset=["date"])
-        df_work["date"] = pd.to_datetime(df_work["date"], errors="coerce")
-        df_work = df_work.dropna(subset=["date"])
-        df_work = df_work.sort_values("date")
-
-        expectations = [
-            {"date": str(r.date.date()), "value": round(float(r.expectations), 4)}
-            for r in df_work.itertuples()
-            if not pd.isna(r.expectations)
-        ]
-        term_premium = [
-            {"date": str(r.date.date()), "value": round(float(r.term_premium), 4)}
-            for r in df_work.itertuples()
-            if not pd.isna(r.term_premium)
-        ]
         return {
-            "expectations": expectations,
-            "term_premium": term_premium,
+            "expectations": _pts("ACMRNY10"),
+            "term_premium": _pts("ACMTP10"),
             "source": "NY Fed (ACM)",
         }
     except Exception as exc:
@@ -267,12 +225,16 @@ async def get_rates_data() -> dict:
         return await asyncio.to_thread(_get_rates_data_sync)
     except Exception as exc:
         log.warning("get_rates_data failed: %s", exc)
+        # Unknown, not "not inverted": the envelope is marked unavailable so
+        # it is neither cached nor read as a real curve reading.
         return {
-            "asOf": str(date.today()),
+            "asOf": None,
+            "status": "unavailable",
+            "error": str(exc),
             "yields": {},
             "spread_2y10y": None,
             "spread_3m10y": None,
-            "inverted": False,
+            "inverted": None,
             "history": {},
             "taylor_rule": {"implied": [], "actual": []},
             "acm": {"expectations": [], "term_premium": [], "source": "unavailable"},

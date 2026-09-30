@@ -7,18 +7,22 @@ import pandas as pd
 from ..cache import async_cached
 from ..config import FRED_API_KEY, COUNTRY_NAMES
 from ..models import SeriesResult, make_series
+from ._annual import to_annual
 
 SOURCE_LABEL = "FRED (St. Louis Fed)"
 
 # (series_id, resample_method)  method in {"mean","sum","yoy"}
+# Annual real GDP growth is BEA's own annual series, not an average of the
+# quarterly SAAR prints. Current account is deliberately absent: FRED's
+# BOPGSTB is the goods & services *trade balance* in $mn, not the current
+# account in % of GDP that every other source supplies (audit D-04).
 INDICATOR_MAP = {
-    "gdp_growth": ("A191RL1Q225SBEA", "mean"),
+    "gdp_growth": ("A191RL1A225NBEA", "mean"),
     "inflation": ("CPIAUCSL", "yoy"),
     "unemployment": ("UNRATE", "mean"),
     "interest_rate": ("FEDFUNDS", "mean"),
     "debt_gdp": ("GFDEGDQ188S", "mean"),
     "yield_10y": ("DGS10", "mean"),
-    "current_account": ("BOPGSTB", "sum"),
 }
 
 
@@ -29,23 +33,7 @@ def _fetch_sync(series_id: str, start: int) -> pd.Series:
 
 
 def _to_annual(s: pd.Series, method: str, start: int, end: int) -> list[tuple[int, float]]:
-    if s is None or len(s) == 0:
-        return []
-    s = s.dropna()
-    s.index = pd.to_datetime(s.index)
-    if method == "yoy":
-        annual = s.resample("YE").mean()
-        annual = annual.pct_change() * 100.0
-    elif method == "sum":
-        annual = s.resample("YE").sum()
-    else:
-        annual = s.resample("YE").mean()
-    points: list[tuple[int, float]] = []
-    for ts, val in annual.dropna().items():
-        y = ts.year
-        if start <= y <= end:
-            points.append((y, float(val)))
-    return sorted(points)
+    return to_annual(s, method, start, end)
 
 
 @async_cached("fred_fetch")
@@ -60,7 +48,7 @@ async def fetch(indicator_key: str, countries: tuple[str, ...],
         return []
     series_id, method = mapping
     try:
-        s = await asyncio.to_thread(_fetch_sync, series_id, start)
+        s = await asyncio.to_thread(_fetch_sync, series_id, start - 1)
         points = _to_annual(s, method, start, end)
     except Exception:
         return []

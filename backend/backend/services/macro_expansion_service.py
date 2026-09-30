@@ -81,7 +81,16 @@ def _fetch_fred_series_sync(
     return result
 
 
-@async_cached("fred_multi_series")
+def _all_series_empty(result) -> bool:
+    """Skip caching when every requested series came back empty (an outage).
+
+    A partially-empty result is still cached: a discontinued series is
+    legitimately empty and must not force a refetch of the rest each call.
+    """
+    return not isinstance(result, dict) or not any(result.values())
+
+
+@async_cached("fred_multi_series", skip_if=_all_series_empty)
 async def fetch_fred_series(
     series_ids: list[str] | tuple[str, ...],
     start: str = "2000-01-01",
@@ -111,7 +120,10 @@ async def fetch_fred_series(
             df = pd.DataFrame(series).set_index("date")
             df.index = pd.to_datetime(df.index)
             df = df.sort_index()
-            df["value"] = df["value"].pct_change(12) * 100
+            # One year of observations at the series' own frequency.
+            step = df.index.to_series().diff().dt.days.median() if len(df) > 1 else 365
+            periods = max(1, int(round(365.25 / step))) if step and step > 0 else 1
+            df["value"] = df["value"].pct_change(periods) * 100
             raw[sid] = [
                 {"date": str(d.date()), "value": round(float(v), 4)}
                 for d, v in df["value"].dropna().items()
