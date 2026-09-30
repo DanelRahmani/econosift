@@ -48,7 +48,8 @@ def to_annual(s: pd.Series, method: str, start: int, end: int) -> list[tuple[int
     if s.empty:
         return []
     done = complete_years(s)
-    grouped = s[s.index.year.isin(list(done))].groupby(s.index.year)
+    kept = s[s.index.year.isin(list(done))]
+    grouped = kept.groupby(kept.index.year)
     annual = grouped.sum() if method == "sum" else grouped.mean()
     if method == "yoy":
         # Only adjacent complete years form a valid YoY pair.
