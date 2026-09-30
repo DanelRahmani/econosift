@@ -36,6 +36,42 @@ def _clean(x):
 # Core analysis (existing — unchanged)
 # ---------------------------------------------------------------------------
 
+def _portfolio_returns(frame: pd.DataFrame, weights: dict[str, float]) -> pd.Series:
+    """Daily portfolio *simple* returns: Σ wᵢ·rᵢ over the assets that traded.
+
+    Simple returns aggregate across assets; log returns do not, so a weighted
+    sum of log returns is not the portfolio's return (audit C-19). On days a
+    holding has no return (before it listed, or a data gap) its weight is
+    redistributed over the others instead of earning a fake 0% (C-20).
+    """
+    cols = list(weights)
+    px = frame[cols].dropna(how="all").ffill()
+    rets = px.pct_change().iloc[1:]
+    w = pd.Series(weights, dtype=float)
+    avail = rets.notna()
+    w_eff = avail.mul(w, axis=1)
+    denom = w_eff.sum(axis=1)
+    port = rets.fillna(0.0).mul(w, axis=1).sum(axis=1) / denom.replace(0.0, np.nan)
+    return port.dropna()
+
+
+def _sortino(simple_ret: pd.Series, risk_free: float) -> float | None:
+    """Sortino ratio: annualised excess return over downside deviation.
+
+    Downside deviation is sqrt(mean(min(r − MAR, 0)²)) over *all* days with
+    the daily risk-free rate as the MAR — not the standard deviation of the
+    negative days around their own mean (audit C-17).
+    """
+    if len(simple_ret) < 2:
+        return None
+    mar = risk_free / TRADING_DAYS
+    shortfall = np.minimum(simple_ret - mar, 0.0)
+    dd = math.sqrt(float((shortfall ** 2).mean())) * math.sqrt(TRADING_DAYS)
+    if dd <= 0:
+        return None
+    return (float(simple_ret.mean()) * TRADING_DAYS - risk_free) / dd
+
+
 def analyze(frame: pd.DataFrame, holdings: list[dict], bench_series: pd.Series | None,
             risk_free: float) -> dict:
     """Aggregate a basket of holdings into a single portfolio.
@@ -51,15 +87,8 @@ def analyze(frame: pd.DataFrame, holdings: list[dict], bench_series: pd.Series |
     total_w = sum(max(h["weight"], 0.0) for h in present) or 1.0
     weights = {h["ticker"]: max(h["weight"], 0.0) / total_w for h in present}
 
-    # Daily simple returns per holding, aligned.
     cols = list(weights.keys())
-    px = frame[cols].dropna(how="all").ffill()
-    rets = px.pct_change().dropna(how="all").fillna(0.0)
-
-    # Weighted portfolio simple return series.
-    w_vec = np.array([weights[c] for c in cols])
-    port_ret = rets[cols].to_numpy() @ w_vec
-    port_ret = pd.Series(port_ret, index=rets.index)
+    port_ret = _portfolio_returns(frame, weights)
 
     # Value series, base 100.
     value = (1.0 + port_ret).cumprod() * 100.0
@@ -73,9 +102,7 @@ def analyze(frame: pd.DataFrame, holdings: list[dict], bench_series: pd.Series |
     ann_vol = log_ret.std(ddof=1) * math.sqrt(TRADING_DAYS) if len(log_ret) > 1 else None
     sharpe = ((ann_return - risk_free) / ann_vol) if ann_vol and ann_vol > 0 else None
 
-    downside = log_ret[log_ret < 0]
-    downside_dev = downside.std(ddof=1) * math.sqrt(TRADING_DAYS) if len(downside) > 1 else None
-    sortino = ((ann_return - risk_free) / downside_dev) if downside_dev and downside_dev > 0 else None
+    sortino = _sortino(port_ret, risk_free)
 
     total_return = (float(value.iloc[-1]) / 100.0 - 1.0) if len(value) else None
 
@@ -109,8 +136,9 @@ def analyze(frame: pd.DataFrame, holdings: list[dict], bench_series: pd.Series |
             "contribution": _clean(weights[c] * h_total) if h_total is not None else None,
         })
 
-    # Drawdown series for extended response.
-    dd_series = drawdown_series(log_ret)
+    # Drawdown series for extended response — compounds *simple* returns, so
+    # it matches maxDrawdown from the value series (audit C-18).
+    dd_series = drawdown_series(port_ret)
 
     return {
         "holdings": holding_rows,
@@ -254,14 +282,7 @@ def capm_attribution(
 
     total_w = sum(max(h["weight"], 0.0) for h in present) or 1.0
     weights = {h["ticker"]: max(h["weight"], 0.0) / total_w for h in present}
-    cols = list(weights.keys())
-
-    px = frame[cols].dropna(how="all").ffill()
-    log_ret_df = np.log(px / px.shift(1)).dropna(how="all")
-
-    w_vec = np.array([weights[c] for c in cols])
-    port_log_ret = log_ret_df[cols].to_numpy() @ w_vec
-    port_log_ret = pd.Series(port_log_ret, index=log_ret_df.index)
+    port_log_ret = np.log1p(_portfolio_returns(frame, weights))
 
     bench_px = frame[bench_col].dropna().ffill()
     bench_log_ret = np.log(bench_px / bench_px.shift(1)).dropna()
@@ -321,14 +342,7 @@ def rolling_portfolio_metrics(
 
     total_w = sum(max(h["weight"], 0.0) for h in present) or 1.0
     weights = {h["ticker"]: max(h["weight"], 0.0) / total_w for h in present}
-    cols = list(weights.keys())
-
-    px = frame[cols].dropna(how="all").ffill()
-    log_ret_df = np.log(px / px.shift(1)).dropna(how="all")
-
-    w_vec = np.array([weights[c] for c in cols])
-    port_log_ret_vals = log_ret_df[cols].to_numpy() @ w_vec
-    port_log_ret = pd.Series(port_log_ret_vals, index=log_ret_df.index)
+    port_log_ret = np.log1p(_portfolio_returns(frame, weights))
 
     roll_sharpe = rolling_sharpe(port_log_ret, rf, window)
     roll_vol = rolling_volatility(port_log_ret, window)
@@ -349,8 +363,13 @@ def rolling_portfolio_metrics(
     }
 
 
-def kelly_criterion(holdings: list[dict], frame: pd.DataFrame) -> list[dict]:
-    """Kelly fraction f* = μ / σ² for each holding (fractional, capped 0–1)."""
+def kelly_criterion(holdings: list[dict], frame: pd.DataFrame, rf: float = 0.0) -> list[dict]:
+    """Kelly fraction f* = (μ − r) / σ² for each holding (capped 0–1).
+
+    μ is the *arithmetic* annual return of simple daily returns. Using the
+    mean log return understated every fraction by ½ (μ_log = μ − σ²/2) and
+    the risk-free rate was ignored (audit C-09).
+    """
     result = []
     for h in holdings:
         ticker = h["ticker"]
@@ -362,11 +381,11 @@ def kelly_criterion(holdings: list[dict], frame: pd.DataFrame) -> list[dict]:
                            "annReturn": None, "annVolatility": None})
             continue
 
-        log_ret = np.log(px / px.shift(1)).dropna()
-        mu = float(log_ret.mean()) * TRADING_DAYS
-        sigma2 = float(log_ret.var(ddof=1)) * TRADING_DAYS
+        simple = px.pct_change().dropna()
+        mu = float(simple.mean()) * TRADING_DAYS
+        sigma2 = float(simple.var(ddof=1)) * TRADING_DAYS
 
-        kelly = max(0.0, min(1.0, mu / sigma2)) if sigma2 > 0 else 0.0
+        kelly = max(0.0, min(1.0, (mu - rf) / sigma2)) if sigma2 > 0 else 0.0
         ann_vol = math.sqrt(sigma2) if sigma2 > 0 else None
 
         result.append({
@@ -384,21 +403,15 @@ def ff_attribution_portfolio(
     model: str,
     rf: float,
 ) -> dict:
-    """Fama-French attribution for the portfolio (weighted log returns)."""
+    """Fama-French attribution for the portfolio (simple returns, matching
+    the Ken French factor files)."""
     present = [h for h in holdings if h["ticker"] in frame.columns]
     if not present:
         return {"error": "no holdings found in price data"}
 
     total_w = sum(max(h["weight"], 0.0) for h in present) or 1.0
     weights = {h["ticker"]: max(h["weight"], 0.0) / total_w for h in present}
-    cols = list(weights.keys())
-
-    px = frame[cols].dropna(how="all").ffill()
-    log_ret_df = np.log(px / px.shift(1)).dropna(how="all")
-
-    w_vec = np.array([weights[c] for c in cols])
-    port_ret_vals = log_ret_df[cols].to_numpy() @ w_vec
-    port_ret = pd.Series(port_ret_vals, index=log_ret_df.index)
+    port_ret = _portfolio_returns(frame, weights)
 
     factors = load_ff_factors(model)
     if factors is None or factors.empty:
@@ -637,19 +650,36 @@ def black_litterman(
     frame: pd.DataFrame,
     views: list[dict],
     rf: float,
+    market_caps: dict[str, float] | None = None,
 ) -> dict:
     """Black-Litterman posterior returns + optimal weights.
 
-    views = [{"ticker": ..., "expectedReturn": ...}] — absolute return views.
+    views = [{"ticker": ..., "expectedReturn": ...}] — absolute (total) return
+    views. Internally everything is in *excess* returns: the equilibrium
+    π = δΣw is an excess return, so views are converted with q − rf and the
+    optimal weights are (δΣ)⁻¹μ_BL with no second rf subtraction. Reported
+    returns are total (excess + rf). Previously excess π was blended with
+    absolute views and rf was subtracted again from the posterior (C-08).
+
+    The prior is market-cap weighted when ``market_caps`` covers every
+    holding (the model's intended "market" portfolio), else the portfolio's
+    own weights — ``priorWeights`` in the response says which.
     """
     present = [h for h in holdings if h["ticker"] in frame.columns]
     if len(present) < 2:
         return {"error": "need at least 2 holdings for Black-Litterman"}
 
     total_w = sum(max(h["weight"], 0.0) for h in present) or 1.0
-    w_mkt = np.array([max(h["weight"], 0.0) / total_w for h in present])
+    w_cur = np.array([max(h["weight"], 0.0) / total_w for h in present])
     tickers = [h["ticker"] for h in present]
     n = len(tickers)
+    caps = [(market_caps or {}).get(t) for t in tickers]
+    if all(c and c > 0 for c in caps):
+        w_mkt = np.array(caps, dtype=float) / float(sum(caps))
+        prior_basis = "marketCap"
+    else:
+        w_mkt = w_cur
+        prior_basis = "portfolio"
 
     px = frame[tickers].dropna(how="all").ffill()
     log_ret = np.log(px / px.shift(1)).dropna(how="all")
@@ -669,14 +699,15 @@ def black_litterman(
     if not valid_views:
         # No views: return equilibrium weights
         eq_returns = [
-            {"ticker": tickers[i], "equilibriumReturn": _clean(float(pi[i])),
-             "blReturn": _clean(float(pi[i]))}
+            {"ticker": tickers[i], "equilibriumReturn": _clean(float(pi[i] + rf)),
+             "blReturn": _clean(float(pi[i] + rf))}
             for i in range(n)
         ]
         return {
             "blReturns": eq_returns,
             "optimalWeights": [{"ticker": tickers[i], "weight": _clean(float(w_mkt[i]))} for i in range(n)],
-            "currentWeights": [{"ticker": tickers[i], "weight": _clean(float(w_mkt[i]))} for i in range(n)],
+            "currentWeights": [{"ticker": tickers[i], "weight": _clean(float(w_cur[i]))} for i in range(n)],
+            "priorWeights": prior_basis,
         }
 
     k = len(valid_views)
@@ -685,7 +716,7 @@ def black_litterman(
     for i, v in enumerate(valid_views):
         j = tickers.index(v["ticker"])
         P[i, j] = 1.0
-        q[i] = float(v["expectedReturn"])
+        q[i] = float(v["expectedReturn"]) - rf  # absolute view → excess
 
     # Ω = τ * P Σ P'  (proportional uncertainty)
     omega = tau * P @ cov @ P.T
@@ -717,7 +748,7 @@ def black_litterman(
     except np.linalg.LinAlgError:
         cov_inv = np.linalg.pinv(cov)
 
-    w_opt_raw = cov_inv @ (mu_bl - rf) / delta
+    w_opt_raw = cov_inv @ mu_bl / delta  # μ_BL is already an excess return
     # Long-only: floor at 0 and renormalise
     w_opt = np.maximum(w_opt_raw, 0.0)
     w_sum = w_opt.sum()
@@ -729,8 +760,8 @@ def black_litterman(
     bl_returns = [
         {
             "ticker": tickers[i],
-            "equilibriumReturn": _clean(float(pi[i])),
-            "blReturn": _clean(float(mu_bl[i])),
+            "equilibriumReturn": _clean(float(pi[i] + rf)),
+            "blReturn": _clean(float(mu_bl[i] + rf)),
         }
         for i in range(n)
     ]
@@ -742,9 +773,10 @@ def black_litterman(
             for i in range(n)
         ],
         "currentWeights": [
-            {"ticker": tickers[i], "weight": _clean(float(w_mkt[i]))}
+            {"ticker": tickers[i], "weight": _clean(float(w_cur[i]))}
             for i in range(n)
         ],
+        "priorWeights": prior_basis,
     }
 
 
@@ -761,7 +793,6 @@ def stress_test_portfolio(
     total_w = sum(max(h["weight"], 0.0) for h in present) or 1.0
     weights = {h["ticker"]: max(h["weight"], 0.0) / total_w for h in present}
     cols = list(weights.keys())
-    w_vec = np.array([weights[c] for c in cols])
 
     px = frame[cols].dropna(how="all").ffill()
     px.index = pd.to_datetime(px.index)
@@ -787,9 +818,9 @@ def stress_test_portfolio(
             })
             continue
 
-        log_ret = np.log(scenario_px / scenario_px.shift(1)).dropna(how="all").fillna(0.0)
-        port_log_ret_vals = log_ret[cols].to_numpy() @ w_vec
-        port_log_ret = pd.Series(port_log_ret_vals, index=log_ret.index)
+        # Weighted simple returns (holdings that had not listed yet are
+        # excluded that day rather than counted as flat).
+        port_log_ret = np.log1p(_portfolio_returns(scenario_px, weights))
 
         cum_ret = np.exp(port_log_ret.cumsum()) - 1.0
         total_return = float(cum_ret.iloc[-1]) if len(cum_ret) else None

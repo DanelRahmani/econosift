@@ -8,6 +8,8 @@ interface Props {
   base: RiskMetric | null;
   extended: ExtendedRiskTicker | null;
   ticker: string;
+  /** Lookback of the extended metrics (max drawdown), e.g. "3y". */
+  period?: string;
 }
 
 function KPI({
@@ -24,7 +26,7 @@ function KPI({
   );
 }
 
-export function RiskKPIRow({ base, extended, ticker }: Props) {
+export function RiskKPIRow({ base, extended, ticker, period }: Props) {
   const beta = base?.beta ?? null;
   const vol30 = base?.annVolatility ?? null;
   const sharpe = base?.sharpe ?? null;
@@ -48,11 +50,11 @@ export function RiskKPIRow({ base, extended, ticker }: Props) {
         <KPI
           label="Realised Vol (Ann.)"
           value={vol30 !== null ? fmtPct(vol30 * 100) : "—"}
-          sub="30-day window"
+          sub="1-year window"
           danger={vol30 !== null && vol30 > 0.4}
         />
         <KPI
-          label="Max Drawdown (3Y)"
+          label={`Max Drawdown${period ? ` (${period.toUpperCase()})` : ""}`}
           value={maxDD !== null ? fmtPct(maxDD * 100) : "—"}
           danger={maxDD !== null && maxDD < -0.2}
         />
@@ -64,7 +66,7 @@ export function RiskKPIRow({ base, extended, ticker }: Props) {
         <KPI
           label="VaR 95% (1-day)"
           value={var95 !== null ? fmtPct(var95 * 100) : "—"}
-          sub="Parametric"
+          sub="Historical (5th pct.)"
           danger={var95 !== null && var95 < -0.03}
         />
       </div>

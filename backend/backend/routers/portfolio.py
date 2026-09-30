@@ -225,7 +225,7 @@ async def kelly(req: PortfolioRequest):
     if frame is None:
         return _empty()
 
-    return await asyncio.to_thread(port.kelly_criterion, holdings, frame)
+    return await asyncio.to_thread(port.kelly_criterion, holdings, frame, req.risk_free)
 
 
 @router.post("/ff")
@@ -283,7 +283,9 @@ async def black_litterman(req: BLRequest):
 
     views = [{"ticker": v.ticker.strip().upper(), "expectedReturn": v.expectedReturn}
              for v in req.views]
-    return await asyncio.to_thread(port.black_litterman, holdings, frame, views, req.risk_free)
+    caps = await asyncio.to_thread(
+        yfs.get_market_caps, tuple(h["ticker"] for h in holdings))
+    return await asyncio.to_thread(port.black_litterman, holdings, frame, views, req.risk_free, caps)
 
 
 @router.post("/stress")

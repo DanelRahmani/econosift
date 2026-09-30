@@ -7,6 +7,7 @@ from __future__ import annotations
 import logging
 
 import numpy as np
+import pandas as pd
 import yfinance as yf
 
 from ..cache import cached
@@ -24,6 +25,10 @@ def _latest_val(df, row_name: str) -> float | None:
         return None
 
 
+def _now() -> pd.Timestamp:
+    return pd.Timestamp.now()
+
+
 def _safe_div(a: float | None, b: float | None) -> float | None:
     if a is None or b is None or b == 0:
         return None
@@ -38,7 +43,6 @@ def get_dividend_analysis(ticker: str) -> dict:
         stock = yf.Ticker(ticker)
         info = stock.info or {}
         dividends = stock.dividends
-        fin = stock.financials
         cashflow = stock.cashflow
 
         price = info.get("currentPrice") or info.get("regularMarketPrice")
@@ -52,13 +56,30 @@ def get_dividend_analysis(ticker: str) -> dict:
         if div_yield is not None:
             div_yield = round(float(div_yield), 2)
 
-        # Annual dividend history (sum by year)
+        # Annual dividend history (per share, sum by calendar year) — complete
+        # years only. The running year is partial, and so is the first year of
+        # the record; summing either as "annual" broke the CAGR, reset the
+        # growth streak to 0 for most of every year and fed the DDM (C-02).
         annual_divs: dict[int, float] = {}
+        ttm_div = None
+        last_div_date = None
         if dividends is not None and not dividends.empty:
             divs = dividends.sort_index()
+            idx = pd.DatetimeIndex(divs.index)
+            if idx.tz is not None:
+                idx = idx.tz_convert(None)
+            divs.index = idx
+            last_div_date = divs.index[-1]
+            now = _now()
+            this_year = now.year
             for dt, val in divs.items():
                 y = dt.year
-                annual_divs[y] = annual_divs.get(y, 0) + float(val)
+                if y < this_year:
+                    annual_divs[y] = annual_divs.get(y, 0) + float(val)
+            if len(annual_divs) > 1:
+                annual_divs.pop(min(annual_divs))
+            window = divs[divs.index > now - pd.Timedelta(days=365)]
+            ttm_div = float(window.sum()) if len(window) else None
 
         years = sorted(annual_divs.keys())
         latest_year = years[-1] if years else None
@@ -97,14 +118,18 @@ def get_dividend_analysis(ticker: str) -> dict:
             else:
                 break
 
-        # Payout ratio
-        net_income = _latest_val(fin, "Net Income")
-        operating_cf = _latest_val(cashflow, "Operating Cash Flow") if cashflow is not None else None
+        # Payout ratios. yfinance dividends are already *per share*: the old
+        # code divided by the share count again (payout ≈ 1e-10 → "safe" for
+        # every stock) and compared a per-share dividend with total operating
+        # cash flow (C-01).
         shares = info.get("sharesOutstanding")
-        dps = _safe_div(latest_annual_div, shares) if latest_annual_div and shares else None
         eps = info.get("trailingEps")
-        payout_ratio = _safe_div(dps, eps) if dps and eps else None
-        fcf_payout = _safe_div(latest_annual_div, operating_cf) if latest_annual_div and operating_cf else None
+        fcf = info.get("freeCashflow")
+        if fcf is None:
+            fcf = _latest_val(cashflow, "Free Cash Flow") if cashflow is not None else None
+        payout_ratio = _safe_div(ttm_div, eps) if ttm_div and eps and eps > 0 else None
+        fcf_payout = (_safe_div(ttm_div * shares, fcf)
+                      if ttm_div and shares and fcf and fcf > 0 else None)
 
         # Sustainability score (0-100)
         sus_score = 50.0
@@ -146,13 +171,14 @@ def get_dividend_analysis(ticker: str) -> dict:
         # DDM: Gordon Growth Model
         ddm_value = None
         ddm_growth = None
-        risk_free = 0.045  # approximate 10Y
-        if latest_annual_div and cagr_5y is not None:
+        from .discount_rates import risk_free_rate
+        risk_free = risk_free_rate()
+        if ttm_div and cagr_5y is not None:
             ddm_growth = min(cagr_5y / 100, risk_free + 0.02)  # cap growth at risk-free + 2%
             ddm_growth = max(ddm_growth, 0.01)  # floor at 1%
             discount = risk_free + 0.05  # 5% equity risk premium
             if discount > ddm_growth:
-                ddm_value = latest_annual_div * (1 + ddm_growth) / (discount - ddm_growth)
+                ddm_value = ttm_div * (1 + ddm_growth) / (discount - ddm_growth)
                 ddm_value = round(ddm_value, 2)
 
         return {
@@ -163,6 +189,7 @@ def get_dividend_analysis(ticker: str) -> dict:
             "dividendYield": div_yield,
             "latestAnnualDividend": latest_annual_div,
             "latestYear": latest_year,
+            "ttmDividend": round(ttm_div, 4) if ttm_div is not None else None,
             "cagr5y": cagr_5y,
             "cagr10y": cagr_10y,
             "consecutiveGrowthYears": consecutive_growth,
@@ -174,7 +201,7 @@ def get_dividend_analysis(ticker: str) -> dict:
             "ddmGrowthRate": round(ddm_growth * 100, 2) if ddm_growth is not None else None,
             "ddmUpsidePct": round((ddm_value / price - 1) * 100, 1) if ddm_value and price else None,
             "annualDividends": {str(y): round(v, 4) for y, v in sorted(annual_divs.items())},
-            "asOf": None,
+            "asOf": last_div_date.strftime("%Y-%m-%d") if last_div_date is not None else None,
         }
     except Exception as exc:
         logger.warning("dividend_analysis failed for %s: %s", ticker, exc)

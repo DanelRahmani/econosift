@@ -82,9 +82,14 @@ export function IVKPIRow({ kpis, loading }: Props) {
         <div className="text-xl font-bold font-mono">
           {kpis.ivRank !== null ? fmtNum(kpis.ivRank, 1) : "—"}
         </div>
+        {kpis.ivRank === null && kpis.ivHistoryDays != null && (
+          <div className="mt-1 text-[10px] text-text-muted" title="IV Rank compares today's IV30 with its own past year; EconoSift records IV30 daily to build that history.">
+            Building history ({kpis.ivHistoryDays}/60 sessions)
+          </div>
+        )}
         {kpis.ivRankApproximate && (
           <span className="mt-1 inline-block text-[10px] px-1.5 py-0.5 rounded-md bg-warning/20 text-warning font-medium">
-            ~approx
+            &lt;1y history
           </span>
         )}
         <IVRankBar value={kpis.ivRank} />

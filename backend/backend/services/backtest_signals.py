@@ -15,6 +15,7 @@ t, which satisfies it by construction.
 """
 from __future__ import annotations
 
+import hashlib
 import logging
 
 import numpy as np
@@ -134,8 +135,10 @@ def build_signal(
 
     truncated = len(symbols) > max_tickers
     if truncated:
-        # Deterministic subset so repeated runs are comparable.
-        symbols = sorted(symbols)[:max_tickers]
+        # Deterministic subset so repeated runs are comparable — ordered by a
+        # hash of the ticker, not alphabetically: the first 120 names A→Z are
+        # an arbitrary slice that over-represents a few sectors (audit C-32).
+        symbols = sorted(symbols, key=lambda t: hashlib.md5(t.encode()).hexdigest())[:max_tickers]
 
     prices = yfs.get_close_frame(tuple(symbols), period)
     if prices is None or prices.empty:
@@ -152,6 +155,7 @@ def build_signal(
         "tickersRequested": len(symbols),
         "tickersWithData": int(prices.shape[1]),
         "universeTruncated": truncated,
+        "universeSampling": "hash-ordered sample of current constituents" if truncated else "all current constituents",
         "maxTickers": max_tickers,
         "isFundamental": is_fundamental,
     }

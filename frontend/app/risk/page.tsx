@@ -225,7 +225,7 @@ function RiskPageInner() {
       {baseLoading ? (
         <Skeleton className="h-28 w-full rounded-xl" />
       ) : (
-        <RiskKPIRow base={firstBase} extended={firstExtended} ticker={primaryTicker} />
+        <RiskKPIRow base={firstBase} extended={firstExtended} ticker={primaryTicker} period={period} />
       )}
 
       {/* Tabs */}

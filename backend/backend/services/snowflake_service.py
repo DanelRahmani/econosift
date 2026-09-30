@@ -128,10 +128,16 @@ def _payout_score(payout: float | None) -> float | None:
 
 
 def _fcf_coverage_score(div_yield: float | None, fcf_yield: float | None) -> float | None:
-    """Score FCF coverage of dividend. Coverage = fcfYield / divYield."""
+    """Score FCF coverage of dividend. Coverage = fcfYield / divYield.
+
+    ``div_yield`` is in percent (yfinance ``dividendYield``, e.g. 2.43) while
+    ``fcf_yield`` is a fraction (FCF / market cap, e.g. 0.014); dividing them
+    as-is made coverage ~100x too small, so every payer got the minimum
+    score (audit C-03).
+    """
     if div_yield is None or div_yield <= 0 or fcf_yield is None or fcf_yield <= 0:
         return None
-    coverage = fcf_yield / div_yield
+    coverage = fcf_yield / (div_yield / 100.0)
     thresholds = [(3.0, 10.0), (2.0, 8.0), (1.5, 6.0), (1.0, 4.0), (0.7, 2.0)]
     for minimum, score in thresholds:
         if coverage >= minimum:

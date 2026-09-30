@@ -68,13 +68,9 @@ def _clean(v) -> float | None:
         return None
 
 
-def _resolve_policy_rates(start: str) -> tuple[dict[str, float], dict[str, str]]:
-    """Fetch FRED policy rates for all G10 currencies.
-
-    Returns:
-        rates:   CCY -> latest rate (%)
-        sources: CCY -> FRED series id that resolved
-    """
+def _resolve_policy_rate_series(start: str) -> tuple[dict[str, pd.Series], dict[str, str]]:
+    """Per currency, the full history of the first candidate FRED series whose
+    latest observation is recent. Returns (CCY -> series in %, CCY -> id)."""
     all_series: list[str] = []
     for series_list in _POLICY_RATE_SERIES.values():
         all_series.extend(series_list)
@@ -84,7 +80,7 @@ def _resolve_policy_rates(start: str) -> tuple[dict[str, float], dict[str, str]]
 
     fred_data = rates_service._fetch_many_fred_sync(unique_series, start)
 
-    rates: dict[str, float] = {}
+    out: dict[str, pd.Series] = {}
     sources: dict[str, str] = {}
     cutoff = date.today() - timedelta(days=_MAX_STALE_DAYS)
 
@@ -101,14 +97,21 @@ def _resolve_policy_rates(start: str) -> tuple[dict[str, float], dict[str, str]]
             if last_date < cutoff:
                 log.debug("FRED %s for %s last obs %s is stale (>%d days)", sid, ccy, last_date, _MAX_STALE_DAYS)
                 continue
-            rates[ccy] = round(float(clean.iloc[-1]), 4)
+            clean.index = pd.to_datetime(clean.index)
+            out[ccy] = clean.sort_index()
             sources[ccy] = sid
-            log.info("Carry: %s resolved via %s (last obs %s, rate %.4f%%)", ccy, sid, last_date, rates[ccy])
+            log.info("Carry: %s resolved via %s (last obs %s)", ccy, sid, last_date)
             break
         else:
             log.warning("Carry: could not resolve policy rate for %s", ccy)
 
-    return rates, sources
+    return out, sources
+
+
+def _resolve_policy_rates(start: str) -> tuple[dict[str, float], dict[str, str]]:
+    """Latest policy rate per currency (%), and the FRED id that resolved."""
+    series, sources = _resolve_policy_rate_series(start)
+    return {ccy: round(float(s.iloc[-1]), 4) for ccy, s in series.items()}, sources
 
 
 def _compute_fx_vol(close: pd.DataFrame, ticker: str, min_rows: int = 20) -> float | None:
@@ -135,7 +138,9 @@ def _metrics_from_series(cum: pd.Series) -> dict:
     total_return = float(cum.iloc[-1] / cum.iloc[0]) - 1.0
     cagr = round(((1 + total_return) ** (1 / years) - 1) * 100, 4) if years > 0 else None
     ann_vol = round(float(log_rets.std() * math.sqrt(252) * 100), 4) if n > 1 else None
-    sharpe = round(cagr / ann_vol, 4) if (cagr is not None and ann_vol and ann_vol > 0) else None
+    # Sharpe (rf = 0): annualised mean daily return over annualised vol.
+    ann_mean = float((cum / cum.shift(1) - 1).dropna().mean() * 252 * 100)
+    sharpe = round(ann_mean / ann_vol, 4) if (ann_vol and ann_vol > 0) else None
     rolling_max = cum.cummax()
     dd = (cum - rolling_max) / rolling_max
     max_dd = round(float(dd.min() * 100), 4)
@@ -256,54 +261,67 @@ def get_carry_backtest(period: str = "3y") -> dict:
         "metrics": {"cagr": None, "vol": None, "sharpe": None, "maxDrawdown": None},
     }
     try:
-        table = get_carry_table(period)
-        rows = table.get("rows", [])
-        if not rows:
-            return {**_EMPTY, "error": table.get("error", "no carry data")}
+        # Walk-forward: at each month start, rank currencies by the carry
+        # known *then* and hold long top-3 / short bottom-3 for the month.
+        # Earlier versions ranked by today's carry and applied those legs to
+        # the whole history (look-ahead), and earned FX moves only — never
+        # the interest differential that is the point of a carry trade (C-06).
+        start = (date.today() - timedelta(days=8 * 365)).strftime("%Y-%m-%d")
+        rate_series, _ = _resolve_policy_rate_series(start)
+        if "USD" not in rate_series:
+            return {**_EMPTY, "error": "USD policy rate unavailable"}
+        ccys = [c for c in _NON_USD_CCYS if c in rate_series]
+        if len(ccys) < 6:
+            return {**_EMPTY, "error": f"not enough currencies with carry data (need 6, got {len(ccys)})"}
 
-        # Rank by carry — rows already sorted desc
-        ranked = [r for r in rows if r["carry"] is not None]
-        if len(ranked) < 6:
-            return {**_EMPTY, "error": f"not enough currencies with carry data (need 6, got {len(ranked)})"}
+        close = yfs.get_close_frame(tuple(_fx_ticker(c) for c in ccys), period)
+        if close.empty:
+            return {**_EMPTY, "error": "no FX price data"}
+        close.index = pd.to_datetime(close.index)
+        # Daily return of holding each currency vs USD (tickers are USD per unit).
+        fx_rets = close.ffill().pct_change().rename(columns={_fx_ticker(c): c for c in ccys})
 
-        long_ccys = [r["ccy"] for r in ranked[:3]]
-        short_ccys = [r["ccy"] for r in ranked[-3:]]
+        def _rate_known(ccy: str, when: pd.Timestamp) -> float | None:
+            # Monthly FRED policy/interbank rates are averages dated the 1st of
+            # the month and published after it ends: lag one month.
+            s = rate_series[ccy].loc[: when - pd.DateOffset(months=1) - pd.Timedelta(days=1)]
+            return float(s.iloc[-1]) if len(s) else None
 
-        # Fetch FX price histories
-        all_ccys = long_ccys + short_ccys
-        fx_tickers = tuple(_fx_ticker(ccy) for ccy in all_ccys)
-        close = yfs.get_close_frame(fx_tickers, period)
+        weight = 1.0 / 3.0
+        strategy_parts: list[pd.Series] = []
+        long_ccys: list[str] = []
+        short_ccys: list[str] = []
+        months = fx_rets.index.to_period("M")
+        for month in months.unique():
+            seg = fx_rets[months == month].dropna(how="all")
+            if seg.empty:
+                continue
+            t0 = seg.index[0]
+            usd = _rate_known("USD", t0)
+            carry = {c: _rate_known(c, t0) - usd for c in ccys
+                     if usd is not None and _rate_known(c, t0) is not None}
+            if len(carry) < 6:
+                continue
+            ranked = sorted(carry, key=carry.get, reverse=True)
+            long_ccys, short_ccys = ranked[:3], ranked[-3:]
+            leg = pd.Series(0.0, index=seg.index)
+            for c in long_ccys:
+                leg += weight * (seg[c].fillna(0.0) + carry[c] / 100.0 / 252)
+            for c in short_ccys:
+                leg -= weight * (seg[c].fillna(0.0) + carry[c] / 100.0 / 252)
+            strategy_parts.append(leg)
 
-        # Fetch DXY benchmark
+        strategy_rets = pd.concat(strategy_parts).dropna() if strategy_parts else pd.Series(dtype=float)
+        if strategy_rets.empty:
+            return {**_EMPTY, "error": "strategy returns are empty"}
+
         dxy_close: pd.Series | None = None
         for dxy_sym in _DXY_TICKERS:
             dxy_frame = yfs.get_close_frame((dxy_sym,), period)
             if dxy_sym in dxy_frame.columns and not dxy_frame[dxy_sym].dropna().empty:
                 dxy_close = dxy_frame[dxy_sym].dropna()
+                dxy_close.index = pd.to_datetime(dxy_close.index)
                 break
-
-        if close.empty:
-            return {**_EMPTY, "error": "no FX price data"}
-
-        # Daily returns for each leg
-        rets = close.pct_change().dropna(how="all")
-
-        # Strategy return = Σ weight_i * daily_return
-        # long: +1/3 each, short: -1/3 each
-        weight = 1.0 / 3.0
-        strategy_rets = pd.Series(0.0, index=rets.index)
-        for ccy in long_ccys:
-            tk = _fx_ticker(ccy)
-            if tk in rets.columns:
-                strategy_rets = strategy_rets.add(rets[tk].fillna(0) * weight)
-        for ccy in short_ccys:
-            tk = _fx_ticker(ccy)
-            if tk in rets.columns:
-                strategy_rets = strategy_rets.add(rets[tk].fillna(0) * (-weight))
-
-        strategy_rets = strategy_rets.dropna()
-        if strategy_rets.empty:
-            return {**_EMPTY, "error": "strategy returns are empty"}
 
         cum_strategy = (1 + strategy_rets).cumprod() * 100
 

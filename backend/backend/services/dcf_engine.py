@@ -7,6 +7,72 @@ from datetime import date
 
 from .metrics import _clean
 
+log = logging.getLogger(__name__)
+
+# yfinance ``info`` fields reported in the *statement* currency
+# (``financialCurrency``) rather than the trading currency (``currency``).
+_STATEMENT_INFO_FIELDS = (
+    "freeCashflow", "operatingCashflow", "totalDebt", "totalCash", "ebitda",
+    "totalRevenue", "grossProfits", "netIncomeToCommon",
+)
+
+
+def _fx_rate(from_ccy: str, to_ccy: str) -> float | None:
+    """Latest price of 1 ``from_ccy`` in ``to_ccy`` (Yahoo ``XXXYYY=X``)."""
+    from . import yfinance_service as yfs
+    sym = f"{from_ccy}{to_ccy}=X"
+    try:
+        frame = yfs.get_close_frame((sym,), "5d")
+        s = frame[sym].dropna() if sym in frame.columns else None
+        return float(s.iloc[-1]) if s is not None and len(s) else None
+    except Exception:
+        log.debug("FX %s unavailable", sym, exc_info=True)
+        return None
+
+
+def to_price_currency(bundle: dict) -> dict:
+    """Return a copy of ``bundle`` with statement figures in the price currency.
+
+    ADRs and other cross-listings (TSM, NVO, BABA) quote in USD but report
+    FCF, debt, cash and statements in TWD/DKK/CNY; valuing those as dollars
+    produced intrinsic values tens of times off (audit C-16). Monetary
+    ``info`` fields and every statement line except share counts and rates
+    are converted at the latest FX rate; book value per share is taken from
+    price / (price-to-book), which Yahoo keeps in the trading currency.
+
+    Sets ``_fx = {"from", "to", "rate"}`` (rate None when unavailable, in
+    which case the caller must not value the company).
+    """
+    if bundle.get("_fx") is not None:
+        return bundle  # already normalised
+    info = dict(bundle.get("info") or {})
+    fin_ccy = info.get("financialCurrency")
+    px_ccy = info.get("currency")
+    out = dict(bundle)
+    if not fin_ccy or not px_ccy or fin_ccy == px_ccy:
+        out["_fx"] = {"from": fin_ccy or px_ccy, "to": px_ccy, "rate": 1.0}
+        return out
+    rate = _fx_rate(fin_ccy, px_ccy)
+    out["_fx"] = {"from": fin_ccy, "to": px_ccy, "rate": rate}
+    if rate is None:
+        return out
+    for k in _STATEMENT_INFO_FIELDS:
+        v = _clean(info.get(k))
+        if v is not None:
+            info[k] = v * rate
+    price, ptb = _clean(info.get("currentPrice") or info.get("regularMarketPrice")), _clean(info.get("priceToBook"))
+    info["bookValue"] = price / ptb if price and ptb else None
+    out["info"] = info
+
+    def _scale(stmt: dict) -> dict:
+        return {k: (v * rate if isinstance(v, (int, float)) and "Share" not in k and "Rate" not in k else v)
+                for k, v in (stmt or {}).items()}
+
+    for key in ("financials", "balance_sheet", "cashflow"):
+        if isinstance(bundle.get(key), dict):
+            out[key] = _scale(bundle[key])
+    return out
+
 
 def _single_dcf(
     fcf: float,
@@ -63,11 +129,16 @@ def two_stage_dcf(
     stage1_years : int
         Number of years in Stage 1 (default 10).
     """
+    bundle = to_price_currency(bundle)
     info: dict = bundle.get("info") or {}
     ticker: str = bundle.get("ticker") or ""
+    fx = bundle.get("_fx") or {}
 
     # --- Extract inputs ---
-    fcf_raw = info.get("freeCashflow") or info.get("operatingCashflow")
+    # Yahoo's freeCashflow is *levered* FCF (after interest). Operating cash
+    # flow is not FCF at all and is no longer substituted (audit C-27); the
+    # levered-FCF-at-WACC approximation is disclosed in the inputs.
+    fcf_raw = info.get("freeCashflow")
     shares_raw = info.get("sharesOutstanding")
     total_debt_raw = info.get("totalDebt") or 0
     total_cash_raw = info.get("totalCash") or 0
@@ -119,12 +190,17 @@ def two_stage_dcf(
                 "terminalGrowth": terminal_growth,
                 "wacc": wacc,
                 "stage1Years": stage1_years,
+                "fcfBasis": "levered FCF (Yahoo freeCashflow), TTM",
+                "statementCurrency": fx.get("from"),
+                "fxRate": fx.get("rate"),
             },
             "scenarios": [],
             "sensitivity": {},
             "asOf": as_of,
         }
 
+    if fx.get("rate") is None:
+        return _locked(f"No FX rate to convert {fx.get('from')} statements to {fx.get('to')}")
     if fcf is None:
         return _locked("TTM free cash flow unavailable")
     if shares is None:
@@ -203,6 +279,9 @@ def two_stage_dcf(
             "terminalGrowth": terminal_growth,
             "wacc": wacc,
             "stage1Years": stage1_years,
+            "fcfBasis": "levered FCF (Yahoo freeCashflow), TTM",
+            "statementCurrency": fx.get("from"),
+            "fxRate": fx.get("rate"),
         },
         "scenarios": scenarios,
         "sensitivity": sensitivity,

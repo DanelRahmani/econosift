@@ -293,7 +293,7 @@ def _fetch_ticker_fundamentals(sym: str) -> dict:
             "pe":             _i("trailingPE"),
             "forwardPE":      _i("forwardPE"),
             "eps":            _i("trailingEps"),
-            # dividendYield: yfinance returns as a decimal fraction (e.g. 0.015)
+            # dividendYield: yfinance returns it in percent (e.g. 2.43 = 2.43%)
             "dividendYield":  _i("dividendYield"),
             "beta":           _i("beta"),
             "pb":             _i("priceToBook"),

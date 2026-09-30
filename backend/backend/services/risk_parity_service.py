@@ -135,9 +135,14 @@ def _portfolio_metrics(daily_ret: pd.Series) -> dict:
 
     log_r = np.log1p(daily_ret.clip(lower=-0.999))
     n_years = len(log_r) / TRADING_DAYS
-    cagr = float(np.exp(log_r.sum()) - 1.0) / n_years if n_years > 0 else None
+    # Compounded annual growth — total return ÷ years is an arithmetic
+    # average, not a CAGR (audit C-04).
+    total = float(np.exp(log_r.sum()))
+    cagr = total ** (1.0 / n_years) - 1.0 if n_years > 0 and total > 0 else None
     vol = float(log_r.std(ddof=1) * math.sqrt(TRADING_DAYS)) if len(log_r) > 1 else None
-    sharpe = (cagr / vol) if (cagr is not None and vol and vol > 0) else None
+    # Sharpe (rf = 0): annualised mean daily return over annualised vol.
+    ann_mean = float(daily_ret.mean()) * TRADING_DAYS
+    sharpe = (ann_mean / vol) if (vol and vol > 0) else None
 
     cum = (1.0 + daily_ret).cumprod()
     max_dd = float((cum / cum.cummax() - 1.0).min()) if len(cum) else None
@@ -277,6 +282,12 @@ def risk_parity_backtest(
     current_w: Optional[np.ndarray] = None
     final_w: Optional[np.ndarray] = None
 
+    # Daily returns computed once over the whole history, so the return from
+    # the last close of one month to the first close of the next is kept.
+    # (Computing pct_change inside each monthly segment dropped ~12 sessions
+    # a year from the strategy but not from the 60/40 benchmark — C-05.)
+    all_ret = px_assets.ffill().pct_change()
+
     for seg_idx, seg_start in enumerate(month_starts):
         seg_end = month_starts[seg_idx + 1] if seg_idx + 1 < len(month_starts) else len(dates)
 
@@ -299,10 +310,9 @@ def risk_parity_backtest(
             current_w = np.full(n, 1.0 / n)
 
         # Forward returns for this segment
-        seg_px = px_assets.iloc[seg_start:seg_end]
-        if len(seg_px) < 2:
+        seg_ret = all_ret.iloc[seg_start:seg_end].dropna(how="all").fillna(0.0)
+        if seg_ret.empty:
             continue
-        seg_ret = seg_px.pct_change().dropna(how="all").fillna(0.0)
         port_ret = seg_ret.values @ current_w
         for i, d in enumerate(seg_ret.index):
             strategy_returns.append(float(port_ret[i]))

@@ -96,6 +96,8 @@ class _Ctx:
     """Pre-computed context shared across all models for a single valuation call."""
 
     def __init__(self, bundle: dict, beta: float | None, growth: float | None):
+        # Statement figures converted to the trading currency (ADRs; C-16).
+        bundle = dcf_engine.to_price_currency(bundle)
         self.bundle = bundle
         self.info: dict = bundle.get("info") or {}
         self.fin: dict = bundle.get("financials") or {}
@@ -141,18 +143,31 @@ class _Ctx:
         self.ticker: str = bundle.get("ticker") or ""
         self.sector: str | None = self.info.get("sector")
 
-        # Growth rate (annual, as decimal e.g. 0.10)
+        # Growth rate (annual, as decimal e.g. 0.10). Yahoo's earningsGrowth
+        # and revenueGrowth are *single-quarter* YoY changes; compounding a
+        # quarter's +77% for ten years (capped at 50%) inflated DCF, Graham,
+        # Lynch and DDM values (audit C-15). Preferred: consensus next-year EPS
+        # growth (forwardEps / trailingEps − 1, an annual rate by
+        # construction); then revenue growth; then a neutral 5%. A derived
+        # rate is capped at 15%/yr because it is applied for up to ten years;
+        # an explicit caller-supplied rate keeps the wider bounds.
+        lo, hi = -0.10, 0.15
         if growth is not None:
             self.growth: float | None = _clean(growth)
+            self.growth_source = "user"
+            lo, hi = -0.20, 0.50
         else:
-            # Use yfinance earningsGrowth (annual), fall back to revenueGrowth
-            eg = _clean(self.info.get("earningsGrowth"))
+            fwd, trl = self.forward_eps, self.eps
             rg = _clean(self.info.get("revenueGrowth"))
-            self.growth = eg or rg or 0.08  # default 8%
+            if fwd and trl and fwd > 0 and trl > 0:
+                self.growth, self.growth_source = fwd / trl - 1.0, "consensus forward EPS"
+            elif rg is not None:
+                self.growth, self.growth_source = rg, "revenue growth (latest quarter YoY)"
+            else:
+                self.growth, self.growth_source = 0.05, "default 5%"
 
-        # Clamp growth to reasonable range
         if self.growth is not None:
-            self.growth = max(-0.20, min(self.growth, 0.50))
+            self.growth = max(lo, min(self.growth, hi))
 
 
 # ---------------------------------------------------------------------------
@@ -630,5 +645,7 @@ def valuation_models(
         "models": models,
         "capmImplied": capm_implied,
         "axiomFairValue": composite,
+        "growthInput": {"rate": ctx.growth, "source": ctx.growth_source},
+        "statementFx": ctx.bundle.get("_fx"),
         "asOf": date.today().isoformat(),
     }

@@ -73,17 +73,23 @@ def test_price_frame_helper_recovers_its_inputs_exactly():
 
 # ── Kelly criterion ──────────────────────────────────────────────────────────
 
-def test_kelly_fraction_equals_mu_over_sigma_squared():
-    """f* = mu / sigma^2 — verified against the exact generating parameters."""
-    mu, var = 0.08, 0.16          # sigma^2 = 0.16 -> f* = 0.5
-    frame = _price_frame(["A"], [mu], [[var]])
+def test_kelly_fraction_uses_arithmetic_excess_return():
+    """Audit C-09: f* = (mu_arith - r) / sigma^2 on simple returns.
 
-    row = pf.kelly_criterion(_holdings(["A"], [1.0]), frame)[0]
+    The generator's log drift 0.02 with variance 0.16 is an arithmetic drift
+    of 0.02 + 0.16/2 = 0.10, so f* = (0.10 - 0.02) / 0.16 = 0.5 (the old
+    log-mean formula gave 0.125). Checked against the frame's own simple
+    returns, independently of the production code path.
+    """
+    mu_log, var, rf = 0.02, 0.16, 0.02
+    frame = _price_frame(["A"], [mu_log], [[var]])
+    simple = frame["A"].pct_change().dropna()
+    expected = (simple.mean() * TD - rf) / (simple.var(ddof=1) * TD)
 
-    assert row["kellyFraction"] == pytest.approx(mu / var, abs=1e-9)
-    assert row["kellyFraction"] == pytest.approx(0.5, abs=1e-9)
-    assert row["annReturn"] == pytest.approx(mu, abs=1e-9)
-    assert row["annVolatility"] == pytest.approx(math.sqrt(var), abs=1e-9)
+    row = pf.kelly_criterion(_holdings(["A"], [1.0]), frame, rf=rf)[0]
+
+    assert row["kellyFraction"] == pytest.approx(expected, abs=1e-9)
+    assert row["kellyFraction"] == pytest.approx((mu_log + var / 2 - rf) / var, abs=0.03)
 
 
 def test_kelly_is_capped_at_one_and_floored_at_zero():
@@ -276,7 +282,8 @@ def test_with_no_views_posterior_equals_the_equilibrium_prior(bl_frame):
 def test_equilibrium_returns_match_reverse_optimisation_formula(bl_frame):
     """pi = delta * Sigma * w_mkt with delta = 2.5."""
     w = np.array([0.5, 0.3, 0.2])
-    expected = 2.5 * np.array(BL_COV) @ w
+    # pi is an excess return; the response reports total return (pi + rf).
+    expected = 2.5 * np.array(BL_COV) @ w + 0.03
 
     out = pf.black_litterman(_holdings(BL_TICKERS, list(w)), bl_frame, views=[], rf=0.03)
     got = [r["equilibriumReturn"] for r in out["blReturns"]]
@@ -403,3 +410,35 @@ def test_stress_test_returns_empty_when_no_holding_is_present():
 def test_stress_test_does_not_raise_on_a_normal_portfolio(three_asset_frame):
     out = pf.stress_test_portfolio(_holdings(["A", "B", "C"], [0.4, 0.4, 0.2]), three_asset_frame, "^GSPC")
     assert isinstance(out, list)
+
+
+def test_bl_prior_uses_market_caps_when_available(bl_frame):
+    """Audit C-08: the equilibrium prior is the market-cap portfolio."""
+    caps = {"A": 600.0, "B": 300.0, "C": 100.0}
+    out = pf.black_litterman(_holdings(BL_TICKERS, [0.2, 0.2, 0.6]), bl_frame,
+                             views=[], rf=0.03, market_caps=caps)
+    assert out["priorWeights"] == "marketCap"
+    expected = 2.5 * np.array(BL_COV) @ np.array([0.6, 0.3, 0.1]) + 0.03
+    assert [r["equilibriumReturn"] for r in out["blReturns"]] == pytest.approx(expected, abs=1e-9)
+    # No views: optimal = market weights; current = the user's weights.
+    assert [w["weight"] for w in out["optimalWeights"]] == pytest.approx([0.6, 0.3, 0.1], abs=1e-9)
+    assert [w["weight"] for w in out["currentWeights"]] == pytest.approx([0.2, 0.2, 0.6], abs=1e-9)
+
+
+def test_sortino_downside_deviation_over_all_days():
+    """Audit C-17, by hand: r = [+2%, −1%, +1%, −3%], MAR 0.
+    shortfall² = [0, 1e-4, 0, 9e-4] → mean 2.5e-4 → DD = 0.015811·√252;
+    mean r = −0.25% → numerator −0.0025·252."""
+    r = pd.Series([0.02, -0.01, 0.01, -0.03])
+    expected = (-0.0025 * TD) / (math.sqrt(2.5e-4) * math.sqrt(TD))
+    assert pf._sortino(r, 0.0) == pytest.approx(expected, abs=1e-12)
+
+
+def test_portfolio_returns_reweight_before_a_holding_lists():
+    """Audit C-20: a holding with no price yet must not earn a fake 0%."""
+    idx = pd.bdate_range("2024-01-01", periods=4)
+    frame = pd.DataFrame({"A": [100.0, 110.0, 121.0, 133.1],
+                          "B": [np.nan, np.nan, 50.0, 55.0]}, index=idx)
+    port = pf._portfolio_returns(frame, {"A": 0.5, "B": 0.5})
+    # Days 2–3: only A trades → 100% A (+10%); day 4: both +10%.
+    assert list(port.round(10)) == [0.1, 0.1, 0.1]

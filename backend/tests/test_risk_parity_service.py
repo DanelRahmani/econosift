@@ -302,3 +302,15 @@ class TestRiskParityBacktest:
         monkeypatch.setattr(rps.yfs, "get_close_frame", lambda s, p: tiny)
         result = rps.risk_parity_backtest(_TICKERS)
         assert "error" in result
+
+
+def test_portfolio_metrics_cagr_is_compounded():
+    """Audit C-04: +21% over two years is a 10% CAGR, not 10.5%."""
+    import numpy as np
+    import pandas as pd
+    from backend.services.risk_parity_service import _portfolio_metrics, TRADING_DAYS
+
+    n = 2 * TRADING_DAYS
+    daily = (1.21) ** (1 / n) - 1
+    m = _portfolio_metrics(pd.Series(np.full(n, daily)))
+    assert m["cagr"] == pytest.approx(0.10, abs=1e-9)

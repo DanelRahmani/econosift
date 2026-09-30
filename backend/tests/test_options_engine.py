@@ -269,3 +269,22 @@ def test_mc_distribution_has_expected_shape(seeded_rng):
     out = mc_option_price(S, K, T, R, SIGMA, "call", sims=10_000)
     assert len(out["distribution"]) == 50
     assert set(out["distribution"][0]) == {"bin", "count"}
+
+
+def test_merton_dividend_yield_put_call_parity():
+    """Audit C-30: with a dividend yield q, C − P = S·e^(−qT) − K·e^(−rT)."""
+    import math
+    from backend.services.options_engine import bs_price
+    S, K, T, r, q, sig = 100.0, 95.0, 0.5, 0.04, 0.03, 0.25
+    c = bs_price(S, K, T, r, sig, "call", q)
+    p = bs_price(S, K, T, r, sig, "put", q)
+    assert c - p == pytest.approx(S * math.exp(-q * T) - K * math.exp(-r * T), abs=1e-9)
+    # A dividend lowers the call and raises the put vs q = 0.
+    assert c < bs_price(S, K, T, r, sig, "call") and p > bs_price(S, K, T, r, sig, "put")
+
+
+def test_merton_delta_matches_finite_difference():
+    from backend.services.options_engine import bs_price, bs_greeks
+    S, K, T, r, q, sig, h = 100.0, 100.0, 0.75, 0.03, 0.02, 0.3, 1e-4
+    fd = (bs_price(S + h, K, T, r, sig, "call", q) - bs_price(S - h, K, T, r, sig, "call", q)) / (2 * h)
+    assert bs_greeks(S, K, T, r, sig, "call", q)["delta"] == pytest.approx(fd, abs=1e-6)

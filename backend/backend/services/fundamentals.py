@@ -29,6 +29,7 @@ from typing import Any
 # Re-use _clean from the sibling metrics module so NaN/Inf/None handling is
 # consistent across the whole backend.
 # ---------------------------------------------------------------------------
+from ..cache import cached
 from .metrics import _clean
 
 
@@ -264,10 +265,10 @@ def piotroski_f(bundle: dict, prior_year: dict | None = None) -> dict:
     if net_income is not None:
         f1 = net_income > 0
 
-    # F2: Positive ROA (net income / total assets)
+    # F2: ROA improved YoY (needs the prior year — set below). Piotroski's
+    # profitability block is ROA > 0, CFO > 0, ΔROA > 0 and accruals; the old
+    # "positive ROA" test only repeated F1 (audit C-24).
     f2: bool | None = None
-    if net_income is not None and total_assets:
-        f2 = (net_income / total_assets) > 0
 
     # F3: Positive operating cash flow
     f3: bool | None = None
@@ -313,10 +314,19 @@ def piotroski_f(bundle: dict, prior_year: dict | None = None) -> dict:
                 and py_cur_assets is not None and py_cur_liab and py_cur_liab > 0):
             f6 = (cur_assets / cur_liab) > (py_cur_assets / py_cur_liab)
 
-        # F7: No dilution — shares outstanding did not increase YoY
-        shares = _clean(info.get("sharesOutstanding") or info.get("impliedSharesOutstanding"))
-        py_info = prior_year.get("info") or {}
-        py_shares = _clean(py_info.get("sharesOutstanding") or py_info.get("impliedSharesOutstanding"))
+        # F2: ΔROA > 0
+        py_net_income = _clean(_g(py_fin, "Net Income", "Net Income Common Stockholders"))
+        py_ta_2 = _clean(_g(py_bs, "Total Assets"))
+        if (net_income is not None and total_assets and total_assets > 0
+                and py_net_income is not None and py_ta_2 and py_ta_2 > 0):
+            f2 = (net_income / total_assets) > (py_net_income / py_ta_2)
+
+        # F7: No dilution — share count did not increase YoY. Both counts come
+        # from the balance-sheet columns (t and t-1): the prior-year "info" is
+        # today's info again, so comparing info share counts always passed
+        # (audit C-10).
+        shares = _clean(_g(bs, "Ordinary Shares Number", "Share Issued"))
+        py_shares = _clean(_g(py_bs, "Ordinary Shares Number", "Share Issued"))
         if shares is not None and py_shares is not None and py_shares > 0:
             f7 = shares <= py_shares * 1.01  # 1% tolerance for rounding
 
@@ -339,7 +349,7 @@ def piotroski_f(bundle: dict, prior_year: dict | None = None) -> dict:
 
     criteria = {
         "positiveNetIncome": f1,
-        "positiveROA": f2,
+        "higherROA": f2,
         "positiveOperatingCF": f3,
         "accrualQuality": f4,
         "lowerLTDebtRatio": f5,
@@ -390,6 +400,29 @@ def beneish_m(bundle: dict) -> dict:
 # 5. Ohlson O-Score
 # ---------------------------------------------------------------------------
 
+def _gnp_price_index() -> float | None:
+    """US GDP price deflator rebased to 1968 = 100 (Ohlson's SIZE scaling).
+
+    Built from FRED GDPDEF: latest quarter / 1968 average × 100. Cached for
+    the process lifetime of the cache TTL; None if FRED is unreachable (the
+    O-score is then not computed rather than mis-scaled).
+    """
+    return _gnp_price_index_cached()
+
+
+@cached("gnp_price_index_1968")
+def _gnp_price_index_cached() -> float | None:
+    try:
+        from .macro_expansion_service import _fetch_fred_series_sync
+        pts = _fetch_fred_series_sync(["GDPDEF"], start="1968-01-01").get("GDPDEF", [])
+    except Exception:
+        return None
+    base = [p["value"] for p in pts if p["date"].startswith("1968")]
+    if not base or not pts:
+        return None
+    return float(pts[-1]["value"]) / (sum(base) / len(base)) * 100.0
+
+
 def ohlson_o(bundle: dict) -> dict:
     """Ohlson O-Score (1980 logit model, 9 coefficients).
 
@@ -431,8 +464,14 @@ def ohlson_o(bundle: dict) -> dict:
     if total_liab is None:
         return {"oScore": None, "probDefault": None}
 
-    # SIZE proxy: log(Total Assets)  [original uses TA/GNP deflator]
-    size = _clean(math.log(abs(total_assets))) if total_assets > 0 else None
+    # SIZE = log(total assets in $ millions / GNP price-level index, 1968=100),
+    # as in Ohlson (1980). log of raw dollars made SIZE ~20 larger, and with
+    # its −0.407 coefficient pushed every O-score so low that the default
+    # probability read ~0 for all firms (audit C-11).
+    price_index = _gnp_price_index()
+    if price_index is None or total_assets <= 0:
+        return {"oScore": None, "probDefault": None}
+    size = _clean(math.log(total_assets / 1e6 / (price_index / 100.0)))
     if size is None:
         return {"oScore": None, "probDefault": None}
 
