@@ -29,11 +29,11 @@ import requests
 
 from .. import provenance as pv
 from ..cache import async_cached, cached
+from . import sec_datasets
 from .bulk_data_service import DATA_DIR as _BULK_DIR
 
 log = logging.getLogger(__name__)
 
-_BASE_URL = "https://www.sec.gov/files/structureddata/data/form-13f-data-sets/"
 _DIR = _BULK_DIR / "13f"
 _TOP_N = 25          # holders kept per CUSIP in the reduced file
 _SHOW = 10           # holders returned per lookup
@@ -163,12 +163,12 @@ def _fix_thousands(pos: pd.DataFrame) -> pd.DataFrame:
     return pos
 
 
-def write_reduced(window: str, holders: pd.DataFrame, totals: pd.DataFrame, period: str) -> None:
+def write_reduced(window: str, holders: pd.DataFrame, totals: pd.DataFrame, period: str, url: str = "") -> None:
     """Store a reduced data set and remove older ones."""
     _DIR.mkdir(parents=True, exist_ok=True)
     holders.to_parquet(_DIR / f"holders_{window}.parquet", index=False)
     totals.to_parquet(_DIR / f"totals_{window}.parquet", index=False)
-    meta = {"window": window, "period": period, "format": _FORMAT, "url": f"{_BASE_URL}{window}_form13f.zip",
+    meta = {"window": window, "period": period, "format": _FORMAT, "url": url,
             "builtAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}
     # Meta last: its presence marks the data set as complete.
     (_DIR / f"meta_{window}.json").write_text(json.dumps(meta))
@@ -246,13 +246,12 @@ def _latest_window() -> dict | None:
     if not ua:
         return None
     for name in window_names(date.today()):
-        url = f"{_BASE_URL}{name}_form13f.zip"
         try:
-            r = requests.head(url, headers={"User-Agent": ua}, timeout=20, allow_redirects=True)
+            url = sec_datasets.find(f"form-13f-data-sets/{name}_form13f.zip", ua)
         except requests.RequestException as exc:
             log.warning("13F data set probe failed: %s", exc)
             return None
-        if r.status_code == 200:
+        if url:
             return {"window": name, "url": url}
     return None
 
@@ -262,12 +261,8 @@ def _build(window: str, url: str) -> None:
     try:
         _DIR.mkdir(parents=True, exist_ok=True)
         t0 = time.time()
-        with requests.get(url, headers={"User-Agent": _user_agent()}, stream=True, timeout=120) as r:
-            r.raise_for_status()
-            with open(zpath, "wb") as fh:
-                for chunk in r.iter_content(1 << 20):
-                    fh.write(chunk)
-        write_reduced(window, *reduce_dataset(zpath))
+        sec_datasets.download(url, zpath, _user_agent())
+        write_reduced(window, *reduce_dataset(zpath), url=url)
         log.info("13F data set %s built in %.0f s", window, time.time() - t0)
         _build_state.update(error=None)
     except Exception as exc:

@@ -2305,6 +2305,9 @@ export interface InsiderTopTrade {
 }
 export interface InsiderAggregateResponse {
   asOf: string | null;
+  /** SEC data set, e.g. "2026q2", and the trade dates it covers */
+  dataset?: string;
+  period?: { start: string; end: string };
   tickersChecked: number;
   tickersWithData: number;
   totalTransactions: number;

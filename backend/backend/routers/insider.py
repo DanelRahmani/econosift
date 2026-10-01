@@ -1,6 +1,6 @@
 """Insider Trading Aggregator router — Phase 27.
 
-🟡 Compute tier — triggers aggregation across S&P 500 EDGAR Form 4 filings.
+🟡 Compute tier — aggregates the SEC's quarterly insider transactions data set over the S&P 500.
 """
 from __future__ import annotations
 
@@ -15,13 +15,12 @@ router = APIRouter(prefix="/api/insider", tags=["insider"])
 
 @router.get("/aggregate")
 async def insider_aggregate():
-    """🟡 Aggregate Form 4 insider transactions across S&P 500.
-    
-    First run is slow (100+ seconds). Subsequent calls use cache (6h TTL).
+    """🟡 Aggregate open-market insider trades across the S&P 500 for the
+    newest quarter the SEC has published. The first run downloads ~11 MB.
     """
     try:
-        # A worker thread: the aggregate fetches Form 4s for every S&P 500
-        # member synchronously and would otherwise freeze the event loop.
+        # A worker thread: the download and reduce are synchronous and would
+        # otherwise freeze the event loop.
         result = await asyncio.to_thread(insider_aggregator.get_insider_aggregate)
         if "error" in result:
             raise HTTPException(status_code=503, detail=result["error"])

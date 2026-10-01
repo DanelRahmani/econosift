@@ -17,7 +17,6 @@
 
 | ID | Issue | Source | Details |
 |----|-------|--------|---------|
-| P1-17 | **Insider aggregate takes 1–2 hours** | Phase 52b | `/api/insider/aggregate` fetches every Form 4 of the last 90 days for ~500 S&P 500 members one SEC request at a time (AAPL alone: 14 filings, ~13 s), so the 🟡 Calculate run far exceeds nginx's 180 s and the user sees a timeout while it keeps running in a worker thread (no longer freezing the server). Options: build it from the SEC's quarterly insider-transaction data sets (one ZIP, like 13F) plus recent daily filings, or run it as a background job with progress. |
 | P1-15 | **Central-bank meetings data ends 2026-12-31** | Audit (calendar) | `cb_meetings.json` lists 2026 meetings only (52 rows, no source). Central-bank events disappear from the calendar in January 2027 unless the file is extended or replaced by a sourced feed. |
 
 ---
@@ -43,7 +42,7 @@
 | P2-34 | **Low-severity audit findings** | Audit C-34…C-40, D-30, D-40 | IV30 interpolated in vol not total variance; risk Calmar uses log-mean×252; Garman-Klass ignores overnight gaps; DDM grows the forward dividend twice; options Monte Carlo unseeded; foreign real yields use a year-old annual CPI; unknown quote currency defaults to USD; undefined `--color-*` CSS variables / `text-muted` class in ~20 files; banking NPL >5% and >10% add the same single flag, `capitalAdequacy` is capital-to-assets and `domesticCreditGrowth` is a level; currency-crisis reserves change includes valuation effects; credit-pulse funding spread splices TEDRATE with SOFR−DTB3; an ongoing recession's period ends "today"; the `TOTCI` fallback in financial conditions is never fetched; Technicals hard-codes `$`; short-interest average can print NaN%; sector-rotation confidence is always 100%; CAPM tile falls back from annualised to daily alpha; several components are not mounted (PositioningTab, FundingLiquidityTab, RankingsTab, RiskMetricsTable, PortfolioTab, ScreenerTab, FxRatesPanel). |
 | P2-35 | **Breadth uses today's index members (survivorship)** | Audit C-23 | Breadth and Fear & Greed count today's S&P 500 constituents over the 2-year window; point-in-time membership exists for backtests but is not applied here. |
 | P2-36 | **Running pytest inside the backend container wipes the live cache** | Phase 52 | `tests/conftest.py` calls `cache.clear_all()` before every test against whatever `DATABASE_URL` points at — in the container that is the live `./data` DB. Run container tests with `-e DATABASE_URL=sqlite:////tmp/pytest.db` until conftest pins a test DB itself. |
-| P2-37 | **13F panel: % float and quarter-on-quarter change are blank** | Phase 52b | Holders now come from the SEC 13F data sets, one quarter at a time. QoQ change needs the previous quarter's data set as well (a second ~100 MB download); % float needs shares outstanding. The newest data set also lags: the Jun–Aug 2026 filings window was not yet published on 2026-10-01, so the panel shows the quarter ending 2026-03-31. |
+| P2-37 | **13F panel: % float and quarter-on-quarter change are blank** | Phase 52b | Holders come from the SEC 13F data sets, one quarter at a time. QoQ change needs the previous quarter's data set as well (a second ~100 MB download); % float needs shares outstanding. |
 
 ---
 
@@ -120,6 +119,7 @@ These items are verified as fixed in shipped phases. Listed here for reference t
 
 | ID | Issue | Fixed In |
 |----|-------|----------|
+| P1-17 | Insider aggregate took 1–2 hours (one SEC request per Form 4 across ~500 companies); now built from the SEC's quarterly insider transactions data set in ~11 s. 13F also missed the newest quarter because the SEC moved new data-set files to a new folder. | Phase 52d |
 | ✅ | Color system: beige → true white, reddish-black → greyish-black | Phase 22 |
 | ✅ | Fear & Greed gauge redesign with tick marks | Phase 22 |
 | ✅ | Admin nav link added | Phase 23 |

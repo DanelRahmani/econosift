@@ -57,8 +57,8 @@ function InsiderPageInner() {
       {!hasRun && !loading && (
         <div className="text-center py-16 space-y-4">
           <p className="text-text-secondary text-sm">
-            This analysis iterates over ~500 S&P 500 constituents calling EDGAR Form 4 filings.
-            First run takes 60-120 seconds due to rate limiting. Results are cached for 6 hours.
+            Aggregates open-market insider trades by S&P 500 insiders from the SEC&apos;s quarterly
+            insider transactions data set. The first run downloads it (~11 MB, a few seconds).
           </p>
           <button
             onClick={runAnalysis}
@@ -69,7 +69,7 @@ function InsiderPageInner() {
         </div>
       )}
 
-      {loading && <PageSkeleton text="Aggregating insider transactions across S&P 500… This may take 60-120s." />}
+      {loading && <PageSkeleton text="Aggregating insider transactions across the S&P 500…" />}
 
       {error && !loading && (
         <div className="text-danger text-sm py-4 text-center bg-danger/10 rounded-lg">{error}</div>
@@ -121,7 +121,7 @@ function InsiderPageInner() {
             <Card className="p-4" data-prov="clusterBuys">
               <h3 className="font-semibold mb-1">🟢 Cluster Buys</h3>
               <p className="text-xs text-text-secondary mb-3">
-                Stocks with ≥3 unique insiders buying within the last 30 days — potential bullish signal.
+                Stocks with ≥3 unique insiders buying in the last 30 days of the period — potential bullish signal.
               </p>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -191,7 +191,9 @@ function InsiderPageInner() {
           )}
 
           <p className="text-xs text-text-muted text-center">
-            Data from SEC EDGAR Form 4 filings. As of {data.asOf}. Cached for 6 hours.
+            SEC insider transactions data set {data.dataset ?? ""}
+            {data.period ? ` · trades ${data.period.start} to ${data.period.end}` : ` · as of ${data.asOf}`}.
+            The SEC publishes each quarter a few days after it ends.
           </p>
         </div>
       )}

@@ -132,3 +132,25 @@ def test_files_built_by_older_code_are_ignored(dataset, tmp_path, monkeypatch):
     assert tf._latest_meta()["format"] == tf._FORMAT
     meta.write_text(json.dumps({**m, "format": tf._FORMAT - 1}))
     assert tf._latest_meta() is None  # triggers a rebuild
+
+
+def test_latest_window_finds_files_at_the_new_sec_location(monkeypatch):
+    # Jun-Aug 2026 was published only under /files/datastandardsinnovation/.
+    seen = []
+
+    def find(path, ua):
+        seen.append(path)
+        return "https://new.example/" + path if path.startswith("form-13f-data-sets/01jun2026") else None
+
+    monkeypatch.setattr(tf.sec_datasets, "find", find)
+    monkeypatch.setattr(tf, "_user_agent", lambda: "Test Person test@example.com")
+    class Oct1(date):
+        @classmethod
+        def today(cls):
+            return date(2026, 10, 1)
+
+    monkeypatch.setattr(tf, "date", Oct1)
+    out = tf._latest_window.__wrapped__()
+    assert out == {"window": "01jun2026-31aug2026",
+                   "url": "https://new.example/form-13f-data-sets/01jun2026-31aug2026_form13f.zip"}
+    assert seen == ["form-13f-data-sets/01jun2026-31aug2026_form13f.zip"]
