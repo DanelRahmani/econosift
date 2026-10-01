@@ -157,7 +157,9 @@ def refresh_daily_prices() -> None:
                         volume=_safe_int(row.get("Volume")),
                     ))
                     rows += 1
-            session.commit()
+                # Per ticker, so other writers (the cache) get the lock between
+                # tickers instead of waiting out one 25k-row transaction.
+                session.commit()
 
         log_job_success(job_id, rows)
         logger.info("refresh_daily_prices: %d rows updated", rows)
@@ -183,54 +185,48 @@ def refresh_daily_quotes() -> None:
 
         from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
-        with _get_session()() as session:
-            for sym in tickers[:50]:
-                try:
-                    q = get_quote(sym)
-                    if not q:
-                        continue
-                    info: dict = {}
-                    try:
-                        info = get_info(sym) or {}
-                    except Exception:
-                        pass
-                    stmt = sqlite_insert(DailyQuote).values(
-                        symbol=sym,
-                        date=today,
-                        price=_safe_float(q.get("price")),
-                        market_cap=_safe_float(info.get("marketCap")),
-                        pe=_safe_float(info.get("trailingPE")),
-                        forward_pe=_safe_float(info.get("forwardPE")),
-                        div_yield=_safe_float(info.get("dividendYield")),
-                        beta=_safe_float(info.get("beta")),
-                        high52=_safe_float(info.get("fiftyTwoWeekHigh")),
-                        low52=_safe_float(info.get("fiftyTwoWeekLow")),
-                        avg_vol_20d=_safe_float(
-                            info.get("averageVolume20days")
-                            or info.get("averageDailyVolume10Day")
-                        ),
-                        updated_at=_now_utc(),
-                    ).on_conflict_do_update(
-                        index_elements=["symbol"],
-                        set_={
-                            "date": today,
-                            "price": _safe_float(q.get("price")),
-                            "market_cap": _safe_float(info.get("marketCap")),
-                            "pe": _safe_float(info.get("trailingPE")),
-                            "forward_pe": _safe_float(info.get("forwardPE")),
-                            "div_yield": _safe_float(info.get("dividendYield")),
-                            "beta": _safe_float(info.get("beta")),
-                            "high52": _safe_float(info.get("fiftyTwoWeekHigh")),
-                            "low52": _safe_float(info.get("fiftyTwoWeekLow")),
-                            "avg_vol_20d": _safe_float(info.get("averageVolume20days") or info.get("averageDailyVolume10Day")),
-                            "updated_at": _now_utc(),
-                        },
-                    )
-                    session.execute(stmt)
-                    rows += 1
-                except Exception as exc:
-                    logger.debug("refresh_daily_quotes skip %s: %s", sym, exc)
+        # Fetch first, then write in one short transaction: holding SQLite's
+        # write lock across ~50 network round trips blocked every other writer
+        # (cache, Admin "Clear cache") for the whole run (P1-16).
+        values: list[dict] = []
+        for sym in tickers[:50]:
+            try:
+                q = get_quote(sym)
+                if not q:
                     continue
+                info: dict = {}
+                try:
+                    info = get_info(sym) or {}
+                except Exception:
+                    pass
+                values.append(dict(
+                    symbol=sym,
+                    date=today,
+                    price=_safe_float(q.get("price")),
+                    market_cap=_safe_float(info.get("marketCap")),
+                    pe=_safe_float(info.get("trailingPE")),
+                    forward_pe=_safe_float(info.get("forwardPE")),
+                    div_yield=_safe_float(info.get("dividendYield")),
+                    beta=_safe_float(info.get("beta")),
+                    high52=_safe_float(info.get("fiftyTwoWeekHigh")),
+                    low52=_safe_float(info.get("fiftyTwoWeekLow")),
+                    avg_vol_20d=_safe_float(
+                        info.get("averageVolume20days")
+                        or info.get("averageDailyVolume10Day")
+                    ),
+                    updated_at=_now_utc(),
+                ))
+            except Exception as exc:
+                logger.debug("refresh_daily_quotes skip %s: %s", sym, exc)
+
+        with _get_session()() as session:
+            for v in values:
+                stmt = sqlite_insert(DailyQuote).values(**v).on_conflict_do_update(
+                    index_elements=["symbol"],
+                    set_={k: val for k, val in v.items() if k != "symbol"},
+                )
+                session.execute(stmt)
+                rows += 1
             session.commit()
 
         log_job_success(job_id, rows)

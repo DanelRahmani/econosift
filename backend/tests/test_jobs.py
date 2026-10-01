@@ -119,3 +119,54 @@ def test_refresh_fx_rates_logs_job(in_memory_session):
         jobs = session.query(JobExecution).filter_by(job_name="refresh_fx_rates").all()
         assert len(jobs) == 1
         assert jobs[0].status in ("success", "failed")
+
+
+# ---------------------------------------------------------------------------
+# P1-16: jobs must not hold SQLite's write lock across network fetches, or
+# every cache write and Admin "Clear cache" fails with "database is locked"
+# for the whole run (refresh_daily_quotes held it ~14 min).
+# ---------------------------------------------------------------------------
+
+def _file_session(tmp_path):
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from backend.db_models import Base
+
+    url = f"sqlite:///{(tmp_path / 'jobs.db').as_posix()}"
+    engine = create_engine(url, connect_args={"check_same_thread": False, "timeout": 0.1})
+    Base.metadata.create_all(engine)
+    return sessionmaker(bind=engine, autocommit=False, autoflush=False), url
+
+
+def _can_write(url) -> bool:
+    import sqlite3
+    conn = sqlite3.connect(url.replace("sqlite:///", ""), timeout=0.1)
+    try:
+        conn.execute("CREATE TABLE IF NOT EXISTS probe (x INTEGER)")
+        conn.execute("INSERT INTO probe VALUES (1)")
+        conn.commit()
+        return True
+    except sqlite3.OperationalError:
+        return False
+    finally:
+        conn.close()
+
+
+def test_daily_quotes_does_not_hold_write_lock_while_fetching(tmp_path):
+    Session, url = _file_session(tmp_path)
+    jobs_mod = _make_jobs_mod(Session)
+    writable = []
+
+    def fake_quote(sym):
+        writable.append(_can_write(url))  # another writer during the fetch
+        return {"price": 10.0}
+
+    with patch.object(jobs_mod, "_get_all_tracked_tickers", return_value=["AAA", "BBB", "CCC"]), \
+         patch("backend.services.yfinance_service.get_quote", side_effect=fake_quote), \
+         patch("backend.services.yfinance_service.get_info", return_value={"marketCap": 1e9}):
+        jobs_mod.refresh_daily_quotes()
+
+    assert writable == [True, True, True]
+    from backend.db_models import DailyQuote
+    with Session() as s:
+        assert {q.symbol for q in s.query(DailyQuote)} == {"AAA", "BBB", "CCC"}
