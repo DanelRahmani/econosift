@@ -96,8 +96,48 @@ def get_volume_frame(symbols: tuple[str, ...], period: str) -> pd.DataFrame:
     return vol.dropna(how="all")
 
 
+# Share classes of one issuer. Yahoo reports the WHOLE-company cap at each class's price (live: GOOGL 4.19T and
+# GOOG 4.15T), so summing both double-counts the issuer. First symbol = the class kept. Same-share-count pairs
+# not listed here (e.g. FOX/FOXA, NWS/NWSA) are caught by the shares rule in _one_per_issuer.
+_SHARE_CLASS_GROUPS = (("GOOGL", "GOOG"), ("BRK-B", "BRK-A"), ("FOXA", "FOX"), ("NWSA", "NWS"),
+                       ("LEN", "LEN-B"), ("BF-B", "BF-A"), ("HEI", "HEI-A"))
+_SAME_CAP_TOLERANCE = 0.25  # classes are one reported company cap only when their caps agree within 25 %
+
+
+def _one_per_issuer(caps: dict[str, float], shares: dict[str, float]) -> dict[str, float]:
+    """Keep one symbol per issuer when Yahoo reports the same company cap for several share classes.
+
+    Issuer = a listed share-class group, or symbols with an identical share count. Classes whose caps differ by
+    more than 25 % are genuine per-class caps and are all kept.
+    """
+    listed = {s: i for i, g in enumerate(_SHARE_CLASS_GROUPS) for s in g}
+    groups: dict = {}
+    for sym in caps:
+        if sym in listed:
+            key = ("g", listed[sym])
+        elif shares.get(sym):
+            key = ("s", shares[sym])
+        else:
+            key = ("x", sym)
+        groups.setdefault(key, []).append(sym)
+    drop: set[str] = set()
+    for key, members in groups.items():
+        if len(members) < 2:
+            continue
+        if key[0] == "g":
+            order = {s: i for i, s in enumerate(_SHARE_CLASS_GROUPS[key[1]])}
+            members = sorted(members, key=lambda m: order[m])
+        else:
+            members = sorted(members, key=lambda m: -caps[m])
+        keep = members[0]
+        for other in members[1:]:
+            if abs(caps[other] - caps[keep]) <= _SAME_CAP_TOLERANCE * caps[keep]:
+                drop.add(other)
+    return {s: c for s, c in caps.items() if s not in drop}
+
+
 @cached("yf_mcap")
-def get_market_caps(symbols: tuple[str, ...]) -> dict[str, float]:
+def get_market_caps(symbols: tuple[str, ...], one_per_issuer: bool = True) -> dict[str, float]:
     """Fetch market cap for each symbol via ``fast_info``, in parallel threads.
 
     This is the first threaded-batch fetch in the service — uses
@@ -105,7 +145,8 @@ def get_market_caps(symbols: tuple[str, ...]) -> dict[str, float]:
     (~500 tickers) completes in a few seconds rather than serially.  Any symbol
     that fails or has no positive finite cap is silently omitted.  Never raises.
 
-    Returns ``{symbol: market_cap_float}`` for symbols with a valid cap only.
+    Returns ``{symbol: market_cap_float}`` for symbols with a valid cap only. With ``one_per_issuer`` (default)
+    a dual-class issuer appears once (see :func:`_one_per_issuer`); pass False for per-symbol caps.
     """
     import math
     from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -113,9 +154,17 @@ def get_market_caps(symbols: tuple[str, ...]) -> dict[str, float]:
     if not symbols:
         return {}
 
+    shares: dict[str, float] = {}
+
     def _fetch_one(sym: str) -> tuple[str, float] | None:
         def _call():
             fi = yf.Ticker(sym).fast_info
+            try:
+                sh = fi["shares"]
+                if sh is not None and float(sh) > 0:
+                    shares[sym] = float(sh)
+            except Exception:
+                pass
             mcap = None
             try:
                 mcap = fi["market_cap"]
@@ -161,7 +210,7 @@ def get_market_caps(symbols: tuple[str, ...]) -> dict[str, float]:
                         result[pair[0]] = pair[1]
                 except Exception:
                     pass
-    return result
+    return _one_per_issuer(result, shares) if one_per_issuer else result
 
 
 def _retry_yf(fn, max_retries=2, delay=1.0):
@@ -191,6 +240,20 @@ def get_quote(ticker: str) -> dict:
     price = _safe(info, "last_price") or _safe(info, "lastPrice")
     prev = _safe(info, "previous_close") or _safe(info, "previousClose")
     currency = _safe(info, "currency") or "USD"
+
+    # Change % = last daily bar vs the one before (the Treemap's 1d rule), not fast_info.previous_close, which
+    # Yahoo gets wrong (AAPL +0.85 % vs +1.10 %). Market open: the last bar is today's live bar, so the quote is
+    # today's move so far; market closed: the last session's move. Price comes from the same bar so the two agree.
+    bars = None
+    try:
+        h = _retry_yf(lambda: t.history(period="7d", interval="1d", auto_adjust=False))
+        closes = h["Close"].dropna() if h is not None and len(h) else None
+        if closes is not None and len(closes) >= 2:
+            bars = (float(closes.iloc[-1]), float(closes.iloc[-2]))
+    except Exception:
+        bars = None
+    if bars:
+        price, prev = bars
 
     name = ticker
     try:
@@ -276,8 +339,10 @@ def get_info(ticker: str) -> dict:
     if "forwardEps" not in info or info["forwardEps"] is None:
         try:
             ee = t.earnings_estimate
-            if ee is not None and not ee.empty and "0y" in ee.index:
-                row = ee.loc["0y"]
+            # +1y = next fiscal year, the year forwardPE is struck on (0y gave Samsung Fwd EPS 47,965 beside a
+            # Fwd P/E that implies 71,030).
+            if ee is not None and not ee.empty and "+1y" in ee.index:
+                row = ee.loc["+1y"]
                 if "avg" in ee.columns:
                     info["forwardEps"] = float(row["avg"])
         except Exception:
