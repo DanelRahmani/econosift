@@ -74,7 +74,9 @@ export function SnowflakeChart({ ticker, onAxisClick, compact = false }: Props) 
   const radarData = AXES.map(({ key, label }) => ({
     axis: label,
     axisKey: key,
+    // plot 0 for a missing axis (geometry only); `raw` keeps the truth for labels/tooltip
     score: data.scores[key] ?? 0,
+    raw: data.scores[key] ?? null,
     fullMark: 10,
     tabTarget: AXES.find(a => a.key === key)?.tab ?? "Ratios",
   }));
@@ -137,7 +139,7 @@ export function SnowflakeChart({ ticker, onAxisClick, compact = false }: Props) 
                     {payload.value}
                     {" "}
                     <tspan fontSize={9} fill={verdictColor}>
-                      {score.toFixed(1)}
+                      {item?.raw === null || item?.raw === undefined ? "n/a" : score.toFixed(1)}
                     </tspan>
                   </text>
                 );
@@ -158,7 +160,10 @@ export function SnowflakeChart({ ticker, onAxisClick, compact = false }: Props) 
               strokeWidth={1.5}
             />
             <Tooltip
-              formatter={(v: number) => [v.toFixed(1), "Score"]}
+              formatter={(v: number, _n, entry) => {
+                const raw = (entry?.payload as { raw?: number | null } | undefined)?.raw;
+                return [raw === null ? "n/a" : v.toFixed(1), "Score"];
+              }}
               contentStyle={{
                 backgroundColor: palette.tooltipBg,
                 border: `1px solid ${palette.tooltipBorder}`,

@@ -52,6 +52,37 @@ def _ok_model(name: str, value: float | None, detail: dict | None = None) -> dic
     }
 
 
+# Long-run ROE ceiling. A TTM ROE far above this (AAPL 149 %, MSFT 33 %) mostly reflects a book
+# value shrunk by buybacks, and competition erodes excess returns, so it is not compounded.
+_ROE_CAP = 0.25
+# Perpetual dividend growth cap when no risk-free rate is available (long-run nominal GDP).
+_DEFAULT_GROWTH_CAP = 0.04
+
+
+def _dividend_payout(info: dict) -> float | None:
+    """Dividend payout ratio: Yahoo payoutRatio, else dividendRate / trailingEps."""
+    payout = _clean(info.get("payoutRatio"))
+    if payout is None:
+        rate, eps = _clean(info.get("dividendRate")), _clean(info.get("trailingEps"))
+        if rate is not None and eps is not None and eps > 0:
+            payout = rate / eps
+    return None if payout is None else min(max(payout, 0.0), 1.0)
+
+
+def _buyback_ratio(info: dict, fin: dict, cf: dict) -> float:
+    """Net share repurchases / net income from the latest annual statements (0 when unknown)."""
+    ni = (_clean(fin.get("Net Income Common Stockholders")) or _clean(fin.get("Net Income"))
+          or _clean(info.get("netIncomeToCommon")))
+    if ni is None or ni <= 0:
+        return 0.0
+    flow = _clean(cf.get("Net Common Stock Issuance"))
+    if flow is None:
+        flow = _clean(cf.get("Repurchase Of Capital Stock"))
+    if flow is None or flow >= 0:
+        return 0.0
+    return -flow / ni
+
+
 def _fetch_aaa_yield() -> float:
     """Fetch Moody's AAA corporate bond yield from FRED (percent). Fallback 5.0."""
     try:
@@ -178,6 +209,24 @@ class _Ctx:
 # Model 1: DCF (Two-Stage) — reuses dcf_engine
 # ---------------------------------------------------------------------------
 
+def _lock_non_positive(models: list[dict]) -> list[dict]:
+    """Generic guard: an unlocked model with a per-share value <= 0 becomes null + reason.
+
+    A negative price per share (net debt above implied EV, etc.) is not a valuation.
+    Models that already carry a more specific lock keep their reason; ``detail`` is kept.
+    """
+    for m in models:
+        v = m.get("value")
+        if v is not None and v <= 0:
+            m["value"] = None
+            m["locked"] = True
+            m["reason"] = NON_POSITIVE_REASON
+    return models
+
+
+NON_POSITIVE_REASON = "not meaningful: value ≤ 0 after net debt"
+
+
 def _model_dcf(ctx: _Ctx) -> dict:
     NAME = "DCF (Two-Stage)"
     wacc_val = ctx.wacc_val
@@ -228,10 +277,19 @@ def _model_ddm(ctx: _Ctx) -> dict:
     if ke is None:
         return _locked_model(NAME, "Cost of equity unavailable")
 
-    g = ctx.growth or 0.04
-    # Cap g so it stays below ke
-    g = min(g, ke - 0.005)
-    if g <= 0 or ke <= g:
+    # Perpetual dividend growth is the *sustainable* rate, retention x ROE, with ROE normalised
+    # (capped at _ROE_CAP) and g capped at the risk-free rate (long-run nominal growth) and below ke.
+    # It is never the 10-year earnings-growth rate (audit M-03).
+    roe_raw = _clean(ctx.info.get("returnOnEquity"))
+    payout = _dividend_payout(ctx.info)
+    if roe_raw is None or payout is None:
+        return _locked_model(NAME, "Sustainable dividend growth unavailable (ROE or payout ratio missing)")
+    roe = min(roe_raw, _ROE_CAP)
+    g_sustainable = max((1.0 - payout) * roe, 0.0)
+    cap = ctx.rf if ctx.rf is not None else _DEFAULT_GROWTH_CAP
+    cap = min(cap, ke - 0.005)
+    g = min(g_sustainable, cap)
+    if g < 0 or ke <= g:
         return _locked_model(NAME, f"Growth ({g:.4f}) ≥ cost of equity ({ke:.4f}) — Gordon Growth undefined")
 
     d1 = div_rate * (1.0 + g)
@@ -242,6 +300,10 @@ def _model_ddm(ctx: _Ctx) -> dict:
         "D1": _clean(d1),
         "costOfEquity": _clean(ke),
         "growthRate": _clean(g),
+        "sustainableGrowth": _clean(g_sustainable),
+        "growthCap": _clean(cap),
+        "roe": _clean(roe),
+        "payoutRatio": _clean(payout),
     })
 
 
@@ -385,42 +447,67 @@ def _model_ev_ebitda(ctx: _Ctx) -> dict:
 # Model 7: Residual Income Model (RIM / Edwards-Bell-Ohlson)
 # ---------------------------------------------------------------------------
 
+def _rim_value(bvps: float, roe0: float, ke: float, retention: float, years: int = 5) -> tuple[float, float]:
+    """Residual-income value per share and the PV of the residual income.
+
+    ROE fades linearly from ``roe0`` to the cost of equity over ``years``
+    (ROE_t = ke + (roe0 - ke) * (1 - t / years)), so excess returns are gone by
+    the end of the horizon and no terminal value is added. Book value follows
+    clean surplus: book_t = book_(t-1) * (1 + retention * ROE_t), and
+    RI_t = (ROE_t - ke) * book_(t-1).
+    """
+    book = bvps
+    pv_ri = 0.0
+    for t in range(1, years + 1):
+        roe_t = ke + (roe0 - ke) * (1.0 - t / years)
+        pv_ri += (roe_t - ke) * book / ((1.0 + ke) ** t)
+        book *= 1.0 + retention * roe_t
+    return bvps + pv_ri, pv_ri
+
+
 def _model_rim(ctx: _Ctx) -> dict:
+    """Residual income (Edwards-Bell-Ohlson), audit M-05 formula.
+
+    * ROE starts at Yahoo's TTM ROE capped at ``_ROE_CAP`` (a 149 % ROE on a
+      buyback-shrunk book is not compounded) and fades to ke over 5 years
+      (see :func:`_rim_value`).
+    * Retention = 1 - dividend payout - net buybacks / net income, clamped to
+      [0, 1]: buybacks leave the company just as dividends do, so ignoring
+      them overstated book growth.
+    """
     NAME = "Residual Income (RIM)"
     bvps = ctx.bvps
     if bvps is None or bvps <= 0:
         return _locked_model(NAME, "Book value per share unavailable")
 
-    roe = _clean(ctx.info.get("returnOnEquity"))
-    if roe is None:
+    roe_raw = _clean(ctx.info.get("returnOnEquity"))
+    if roe_raw is None:
         return _locked_model(NAME, "ROE unavailable")
+    if roe_raw > 1.0:
+        # Book value shrunk by buybacks: ROE x a tiny book is not an economic return.
+        return _locked_model(NAME, "not meaningful: ROE above 100% on a buyback-shrunk book",
+                             {"roeRaw": roe_raw, "bvps": bvps})
 
     ke = ctx.ke
     if ke is None:
         return _locked_model(NAME, "Cost of equity unavailable")
 
-    # Dividend payout and retention
-    payout = _clean(ctx.info.get("payoutRatio")) or 0.0
-    payout = min(max(payout, 0.0), 1.0)
-    retention = 1.0 - payout
+    roe = min(roe_raw, _ROE_CAP)
+    payout = _dividend_payout(ctx.info) or 0.0
+    buyback = _buyback_ratio(ctx.info, ctx.fin, ctx.cf)
+    retention = min(max(1.0 - payout - buyback, 0.0), 1.0)
 
-    # Project 5 years of residual income
     YEARS = 5
-    book = bvps
-    pv_ri = 0.0
-    for t in range(1, YEARS + 1):
-        ri = (roe - ke) * book
-        pv_ri += ri / ((1.0 + ke) ** t)
-        book = book * (1.0 + retention * roe)
-
-    # Terminal: assume RI fades to 0 after stage (conservative)
-    value = bvps + pv_ri
+    value, pv_ri = _rim_value(bvps, roe, ke, retention, YEARS)
 
     return _ok_model(NAME, value, {
         "bvps": bvps,
+        "roeRaw": roe_raw,
         "roe": roe,
         "costOfEquity": ke,
         "retentionRate": retention,
+        "dividendPayoutRatio": payout,
+        "buybackPayoutRatio": _clean(buyback),
         "pvRI": _clean(pv_ri),
         "years": YEARS,
     })
@@ -432,6 +519,10 @@ def _model_rim(ctx: _Ctx) -> dict:
 
 def _model_epv(ctx: _Ctx) -> dict:
     NAME = "EPV (Earnings Power Value)"
+
+    # EPV subtracts net debt; a bank's debt and cash are operating balances (audit M-02).
+    if dcf_engine.is_bank(ctx.info):
+        return _locked_model(NAME, "not meaningful for banks")
 
     wacc_val = ctx.wacc_val
     if wacc_val is None:
@@ -542,10 +633,15 @@ _WEIGHTS: dict[str, float] = {
 
 
 def _composite_fair_value(models: list[dict], spot: float | None) -> dict:
-    """Weighted composite of unlocked models, renormalised."""
+    """Weighted composite of the models with a positive value, weights renormalised.
+
+    A null or non-positive per-share value is "not meaningful" and is excluded,
+    so the composite can never be negative (audit M-02). ``reason`` is set only
+    when nothing remains.
+    """
     available: list[tuple[str, float, float]] = []  # (name, value, weight)
     for m in models:
-        if not m.get("locked") and m.get("value") is not None:
+        if not m.get("locked") and m.get("value") is not None and m["value"] > 0:
             name = m["model"]
             w = _WEIGHTS.get(name)
             if w is not None:
@@ -557,6 +653,7 @@ def _composite_fair_value(models: list[dict], spot: float | None) -> dict:
             "upsidePct": None,
             "verdict": "Insufficient Data",
             "weightsUsed": {},
+            "reason": "no model produced a positive value",
         }
 
     total_w = sum(w for _, _, w in available)
@@ -591,6 +688,7 @@ def _composite_fair_value(models: list[dict], spot: float | None) -> dict:
         "upsidePct": upside,
         "verdict": verdict,
         "weightsUsed": weights_used,
+        "reason": None,
     }
 
 
@@ -639,6 +737,7 @@ def valuation_models(
     ]
 
     capm_implied = _capm_implied(ctx)
+    _lock_non_positive(models + [capm_implied])
     composite = _composite_fair_value(models, ctx.spot)
 
     return {
@@ -784,8 +883,10 @@ def provenance(bundle: dict, result: dict, beta: float | None, root: str = "valu
                           note="Static snapshot bundled with the app: median of Damodaran's US industry multiples "
                                "mapped to sectors.")
     formulas = {
-        "DDM (Gordon Growth)": ("D1 / (ke − g), D1 = dividendRate × (1 + g), g = growth capped at ke − 0.5pp",
-                                [y("dividendRate"), ke, growth]),
+        "DDM (Gordon Growth)": ("D1 / (ke − g), D1 = dividendRate × (1 + g), g = (1 − payout ratio) × ROE (ROE capped at 25%), "
+                                "capped at the risk-free rate and at ke − 0.5pp; earnings growth is not used",
+                                [y("dividendRate"), ke, y("returnOnEquity"), y("payoutRatio"),
+                                 k("wacc", "riskFree")]),
         "Graham Formula": ("EPS × (8.5 + 2g) × 4.4 / Y, g = growth in percent (0-20), Y = Aaa corporate yield in percent",
                            [eps, growth, m_aaa]),
         "Graham Number": ("√(22.5 × EPS × book value per share)", [eps, y("bookValue")]),
@@ -793,9 +894,11 @@ def provenance(bundle: dict, result: dict, beta: float | None, root: str = "valu
                               [eps, growth]),
         "EV/EBITDA Comps": ("(sector EV/EBITDA × EBITDA − net debt) / shares", [y("ebitda"), m_mult, net_debt, shares]),
         "Residual Income (RIM)": (
-            "book value per share + Σ(t = 1…5) (ROE − ke) × book_(t−1) / (1 + ke)^t, "
-            "book grows by ROE × (1 − payout ratio) a year; no terminal value",
-            [y("bookValue"), y("returnOnEquity"), ke, y("payoutRatio")]),
+            "book value per share + Σ(t = 1…5) (ROE_t − ke) × book_(t−1) / (1 + ke)^t; ROE starts at Yahoo's "
+            "TTM ROE capped at 25% and fades linearly to ke by year 5; book grows by ROE_t × retention, "
+            "retention = 1 − dividend payout − net buybacks / net income (clamped to 0–1); no terminal value",
+            [y("bookValue"), y("returnOnEquity"), ke, y("payoutRatio"),
+             pv.yahoo(sym, "Annual cash-flow statement: net common stock issuance / repurchases, and net income")]),
         "EPV (Earnings Power Value)": (
             "(EBIT × (1 − tax rate) / WACC − net debt) / shares; tax rate 21% if unavailable",
             [y("ebit (else statement EBIT / Operating Income)"), k("wacc", "taxRate"), k("wacc", "wacc"), net_debt,
@@ -816,7 +919,7 @@ def provenance(bundle: dict, result: dict, beta: float | None, root: str = "valu
     prov[k("capmImplied")] = pv.derived("forward EPS (trailing EPS if missing) / cost of equity",
                                         [y("forwardEps"), eps, ke], title="CAPM-implied value")
     prov[k("axiomFairValue")] = pv.derived(
-        "weighted mean of the models that produced a value, weights renormalised: DCF 30%, EV/EBITDA 20%, RIM 15%, "
+        "weighted mean of the models that produced a positive value (null or non-positive values are excluded), weights renormalised: DCF 30%, EV/EBITDA 20%, RIM 15%, "
         "EPV 15%, Graham Formula 10%, Lynch 5%, DDM 5% (Graham Number and CAPM-implied carry no weight)",
         [k("models", mm["model"]) for mm in result.get("models") or []], title="Composite fair value")
     prov[k("axiomFairValue", "upsidePct")] = pv.derived("(composite value − spot price) / spot price",

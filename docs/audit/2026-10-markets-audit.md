@@ -19,6 +19,20 @@ rejected) with a known-value test when it is fixed. Items already tracked in
 | M-04 | Technicals: 1mo/3mo/6mo return HTTP 500 (tz-naive vs tz-aware compare); 1y/2y windows count rows vs calendar days and show far more history | `technicals_service.py:111-113` | AAPL 1y = 344 bars from 2025-05-19 |
 | M-05 | Residual-income model explodes for high-ROE buyback companies (TTM ROE compounding, retention ignores buybacks) | `valuation_engine.py:388-426` | AAPL RIM $340.98 (ROE 148.8 %) |
 
+### Status of the High findings (Phase 53, 2026-10-01)
+
+All five reproduced against the live stack or by direct computation. Live values after the fix are from the rebuilt stack.
+
+| ID | Status | Before → after (live) | Tests |
+|---|---|---|---|
+| M-01 | ✅ fixed | TSM FCF yield 30.9 % → 0.97 %, Altman Z 3.06 → 20.3, P/S 0.53 → 17.0 (TTM revenue; the audit's 19.9 used annual revenue), P/B 93.8 → 14.1, book value 4.86 → 32.4, Graham Number $38 → $99, RIM $12.8 → $39.6; NVO EV/EBITDA 1.5 → 6.93 | `test_metrics_currency.py`, `test_screener_currency.py`, `test_fx_minor_units.py`, `TestAdrBookValue`, `test_fallback_value_inputs_*` |
+| M-02 | ✅ fixed | JPM DCF −$1,966.74 → null "not meaningful for banks"; composite −$721.87 → +$229; EPV locked for banks; Snowflake EV/FCF 9.2/10 → n/a "not meaningful: negative multiple"; KPI EV/FCF −4.85 → n/a | `TestDcfLockAndComposite`, `TestNonPositiveGuard`, `test_negative_*`, `TestNegativeFcfEvMultiple` |
+| M-03 | ✅ fixed | MSFT DDM $854.86 → ≈$96; JPM $769 → $162 | `TestDdmSustainableGrowth` |
+| M-04 | ✅ fixed | AAPL 1mo/3mo/6mo HTTP 500 → 200; 1y 344 bars from 2025-05-19 → 252 bars from 2025-10-01 | `test_technicals_display_window_is_a_calendar_window` |
+| M-05 | ✅ fixed | AAPL RIM $340.98 → n/a "not meaningful: ROE above 100% on a buyback-shrunk book" (ROE now capped at 25 % and faded to ke for other firms) | `TestRimNormalised` |
+
+None rejected. Found while fixing: a half-failed Yahoo `info` call was cached for up to a day (fixed, `test_yf_info_partial.py`); `/api/valuation/capm-dcf` keeps an unlocked DCF but no page calls it (P3-28); Altman Z on `/corporate` and dividend FCF coverage still mix currencies (P2-38).
+
 ## Medium — misleading values, labels or edge cases
 
 | ID | Finding | Where |

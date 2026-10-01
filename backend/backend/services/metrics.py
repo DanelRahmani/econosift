@@ -115,8 +115,35 @@ def dcf_target(info: dict, fcf_growth: float, terminal_growth: float,
     return _clean(equity_value / shares)
 
 
-def altman_z(info: dict, balance: dict, financials: dict):
-    """Altman Z-Score for public manufacturing firms."""
+_AUTO = object()
+
+
+def _statement_fx(info: dict) -> float | None:
+    """Factor converting ``financialCurrency`` figures to the price currency.
+
+    1.0 when the currencies match or either is unknown; None when they differ
+    and no rate is available (the caller must not mix the two currencies).
+    """
+    fin_ccy, px_ccy = info.get("financialCurrency"), info.get("currency")
+    if not fin_ccy or not px_ccy or fin_ccy == px_ccy:
+        return 1.0
+    from . import dcf_engine  # lazy: dcf_engine imports this module
+    return dcf_engine._fx_rate(fin_ccy, px_ccy)
+
+
+def altman_z(info: dict, balance: dict, financials: dict, statement_to_price_fx=_AUTO):
+    """Altman Z-Score for public manufacturing firms.
+
+    ``marketCap`` is in the price currency while the statements are in
+    ``financialCurrency`` (ADRs: TSM, NVO), so total liabilities are converted
+    before ``market cap / liabilities`` (audit M-01). ``statement_to_price_fx``
+    is looked up from ``info`` by default; pass 1.0 when the inputs are already
+    in the price currency, or None to force "no score".
+    """
+    if statement_to_price_fx is _AUTO:
+        statement_to_price_fx = _statement_fx(info)
+    if statement_to_price_fx is None:
+        return None
     ta = balance.get("Total Assets")
     tl = balance.get("Total Liabilities Net Minority Interest") or balance.get("Total Liabilities")
     ca = balance.get("Current Assets")
@@ -136,7 +163,7 @@ def altman_z(info: dict, balance: dict, financials: dict):
         x1 = (ca - cl) / ta
         x2 = re / ta
         x3 = ebit / ta
-        x4 = mcap / tl
+        x4 = mcap / (tl * statement_to_price_fx)
         x5 = sales / ta
         z = 1.2 * x1 + 1.4 * x2 + 3.3 * x3 + 0.6 * x4 + 1.0 * x5
         return _clean(z)
@@ -144,8 +171,132 @@ def altman_z(info: dict, balance: dict, financials: dict):
         return None
 
 
+def _ratio(n, d):
+    if n is None or not d:
+        return None
+    try:
+        return _clean(float(n) / float(d))
+    except Exception:
+        return None
+
+
+def market_multiples(bundle: dict) -> dict:
+    """Market-cap / EV multiples with every input in the price currency (audit M-01).
+
+    ADRs and cross-listings quote in ``currency`` but report in
+    ``financialCurrency``; Yahoo's ``enterpriseValue`` and its P/S, P/B, EV/EBITDA
+    and EV/Revenue mix the two. When the currencies differ the statement-currency
+    inputs go through ``dcf_engine.to_price_currency`` and the multiples are
+    rebuilt (EV = market cap + total debt - total cash); when no FX rate or an
+    input is missing the multiple is None with a reason. Same-currency tickers
+    keep Yahoo's values.
+
+    Returns ``{"bundle": <converted bundle>, "statementToPriceFx": 1.0 | None,
+    "values": {fcfYield, evToFcf, psRatio, pbRatio, evEbitda, evRevenue, bookValue},
+    "unavailable": {name: reason}}``. ``bookValue`` is per share in the price
+    currency: Yahoo's for same-currency tickers, else converted equity x price /
+    market cap (market cap / price is the ADR-equivalent share count). ``statementToPriceFx`` is 1.0 because the
+    returned bundle is already converted, None when it could not be.
+    """
+    from .dcf_engine import to_price_currency  # lazy: dcf_engine imports this module
+    conv = to_price_currency(bundle)
+    info = conv.get("info") or {}
+    fx = conv.get("_fx") or {}
+    src, dst = fx.get("from"), fx.get("to")
+    mixed = bool(src and dst and src != dst)
+    labels = {"fcfYield": "FCF yield", "evToFcf": "EV/FCF", "psRatio": "P/S", "pbRatio": "P/B",
+              "evEbitda": "EV/EBITDA", "evRevenue": "EV/Revenue", "bookValue": "book value per share"}
+    mcap = _clean(info.get("marketCap"))
+    fcf = _clean(info.get("freeCashflow"))
+
+    if not mixed:
+        ev = _clean(info.get("enterpriseValue"))
+        values = {
+            "fcfYield": _ratio(fcf, mcap),
+            "evToFcf": _ratio(ev, fcf),
+            "psRatio": _clean(info.get("priceToSalesTrailing12Months")),
+            "pbRatio": _clean(info.get("priceToBook")),
+            "evEbitda": _clean(info.get("enterpriseToEbitda")),
+            "evRevenue": _clean(info.get("enterpriseToRevenue")),
+            "bookValue": _clean(info.get("bookValue")),
+        }
+        unavailable = {}
+        _drop_negative_fcf_multiple(values, unavailable, fcf)
+        return {"bundle": conv, "statementToPriceFx": 1.0, "values": values, "unavailable": unavailable}
+
+    values: dict = {k: None for k in labels}
+    if fx.get("rate") is None:
+        why = (f"No {src}/{dst} exchange rate available, so figures reported in {src} "
+               f"cannot be converted to the {dst} price currency")
+        return {"bundle": conv, "statementToPriceFx": None, "values": values,
+                "unavailable": {k: why for k in labels}}
+
+    unavailable: dict = {}
+
+    def need(name: str, parts: dict) -> None:
+        miss = [k for k, v in parts.items() if v is None]
+        unavailable[name] = (f"Missing {', '.join(miss)}: statements are reported in {src} and the price "
+                             f"is in {dst}, so {labels[name]} cannot be computed without it")
+
+    debt, cash = _clean(info.get("totalDebt")), _clean(info.get("totalCash"))
+    ebitda, revenue = _clean(info.get("ebitda")), _clean(info.get("totalRevenue"))
+    bs = conv.get("balance_sheet") or {}
+    equity = _clean(bs.get("Stockholders Equity") or bs.get("Common Stock Equity")
+                    or info.get("totalStockholderEquity"))
+    ev = mcap + debt - cash if None not in (mcap, debt, cash) else None
+    ev_parts = {"marketCap": mcap, "totalDebt": debt, "totalCash": cash}
+
+    if mcap is None or fcf is None:
+        need("fcfYield", {"marketCap": mcap, "freeCashflow": fcf})
+    else:
+        values["fcfYield"] = _ratio(fcf, mcap)
+    if ev is None or fcf is None:
+        need("evToFcf", {**ev_parts, "freeCashflow": fcf})
+    else:
+        values["evToFcf"] = _ratio(ev, fcf)
+    if mcap is None or not revenue:
+        need("psRatio", {"marketCap": mcap, "totalRevenue": revenue or None})
+    else:
+        values["psRatio"] = mcap / revenue
+    if mcap is None or not equity or equity <= 0:
+        need("pbRatio", {"marketCap": mcap, "stockholdersEquity": equity if equity and equity > 0 else None})
+    else:
+        values["pbRatio"] = mcap / equity
+    if ev is None or not ebitda or ebitda <= 0:
+        need("evEbitda", {**ev_parts, "ebitda": ebitda if ebitda and ebitda > 0 else None})
+    else:
+        values["evEbitda"] = ev / ebitda
+    price = _clean(info.get("currentPrice") or info.get("regularMarketPrice"))
+    if None in (mcap, price) or not mcap or not equity or equity <= 0:
+        need("bookValue", {"marketCap": mcap or None, "price": price,
+                           "stockholdersEquity": equity if equity and equity > 0 else None})
+    else:
+        values["bookValue"] = equity * price / mcap
+    if ev is None or not revenue:
+        need("evRevenue", {**ev_parts, "totalRevenue": revenue or None})
+    else:
+        values["evRevenue"] = ev / revenue
+    _drop_negative_fcf_multiple(values, unavailable, fcf)
+    return {"bundle": conv, "statementToPriceFx": 1.0, "values": values, "unavailable": unavailable}
+
+
+def _drop_negative_fcf_multiple(values: dict, unavailable: dict, fcf: float | None) -> None:
+    """EV / FCF is not a multiple when FCF ≤ 0 (JPM showed −4.85); FCF yield stays as computed."""
+    if fcf is not None and fcf <= 0:
+        values["evToFcf"] = None
+        unavailable["evToFcf"] = "not meaningful: free cash flow ≤ 0"
+
+
 def compute_ratios(bundle: dict) -> dict:
-    """Build the full ratios payload from a yfinance info/statements bundle."""
+    """Build the full ratios payload from a yfinance info/statements bundle.
+
+    Cross-currency tickers (ADRs) are converted to the price currency first, so
+    nothing here divides a statement-currency figure by a USD price or market
+    cap. ``unavailable`` maps ``"valuation.<key>"`` / ``"zScore"`` to the reason
+    a value is None because of currency (missing FX rate or input).
+    """
+    mm = market_multiples(bundle)
+    bundle = mm["bundle"]
     info = bundle.get("info", {}) or {}
     bs = bundle.get("balance_sheet", {}) or {}
     fin = bundle.get("financials", {}) or {}
@@ -185,13 +336,7 @@ def compute_ratios(bundle: dict) -> dict:
     if fcf is None:
         fcf, fcf_revenue = info.get("freeCashflow"), info.get("totalRevenue")
 
-    def ratio(n, d):
-        if n is None or not d:
-            return None
-        try:
-            return _clean(float(n) / float(d))
-        except Exception:
-            return None
+    ratio = _ratio
 
     liquidity = {
         "currentRatio": ratio(current_assets, current_liab),
@@ -224,13 +369,19 @@ def compute_ratios(bundle: dict) -> dict:
     valuation = {
         "peRatio": _clean(info.get("trailingPE")),
         "forwardPE": _clean(info.get("forwardPE")),
-        "pbRatio": _clean(info.get("priceToBook")),
-        "psRatio": _clean(info.get("priceToSalesTrailing12Months")),
-        "evEbitda": _clean(info.get("enterpriseToEbitda")),
-        "evRevenue": _clean(info.get("enterpriseToRevenue")),
+        "pbRatio": mm["values"]["pbRatio"],
+        "psRatio": mm["values"]["psRatio"],
+        "evEbitda": mm["values"]["evEbitda"],
+        "evRevenue": mm["values"]["evRevenue"],
         "dividendYield": _clean(info.get("dividendYield")),
         "eps": _clean(info.get("trailingEps")),
     }
+
+    z_score = altman_z(info, bs, fin, mm["statementToPriceFx"])
+    unavailable = {f"valuation.{k}": why for k, why in mm["unavailable"].items()
+                   if k in ("psRatio", "pbRatio", "evEbitda", "evRevenue")}
+    if mm["statementToPriceFx"] is None:
+        unavailable["zScore"] = next(iter(mm["unavailable"].values()))
 
     return {
         "liquidity": liquidity,
@@ -238,5 +389,6 @@ def compute_ratios(bundle: dict) -> dict:
         "efficiency": efficiency,
         "profitability": profitability,
         "valuation": valuation,
-        "zScore": altman_z(info, bs, fin),
+        "zScore": z_score,
+        "unavailable": unavailable,
     }

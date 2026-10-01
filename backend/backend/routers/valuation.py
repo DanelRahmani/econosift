@@ -20,18 +20,19 @@ from ..services import fama_french
 router = APIRouter(prefix="/api/valuation", tags=["valuation"])
 
 
-def _kpis(info: dict) -> dict:
+def _kpis(info: dict, bundle: dict | None = None) -> dict:
     """Headline KPI + extended-fundamental fields straight from Ticker.info.
 
     Every access is guarded; short data is US-listed only and may be absent.
+    ``evToFcf`` / ``fcfYield`` are built in the price currency (ADRs report in
+    another one, audit M-01), and so is ``bookValue`` (``bundle`` supplies the
+    balance sheet it needs); ``unavailable`` maps a field to the reason it is None.
     """
     g = info.get
-    mcap = g("marketCap")
-    fcf = g("freeCashflow")
-    ev = g("enterpriseValue")
+    mm = metrics.market_multiples({**(bundle or {}), "info": info})
     return {
         "price": g("currentPrice") or g("regularMarketPrice"),
-        "marketCap": mcap,
+        "marketCap": g("marketCap"),
         "trailingPE": g("trailingPE"),
         "forwardPE": g("forwardPE"),
         "trailingEps": g("trailingEps"),
@@ -41,9 +42,10 @@ def _kpis(info: dict) -> dict:
         "fiftyTwoWeekLow": g("fiftyTwoWeekLow"),
         "beta": g("beta"),
         "averageVolume": g("averageVolume") or g("averageDailyVolume10Day"),
-        "bookValue": g("bookValue"),
-        "evToFcf": (ev / fcf) if (ev and fcf) else None,
-        "fcfYield": (fcf / mcap) if (fcf and mcap) else None,
+        "bookValue": mm["values"]["bookValue"],
+        "evToFcf": mm["values"]["evToFcf"],
+        "fcfYield": mm["values"]["fcfYield"],
+        "unavailable": {k: v for k, v in mm["unavailable"].items() if k in ("evToFcf", "fcfYield", "bookValue")},
         "shortPercentOfFloat": g("shortPercentOfFloat"),
         "shortRatio": g("shortRatio"),
         "sector": g("sector"),
@@ -251,13 +253,15 @@ async def full(ticker: str):
         asyncio.to_thread(valuation_models, bundle, beta),
         asyncio.to_thread(extended_fundamentals, bundle),
     )
-    kpis = _kpis(bundle.get("info", {}) or {})
+    kpis = _kpis(bundle.get("info", {}) or {}, bundle)
     # Fix 7: Inject computed beta when yfinance info.beta is null
     beta_injected = kpis.get("beta") is None and beta is not None
     if beta_injected:
         kpis["beta"] = beta
     prov = {"*": pv.yahoo(sym, "Company fundamentals, valuation inputs and analyst data")}
-    prov.update(_kpi_provenance(sym, kpis, beta_injected))
+    info = bundle.get("info", {}) or {}
+    prov.update(_kpi_provenance(sym, kpis, beta_injected,
+                                info.get("financialCurrency") not in (None, info.get("currency"))))
     prov.update(valuation_engine.provenance(bundle, valuation, beta, "valuation"))
     prov.update(fundamentals_svc.provenance(bundle, "fundamentals"))
     prov.update(analyst_service.provenance(analyst, "analyst"))
@@ -270,7 +274,7 @@ async def full(ticker: str):
     }, prov)
 
 
-def _kpi_provenance(sym: str, kpis: dict, beta_injected: bool) -> dict:
+def _kpi_provenance(sym: str, kpis: dict, beta_injected: bool, cross_currency: bool = False) -> dict:
     """``kpis.<field>`` refs for the headline block of /full."""
     def y(field: str, **kw) -> dict:
         return pv.yahoo(sym, f"info.{field}", **kw)
@@ -286,10 +290,19 @@ def _kpi_provenance(sym: str, kpis: dict, beta_injected: bool) -> dict:
     prov["kpis.dividendYield"] = y("dividendYield", units="percent (0.98 = 0.98%)")
     prov["kpis.averageVolume"] = y("averageVolume (else averageDailyVolume10Day)", units="shares")
     prov["kpis.currency"] = y("currency (USD if missing)")
+    fx_note = ("Statements are reported in a different currency from the price, so free cash flow, debt and "
+               "cash are converted to the price currency first and EV = market cap + debt − cash."
+               if cross_currency else None)
     prov["kpis.evToFcf"] = pv.derived("info.enterpriseValue / info.freeCashflow",
-                                      [y("enterpriseValue"), y("freeCashflow")], title="EV / free cash flow")
+                                      [y("enterpriseValue"), y("freeCashflow")], title="EV / free cash flow",
+                                      note=fx_note)
     prov["kpis.fcfYield"] = pv.derived("info.freeCashflow / info.marketCap", [y("freeCashflow"), y("marketCap")],
-                                       title="Free cash flow yield")
+                                       title="Free cash flow yield", note=fx_note)
+    if cross_currency:
+        prov["kpis.bookValue"] = pv.derived(
+            "stockholders' equity × FX to the price currency × price / market cap",
+            [pv.yahoo(sym, "Balance sheet, latest fiscal year", frequency="annual"), y("marketCap")],
+            title="Book value per share", note="Yahoo's bookValue mixes currencies for ADRs, so it is rebuilt.")
     if beta_injected:
         prov["kpis.beta"] = pv.derived(
             "cov(r, r_benchmark) / var(r_benchmark) of 2 years of daily log returns",

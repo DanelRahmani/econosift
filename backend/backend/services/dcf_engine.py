@@ -14,12 +14,24 @@ log = logging.getLogger(__name__)
 # (``financialCurrency``) rather than the trading currency (``currency``).
 _STATEMENT_INFO_FIELDS = (
     "freeCashflow", "operatingCashflow", "totalDebt", "totalCash", "ebitda",
-    "totalRevenue", "grossProfits", "netIncomeToCommon",
+    "totalRevenue", "grossProfits", "netIncomeToCommon", "totalStockholderEquity",
 )
 
 
+# Yahoo quote currencies in minor units -> (major currency, major units per minor unit).
+_MINOR_UNITS = {"GBp": ("GBP", 0.01), "GBX": ("GBP", 0.01), "ZAc": ("ZAR", 0.01), "ILA": ("ILS", 0.01)}
+
+
 def _fx_rate(from_ccy: str, to_ccy: str) -> float | None:
-    """Latest price of 1 ``from_ccy`` in ``to_ccy`` (Yahoo ``XXXYYY=X``)."""
+    """Latest price of 1 ``from_ccy`` in ``to_ccy`` (Yahoo ``XXXYYY=X``).
+
+    Minor units (London pence "GBp", Johannesburg cents "ZAc", Tel Aviv agorot
+    "ILA") are scaled from their major currency; GBP -> GBp is ×100 with no lookup.
+    """
+    (src, src_k), (dst, dst_k) = (_MINOR_UNITS.get(c, (c, 1.0)) for c in (from_ccy, to_ccy))
+    if src_k != 1.0 or dst_k != 1.0:
+        base = 1.0 if src == dst else _fx_rate(src, dst)
+        return base * src_k / dst_k if base is not None else None
     from . import yfinance_service as yfs
     sym = f"{from_ccy}{to_ccy}=X"
     try:
@@ -38,8 +50,9 @@ def to_price_currency(bundle: dict) -> dict:
     FCF, debt, cash and statements in TWD/DKK/CNY; valuing those as dollars
     produced intrinsic values tens of times off (audit C-16). Monetary
     ``info`` fields and every statement line except share counts and rates
-    are converted at the latest FX rate; book value per share is taken from
-    price / (price-to-book), which Yahoo keeps in the trading currency.
+    are converted at the latest FX rate; book value per share is the converted
+    stockholders' equity / (market cap / price), because Yahoo's priceToBook
+    mixes currencies for these tickers (None when equity is unavailable).
 
     Sets ``_fx = {"from", "to", "rate"}`` (rate None when unavailable, in
     which case the caller must not value the company).
@@ -61,8 +74,6 @@ def to_price_currency(bundle: dict) -> dict:
         v = _clean(info.get(k))
         if v is not None:
             info[k] = v * rate
-    price, ptb = _clean(info.get("currentPrice") or info.get("regularMarketPrice")), _clean(info.get("priceToBook"))
-    info["bookValue"] = price / ptb if price and ptb else None
     out["info"] = info
 
     def _scale(stmt: dict) -> dict:
@@ -72,7 +83,27 @@ def to_price_currency(bundle: dict) -> dict:
     for key in ("financials", "balance_sheet", "cashflow"):
         if isinstance(bundle.get(key), dict):
             out[key] = _scale(bundle[key])
+
+    # Book value per ADR-equivalent share = converted equity / (marketCap / price). Yahoo's priceToBook
+    # divides a trading-currency price by a statement-currency book, so price / priceToBook is wrong
+    # for these tickers (TSM: 4.86 vs about 32.7; audit M-01).
+    bs = out.get("balance_sheet") or {}
+    equity = _clean(bs.get("Stockholders Equity")) or _clean(bs.get("Common Stock Equity"))
+    price = _clean(info.get("currentPrice") or info.get("regularMarketPrice"))
+    mcap = _clean(info.get("marketCap"))
+    info["bookValue"] = equity * price / mcap if equity and price and mcap and mcap > 0 else None
     return out
+
+
+def is_bank(info: dict) -> bool:
+    """True for deposit-taking banks (Yahoo industry "Banks - ...", screener "... Banks").
+
+    A bank's debt and cash are operating balances (deposits, reserves), so
+    neither a free-cash-flow DCF nor an EV-based multiple is meaningful.
+    Other financials (payment networks, asset managers) have real FCF and are
+    not matched.
+    """
+    return "bank" in str((info or {}).get("industry") or "").lower()
 
 
 def _single_dcf(
@@ -84,7 +115,12 @@ def _single_dcf(
     net_debt: float,
     shares: float,
 ) -> float | None:
-    """Compute per-share intrinsic value for one parameter set. Returns None if invalid."""
+    """Compute per-share intrinsic value for one parameter set.
+
+    Returns None if invalid, or if the equity value is not positive (net debt
+    exceeds the enterprise value): a negative price per share is not a
+    valuation (audit M-02).
+    """
     if wacc <= terminal_growth:
         return None
     if wacc <= terminal_growth + 0.005:
@@ -102,8 +138,10 @@ def _single_dcf(
 
     ev = pv1 + pv_tv
     equity = ev - net_debt
-    intrinsic = equity / shares
-    return _clean(intrinsic)
+    intrinsic = _clean(equity / shares)
+    if intrinsic is None or intrinsic <= 0:
+        return None
+    return intrinsic
 
 
 def two_stage_dcf(
@@ -200,10 +238,14 @@ def two_stage_dcf(
             "asOf": as_of,
         }
 
+    if is_bank(info):
+        return _locked("not meaningful for banks")
     if fx.get("rate") is None:
         return _locked(f"No FX rate to convert {fx.get('from')} statements to {fx.get('to')}")
     if fcf is None:
         return _locked("TTM free cash flow unavailable")
+    if fcf <= 0:
+        return _locked("not meaningful: free cash flow ≤ 0")
     if shares is None:
         return _locked("Shares outstanding unavailable")
     if shares <= 0:
@@ -215,6 +257,8 @@ def two_stage_dcf(
 
     # --- Base intrinsic value ---
     intrinsic = _single_dcf(fcf, fcf_growth, terminal_growth, wacc, stage1_years, net_debt, shares)
+    if intrinsic is None:
+        return _locked("not meaningful: equity value ≤ 0 after net debt")
 
     upside_pct: float | None = None
     if intrinsic is not None and spot is not None and spot != 0:

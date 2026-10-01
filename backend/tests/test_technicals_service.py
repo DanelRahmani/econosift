@@ -150,3 +150,40 @@ def test_empty_response_carries_every_key_the_frontend_reads():
     assert out["ticker"] == "AAPL"
     assert out["summary"]["rsi"] is None
     assert out["summary"]["bbSqueeze"] is False
+
+
+# ── Display window (M-04) ────────────────────────────────────────────────────
+# The displayed window is a calendar window ending on the last bar, not a row
+# count, and must not depend on whether yfinance's index carries a timezone.
+
+def _ohlcv(tz: str | None) -> pd.DataFrame:
+    """600 business days ending Wed 2026-09-30 (no holidays), optionally tz-aware."""
+    idx = pd.bdate_range(end="2026-09-30", periods=600, tz=tz)
+    close = pd.Series(100.0 + np.arange(600) * 0.1, index=idx)
+    return pd.DataFrame(
+        {"Open": close, "High": close + 1.0, "Low": close - 1.0, "Close": close, "Volume": 1_000.0},
+        index=idx,
+    )
+
+
+@pytest.mark.parametrize("tz", [None, "America/New_York", "UTC"])
+@pytest.mark.parametrize("period, first_date", [
+    # last bar 2026-09-30; cutoff = last bar - calendar offset; first business day on/after it
+    ("1mo", "2026-08-31"),   # 2026-09-30 - 1 month  = 2026-08-30 (Sun) -> Mon 2026-08-31
+    ("3mo", "2026-06-30"),   # 2026-09-30 - 3 months = 2026-06-30 (Tue)
+    ("6mo", "2026-03-30"),   # 2026-09-30 - 6 months = 2026-03-30 (Mon)
+    ("1y", "2025-09-30"),    # 2026-09-30 - 1 year   = 2025-09-30 (Tue)
+    ("2y", "2024-09-30"),    # 2026-09-30 - 2 years  = 2024-09-30 (Mon)
+])
+def test_technicals_display_window_is_a_calendar_window(monkeypatch, period, first_date, tz):
+    monkeypatch.setattr(ts.yf, "download", lambda *a, **k: _ohlcv(tz))
+
+    out = ts.get_technicals.__wrapped__("AAPL", period)
+
+    dates = [p["date"] for p in out["prices"]]
+    assert dates[0] == first_date
+    assert dates[-1] == "2026-09-30"
+    assert out["asOf"] == "2026-09-30"
+    # sub-chart series (RSI exists with or without pandas-ta) are sliced to the same window
+    assert out["rsi"][0]["date"] >= first_date
+

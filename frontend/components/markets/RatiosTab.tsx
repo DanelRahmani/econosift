@@ -7,6 +7,7 @@ import { Card, Skeleton, ZScoreBadge } from "@/components/ui";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
 import { fmtNum, fmtPctFlex } from "@/lib/format";
+import { NaReason } from "@/components/markets/NaReason";
 import {
   RATIO_GUIDE, ratioTone, ratioRanges, TONE_TEXT, TONE_DOT,
   RISK_METRIC_GUIDES, type RiskMetricGuide,
@@ -158,7 +159,7 @@ function MetricInfoRow({
 // Ratio row (unchanged logic, minor UI polish)
 // ──────────────────────────────────────────────────────────────────────────
 
-function RatioRow({ k, v, prov }: { k: string; v: number | null; prov: string }) {
+function RatioRow({ k, v, prov, naReason }: { k: string; v: number | null; prov: string; naReason?: string }) {
   const [open, setOpen] = useState(false);
   const tone = ratioTone(k, v);
   const ranges = ratioRanges(k);
@@ -180,7 +181,7 @@ function RatioRow({ k, v, prov }: { k: string; v: number | null; prov: string })
           )}
         </div>
         <span className={`font-mono shrink-0 tabular-nums ${tone ? TONE_TEXT[tone] : "text-text-primary"}`}>
-          {fmt(k, v)}
+          {v === null && naReason ? <NaReason reason={naReason} /> : fmt(k, v)}
         </span>
         {hasGuide && (
           <span className="text-text-muted text-xs w-4 text-center shrink-0" data-hide-print>
@@ -219,7 +220,9 @@ function RangePill({ tone, label, value }: { tone: "good" | "normal" | "bad"; la
   );
 }
 
-function Group({ title, group, groupKey }: { title: string; group: RatioGroup; groupKey: string }) {
+function Group({
+  title, group, groupKey, unavailable,
+}: { title: string; group: RatioGroup; groupKey: string; unavailable?: Record<string, string> }) {
   const [open, setOpen] = useState(true);
   return (
     <Card className="p-0 overflow-hidden">
@@ -234,7 +237,7 @@ function Group({ title, group, groupKey }: { title: string; group: RatioGroup; g
       {open && (
         <div className="px-6 pb-4 grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-0 text-sm">
           {Object.entries(group).map(([k, v]) => (
-            <RatioRow key={k} k={k} v={v} prov={`${groupKey}.${k}`} />
+            <RatioRow key={k} k={k} v={v} prov={`${groupKey}.${k}`} naReason={unavailable?.[`${groupKey}.${k}`]} />
           ))}
         </div>
       )}
@@ -391,7 +394,13 @@ export function RatiosTab({ tickers }: { tickers: string[] }) {
                   <span className="text-text-secondary text-sm">Altman Z-Score</span>
                   <span className="text-text-muted text-xs leading-snug truncate">Bankruptcy risk model (5 financial ratios)…</span>
                 </div>
-                <ZScoreBadge z={data.zScore} />
+                {data.zScore === null && data.unavailable?.zScore ? (
+                  <span className="px-2 py-0.5 rounded-md text-xs font-semibold bg-text-muted/20">
+                    <NaReason reason={data.unavailable.zScore} />
+                  </span>
+                ) : (
+                  <ZScoreBadge z={data.zScore} />
+                )}
                 <button
                   onClick={() => {
                     const el = document.getElementById("altman-z-info");
@@ -435,11 +444,23 @@ export function RatiosTab({ tickers }: { tickers: string[] }) {
           </Card>
 
           {/* Ratio groups */}
-          <Group title="Liquidity" group={data.liquidity} groupKey="liquidity" />
-          <Group title="Leverage" group={data.leverage} groupKey="leverage" />
-          <Group title="Efficiency" group={data.efficiency} groupKey="efficiency" />
-          <Group title="Profitability" group={data.profitability} groupKey="profitability" />
-          <Group title="Valuation Multiples" group={data.valuation} groupKey="valuation" />
+          <Group title="Liquidity" group={data.liquidity} groupKey="liquidity" unavailable={data.unavailable} />
+          <Group title="Leverage" group={data.leverage} groupKey="leverage" unavailable={data.unavailable} />
+          <Group title="Efficiency" group={data.efficiency} groupKey="efficiency" unavailable={data.unavailable} />
+          <Group title="Profitability" group={data.profitability} groupKey="profitability" unavailable={data.unavailable} />
+          <Group title="Valuation Multiples" group={data.valuation} groupKey="valuation" unavailable={data.unavailable} />
+          {data.unavailable && Object.keys(data.unavailable).length > 0 && (
+            <Card className="p-4" data-prov="unavailable">
+              <p className="text-xs font-semibold text-text-secondary mb-1">Not available</p>
+              <ul className="space-y-0.5 text-xs text-text-muted">
+                {Object.entries(data.unavailable).map(([path, reason]) => (
+                  <li key={path}>
+                    {LABELS[path.split(".").pop() ?? ""] ?? (path === "zScore" ? "Altman Z-Score" : path)}: n/a — {reason}
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
         </>
       )}
     </div>

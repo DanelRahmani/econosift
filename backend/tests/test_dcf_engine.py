@@ -197,12 +197,19 @@ class TestLockedCases:
 class TestEdgeCases:
     """Numeric edge cases that should still produce valid results."""
 
-    def test_negative_fcf_returns_negative_intrinsic(self):
-        """Negative FCF should still complete without raising (intrinsic may be negative)."""
+    def test_negative_fcf_is_locked_not_a_negative_value(self):
+        """Audit M-02: FCF <= 0 cannot be capitalised; lock instead of printing a negative price."""
         bundle = _make_bundle(freeCashflow=-1_000_000_000, totalCash=50_000_000_000)
         result = two_stage_dcf(bundle, fcf_growth=0.08, terminal_growth=0.025, wacc=0.09)
-        # Should not raise and locked should be False (inputs are technically valid)
-        assert result["locked"] is False
+        assert result["locked"] is True
+        assert result["intrinsicValue"] is None
+        assert result["reason"] == "not meaningful: free cash flow ≤ 0"
+        assert result["scenarios"] == []
+
+    def test_zero_fcf_is_locked(self):
+        result = two_stage_dcf(_make_bundle(freeCashflow=0), fcf_growth=0.08, terminal_growth=0.025, wacc=0.09)
+        assert result["locked"] is True
+        assert result["reason"] == "not meaningful: free cash flow ≤ 0"
 
     def test_no_spot_price_still_works(self):
         """Missing spot price: upside is None but intrinsic should still compute."""
@@ -219,3 +226,51 @@ class TestEdgeCases:
         result = two_stage_dcf(bundle, fcf_growth=0.08, terminal_growth=0.025, wacc=0.09, stage1_years=5)
         assert result["inputs"]["stage1Years"] == 5
         assert result["locked"] is False
+
+
+class TestBankLock:
+    """Audit M-02: a bank's debt and cash are operating balances, so a free-cash-flow DCF is meaningless."""
+
+    @staticmethod
+    def _bank(fcf):
+        b = _make_bundle(freeCashflow=fcf)
+        b["info"]["sector"] = "Financial Services"
+        b["info"]["industry"] = "Banks - Diversified"
+        return b
+
+    def test_bank_with_negative_fcf_locked_with_exact_reason(self):
+        # JPM-like: FCF -147.8bn.
+        result = two_stage_dcf(self._bank(-147_782_000_000), fcf_growth=0.08, terminal_growth=0.025, wacc=0.09)
+        assert result["locked"] is True
+        assert result["reason"] == "not meaningful for banks"
+        assert result["intrinsicValue"] is None
+        assert result["upsidePct"] is None
+        assert result["scenarios"] == []
+
+    def test_bank_with_positive_fcf_also_locked(self):
+        result = two_stage_dcf(self._bank(5_000_000_000), fcf_growth=0.08, terminal_growth=0.025, wacc=0.09)
+        assert result["locked"] is True
+        assert result["reason"] == "not meaningful for banks"
+
+    def test_non_bank_financial_company_is_not_locked(self):
+        # Visa-like: Financial Services but "Credit Services" - FCF is real.
+        b = _make_bundle()
+        b["info"]["sector"] = "Financial Services"
+        b["info"]["industry"] = "Credit Services"
+        assert two_stage_dcf(b, fcf_growth=0.08, terminal_growth=0.025, wacc=0.09)["locked"] is False
+
+
+class TestNonPositiveEquity:
+    def test_single_dcf_returns_none_when_net_debt_exceeds_ev(self):
+        from backend.services.dcf_engine import _single_dcf
+        # 1 year, g=0, terminal g=0, wacc 10%: PV(year 1) = 1e9/1.1 = 0.909e9;
+        # TV = 1e9*1/0.10 = 1e10, PV(TV) = 9.091e9; EV = 1e10.
+        # Equity = 1e10 - 2e10 = -1e10; per share (1e9 shares) = -10 -> not meaningful.
+        assert _single_dcf(1e9, 0.0, 0.0, 0.10, 1, 2e10, 1e9) is None
+
+    def test_two_stage_locks_when_equity_value_not_positive(self):
+        bundle = _make_bundle(freeCashflow=1_000_000_000, totalDebt=2_000_000_000_000, totalCash=0)
+        result = two_stage_dcf(bundle, fcf_growth=0.0, terminal_growth=0.0, wacc=0.10, stage1_years=1)
+        assert result["locked"] is True
+        assert result["intrinsicValue"] is None
+        assert result["reason"] == "not meaningful: equity value ≤ 0 after net debt"

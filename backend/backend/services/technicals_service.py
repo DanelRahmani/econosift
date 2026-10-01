@@ -31,6 +31,19 @@ _LOOKBACK_EXTRA = {
 }
 
 
+# Period -> calendar window shown to the user (months, years)
+_DISPLAY_OFFSET = {
+    "1mo": pd.DateOffset(months=1), "3mo": pd.DateOffset(months=3), "6mo": pd.DateOffset(months=6),
+    "1y": pd.DateOffset(years=1), "2y": pd.DateOffset(years=2), "5y": pd.DateOffset(years=5),
+}
+
+
+def _display_window(df: pd.DataFrame, period: str) -> pd.DataFrame:
+    """Rows of a tz-naive, date-indexed frame inside the calendar window ending on its last bar."""
+    cutoff = df.index[-1] - _DISPLAY_OFFSET.get(period, _DISPLAY_OFFSET["1y"])
+    return df[df.index >= cutoff]
+
+
 def _clean(v: Any) -> float | None:
     if v is None:
         return None
@@ -102,15 +115,16 @@ def get_technicals(ticker: str, period: str = "1y") -> dict:
 
     df = df[["Open", "High", "Low", "Close", "Volume"]].copy()
     df.index = pd.to_datetime(df.index)
+    if df.index.tz is not None:
+        # yfinance may return a tz-aware index; keep the exchange-local calendar dates, tz-naive
+        df.index = df.index.tz_localize(None)
     df = df.dropna(subset=["Close"])
 
     if len(df) < 30:
         return _empty_response(ticker, period)
 
     # Trim to requested period for output (but compute on full fetch for accuracy)
-    period_days = {"1mo": 30, "3mo": 90, "6mo": 180, "1y": 365, "2y": 730, "5y": 1825}
-    cutoff = pd.Timestamp.now(tz="UTC") - pd.Timedelta(days=period_days.get(period, 365))
-    display_df = df[df.index >= cutoff] if len(df) > period_days.get(period, 365) else df
+    display_df = _display_window(df, period)
 
     close = df["Close"]
     high = df["High"]
