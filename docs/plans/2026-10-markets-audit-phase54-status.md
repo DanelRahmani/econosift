@@ -58,3 +58,25 @@ Live ASML.AS: rf 5.26 % (US DGS10), ERP 4.23 % (NL), β 2.235 vs ^AEX (Yahoo β 
    ACTIVE_ISSUES "Recently Fixed" → CHANGELOG line → commit "Phase 54 — Markets audit: Medium
    findings" → push `DEV`.
 3. Ask the owner before M-10, before merging DEV → main, and before starting P1-19 / P1-18.
+
+## Session 2026-10-02 — progress
+
+- Step 0 frontend follow-ups ✅ `2940421` (Beneish badge uses `manipulationLikely`, `peerGroup.reason`, CCC NaReason).
+- Spec-verifier ran on `1aa9666..DEV`: FAIL → fixed and pushed in `1012736` with tests: D1 top-level growth
+  fractions / forwardEps formatting; D2 Piotroski maxScore 0 (Snowflake scored 0/10, badge green "0 / 0");
+  D3 Sharpe/Sortino guide said log returns; D5 Ohlson on a converted bundle with failed FX read as USD;
+  D6 Beneish on Markets lacked the quarterly prior-year fallback of /corporate/health; D7 DcfPanel dropped
+  the region override on ticker switch and kept the old result on screen; rf label race
+  (`short_risk_free_rate_with_source`). Not fixed: D4 (honest empty peer set), D8 (holiday-Friday weekly
+  pivot, needs a trading calendar → P3 row with the daily-pivot one), D9 (P3-16/17/28 one-liners, intended).
+- Phase 55 / M-10 implemented and committed locally `b90faf8` (NOT pushed — gate pending):
+  `discount_rates.wacc` — non-USD listings: local 10Y (`local_risk_free_rate`, FRED IRLTLT01xxM156N,
+  `riskFreeSource`/`riskFreeAsOf`/`riskFreeStale`), Blume beta (`rawBeta`, `betaAdjustment`), null + reason in
+  `unavailable` (no series / currency mismatch / FRED down), β from an S&P fallback benchmark dropped.
+  16 more 10Y series in `risk_free_service`; `.BR` → ^BFX + 12 more local indexes. Tests
+  `tests/test_local_discount_rate_m10.py` (ASML ke 14.72 % → 11.02 % with NL 3.285 %).
+- Gate NOT run: Docker Desktop was not running all session. Local pytest: only the 7 known environmental
+  failures (fredapi missing on host; 2 cointegration tests).
+
+Remaining: gate (container pytest, tsc, build + recreate, cache clear, live curls incl. ASML.AS wacc),
+docs (audit Medium status table + M-10, ACTIVE_ISSUES, CHANGELOG Phase 54 + 55 lines), push DEV.
