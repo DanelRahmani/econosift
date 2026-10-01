@@ -1,12 +1,16 @@
 """Shared discount-rate helpers: risk-free rate, ERP, WACC for valuation models."""
 from __future__ import annotations
 
+import io
 import json
+import logging
 import math
 from pathlib import Path
 
 from ..cache import cached
 from .metrics import _clean
+
+log = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Exchange code → Damodaran country name
@@ -40,7 +44,7 @@ EXCHANGE_COUNTRY: dict[str, str] = {
     "HKG": "Hong Kong",
     "SHG": "China",
     "SHE": "China",
-    "KSC": "South Korea",
+    "KSC": "Korea",
     "BSE": "India",
     "NSE": "India",
     "ASX": "Australia",
@@ -66,9 +70,14 @@ _EXCHANGE_NAME_HINTS: list[tuple[str, str]] = [
     ("asx", "Australia"),
     ("bombay", "India"),
     ("national stock exchange of india", "India"),
-    ("korea", "South Korea"),
+    ("korea", "Korea"),
     ("singapore", "Singapore"),
 ]
+
+# yfinance's info["country"] spellings that differ from Damodaran's table keys.
+_COUNTRY_ALIASES: dict[str, str] = {
+    "South Korea": "Korea",
+}
 
 
 # ---------------------------------------------------------------------------
@@ -83,76 +92,83 @@ def _data_path(fname: str) -> Path:
     return Path(__file__).resolve().parents[1] / "data" / fname
 
 
+# Damodaran's data lives on this sheet (header in row 1; values are decimals, e.g. 0.0446). The
+# first sheets whose names contain "country" ('Country Lookup', 'ERPs by country') are a calculator
+# and a header-offset copy, not this table.
+_ERP_SHEET = "regional breakdown"
+
+
+def _download_damodaran_xlsx() -> bytes:
+    """Download ctryprem.xlsx and return its bytes (separate so tests can stub the network)."""
+    import urllib.request
+
+    req = urllib.request.Request(DAMODARAN_URL, headers={"User-Agent": "Mozilla/5.0 (Axiom Finance)"})
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        return resp.read()
+
+
+def _parse_damodaran_xlsx(blob: bytes) -> dict:
+    """Parse the 'Regional breakdown' sheet into the static-JSON shape (erp/crp/taxRate in percent).
+
+    Raises ValueError when the sheet, its columns or the United States row are missing, so the
+    caller serves the static file instead of a half-parsed table.
+    """
+    import pandas as pd
+
+    xl = pd.ExcelFile(io.BytesIO(blob))
+    sheet = next((s for s in xl.sheet_names if s.strip().lower() == _ERP_SHEET), None)
+    if sheet is None:
+        raise ValueError(f"no '{_ERP_SHEET}' sheet in {xl.sheet_names}")
+
+    df = xl.parse(sheet, header=0)
+    df.columns = [str(c).strip().lower() for c in df.columns]
+    wanted = {"country": "country", "erp": "equity risk premium",
+              "crp": "country risk premium", "tax": "corporate tax rate"}
+    missing = [w for w in wanted.values() if w not in df.columns]
+    if missing:
+        raise ValueError(f"'{sheet}' sheet lacks columns {missing}")
+
+    def pct(v) -> float | None:
+        """Sheet decimal (0.0446) -> percent (4.46), None for 'NA'/blank."""
+        try:
+            val = _clean(float(v))
+        except (TypeError, ValueError):
+            return None
+        return None if val is None else round(val * 100.0, 4)
+
+    countries: dict[str, dict] = {}
+    for _, row in df.iterrows():
+        name = str(row[wanted["country"]]).strip()
+        if not name or name.lower() in ("nan", "none", "total"):
+            continue
+        erp_val = pct(row[wanted["erp"]])
+        if erp_val is None:
+            continue
+        countries[name] = {
+            "erp": erp_val,
+            "crp": pct(row[wanted["crp"]]),
+            "taxRate": pct(row[wanted["tax"]]),
+        }
+
+    us = countries.get("United States")
+    if us is None or not 1.0 < us["erp"] < 15.0:
+        raise ValueError("no plausible United States row in the parsed table")
+    return {
+        "asOf": "live",
+        "source": "Aswath Damodaran — ctryprem.xlsx (live download)",
+        "sourceUrl": DAMODARAN_URL,
+        "matureMarketERP": round(us["erp"], 2),
+        "countries": countries,
+    }
+
+
 @cached("erp_json")
 def load_erp() -> dict:
     """Load Damodaran ERP data — live Excel download with static JSON fallback."""
-    import pandas as pd
-    import tempfile
-    import urllib.request
-
     try:
-        # Download the latest ctryprem.xlsx from Damodaran's site
-        with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as tmp:
-            urllib.request.urlretrieve(DAMODARAN_URL, tmp.name)
-            xl = pd.ExcelFile(tmp.name)
-
-        # Find the regional breakdown sheet
-        sheet_name = None
-        for s in xl.sheet_names:
-            if "regional" in s.lower() or "country" in s.lower():
-                sheet_name = s
-                break
-        if sheet_name is None:
-            sheet_name = xl.sheet_names[1] if len(xl.sheet_names) > 1 else xl.sheet_names[0]
-
-        df = xl.parse(sheet_name, header=0)
-        df.columns = [str(c).strip().lower() for c in df.columns]
-
-        # Detect column names (Damodaran uses different column names across years)
-        country_col = erp_col = crp_col = tax_col = None
-        for c in df.columns:
-            c_clean = c.lower().strip()
-            if c_clean in ("country", "region"):
-                country_col = c
-            elif "risk premium" in c_clean or "total erp" in c_clean or c_clean == "erp":
-                if erp_col is None:
-                    erp_col = c
-            elif "country risk" in c_clean or "crp" in c_clean or "premium" in c_clean:
-                if crp_col is None and erp_col is not None:
-                    crp_col = c
-            elif "tax" in c_clean:
-                tax_col = c
-
-        countries: dict[str, dict] = {}
-        mature_erp = None
-        for _, row in df.iterrows():
-            name = str(row.get(country_col, "")).strip()
-            if not name or name.lower() in ("nan", "none", "", "total"):
-                continue
-            erp_val = _clean(row.get(erp_col)) if erp_col else None
-            crp_val = _clean(row.get(crp_col)) if crp_col else None
-            tax_val = _clean(row.get(tax_col)) if tax_col else None
-
-            if erp_val is None:
-                continue
-
-            countries[name] = {
-                "erp": round(erp_val, 4),
-                "crp": round(crp_val, 4) if crp_val is not None else None,
-                "taxRate": round(tax_val, 4) if tax_val is not None else None,
-            }
-            if name == "United States" or mature_erp is None:
-                mature_erp = erp_val
-
-        if countries:
-            log.info("Loaded %d countries from live Damodaran Excel (%s sheet)", len(countries), sheet_name)
-            return {
-                "asOf": "live",
-                "source": "Aswath Damodaran — ctryprem.xlsx (live download)",
-                "sourceUrl": DAMODARAN_URL,
-                "matureMarketERP": round(mature_erp or 4.46, 2),
-                "countries": countries,
-            }
+        data = _parse_damodaran_xlsx(_download_damodaran_xlsx())
+        log.info("Loaded %d countries from live Damodaran Excel", len(data["countries"]))
+        return data
     except Exception as exc:
         log.warning("Failed to download/parse Damodaran Excel, falling back to JSON: %s", exc)
 
@@ -195,6 +211,7 @@ def detect_country(info: dict) -> str:
 
     # 3. info["country"] if it matches the ERP table directly
     info_country = (info.get("country") or "").strip()
+    info_country = _COUNTRY_ALIASES.get(info_country, info_country)
     if info_country and info_country in country_table:
         return info_country
 
@@ -248,15 +265,18 @@ def tax_rate_for(info: dict, country: str) -> float:
 # Risk-free rate (US 10Y Treasury)
 # ---------------------------------------------------------------------------
 
-def _fetch_dgs10() -> float | None:
-    """Synchronously fetch the latest DGS10 from FRED via fredapi or pandas_datareader."""
+def _fetch_fred_latest(series_id: str) -> float | None:
+    """Synchronously fetch the latest observation of a FRED yield series (percent) as a decimal.
+
+    Uses fredapi, then pandas_datareader; None when both fail or the value is implausible.
+    """
     # Try fredapi first
     try:
         from ..config import FRED_API_KEY
         if FRED_API_KEY:
             from fredapi import Fred
             fred = Fred(api_key=FRED_API_KEY)
-            s = fred.get_series("DGS10")
+            s = fred.get_series(series_id)
             s = s.dropna()
             if len(s) > 0:
                 val = _clean(float(s.iloc[-1]))
@@ -271,7 +291,7 @@ def _fetch_dgs10() -> float | None:
         import pandas_datareader.data as web
         end = datetime.today()
         start = end - timedelta(days=30)
-        df = web.DataReader("DGS10", "fred", start=start, end=end)
+        df = web.DataReader(series_id, "fred", start=start, end=end)
         s = df.iloc[:, 0].dropna()
         if len(s) > 0:
             val = _clean(float(s.iloc[-1]))
@@ -281,6 +301,11 @@ def _fetch_dgs10() -> float | None:
         pass
 
     return None
+
+
+def _fetch_dgs10() -> float | None:
+    """Latest US 10-year Treasury yield (FRED DGS10) as a decimal."""
+    return _fetch_fred_latest("DGS10")
 
 
 RISK_FREE_FALLBACK = 0.04
@@ -305,6 +330,27 @@ def risk_free_rate() -> float:
     hour (and persisted) as if it were real.
     """
     live = _risk_free_rate_live()
+    return live if live is not None else RISK_FREE_FALLBACK
+
+
+@cached("rf3m")
+def _short_risk_free_rate_live() -> float | None:
+    """Live DGS3MO as a decimal, or None — a failure is never cached."""
+    return _fetch_fred_latest("DGS3MO")
+
+
+def short_risk_free_rate_is_fallback() -> bool:
+    """True when :func:`short_risk_free_rate` is serving the hard-coded fallback."""
+    return _short_risk_free_rate_live() is None
+
+
+def short_risk_free_rate() -> float:
+    """US 3-month Treasury bill yield (FRED DGS3MO) as a decimal. Cached 60 min.
+
+    Falls back to :data:`RISK_FREE_FALLBACK` when FRED is unreachable; like the 10-year
+    rate, the fallback is not cached.
+    """
+    live = _short_risk_free_rate_live()
     return live if live is not None else RISK_FREE_FALLBACK
 
 
