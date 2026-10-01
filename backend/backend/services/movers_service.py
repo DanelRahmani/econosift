@@ -1,16 +1,18 @@
 """Top movers from an index's constituents (compute tier 🟢).
 
 Gainers, losers, unusual volume (last session > 2× its 3-month average), and
-fresh 52-week highs / lows — all from the cached constituent universe plus one
-close download and one volume download.
+fresh 52-week highs / lows — from the same session-aligned constituent prices
+as the breadth bar, so the lists agree with its counts, plus one volume
+download.
 """
 from __future__ import annotations
 
 import pandas as pd
 
+from .. import provenance as pv
 from ..cache import cached
 from . import yfinance_service as yfs
-from . import constituents
+from . import breadth_service, constituents
 
 
 def _names(index: str) -> dict[str, str]:
@@ -27,19 +29,23 @@ def top_movers(index: str = "sp500", limit: int = 10) -> dict:
     if not syms:
         return empty
 
-    frame = yfs.get_close_frame(syms, "1y")
-    if frame is None or frame.empty:
+    # Prices as traded for the last completed session — the breadth bar's
+    # frames. (Adjusted closes from a separate download made the 1-day change
+    # differ from the quoted one on ex-dividend days, and the new-high/low
+    # lists disagree with the breadth counts shown next to them.)
+    frames = breadth_service._ohlc_frames(index)
+    if not frames or len(frames["close"]) < 2:
         return empty
-    frame = frame.sort_index()
-    as_of = frame.index[-1].strftime("%Y-%m-%d")
+    close, high, low = frames["close"], frames["high"], frames["low"]
+    session = close.index[-1]
+    as_of = session.strftime("%Y-%m-%d")
 
-    last = frame.iloc[-1]
-    prev = frame.iloc[-2] if len(frame) > 1 else last
+    last = close.iloc[-1]
+    prev = close.iloc[-2]
 
     # 1-day % change per symbol.
     rows: list[dict] = []
-    window = frame.tail(252)
-    for sym in frame.columns:
+    for sym in close.columns:
         cur = last.get(sym)
         pr = prev.get(sym)
         if pd.isna(cur) or pd.isna(pr) or pr == 0:
@@ -51,19 +57,16 @@ def top_movers(index: str = "sp500", limit: int = 10) -> dict:
     gainers = sorted(rows, key=lambda r: r["changePercent"], reverse=True)[:limit]
     losers = sorted(rows, key=lambda r: r["changePercent"])[:limit]
 
-    # 52-week highs / lows.
-    highs: list[dict] = []
-    lows: list[dict] = []
+    # 52-week highs / lows: session high (low) is the extreme of the trailing
+    # 252 sessions — the definition the breadth counts use.
     by_sym = {r["ticker"]: r for r in rows}
-    for sym in frame.columns:
-        s = window[sym].dropna()
-        if len(s) < 30 or sym not in by_sym:
-            continue
-        cur = s.iloc[-1]
-        if cur >= s.max() - 1e-9:
-            highs.append(by_sym[sym])
-        elif cur <= s.min() + 1e-9:
-            lows.append(by_sym[sym])
+    hi_max = high.tail(252).max()
+    lo_min = low.tail(252).min()
+    sessions = close.tail(252).notna().sum()
+    highs = [by_sym[s] for s in close.columns
+             if s in by_sym and sessions[s] >= 30 and high[s].iloc[-1] >= hi_max[s] - 1e-9]
+    lows = [by_sym[s] for s in close.columns
+            if s in by_sym and sessions[s] >= 30 and low[s].iloc[-1] <= lo_min[s] + 1e-9]
     highs = sorted(highs, key=lambda r: r["changePercent"], reverse=True)[:limit]
     lows = sorted(lows, key=lambda r: r["changePercent"])[:limit]
 
@@ -72,6 +75,8 @@ def top_movers(index: str = "sp500", limit: int = 10) -> dict:
     vol = yfs.get_volume_frame(syms, "3mo")
     if vol is not None and not vol.empty:
         vol = vol.sort_index()
+        vol = vol[pd.to_datetime(vol.index).tz_localize(None).normalize() <= session]
+    if vol is not None and not vol.empty:
         last_vol = vol.iloc[-1]
         avg_vol = vol.tail(63).mean()
         for sym in vol.columns:
@@ -85,8 +90,23 @@ def top_movers(index: str = "sp500", limit: int = 10) -> dict:
                                 "avgVolume": int(av), "volumeRatio": round(ratio, 2)})
         unusual = sorted(unusual, key=lambda r: r["volumeRatio"], reverse=True)[:limit]
 
-    return {
+    prices = pv.ref("yahoo", None, f"Daily high/low/close of each {index} member",
+                    units="price as traded (split-adjusted)", frequency="daily", observed=as_of)
+    members_ref = pv.ref("wikipedia", None, f"Current {index} constituents")
+    change = pv.derived("close / previous close − 1", [prices, members_ref],
+                        title="1-day change, last completed session", observed=as_of)
+    hilo = pv.derived("session high (low) is the highest (lowest) of the trailing 252 sessions",
+                      [prices, members_ref], title="New 52-week highs / lows", observed=as_of)
+    return pv.attach({
         "index": index, "asOf": as_of,
         "gainers": gainers, "losers": losers,
         "unusualVolume": unusual, "newHighs": highs, "newLows": lows,
-    }
+    }, {
+        "*": change, "gainers": change, "losers": change,
+        "newHighs": hilo, "newLows": hilo,
+        "unusualVolume": pv.derived(
+            "last session's volume ≥ 2 × its trailing 63-session average",
+            [pv.ref("yahoo", None, f"Daily share volume of each {index} member", frequency="daily", observed=as_of),
+             members_ref],
+            title="Unusual volume", observed=as_of),
+    })

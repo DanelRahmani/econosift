@@ -10,6 +10,8 @@ import { chartTooltipStyle, chartPalette } from "@/components/ui";
 import { fmtPct } from "@/lib/format";
 import { api } from "@/lib/api";
 import type { StressTestResponse, StressScenarioResult } from "@/lib/types";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 
 interface Props {
   ticker: string;
@@ -32,7 +34,7 @@ function ScenarioCard({
   const palette = chartPalette(theme);
 
   return (
-    <Card className="p-4 space-y-2">
+    <Card className="p-4 space-y-2" data-prov={`scenarios.${scenario.scenario}`} data-prov-ctx={scenario.label}>
       <div className="flex items-start justify-between">
         <div>
           <div className="flex items-center gap-2">
@@ -114,6 +116,7 @@ function ScenarioCard({
 export function StressTestPanel({ ticker, theme }: Props) {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<StressTestResponse | null>(null);
+  const scope = useSourceScope(provOf(result));
 
   async function runStress() {
     setLoading(true);
@@ -126,7 +129,7 @@ export function StressTestPanel({ ticker, theme }: Props) {
   }
 
   return (
-    <Card className="p-4 space-y-4">
+    <Card className="p-4 space-y-4" {...scope}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <h3 className="text-sm font-semibold">Historical Stress Testing</h3>

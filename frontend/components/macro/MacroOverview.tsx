@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
 import type { Country, Indicator, MacroResponse, MacroSeries } from "@/lib/types";
+import { provOf, type Provenance } from "@/lib/provenance";
 import { Card, Skeleton } from "@/components/ui";
 import { FxWidget } from "./FxWidget";
 import { YieldCurve } from "./YieldCurve";
@@ -37,6 +38,7 @@ export function MacroOverview() {
   const [loading, setLoading] = useState(false);
   const [showForecast, setShowForecast] = useState(false);
   const [forecast, setForecast] = useState<MacroSeries[]>([]);
+  const [forecastProv, setForecastProv] = useState<Provenance | undefined>(undefined);
   const [forecastLoading, setForecastLoading] = useState(false);
 
   useEffect(() => {
@@ -66,12 +68,12 @@ export function MacroOverview() {
   }, [selKey, indicator, start, end]);
 
   useEffect(() => {
-    if (!showForecast || !canForecast || !selected.length) { setForecast([]); return; }
+    if (!showForecast || !canForecast || !selected.length) { setForecast([]); setForecastProv(undefined); return; }
     let active = true;
     setForecastLoading(true);
     api.forecast(selKey, indicator, CURRENT_YEAR + 5)
-      .then((r) => active && setForecast(r.series))
-      .catch(() => active && setForecast([]))
+      .then((r) => { if (active) { setForecast(r.series); setForecastProv(provOf(r)); } })
+      .catch(() => { if (active) { setForecast([]); setForecastProv(undefined); } })
       .finally(() => active && setForecastLoading(false));
     return () => { active = false; };
   }, [showForecast, canForecast, selKey, indicator]);
@@ -167,7 +169,7 @@ export function MacroOverview() {
         {loading && !data ? (
           <Skeleton className="h-96" />
         ) : data ? (
-          <MacroChart data={data} forecast={showForecast ? forecast : []} />
+          <MacroChart data={data} forecast={showForecast ? forecast : []} forecastProv={showForecast ? forecastProv : undefined} />
         ) : null}
       </Card>
 

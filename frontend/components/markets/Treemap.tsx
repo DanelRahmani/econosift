@@ -308,6 +308,8 @@ export function TreemapChart({ stocks, groupBy, period }: Props) {
               key={`group-${node.data.name}-${node.depth}`}
               onClick={() => canDrillDown && handleGroupClick(node)}
               style={{ cursor: canDrillDown ? "pointer" : "default" }}
+              data-prov={node.depth === 1 ? "stocks.sector" : "stocks.industry"}
+              data-prov-ctx={node.data.name}
             >
               <rect
                 x={x0}
@@ -367,6 +369,8 @@ export function TreemapChart({ stocks, groupBy, period }: Props) {
               onClick={() => handleLeafClick(node)}
               onMouseMove={(e) => handleMouseMove(e, stock.symbol)}
               style={{ cursor: "crosshair" }}
+              data-prov="stocks.changePercent"
+              data-prov-ctx={stock.symbol}
             >
               <rect
                 x={x0}

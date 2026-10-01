@@ -6,6 +6,8 @@ import { useTheme } from "@/components/ThemeProvider";
 import { Skeleton, TabButton } from "@/components/ui";
 import { SearchBar } from "@/components/SearchBar";
 import { useUrlState } from "@/lib/useUrlState";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 import { IVKPIRow } from "@/components/options/IVKPIRow";
 import { ChainTable } from "@/components/options/ChainTable";
 import { IVTermStructure } from "@/components/options/IVTermStructure";
@@ -48,6 +50,11 @@ function OptionsPageInner() {
   const [termStructure, setTermStructure] = useState<IVTermPoint[]>([]);
   const [smile, setSmile] = useState<IVSmilePoint[]>([]);
   const [oiProfile, setOiProfile] = useState<OIProfile | null>(null);
+
+  // Expiries, term structure and smile are bare lists with no map of their own; they sit under the
+  // ivmetrics scope (same Yahoo option-chain source). The chain response has its own scope for the spot line.
+  const kpisScope = useSourceScope(provOf(kpis));
+  const chainScope = useSourceScope(provOf(chain));
 
   // Loading states
   const [kpisLoading, setKpisLoading] = useState(false);
@@ -184,7 +191,7 @@ function OptionsPageInner() {
       <IVKPIRow kpis={kpis} loading={kpisLoading} />
 
       {/* Expiry selector */}
-      <div className="flex items-center gap-3 flex-wrap">
+      <div className="flex items-center gap-3 flex-wrap" {...kpisScope}>
         <span className="text-sm text-text-muted font-medium">Expiry:</span>
         {expiriesLoading ? (
           <Skeleton className="h-9 w-40 rounded-lg" />
@@ -238,7 +245,7 @@ function OptionsPageInner() {
                 OTM only
               </label>
               {chain && (
-                <span className="text-xs text-text-muted">
+                <span className="text-xs text-text-muted" data-prov="spot" {...chainScope}>
                   {chain.calls.length} calls · {chain.puts.length} puts ·
                   Spot {chain.spot ? `$${chain.spot.toFixed(2)}` : "—"}
                 </span>
@@ -250,7 +257,7 @@ function OptionsPageInner() {
 
         {/* Volatility Tab */}
         {tab === "Volatility" && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4" {...kpisScope}>
             <IVTermStructure data={termStructure} loading={termLoading} theme={theme} />
             <IVSmile data={smile} loading={smileLoading} theme={theme} />
           </div>

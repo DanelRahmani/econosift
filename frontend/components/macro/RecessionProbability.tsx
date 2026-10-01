@@ -4,6 +4,9 @@ import { api } from "@/lib/api";
 import type { RecessionProbabilityData } from "@/lib/types";
 import { PageSkeleton, Card, chartPalette } from "@/components/ui";
 import { CHART_COLORS } from "@/lib/format";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
+import { legendProv } from "./legendProv";
 import {
   ResponsiveContainer,
   LineChart,
@@ -21,9 +24,9 @@ function fmtNum(v: number | null | undefined, decimals = 1, suffix = ""): string
   return v != null ? `${v.toFixed(decimals)}${suffix}` : "—";
 }
 
-function RecessionKpi({ label, value, color }: { label: string; value: string; color?: string }) {
+function RecessionKpi({ label, value, color, prov }: { label: string; value: string; color?: string; prov?: string }) {
   return (
-    <Card className="p-4">
+    <Card className="p-4" data-prov={prov} data-prov-ctx={label}>
       <div className="text-xs text-text-secondary">{label}</div>
       <div className={`text-2xl font-bold mt-1 ${color ?? ""}`}>{value}</div>
     </Card>
@@ -33,6 +36,7 @@ function RecessionKpi({ label, value, color }: { label: string; value: string; c
 export function RecessionProbability() {
   const [data, setData] = useState<RecessionProbabilityData | null>(null);
   const [loading, setLoading] = useState(true);
+  const scope = useSourceScope(provOf(data));
   // Use dark as default since chartPalette dark values work reasonably in both themes
   const pal = chartPalette("dark");
 
@@ -111,7 +115,7 @@ export function RecessionProbability() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" {...scope}>
       <div>
         <h2 className="font-semibold mb-1">Recession Probability Model</h2>
         <p className="text-xs text-text-secondary mb-3">
@@ -119,16 +123,18 @@ export function RecessionProbability() {
           NBER recession history.
         </p>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          <RecessionKpi label="12-Mo Recession Prob" value={fmtNum(kpis.prob12m, 1, "%")} color={probColor} />
+          <RecessionKpi prov="kpis.prob12m" label="12-Mo Recession Prob" value={fmtNum(kpis.prob12m, 1, "%")} color={probColor} />
           <RecessionKpi
+            prov="kpis.sahm"
             label="Sahm Rule"
             value={kpis.sahm != null ? kpis.sahm.toFixed(2) : "—"}
             color={kpis.sahm != null ? (sahmTriggered ? "text-danger" : "text-success") : undefined}
           />
-          <RecessionKpi label="10y–3m Spread" value={fmtNum(kpis.spreadPct, 2, "%")} />
-          <RecessionKpi label="Months Inverted" value={kpis.monthsInverted != null ? `${kpis.monthsInverted}` : "—"} />
-          <RecessionKpi label="FRED Smoothed Prob" value={fmtNum(kpis.smoothedProb, 1, "%")} />
+          <RecessionKpi prov="kpis.spreadPct" label="10y–3m Spread" value={fmtNum(kpis.spreadPct, 2, "%")} />
+          <RecessionKpi prov="kpis.monthsInverted" label="Months Inverted" value={kpis.monthsInverted != null ? `${kpis.monthsInverted}` : "—"} />
+          <RecessionKpi prov="kpis.smoothedProb" label="FRED Smoothed Prob" value={fmtNum(kpis.smoothedProb, 1, "%")} />
           <RecessionKpi
+            prov="kpis.prob12mRealtime"
             label="Real-time P(recession)"
             value={fmtNum(kpis.prob12mRealtime, 1, "%")}
           />
@@ -136,7 +142,7 @@ export function RecessionProbability() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="p-4 bg-surface border border-border rounded-lg shadow-sm">
+        <div className="p-4 bg-surface border border-border rounded-lg shadow-sm" data-prov="history.probability" data-prov-ctx="12-month recession probability">
           <h3 className="font-semibold text-sm mb-1">12-Month Recession Probability</h3>
           <p className="text-xs text-text-secondary mb-2">
             The solid line fits one probit over the whole history and applies it
@@ -152,7 +158,7 @@ export function RecessionProbability() {
                 <XAxis dataKey="date" fontSize={10} minTickGap={40} />
                 <YAxis domain={[0, 100]} width={36} fontSize={10} tickFormatter={(v) => `${v}%`} />
                 <Tooltip contentStyle={tooltipStyle} />
-                <Legend wrapperStyle={{ fontSize: 11 }} />
+                <Legend wrapperStyle={{ fontSize: 11 }} formatter={legendProv({ "In-sample P(recession)": "history.probability", "Real-time (walk-forward)": "history.probabilityRealtime", "FRED Smoothed Prob": "history.smoothedProb" })} />
                 <RecessionAreas />
                 <Line type="monotone" dataKey="probability" name="In-sample P(recession)" stroke={CHART_COLORS[0]} dot={false} connectNulls />
                 <Line
@@ -178,7 +184,7 @@ export function RecessionProbability() {
           </div>
         </div>
 
-        <div className="p-4 bg-surface border border-border rounded-lg shadow-sm">
+        <div className="p-4 bg-surface border border-border rounded-lg shadow-sm" data-prov="history.spread" data-prov-ctx="10y–3m Treasury spread (monthly mean)">
           <h3 className="font-semibold text-sm mb-2">10y–3m Treasury Spread (Monthly Mean)</h3>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
@@ -210,16 +216,16 @@ export function RecessionProbability() {
           </thead>
           <tbody>
             {tableRows.map((r) => (
-              <tr key={r.date} className="border-b border-border/50">
+              <tr key={r.date} className="border-b border-border/50" data-prov-ctx={r.date}>
                 <td className="py-1.5 pr-3">{r.date}</td>
-                <td className={`py-1.5 pr-3 text-right ${r.spread != null ? (r.spread < 0 ? "text-danger" : "") : ""}`}>
+                <td data-prov="history.spread" className={`py-1.5 pr-3 text-right ${r.spread != null ? (r.spread < 0 ? "text-danger" : "") : ""}`}>
                   {fmtNum(r.spread, 2, "%")}
                 </td>
-                <td className="py-1.5 pr-3 text-right">{fmtNum(r.probability, 1, "%")}</td>
-                <td className={`py-1.5 pr-3 text-right ${r.sahm != null && r.sahm >= 0.5 ? "text-danger" : ""}`}>
+                <td data-prov="history.probability" className="py-1.5 pr-3 text-right">{fmtNum(r.probability, 1, "%")}</td>
+                <td data-prov="history.sahm" className={`py-1.5 pr-3 text-right ${r.sahm != null && r.sahm >= 0.5 ? "text-danger" : ""}`}>
                   {r.sahm != null ? r.sahm.toFixed(2) : "—"}
                 </td>
-                <td className="py-1.5 text-right">{fmtNum(r.smoothed, 1, "%")}</td>
+                <td data-prov="history.smoothedProb" className="py-1.5 text-right">{fmtNum(r.smoothed, 1, "%")}</td>
               </tr>
             ))}
           </tbody>

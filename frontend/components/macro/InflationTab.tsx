@@ -1,8 +1,12 @@
 "use client";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import { asOf } from "@/lib/series";
 import type { InflationData } from "@/lib/types";
 import { Card, PageSkeleton } from "@/components/ui";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
+import { legendProv } from "./legendProv";
 import {
   LineChart,
   Line,
@@ -22,14 +26,16 @@ function KpiCard({
   value,
   unit = "%",
   color,
+  prov,
 }: {
   label: string;
   value: number | null;
   unit?: string;
   color?: string;
+  prov?: string;
 }) {
   return (
-    <Card className="p-4">
+    <Card className="p-4" data-prov={prov} data-prov-ctx={label}>
       <div className="text-xs text-text-secondary">{label}</div>
       <div className={`text-2xl font-bold mt-1 ${color ?? ""}`}>
         {value != null ? `${value.toFixed(2)}${unit}` : "—"}
@@ -49,6 +55,7 @@ export function InflationTab() {
   const [data, setData] = useState<InflationData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const scope = useSourceScope(provOf(data));
 
   useEffect(() => {
     api
@@ -71,84 +78,96 @@ export function InflationTab() {
   }
 
   const { kpis, history } = data;
+  // Series differ in frequency and start date: pair them by date, never by
+  // array position (which plotted values against the wrong dates).
+  const at = {
+    cpi: asOf(history.cpiYoY), coreCpi: asOf(history.coreCpiYoY), pce: asOf(history.pceYoY),
+    corePce: asOf(history.corePceYoY), be10: asOf(history.breakeven10y), fwd: asOf(history.forward5y5y),
+    mich: asOf(history.michigan5y), m2: asOf(data.quantityTheory?.m2YoY),
+  };
 
   // Chart 1: CPI vs Core CPI vs PCE vs Core PCE
-  const cpiMulti = (history.cpiYoY ?? []).map((pt, i) => ({
+  const cpiMulti = (history.cpiYoY ?? []).map((pt) => ({
     date: pt.date.slice(0, 7),
     "CPI YoY": pt.value,
-    "Core CPI YoY": history.coreCpiYoY?.[i]?.value ?? null,
-    "PCE YoY": history.pceYoY?.[i]?.value ?? null,
-    "Core PCE YoY": history.corePceYoY?.[i]?.value ?? null,
+    "Core CPI YoY": at.coreCpi(pt.date),
+    "PCE YoY": at.pce(pt.date),
+    "Core PCE YoY": at.corePce(pt.date),
   }));
 
   // Chart 2: PPI vs CPI
-  const ppiData = (history.ppiYoY ?? []).map((pt, i) => ({
+  const ppiData = (history.ppiYoY ?? []).map((pt) => ({
     date: pt.date.slice(0, 7),
     "PPI YoY": pt.value,
-    "CPI YoY": history.cpiYoY?.[i]?.value ?? null,
+    "CPI YoY": at.cpi(pt.date),
   }));
 
-  // Chart 3: Breakeven inflation
-  const beData = (history.breakeven5y ?? []).map((pt, i) => ({
+  // Chart 3: Breakeven inflation (daily) with the monthly Michigan survey
+  const beData = (history.breakeven5y ?? []).map((pt) => ({
     date: pt.date.slice(0, 7),
     "5Y Breakeven": pt.value,
-    "10Y Breakeven": history.breakeven10y?.[i]?.value ?? null,
-    "5Y5Y Forward": history.forward5y5y?.[i]?.value ?? null,
-    "Michigan 5Y": history.michigan5y?.[i]?.value ?? null,
+    "10Y Breakeven": at.be10(pt.date),
+    "5Y5Y Forward": at.fwd(pt.date),
+    "Michigan 1Y": at.mich(pt.date),
   }));
 
-  // Chart 3b: Market-Implied (5Y Breakeven) vs Survey-Implied (Michigan 5Y)
-  const msData = (history.breakeven5y ?? []).map((pt, i) => ({
+  // Chart 3b: Market-Implied (5Y Breakeven) vs Survey-Implied (Michigan, 1-year ahead)
+  const msData = (history.breakeven5y ?? []).map((pt) => ({
     date: pt.date.slice(0, 7),
     "Market 5Y BE": pt.value,
-    "Michigan 5Y": history.michigan5y?.[i]?.value ?? null,
+    "Michigan 1Y": at.mich(pt.date),
   }));
 
   // Chart 4: M2 vs CPI (dual axis)
-  const m2Data = (history.m2Yoy ?? []).map((pt, i) => ({
+  const m2Data = (history.m2Yoy ?? []).map((pt) => ({
     date: pt.date.slice(0, 7),
     "M2 YoY %": pt.value,
-    "CPI YoY": history.cpiYoY?.[i]?.value ?? null,
+    "CPI YoY": at.cpi(pt.date),
   }));
 
-  // Chart 5: Quantity Theory — M2 growth vs Nominal GDP growth (dual axis)
-  const qtData = (data.quantityTheory?.nominalGdp ?? []).map((pt, i) => ({
+  // Chart 5: Quantity Theory — M2 growth vs Nominal GDP growth (dual axis).
+  // (Read nominalGdp/m2, which the API never sent, so this chart never drew.)
+  const qtData = (data.quantityTheory?.nominalGdpYoY ?? []).map((pt) => ({
     date: pt.date.slice(0, 7),
     "Nominal GDP YoY %": pt.value,
-    "M2 YoY %": data.quantityTheory?.m2?.[i]?.value ?? null,
+    "M2 YoY %": at.m2(pt.date),
   }));
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" {...scope}>
       {/* KPI Row */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         <KpiCard
           label="CPI YoY"
+          prov="kpis.cpiYoY"
           value={kpis.cpiYoY}
           color={kpiColor(kpis.cpiYoY)}
         />
         <KpiCard
           label="Core CPI YoY"
+          prov="kpis.coreCpiYoY"
           value={kpis.coreCpiYoY}
           color={kpiColor(kpis.coreCpiYoY)}
         />
         <KpiCard
           label="PCE YoY"
+          prov="kpis.pceYoY"
           value={kpis.pceYoY}
           color={kpiColor(kpis.pceYoY)}
         />
         <KpiCard
           label="Core PCE YoY"
+          prov="kpis.corePceYoY"
           value={kpis.corePceYoY}
           color={kpiColor(kpis.corePceYoY)}
         />
-        <KpiCard label="5Y Breakeven" value={kpis.breakeven5y} />
-        <KpiCard label="Michigan 5Y Expectations" value={kpis.michigan5y} />
+        <KpiCard label="5Y Breakeven" value={kpis.breakeven5y} prov="kpis.breakeven5y" />
+        <KpiCard label="Michigan 1Y Expectations" value={kpis.michigan5y} prov="kpis.michigan5y" />
       </div>
 
       {/* Chart 1: Inflation measures multi-line */}
       {cpiMulti.length > 0 && (
-        <Card className="p-4">
+        <Card className="p-4" data-prov="history.cpiYoY" data-prov-ctx="Inflation measures (YoY %)">
           <h3 className="font-semibold mb-3">Inflation Measures (YoY %)</h3>
           <ResponsiveContainer width="100%" height={280}>
             <LineChart data={cpiMulti}>
@@ -156,7 +175,7 @@ export function InflationTab() {
               <XAxis dataKey="date" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
               <YAxis tickFormatter={(v) => `${v}%`} tick={{ fontSize: 11 }} />
               <Tooltip formatter={(v: number) => [`${v?.toFixed(2)}%`]} />
-              <Legend />
+              <Legend formatter={legendProv({ "CPI YoY": "history.cpiYoY", "Core CPI YoY": "history.coreCpiYoY", "PCE YoY": "history.pceYoY", "Core PCE YoY": "history.corePceYoY" })} />
               <ReferenceLine y={2} stroke="rgba(255,255,255,0.25)" strokeDasharray="4 4" />
               <Line type="monotone" dataKey="CPI YoY" stroke="#ef4444" dot={false} strokeWidth={1.5} />
               <Line type="monotone" dataKey="Core CPI YoY" stroke="#f59e0b" dot={false} strokeWidth={1.5} />
@@ -169,7 +188,7 @@ export function InflationTab() {
 
       {/* Chart 2: PPI vs CPI */}
       {ppiData.length > 0 && (
-        <Card className="p-4">
+        <Card className="p-4" data-prov="history.ppiYoY" data-prov-ctx="PPI vs CPI (YoY %)">
           <h3 className="font-semibold mb-1">PPI vs CPI (YoY %)</h3>
           <p className="text-xs text-text-secondary mb-3">
             PPI leads CPI — producer price pressures flow through to consumers
@@ -180,7 +199,7 @@ export function InflationTab() {
               <XAxis dataKey="date" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
               <YAxis tickFormatter={(v) => `${v}%`} tick={{ fontSize: 11 }} />
               <Tooltip formatter={(v: number) => [`${v?.toFixed(2)}%`]} />
-              <Legend />
+              <Legend formatter={legendProv({ "PPI YoY": "history.ppiYoY", "CPI YoY": "history.cpiYoY" })} />
               <Line type="monotone" dataKey="PPI YoY" stroke="#8b5cf6" dot={false} strokeWidth={1.5} />
               <Line type="monotone" dataKey="CPI YoY" stroke="#ef4444" dot={false} strokeWidth={1.5} />
             </LineChart>
@@ -190,7 +209,7 @@ export function InflationTab() {
 
       {/* Chart 3: Breakeven Inflation */}
       {beData.length > 0 && (
-        <Card className="p-4">
+        <Card className="p-4" data-prov="history.breakeven5y" data-prov-ctx="Breakeven inflation expectations">
           <h3 className="font-semibold mb-1">Breakeven Inflation Expectations</h3>
           <p className="text-xs text-text-secondary mb-3">
             Market-implied inflation derived from TIPS spreads
@@ -201,13 +220,13 @@ export function InflationTab() {
               <XAxis dataKey="date" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
               <YAxis tickFormatter={(v) => `${v}%`} tick={{ fontSize: 11 }} />
               <Tooltip formatter={(v: number) => [`${v?.toFixed(2)}%`]} />
-              <Legend />
+              <Legend formatter={legendProv({ "5Y Breakeven": "history.breakeven5y", "10Y Breakeven": "history.breakeven10y", "5Y5Y Forward": "history.forward5y5y", "Michigan 1Y": "history.michigan5y" })} />
               <ReferenceLine y={2} stroke="rgba(255,255,255,0.25)" strokeDasharray="4 4"
                 label={{ value: "2% Fed target", fill: "rgba(255,255,255,0.4)", fontSize: 11 }} />
               <Line type="monotone" dataKey="5Y Breakeven" stroke="#f59e0b" dot={false} strokeWidth={1.5} />
               <Line type="monotone" dataKey="10Y Breakeven" stroke="#ef4444" dot={false} strokeWidth={1.5} />
               <Line type="monotone" dataKey="5Y5Y Forward" stroke="#10b981" dot={false} strokeWidth={1.5} strokeDasharray="4 4" />
-            <Line type="monotone" dataKey="Michigan 5Y" stroke="#f97316" dot={false} strokeWidth={1.5} strokeDasharray="6 3" />
+            <Line type="monotone" dataKey="Michigan 1Y" stroke="#f97316" dot={false} strokeWidth={1.5} strokeDasharray="6 3" />
             </LineChart>
           </ResponsiveContainer>
         </Card>
@@ -215,10 +234,10 @@ export function InflationTab() {
 
       {/* Chart 3b: Market vs Survey Inflation */}
       {msData.length > 0 && (
-        <Card className="p-4">
+        <Card className="p-4" data-prov="history.breakeven5y" data-prov-ctx="Market-implied vs survey-implied inflation">
           <h3 className="font-semibold mb-1">Market-Implied vs Survey-Implied Inflation</h3>
           <p className="text-xs text-text-secondary mb-3">
-            5Y Breakeven (market-implied, from TIPS) vs Michigan 5Y Survey (consumer expectations). Divergence signals market pricing different inflation than consumers expect.
+            5Y Breakeven (market-implied, from TIPS) vs the Michigan survey&apos;s 1-year-ahead consumer expectation (FRED MICH). The horizons differ, so read divergence loosely.
           </p>
           <ResponsiveContainer width="100%" height={220}>
             <LineChart data={msData}>
@@ -226,10 +245,10 @@ export function InflationTab() {
               <XAxis dataKey="date" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
               <YAxis tickFormatter={(v) => `${v}%`} tick={{ fontSize: 11 }} />
               <Tooltip formatter={(v: number) => [`${v?.toFixed(2)}%`]} />
-              <Legend />
+              <Legend formatter={legendProv({ "Market 5Y BE": "history.breakeven5y", "Michigan 1Y": "history.michigan5y" })} />
               <ReferenceLine y={2} stroke="rgba(255,255,255,0.25)" strokeDasharray="4 4" />
               <Line type="monotone" dataKey="Market 5Y BE" stroke="#f59e0b" dot={false} strokeWidth={2} />
-              <Line type="monotone" dataKey="Michigan 5Y" stroke="#3b82f6" dot={false} strokeWidth={1.5} strokeDasharray="5 5" />
+              <Line type="monotone" dataKey="Michigan 1Y" stroke="#3b82f6" dot={false} strokeWidth={1.5} strokeDasharray="5 5" />
             </LineChart>
           </ResponsiveContainer>
         </Card>
@@ -237,7 +256,7 @@ export function InflationTab() {
 
       {/* Chart 4: M2 vs CPI */}
       {m2Data.length > 0 && (
-        <Card className="p-4">
+        <Card className="p-4" data-prov="history.m2Yoy" data-prov-ctx="M2 money supply growth vs CPI">
           <h3 className="font-semibold mb-1">M2 Money Supply Growth vs CPI</h3>
           <p className="text-xs text-text-secondary mb-3">
             Excess money supply growth tends to precede inflation with a 12–18 month lag
@@ -248,7 +267,7 @@ export function InflationTab() {
               <XAxis dataKey="date" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
               <YAxis tickFormatter={(v) => `${v}%`} tick={{ fontSize: 11 }} />
               <Tooltip formatter={(v: number) => [`${v?.toFixed(2)}%`]} />
-              <Legend />
+              <Legend formatter={legendProv({ "M2 YoY %": "history.m2Yoy", "CPI YoY": "history.cpiYoY" })} />
               <Line type="monotone" dataKey="M2 YoY %" stroke="#8b5cf6" dot={false} strokeWidth={1.5} />
               <Line type="monotone" dataKey="CPI YoY" stroke="#ef4444" dot={false} strokeWidth={1.5} />
             </LineChart>
@@ -258,7 +277,7 @@ export function InflationTab() {
 
       {/* Chart 5: Quantity Theory */}
       {qtData.length > 0 && (
-        <Card className="p-4">
+        <Card className="p-4" data-prov="quantityTheory.nominalGdpYoY" data-prov-ctx="Quantity theory of money (MV = PQ)">
           <h3 className="font-semibold mb-1">Quantity Theory of Money (MV = PQ)</h3>
           <p className="text-xs text-text-secondary mb-3">
             M2 growth (right axis) vs Nominal GDP growth (left axis). If velocity is stable, money growth drives nominal GDP.
@@ -270,7 +289,7 @@ export function InflationTab() {
               <YAxis yAxisId="left" tickFormatter={(v) => `${v}%`} tick={{ fontSize: 11 }} domain={[-10, 30]} />
               <YAxis yAxisId="right" orientation="right" tickFormatter={(v) => `${v}%`} tick={{ fontSize: 11 }} domain={[-10, 30]} />
               <Tooltip formatter={(v: number) => [`${v?.toFixed(2)}%`]} />
-              <Legend />
+              <Legend formatter={legendProv({ "Nominal GDP YoY %": "quantityTheory.nominalGdpYoY", "M2 YoY %": "quantityTheory.m2YoY" })} />
               <Line yAxisId="left" type="monotone" dataKey="Nominal GDP YoY %" stroke="#3b82f6" dot={false} strokeWidth={2} />
               <Line yAxisId="right" type="monotone" dataKey="M2 YoY %" stroke="#8b5cf6" dot={false} strokeWidth={1.5} strokeDasharray="5 5" />
             </LineChart>

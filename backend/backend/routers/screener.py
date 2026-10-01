@@ -6,6 +6,7 @@ import json
 import threading
 from fastapi import APIRouter, HTTPException, Query
 
+from .. import provenance as pv
 from ..services import yfinance_service as yfs
 from ..services import metrics
 from ..services import screener_service
@@ -111,14 +112,28 @@ async def screen(
     sort_field = sort if sort in FIELDS else "sharpe"
     matched.sort(key=lambda r: (_value(r, sort_field) is None, -(_value(r, sort_field) or 0)))
 
-    return {
+    info = pv.ref("yahoo", None, "Quote snapshot and latest annual statements of each ticker")
+    prices = pv.ref("yahoo", None, f"Daily adjusted close of each ticker and its benchmark index, {period}",
+                    frequency="daily")
+    return pv.attach({
         "fields": list(FIELDS.keys()),
         "filters": parsed_filters,
         "sort": sort_field,
         "count": len(matched),
         "screened": len(rows),
         "results": matched,
-    }
+    }, {
+        "*": info,
+        "results": pv.derived("financial ratios from the statements and quote snapshot (see the Ratios tab for "
+                              "each formula)", [info], title="Screener ratios"),
+        "results.sharpe": pv.derived(
+            f"(annualised mean log return − risk-free) / annualised volatility; risk-free = {risk_free:g} "
+            "(request parameter)", [prices], title="Sharpe ratio"),
+        "results.beta": pv.derived("cov(ticker, benchmark daily log returns) / var(benchmark)", [prices],
+                                   title="Beta vs benchmark index"),
+        "results.zScore": pv.derived("Altman Z = 1.2·WC/TA + 1.4·RE/TA + 3.3·EBIT/TA + 0.6·MV/TL + 1.0·Sales/TA",
+                                     [info], title="Altman Z-Score"),
+    })
 
 
 # ---------------------------------------------------------------------------
@@ -182,7 +197,7 @@ async def get_universe(
         except (json.JSONDecodeError, ValueError):
             parsed_filters = []
 
-    return screener_service.query(
+    result = screener_service.query(
         index=index,
         preset_ids=preset_ids,
         filters=parsed_filters,
@@ -190,3 +205,14 @@ async def get_universe(
         direction=dir,
         limit=limit,
     )
+    stale = bool(result.get("stale")) if isinstance(result, dict) else False
+    return pv.attach(result, {
+        "*": pv.derived(
+            f"fundamentals, prices and technical indicators for each {index} member, filtered and sorted",
+            [pv.ref("yahoo", None, "Quote snapshot, statements and daily prices of each member",
+                    observed=result.get("asOf") if isinstance(result, dict) else None,
+                    flags=("stale",) if stale else (),
+                    note="Served from the overnight screener cache; refreshed in the background when stale."),
+             pv.ref("wikipedia", None, f"Current {index} constituents")],
+            title="Screener universe"),
+    })

@@ -90,6 +90,10 @@ export interface Country {
 export interface MacroDataPoint {
   year: string;
   value: number;
+  /** Provider that supplied this point (series can mix providers). */
+  src?: string;
+  /** True for projections (e.g. IMF WEO current/future years). */
+  estimate?: boolean;
 }
 
 export interface MacroSeries {
@@ -296,12 +300,13 @@ export interface FactorResponse {
 export interface BreadthResponse {
   index: string;
   asOf: string | null;
-  total: number;
-  advancing: number;
-  declining: number;
-  unchanged: number;
-  newHighs: number;
-  newLows: number;
+  status?: "unavailable";
+  total: number | null;
+  advancing: number | null;
+  declining: number | null;
+  unchanged: number | null;
+  newHighs: number | null;
+  newLows: number | null;
   pctAboveSma50: number | null;
   pctAboveSma200: number | null;
   mcclellanOscillator: number | null;
@@ -331,13 +336,27 @@ export interface FearGreedSignal {
   label: string;
   score: number | null;
   label_text: string | null;
+  /** Date of the observation this signal used (may lag the index asOf). */
+  asOf?: string | null;
+  /** True when the observation lags the index session by >3 business days. */
+  stale?: boolean | null;
+  /** False for live snapshots (put/call) that are not tied to the session. */
+  aligned?: boolean;
+  /** Unscored raw reading (e.g. the put/call ratio itself). */
+  raw?: number | null;
+  historyDays?: number | null;
+  /** Why the signal has no score yet, e.g. "Building history (12/60 sessions)". */
+  note?: string;
 }
 export interface FearGreedResponse {
+  status?: "unavailable";
   index: number | null;
   label: string | null;
   asOf: string | null;
   signals: FearGreedSignal[];
   history: { date: string; value: number }[];
+  historyExcludes?: string[];
+  signalCount?: number;
 }
 
 export interface MoverRow {
@@ -761,6 +780,8 @@ export interface OptionsKPIs {
   iv30Approximate: boolean;
   ivRank: number | null;
   ivRankApproximate: boolean;
+  /** Sessions of recorded IV30 behind IV Rank / Percentile (need 60). */
+  ivHistoryDays?: number;
   ivPercentile: number | null;
   pcOIRatio: number | null;
   maxPain: number | null;
@@ -881,8 +902,8 @@ export interface InflationData {
     m2Yoy: MacroTimeSeries[];
   };
   quantityTheory: {
-    nominalGdp: MacroTimeSeries[];
-    m2: MacroTimeSeries[];
+    nominalGdpYoY: MacroTimeSeries[];
+    m2YoY: MacroTimeSeries[];
   };
 }
 
@@ -953,9 +974,13 @@ export interface CommodityRow {
   change1w: number | null;
   change1m: number | null;
   changeYtd: number | null;
+  unit?: string;
+  source?: string;
+  asOf?: string | null;
 }
 export interface CommoditiesData {
   asOf: string | null;
+  source?: string;
   kpis: {
     wti: number | null;
     gold: number | null;
@@ -983,17 +1008,27 @@ export interface FxHeatmapData {
 }
 export interface FxPppPair {
   pair: string;
+  /** The non-USD currency; `overvaluation` always refers to it. */
+  currency?: string;
   spot: number | null;
   ppp: number | null;
   overvaluation: number | null;
+  spotAsOf?: string | null;
+  pppYear?: number | null;
+  pppBasis?: string;
 }
 export interface FxPppData {
   pairs: FxPppPair[];
+  asOf?: string | null;
+  source?: string;
+  error?: string;
 }
 
 // Leading Indicators
 export interface LeadingData {
   asOf: string | null;
+  /** Why a KPI has no value (e.g. discontinued/licensed source). */
+  unavailable?: Partial<Record<"lei" | "ismPmi", string>>;
   kpis: {
     lei: number | null;
     cfnai: number | null;
@@ -1352,6 +1387,8 @@ export interface BusinessCountry {
 export interface BusinessData {
   asOf: string | null;
   source: string;
+  /** KPI key → why it has no data. */
+  unavailable?: Record<string, string>;
   countries: BusinessCountry[];
   summary: {
     avgBusinessDensity: number | null;
@@ -1396,6 +1433,8 @@ export interface CurrencyCrisisData {
 // Banking Stability (Phase 28 stub)
 export interface BankingStabilityData {
   asOf: string | null;
+  /** Latest year of the bank Z-score (World Bank GFDD lags by years). */
+  zscoreYear?: number | null;
   source: string;
   countries: any[];
   summary: Record<string, any>;
@@ -1455,6 +1494,20 @@ export interface FactbookCountry {
   region: string;
 }
 
+// Per-country discount-rate inputs (/valuation/risk-free-rates)
+export interface CountryRate {
+  name: string;
+  riskFreeRate: number;
+  erp: number;
+  /** "observed" = a FRED value; "fallback" = a hard-coded estimate. */
+  basis?: "observed" | "fallback";
+  series?: string | null;
+  /** What the rate is, e.g. "10Y government bond" or "overnight rate (proxy)". */
+  tenor?: string;
+  asOf?: string | null;
+  stale?: boolean | null;
+}
+
 // Cross-Border Finance (Phase 31)
 export interface CrossborderClaim {
   creditor: string;
@@ -1462,9 +1515,16 @@ export interface CrossborderClaim {
   value_usd: number;
 }
 export interface CrossborderData {
+  /** Largest bilateral pairs only; see totalUsd for the global total. */
   claims: CrossborderClaim[];
+  /** All reporting countries' cross-border claims on all counterparties. */
+  totalUsd?: number | null;
+  /** Number of reporter/counterparty pairs BIS publishes for the quarter. */
+  pairCount?: number | null;
   source: string;
-  asOf: string;
+  /** Quarter of the observations, e.g. "2026-Q1". */
+  asOf: string | null;
+  status?: "unavailable";
 }
 
 // Sovereign Default Probability (Phase 31)
@@ -1748,7 +1808,8 @@ export interface KellyRow {
 export type KellyData = KellyRow[];
 
 export interface FFFactorRow {
-  factor: string;
+  /** Factor name as the backend emits it (e.g. "MktRF", "SMB", "HML"). */
+  name: string;
   loading: number | null;
   tStat: number | null;
 }
@@ -2205,6 +2266,8 @@ export interface DividendAnalysisResponse {
   sustainabilityLabel: "Strong" | "Adequate" | "Weak";
   ddmFairValue: number | null;
   ddmGrowthRate: number | null;
+  /** Discount rate used by the DDM, % (US 10Y Treasury + 5% equity risk premium). */
+  ddmDiscountRate?: number | null;
   ddmUpsidePct: number | null;
   annualDividends: Record<string, number>;
   asOf: string | null;
@@ -2438,9 +2501,13 @@ export interface MacroRegimeData {
   inflation_z: number | null;
   growth_signal: "rising" | "falling";
   inflation_signal: "above" | "below";
+  /** Name of the growth series (currently CFNAI-MA3). */
+  growth_indicator?: string;
   metrics: {
-    lei_current: number | null;
-    lei_change_3m: number | null;
+    growth_current: number | null;
+    growth_change_3m: number | null;
+    growth_as_of?: string | null;
+    cpi_as_of?: string | null;
     cpi_yoy: number | null;
     fed_funds: number | null;
     yield_spread_2y10y: number | null;
@@ -2517,7 +2584,7 @@ export interface FxMacroLinkItem {
   bestLagCorrelation: number;
   rollingCorrelation: {
     dates: string[];
-    values: number[];
+    values: (number | null)[];
   };
   series: { date: string; fx: number | null; commodity: number | null }[];
 }

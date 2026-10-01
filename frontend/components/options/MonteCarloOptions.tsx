@@ -14,6 +14,8 @@ import { Card, Skeleton, chartPalette, chartTooltipStyle } from "@/components/ui
 import { fmtNum, fmtPrice } from "@/lib/format";
 import { api } from "@/lib/api";
 import type { MCOptionsResult } from "@/lib/types";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 
 interface Props {
   ticker: string;
@@ -57,6 +59,7 @@ export function MonteCarloOptions({ ticker, expiry, theme }: Props) {
   const [result, setResult] = useState<MCOptionsResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const scope = useSourceScope(provOf(result));
 
   async function handleRun() {
     const strikeNum = parseFloat(strike);
@@ -167,17 +170,17 @@ export function MonteCarloOptions({ ticker, expiry, theme }: Props) {
       {loading && <Skeleton className="h-64 w-full rounded-xl" />}
 
       {result && !loading && (
-        <div className="space-y-4">
+        <div className="space-y-4" {...scope}>
           {/* KPI row */}
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
             {[
-              { label: "MC Price", value: result.price !== null ? fmtPrice(result.price) : "—" },
-              { label: "BS Price", value: result.bsPrice !== null ? fmtPrice(result.bsPrice) : "—" },
-              { label: "Std Dev", value: result.std !== null ? fmtPrice(result.std) : "—" },
-              { label: "VaR 95%", value: result.var95 !== null ? fmtPrice(result.var95) : "—" },
-              { label: "VaR 99%", value: result.var99 !== null ? fmtPrice(result.var99) : "—" },
+              { label: "MC Price", value: result.price !== null ? fmtPrice(result.price) : "—", prov: "*" },
+              { label: "BS Price", value: result.bsPrice !== null ? fmtPrice(result.bsPrice) : "—", prov: "bsPrice" },
+              { label: "Std Dev", value: result.std !== null ? fmtPrice(result.std) : "—", prov: "std" },
+              { label: "5th pct payoff", value: result.var95 !== null ? fmtPrice(result.var95) : "—", prov: "var95" },
+              { label: "1st pct payoff", value: result.var99 !== null ? fmtPrice(result.var99) : "—", prov: "var99" },
             ].map((kpi) => (
-              <Card key={kpi.label} className="p-3">
+              <Card key={kpi.label} className="p-3" data-prov={kpi.prov}>
                 <div className="text-[10px] text-text-muted mb-1">{kpi.label}</div>
                 <div className="text-lg font-bold font-mono">{kpi.value}</div>
               </Card>
@@ -186,9 +189,9 @@ export function MonteCarloOptions({ ticker, expiry, theme }: Props) {
 
           {/* Distribution histogram */}
           {result.distribution?.length > 0 && (
-            <Card className="p-4">
+            <Card className="p-4" data-prov="distribution">
               <h4 className="text-sm font-semibold mb-3 text-text-primary">
-                Terminal Price Distribution
+                Discounted Payoff Distribution (non-zero payoffs)
               </h4>
               <ResponsiveContainer width="100%" height={200}>
                 <BarChart

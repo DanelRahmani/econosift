@@ -8,6 +8,8 @@ import { useUrlState } from "@/lib/useUrlState";
 import type { EventsResponse } from "@/lib/types";
 import { SearchBar } from "@/components/SearchBar";
 import { Card, Skeleton, ChartSkeleton, ScrollableTabBar, ExportPdfButton } from "@/components/ui";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 import { PriceChart } from "@/components/markets/PriceChart";
 import { QuoteCards } from "@/components/markets/QuoteCards";
 import { NewsFeed } from "@/components/markets/NewsFeed";
@@ -80,6 +82,10 @@ function MarketsPageInner() {
   const [secRotation, setSecRotation] = useState<SectorRotationResponse | null>(null);
   const [secLoading, setSecLoading] = useState(false);
   const [secPeriod, setSecPeriod] = useState<keyof SectorReturnsResponse["periods"]>("1d");
+  // One scope per card: the returns response feeds two cards.
+  const secKpiScope = useSourceScope(provOf(secReturns));
+  const secChartScope = useSourceScope(provOf(secReturns));
+  const secRotationScope = useSourceScope(provOf(secRotation));
   const [selectedSector, setSelectedSector] = useState<string | null>(null);
   const [drillData, setDrillData] = useState<SectorDrillResponse | null>(null);
   const [drillLoading, setDrillLoading] = useState(false);
@@ -111,6 +117,7 @@ function MarketsPageInner() {
   const [tmPeriod, setTmPeriod] = useState<string>("1d");
   const [tmData, setTmData] = useState<TreemapResponse | null>(null);
   const [tmLoading, setTmLoading] = useState(false);
+  const tmScope = useSourceScope(provOf(tmData));
 
   useEffect(() => {
     if (tab !== "Treemap") return;
@@ -165,6 +172,8 @@ function MarketsPageInner() {
   });
 
   const events = eventsData ?? [];
+  const riskScope = useSourceScope(provOf(risk));
+  const risk0 = risk?.metrics?.[0];
 
   function addTicker(sym: string) {
     const next = tickers.includes(sym) ? tickers : [...tickers, sym];
@@ -278,20 +287,20 @@ function MarketsPageInner() {
         <div className="space-y-6">
           <QuoteCards tickers={tickers} />
           {risk && (
-            <div className="grid grid-cols-3 gap-4">
-              <Card className="p-4">
+            <div className="grid grid-cols-3 gap-4" {...riskScope} data-prov-ctx={risk0?.ticker}>
+              <Card className="p-4" data-prov={`metrics.${risk0?.ticker}.var95`}>
                 <div className="text-xs text-text-secondary">VaR 95%</div>
                 <div className="text-xl font-bold mt-1">
                   {risk.metrics?.[0]?.var95 != null ? `${(risk.metrics[0].var95 * 100).toFixed(1)}%` : "—"}
                 </div>
               </Card>
-              <Card className="p-4">
+              <Card className="p-4" data-prov={`metrics.${risk0?.ticker}.sharpe`}>
                 <div className="text-xs text-text-secondary">Sharpe Ratio</div>
                 <div className="text-xl font-bold mt-1">
                   {risk.metrics?.[0]?.sharpe != null ? risk.metrics[0].sharpe.toFixed(2) : "—"}
                 </div>
               </Card>
-              <Card className="p-4">
+              <Card className="p-4" data-prov={`metrics.${risk0?.ticker}.beta`}>
                 <div className="text-xs text-text-secondary">Beta</div>
                 <div className="text-xl font-bold mt-1">
                   {risk.metrics?.[0]?.beta != null ? risk.metrics[0].beta.toFixed(2) : "—"}
@@ -354,7 +363,7 @@ function MarketsPageInner() {
         <div className="space-y-6">
           <h2 className="text-sm font-semibold text-text-secondary">Sector Performance</h2>
           {/* KPI strip */}
-          <Card>
+          <Card {...secKpiScope} data-prov="periods.1d">
             <h3 className="text-sm font-semibold text-text-secondary mb-3">Today&apos;s Returns</h3>
             {secLoading ? (
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
@@ -368,6 +377,7 @@ function MarketsPageInner() {
                   .sort((a, b) => (b.changePercent ?? 0) - (a.changePercent ?? 0))
                   .map((s) => (
                     <button key={s.ticker} onClick={() => setSelectedSector(s.sector === selectedSector ? null : s.sector)}
+                      data-prov-ctx={s.sector}
                       className={`rounded-lg p-2.5 border text-left transition-colors ${
                         selectedSector === s.sector ? "border-accent bg-accent/10" : "border-border/60 hover:border-border"
                       }`}
@@ -385,7 +395,7 @@ function MarketsPageInner() {
             ) : null}
           </Card>
           {/* Returns chart */}
-          <Card>
+          <Card {...secChartScope} data-prov={`periods.${secPeriod}`}>
             <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
               <h3 className="text-sm font-semibold text-text-secondary">Sector Returns by Period</h3>
               <div className="flex gap-1">
@@ -412,7 +422,7 @@ function MarketsPageInner() {
             ) : <SectorFundamentalsTable data={secFundamentals} />}
           </Card>
           {/* Rotation clock */}
-          <Card>
+          <Card {...secRotationScope}>
             <h3 className="text-sm font-semibold text-text-secondary mb-4">Sector Rotation Clock</h3>
             <p className="text-xs text-text-muted mb-4">
               Sam Stovall 4-phase model. Bubbles sized by AUM. Click a dot to explore an industry.
@@ -433,7 +443,7 @@ function MarketsPageInner() {
       {tab === "Treemap" && (
         <div className="space-y-6">
           <h2 className="text-sm font-semibold text-text-secondary">Market Treemap</h2>
-          <Card className="p-4">
+          <Card className="p-4" {...tmScope}>
             <div className="flex flex-wrap gap-3 mb-4">
               <div className="flex items-center gap-2">
                 <span className="text-xs text-text-muted">Index</span>

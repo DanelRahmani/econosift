@@ -1,54 +1,44 @@
-"""Cross-border finance router — trade flows between major economies.
-
-Uses World Bank merchandise trade data (when BIS LBS is unavailable) to show
-cross-border economic connections. Falls back gracefully if no data is available.
-"""
-from datetime import date
-import asyncio
+"""Cross-border finance router — bilateral international banking claims."""
 from fastapi import APIRouter
 
+from .. import provenance as pv
+
 router = APIRouter(prefix="/api/crossborder", tags=["crossborder"])
+
+_SOURCE = "BIS Locational Banking Statistics (LBS)"
 
 
 @router.get("/claims")
 async def crossborder_claims():
-    """Cross-border claims/trade flows between major economies.
+    """Largest bilateral cross-border bank claims, latest quarter (BIS LBS).
 
-    Uses BIS LBS when available, falls back to World Bank merchandise trade data.
+    When BIS is unreachable the response says so. It used to substitute World
+    Bank merchandise trade (% of GDP) and present those percentages as USD
+    bank claims (audit D-28).
     """
-    # Try BIS LBS first
     from ..sources.source_bis import get_crossborder_claims
-    bis_claims = await get_crossborder_claims()
-    if bis_claims:
-        return {
-            "claims": bis_claims,
-            "source": "BIS Locational Banking Statistics (LBS)",
-            "asOf": str(date.today()),
-        }
-
-    # Fallback: World Bank merchandise trade data
-    from ..services import atlas_service
-    try:
-        trade_data = await atlas_service._wb_timeline("merchandise_trade", 2015, 2024)
-    except Exception:
-        trade_data = {}
-
-    claims = []
-    if trade_data:
-        for iso3, years in trade_data.items():
-            if not years:
-                continue
-            latest_val = years[max(years)]
-            claims.append({
-                "creditor": iso3,
-                "debtor": "WLD",  # World aggregate
-                "value_usd": round(latest_val, 1),
-            })
-        claims.sort(key=lambda c: c["value_usd"], reverse=True)
-        claims = claims[:20]
-
-    return {
-        "claims": claims,
-        "source": "World Bank (merchandise trade % of GDP; BIS LBS unavailable)",
-        "asOf": str(date.today()),
-    }
+    data = await get_crossborder_claims()
+    if not data.get("claims"):
+        return {"claims": [], "source": _SOURCE, "asOf": None, "status": "unavailable"}
+    period = str(data["period"])
+    return pv.attach({
+        "claims": data["claims"],
+        "totalUsd": data.get("totalUsd"),
+        "pairCount": data.get("pairCount"),
+        "source": _SOURCE,
+        "asOf": data["period"],
+    }, {
+        "*": pv.ref(
+            "bis", "WS_LBS_D_PUB",
+            "Locational banking statistics: cross-border claims, all instruments, currencies and sectors",
+            units="USD", frequency="quarterly", observed=period,
+            note="Claims of banks located in the creditor country on residents of the debtor country. "
+                 "Only the newest quarter is kept and only the 60 largest country pairs are listed."),
+        "totalUsd": pv.ref(
+            "bis", "WS_LBS_D_PUB", "Total cross-border claims, all reporting countries on all counterparties",
+            units="USD", frequency="quarterly", observed=period,
+            note="BIS's own aggregate series (reporter 5A, counterparty 5J), not the sum of the listed pairs."),
+        "pairCount": pv.derived(
+            "number of country-to-country pairs with a claim reported in the latest quarter "
+            "(BIS aggregates excluded)", ["*"], title="Pairs reporting", observed=period),
+    })

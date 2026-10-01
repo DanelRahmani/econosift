@@ -1,15 +1,17 @@
 "use client";
 
 import type { CAPMData } from "@/lib/types";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 
 interface Props {
   data: CAPMData | null;
   loading: boolean;
 }
 
-function MetricCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
+function MetricCard({ label, value, sub, prov }: { label: string; value: string; sub?: string; prov?: string }) {
   return (
-    <div className="bg-surface-alt rounded-lg p-3">
+    <div data-prov={prov} className="bg-surface-alt rounded-lg p-3">
       <p className="text-xs text-text-muted">{label}</p>
       <p className="text-lg font-bold text-text-primary mt-1">{value}</p>
       {sub && <p className="text-xs text-text-muted mt-0.5">{sub}</p>}
@@ -18,6 +20,8 @@ function MetricCard({ label, value, sub }: { label: string; value: string; sub?:
 }
 
 export function CAPMAttribution({ data, loading }: Props) {
+  const scope = useSourceScope(provOf(data));
+
   if (loading) {
     return (
       <div className="rounded-xl border border-border bg-surface p-4 animate-pulse">
@@ -57,26 +61,30 @@ export function CAPMAttribution({ data, loading }: Props) {
   const idioPct = (idioNum / total) * 100;
 
   return (
-    <div className="rounded-xl border border-border bg-surface p-4 space-y-4">
+    <div className="rounded-xl border border-border bg-surface p-4 space-y-4" {...scope}>
       <h3 className="font-semibold text-sm">CAPM Attribution</h3>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <MetricCard
+          prov="annAlpha"
           label="Alpha (ann.)"
           value={alphaPct}
           sub={annAlpha !== null ? (annAlpha >= 0 ? "Outperforming" : "Underperforming") : undefined}
         />
         <MetricCard
+          prov="beta"
           label="Beta"
           value={data.beta !== null ? data.beta.toFixed(2) : "—"}
           sub={data.beta !== null ? (data.beta > 1 ? "More volatile than market" : "Less volatile") : undefined}
         />
         <MetricCard
+          prov="rSquared"
           label="R²"
           value={data.rSquared !== null ? data.rSquared.toFixed(3) : "—"}
           sub="Explained by market"
         />
         <MetricCard
+          prov="systematicVarPct"
           label="Systematic Risk"
           value={sysRiskPct}
           sub={`Idiosyncratic: ${idioRiskPct}`}
@@ -84,7 +92,7 @@ export function CAPMAttribution({ data, loading }: Props) {
       </div>
 
       {/* Risk decomposition bar */}
-      <div>
+      <div data-prov="systematicVarPct">
         <p className="text-xs text-text-muted mb-1">Risk Decomposition</p>
         <div className="flex h-4 rounded overflow-hidden text-xs">
           <div

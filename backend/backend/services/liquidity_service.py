@@ -8,10 +8,10 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import date
 
 import pandas as pd
 
+from .. import provenance as pv
 from ..cache import async_cached
 from ..config import FRED_API_KEY
 from . import macro_expansion_service as mes
@@ -76,7 +76,8 @@ def _compute_net_liquidity(data: dict[str, list[dict]], spx_pts: list[dict]) -> 
     spx = _weekly_series(spx_pts, 1.0)
 
     return {
-        "asOf": str(date.today()),
+        # Date of the latest Fed balance-sheet (H.4.1) observation.
+        "asOf": max((p["date"] for p in data.get("WALCL", []) if p.get("value") is not None), default=None),
         "kpis": {
             "netLiquidity": net_latest,
             "netLiquidity4wChange": change_4w,
@@ -109,6 +110,44 @@ def _fetch_spx_points() -> list[dict]:
         return []
 
 
+def _provenance(data: dict[str, list[dict]], result: dict) -> dict:
+    """``kpis.<k>`` / ``history.<k>`` per Fed-balance-sheet component (shared refs)."""
+    def last(sid: str) -> str | None:
+        dates = [p["date"] for p in data.get(sid, []) if p.get("value") is not None]
+        return dates[-1] if dates else None
+
+    def fred(sid: str, title: str, native: str) -> dict:
+        return pv.fred(sid, title, units="trillions of USD", frequency="weekly", observed=last(sid),
+                       transform=f"FRED value in {native} converted to trillions USD; resampled to a weekly "
+                                 "(Wednesday) grid, last observation, forward-filled")
+
+    walcl = fred("WALCL", "Federal Reserve total assets", "millions of USD")
+    rrp = fred("RRPONTSYD", "Overnight reverse repurchase agreements (RRP)", "billions of USD")
+    rrp["frequency"] = "daily"
+    tga = fred("WTREGEN", "Treasury General Account (TGA)", "millions of USD")
+    reserves = fred("WRESBAL", "Reserve balances with Federal Reserve Banks", "millions of USD")
+    net = pv.derived(
+        "WALCL - RRPONTSYD - WTREGEN, in trillions USD on a weekly grid; RRP and TGA are taken as 0 before "
+        "their first observation", [walcl, rrp, tga], title="Net liquidity", observed=result.get("asOf"))
+    chg = pv.derived("net liquidity now minus net liquidity 4 weeks earlier (trillions USD)", ["kpis.netLiquidity"],
+                     title="Net liquidity, 4-week change", observed=result.get("asOf"))
+    prov = {
+        "*": pv.ref("fred", None, "Federal Reserve Economic Data"),
+        "kpis.netLiquidity": net, "history.netLiquidity": net,
+        "kpis.netLiquidity4wChange": chg,
+        "kpis.rrp": rrp, "history.rrp": rrp,
+        "kpis.tga": tga, "history.tga": tga,
+        "kpis.reserves": reserves, "history.reserves": reserves,
+        "history.fedBalanceSheet": walcl,
+    }
+    if result.get("history", {}).get("spx"):
+        prov["history.spx"] = pv.yahoo(
+            "^GSPC", "S&P 500 index, daily close", frequency="weekly",
+            transform="last close of each week (Wednesday-ending), forward-filled",
+            observed=result["history"]["spx"][-1]["date"])
+    return prov
+
+
 @async_cached("net_liquidity")
 async def get_net_liquidity() -> dict:
     """Weekly Fed-plumbing dashboard: net liquidity, RRP, TGA, reserves, SPX overlay."""
@@ -117,4 +156,5 @@ async def get_net_liquidity() -> dict:
 
     data = await mes.fetch_fred_series(_LIQ_SERIES, start=_START)
     spx_pts = await asyncio.to_thread(_fetch_spx_points)
-    return _compute_net_liquidity(data, spx_pts)
+    result = _compute_net_liquidity(data, spx_pts)
+    return pv.attach(result, _provenance(data, result)) if result else result

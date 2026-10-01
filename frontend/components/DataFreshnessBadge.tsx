@@ -3,7 +3,10 @@ import { useMemo } from "react";
 
 function timeAgo(dateStr: string): { text: string; freshness: "fresh" | "aging" | "stale" } {
   try {
-    const d = new Date(dateStr);
+    // A bare YYYY-MM-DD is a calendar date, not UTC midnight — `new Date()`
+    // would parse it as UTC and shift the age by the viewer's offset.
+    const ymd = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr);
+    const d = ymd ? new Date(+ymd[1], +ymd[2] - 1, +ymd[3]) : new Date(dateStr);
     if (isNaN(d.getTime())) return { text: "Unknown", freshness: "stale" };
     const diffMs = Date.now() - d.getTime();
     const diffMin = Math.floor(diffMs / 60000);

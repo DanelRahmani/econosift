@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import type { NewsItem, Sentiment } from "@/lib/types";
 import { Card, Skeleton } from "@/components/ui";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf, type Provenance } from "@/lib/provenance";
 
 const SENTIMENT_STYLE: Record<Sentiment, { dot: string; label: string; text: string }> = {
   positive: { dot: "bg-success", label: "Positive", text: "text-success" },
@@ -15,6 +17,8 @@ export function NewsFeed({ tickers }: { tickers: string[] }) {
   const [active, setActive] = useState<string>(tickers[0] ?? "");
   const [items, setItems] = useState<NewsItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [prov, setProv] = useState<Provenance | undefined>(undefined);
+  const scope = useSourceScope(prov);
 
   // Keep the selected ticker valid as the basket changes.
   useEffect(() => {
@@ -23,12 +27,12 @@ export function NewsFeed({ tickers }: { tickers: string[] }) {
   }, [tickers, active]);
 
   useEffect(() => {
-    if (!active) { setItems([]); return; }
+    if (!active) { setItems([]); setProv(undefined); return; }
     let live = true;
     setLoading(true);
     api.news(active)
-      .then((r) => live && setItems(r.news))
-      .catch(() => live && setItems([]))
+      .then((r) => { if (live) { setItems(r.news); setProv(provOf(r)); } })
+      .catch(() => { if (live) { setItems([]); setProv(undefined); } })
       .finally(() => live && setLoading(false));
     return () => { live = false; };
   }, [active]);
@@ -36,7 +40,7 @@ export function NewsFeed({ tickers }: { tickers: string[] }) {
   if (!tickers.length) return null;
 
   return (
-    <Card>
+    <Card {...scope} data-prov-ctx={active}>
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <h2 className="text-sm font-semibold text-text-secondary">Latest News</h2>
         {tickers.length > 1 && (
@@ -64,7 +68,7 @@ export function NewsFeed({ tickers }: { tickers: string[] }) {
             const s = SENTIMENT_STYLE[n.sentiment];
             return (
               <li key={i} className="flex gap-3">
-                <span className={`mt-1.5 h-2 w-2 rounded-full shrink-0 ${s.dot}`} title={s.label} />
+                <span className={`mt-1.5 h-2 w-2 rounded-full shrink-0 ${s.dot}`} title={s.label} data-prov="news.sentiment" />
                 <div className="min-w-0">
                   <a
                     href={n.url} target="_blank" rel="noopener noreferrer"
@@ -73,7 +77,7 @@ export function NewsFeed({ tickers }: { tickers: string[] }) {
                   <div className="flex items-center gap-2 text-xs text-text-muted mt-0.5">
                     <span className="truncate">{n.publisher || "—"}</span>
                     {n.published && <span>· {n.published}</span>}
-                    <span className={s.text}>· {s.label}</span>
+                    <span className={s.text} data-prov="news.sentiment">· {s.label}</span>
                   </div>
                 </div>
               </li>

@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import type { SnapshotResponse, Country } from "@/lib/types";
 import { Card, Skeleton } from "@/components/ui";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 import { fmtNum, fmtLarge } from "@/lib/format";
 
 const LABELS: Record<string, string> = {
@@ -46,6 +48,7 @@ export function CountryComparison({ selected, countries }: { selected: string[];
   const [loading, setLoading] = useState(false);
   const cols = selected.slice(0, 4);
   const key = cols.join(",");
+  const scope = useSourceScope(provOf(data));
 
   useEffect(() => {
     if (!cols.length) { setData(null); return; }
@@ -61,7 +64,7 @@ export function CountryComparison({ selected, countries }: { selected: string[];
   const nameOf = (iso: string) => countries.find((c) => c.iso2 === iso)?.name ?? iso;
 
   return (
-    <Card>
+    <Card {...scope}>
       <h2 className="text-sm font-semibold mb-1 text-text-secondary">Country Comparison</h2>
       <p className="text-xs text-text-muted mb-4">
         Latest headline indicators · green = healthy, amber = watch, red = warning.
@@ -83,14 +86,14 @@ export function CountryComparison({ selected, countries }: { selected: string[];
             </thead>
             <tbody>
               {data.indicators.map((ind) => (
-                <tr key={ind.id} className="border-b border-border/50">
+                <tr key={ind.id} className="border-b border-border/50" data-prov={`indicators.${ind.id}`} data-prov-ctx={LABELS[ind.id] ?? ind.id}>
                   <td className="py-2 px-3 text-text-secondary">{LABELS[ind.id] ?? ind.id}</td>
                   {cols.map((iso) => {
                     const entry = ind.values[iso];
-                    if (!entry) return <td key={iso} className="py-2 px-3 text-right text-text-muted">—</td>;
+                    if (!entry) return <td key={iso} className="py-2 px-3 text-right text-text-muted" data-prov-ctx={`${nameOf(iso)} · ${LABELS[ind.id] ?? ind.id}`}>—</td>;
                     const tone = classify(ind.id, entry.value);
                     return (
-                      <td key={iso} className="py-1.5 px-3 text-right">
+                      <td key={iso} className="py-1.5 px-3 text-right" data-prov-ctx={`${nameOf(iso)} · ${LABELS[ind.id] ?? ind.id} · ${entry.year}`}>
                         <span className={`inline-block px-2 py-0.5 rounded-md font-mono ${TONE_BG[tone]}`}
                           title={`as of ${entry.year}`}>
                           {formatValue(ind.id, ind.unit, entry.value)}

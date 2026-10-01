@@ -9,8 +9,10 @@ import asyncio
 import logging
 from datetime import datetime
 
+from .. import provenance as pv
 from ..cache import async_cached
 from . import atlas_service
+from .fiscal_service import wb_country_provenance
 
 log = logging.getLogger(__name__)
 
@@ -48,6 +50,31 @@ def _latest(year_map: dict[int, float]) -> float | None:
 
 def _to_timeseries(year_map: dict[int, float]) -> list[dict]:
     return [{"date": str(y), "value": v} for y, v in sorted(year_map.items())]
+
+
+_WB_SPECS = [
+    ("co2PerCapita", "EN.GHG.CO2.PC.CE.AR5", "Carbon dioxide (CO2) emissions excluding LULUCF per capita",
+     "t CO2e per capita"),
+    ("renewableShare", "EG.FEC.RNEW.ZS", "Renewable energy consumption (% of total final energy consumption)",
+     "% of final energy consumption"),
+    ("energyImports", "EG.IMP.CONS.ZS", "Energy imports, net (% of energy use)", "% of energy use"),
+    ("oilRents", "NY.GDP.PETR.RT.ZS", "Oil rents", "% of GDP"),
+    ("gasRents", "NY.GDP.NGAS.RT.ZS", "Natural gas rents", "% of GDP"),
+    ("coalRents", "NY.GDP.COAL.RT.ZS", "Coal rents", "% of GDP"),
+]
+
+
+def _provenance(countries: list[dict]) -> dict:
+    prov = wb_country_provenance(countries, _WB_SPECS)
+    prov["kpis.fossilRentsTotal"] = pv.derived(
+        "oil rents + natural gas rents + coal rents (% of GDP); a missing component counts as 0 and each "
+        "component is its own latest available year",
+        ["kpis.oilRents", "kpis.gasRents", "kpis.coalRents"], title="Fossil-fuel rents, total")
+    prov["summary"] = pv.derived(
+        "simple mean (avgCo2PerCapita, avgRenewableShare) or count (highCo2Count: CO2 per capita above 10 t) "
+        "of the countries' latest KPI values",
+        ["kpis.co2PerCapita", "kpis.renewableShare"], title="Cross-country summary")
+    return prov
 
 
 @async_cached("energy_data")
@@ -121,8 +148,8 @@ async def get_energy_data() -> dict:
     with_ren = [c["kpis"]["renewableShare"] for c in countries_out if c["kpis"]["renewableShare"] is not None]
     high_co2 = sum(1 for c in countries_out if c["kpis"]["co2Signal"] == "red")
 
-    return {
-        "asOf": str(datetime.now().date()),
+    result = {
+        "asOf": atlas_service.stamp_periods(countries_out),
         "source": "World Bank",
         "countries": countries_out,
         "summary": {
@@ -132,3 +159,4 @@ async def get_energy_data() -> dict:
             "totalCountries": len(countries_out),
         },
     }
+    return pv.attach(result, _provenance(countries_out))

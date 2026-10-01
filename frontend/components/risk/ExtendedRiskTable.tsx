@@ -55,13 +55,13 @@ export function ExtendedRiskTable({ tickers }: Props) {
         const idioPct = total > 0 && idioVar !== null ? (idioVar / total) * 100 : null;
 
         return (
-          <Card key={t.ticker} className="p-4">
+          <Card key={t.ticker} className="p-4" data-prov={`tickers.${t.ticker}.systematicVar`} data-prov-ctx={t.ticker}>
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm font-semibold">
                 {multi ? `${t.ticker} — ` : ""}CAPM Variance Decomposition
               </h3>
               {t.rSquared !== null && (
-                <span className="text-xs text-text-muted">R² = {fmtNum(t.rSquared)}</span>
+                <span data-prov={`tickers.${t.ticker}.rSquared`} className="text-xs text-text-muted">R² = {fmtNum(t.rSquared)}</span>
               )}
             </div>
             {sysPct !== null && idioPct !== null ? (
@@ -111,18 +111,18 @@ export function ExtendedRiskTable({ tickers }: Props) {
             </thead>
             <tbody>
               {tickers.map((t) => (
-                <tr key={t.ticker} className="border-b border-border/50">
+                <tr key={t.ticker} data-prov-ctx={t.ticker} className="border-b border-border/50">
                   {multi && <td className="py-2 px-3 font-mono font-semibold">{t.ticker}</td>}
-                  <td className={`py-2 px-3 ${ratioColor(t.annReturn, (v) => v > 0)}`}>{pct(t.annReturn)}</td>
-                  <td className="py-2 px-3">{pct(t.annVolatility)}</td>
-                  <td className={`py-2 px-3 ${ratioColor(t.maxDrawdown, (v) => v > -0.1)}`}>{pct(t.maxDrawdown)}</td>
-                  <td className={`py-2 px-3 ${ratioColor(t.calmar, (v) => v > 1)}`}>{fmtNum(t.calmar)}</td>
-                  <td className={`py-2 px-3 ${ratioColor(t.omega, (v) => v > 1)}`}>{fmtNum(t.omega)}</td>
-                  <td className="py-2 px-3">{fmtNum(t.beta)}</td>
-                  <td className={`py-2 px-3 ${ratioColor(t.alpha, (v) => v > 0)}`}>{pct(t.alpha)}</td>
-                  <td className={`py-2 px-3 ${ratioColor(t.treynor, (v) => v > 0)}`}>{fmtNum(t.treynor)}</td>
-                  <td className="py-2 px-3 text-danger">{pct(t.var99Historical)}</td>
-                  <td className="py-2 px-3 text-danger">{pct(t.cvar95)}</td>
+                  <td data-prov={`tickers.${t.ticker}.annReturn`} className={`py-2 px-3 ${ratioColor(t.annReturn, (v) => v > 0)}`}>{pct(t.annReturn)}</td>
+                  <td data-prov={`tickers.${t.ticker}.annVolatility`} className="py-2 px-3">{pct(t.annVolatility)}</td>
+                  <td data-prov={`tickers.${t.ticker}.maxDrawdown`} className={`py-2 px-3 ${ratioColor(t.maxDrawdown, (v) => v > -0.1)}`}>{pct(t.maxDrawdown)}</td>
+                  <td data-prov={`tickers.${t.ticker}.calmar`} className={`py-2 px-3 ${ratioColor(t.calmar, (v) => v > 1)}`}>{fmtNum(t.calmar)}</td>
+                  <td data-prov={`tickers.${t.ticker}.omega`} className={`py-2 px-3 ${ratioColor(t.omega, (v) => v > 1)}`}>{fmtNum(t.omega)}</td>
+                  <td data-prov={`tickers.${t.ticker}.beta`} className="py-2 px-3">{fmtNum(t.beta)}</td>
+                  <td data-prov={`tickers.${t.ticker}.alpha`} className={`py-2 px-3 ${ratioColor(t.alpha, (v) => v > 0)}`}>{pct(t.alpha)}</td>
+                  <td data-prov={`tickers.${t.ticker}.treynor`} className={`py-2 px-3 ${ratioColor(t.treynor, (v) => v > 0)}`}>{fmtNum(t.treynor)}</td>
+                  <td data-prov={`tickers.${t.ticker}.var99Historical`} className="py-2 px-3 text-danger">{pct(t.var99Historical)}</td>
+                  <td data-prov={`tickers.${t.ticker}.cvar95`} className="py-2 px-3 text-danger">{pct(t.cvar95)}</td>
                 </tr>
               ))}
             </tbody>

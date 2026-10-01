@@ -11,7 +11,7 @@ interface Props {
   onPlayingChange: (playing: boolean) => void;
 }
 
-export function YearSlider({ year, min = 2000, max = 2024, playing, onYear, onPlayingChange }: Props) {
+export function YearSlider({ year, min = 2000, max = new Date().getFullYear() - 1, playing, onYear, onPlayingChange }: Props) {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   // Keep a stable ref to the current year so the interval doesn't go stale
   const yearRef = useRef(year);

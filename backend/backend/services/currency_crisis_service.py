@@ -1,8 +1,12 @@
 """Currency Crisis Early Warning service — Phase 28.
 
-Kaminsky-Lizondo-Reinhart (1998) signal extraction approach.
-Uses: reserves decline, current account deficit, real FX overvaluation,
-inflation, and short-term external debt share.
+A checklist of six vulnerability indicators drawn from the currency-crisis
+literature (Kaminsky-Lizondo-Reinhart 1998): reserves decline, current account
+deficit, real FX overvaluation, inflation, short-term external debt share and
+public debt. Each is flagged against a fixed rule-of-thumb threshold. This is
+*not* KLR's signal-extraction model, which calibrates a percentile threshold
+per indicator and country to minimise the noise-to-signal ratio over past
+crises; the output must not be labelled as such.
 Output: composite traffic-light warning (green/yellow/red) per country.
 """
 from __future__ import annotations
@@ -11,6 +15,7 @@ import asyncio
 import logging
 from datetime import datetime
 
+from .. import provenance as pv
 from ..cache import async_cached
 from . import atlas_service
 from ..sources import source_bis
@@ -38,12 +43,65 @@ def _latest(year_map: dict[int, float]) -> float | None:
     return year_map[max(year_map)]
 
 
+def _latest_year(year_map: dict[int, float]) -> int | None:
+    return max(year_map) if year_map else None
+
+
+# Months of real effective exchange rate history the overvaluation signal
+# compares the latest month against.
+_REER_WINDOW = 60
+
+
 def _signal_color(flags: int) -> str:
     if flags >= 5:
         return "red"
     elif flags >= 3:
         return "yellow"
     return "green"
+
+
+def _provenance(countries: list[dict], cur_year: int) -> dict:
+    """Source map for the currency-crisis checklist (see provenance.py)."""
+    codes = atlas_service._WB_CODES
+    checklist = ("One flag per breach: current account < -5% of GDP, inflation > 10%, short-term debt > 15% "
+                 "of external debt, debt > 90% of GDP, reserves down > 10% YoY, real FX > 15% above its "
+                 "5-year average. compositeScore = flags; red >= 5, yellow >= 3, else green.")
+    prov: dict = {
+        "*": pv.derived(checklist, title="Currency-crisis checklist"),
+        "summary": pv.derived("count of countries per signal colour", ["*"], title="Signal counts"),
+    }
+    wb_kpis = (
+        ("currentAccount", "current_account", "Current account balance (% of GDP)", "% of GDP", ""),
+        ("inflation", "inflation", "Inflation, consumer prices (annual %)", "% per year", ""),
+        ("shortTermDebt", "short_term_debt", "Short-term debt (% of total external debt)",
+         "% of external debt", ""),
+        ("debtGdp", "debt_gdp", "Central government debt (% of GDP)", "% of GDP",
+         "Central-government debt, not general government."),
+    )
+    for c in countries:
+        row = f"countries.{c['iso2']}"
+        per = c["periods"]
+        prov[row] = pv.derived(checklist, title=f"{c['name']} currency-crisis flags")
+        for kpi, key, title, units, note in wb_kpis:
+            yr = per.get(kpi)
+            prov[f"{row}.kpis.{kpi}"] = pv.ref(
+                "worldbank", codes[key], title, units=units, frequency="annual",
+                observed=str(yr) if yr else None,
+                flags=["stale"] if yr and yr < cur_year - 3 else [], note=note or None)
+        yr = per.get("reservesDecline")
+        prov[f"{row}.kpis.reservesDecline"] = pv.derived(
+            "-(latest total reserves - previous available year) / previous x 100; positive = reserves falling. "
+            "Total reserves include gold and are in current US$, so valuation moves count.",
+            [pv.ref("worldbank", codes["reserves_total"], "Total reserves incl. gold (current US$)",
+                    units="current US$", frequency="annual", observed=str(yr) if yr else None)],
+            title="Reserves decline (% YoY)", observed=str(yr) if yr else None)
+        fx = per.get("fxOvervaluation")
+        prov[f"{row}.kpis.fxOvervaluation"] = pv.derived(
+            f"(latest monthly REER - mean of the last {_REER_WINDOW} months) / mean x 100",
+            [pv.ref("bis", "WS_EER", "Real effective exchange rate, broad basket (CPI-based)",
+                    units="index, 2020=100", frequency="monthly", observed=fx)],
+            title="Real FX overvaluation vs 5-year average", observed=fx)
+    return prov
 
 
 @async_cached("currency_crisis")
@@ -94,16 +152,14 @@ async def get_currency_crisis() -> dict:
             if prev_res and prev_res != 0:
                 reserves_decline = round(((cur_res - prev_res) / prev_res) * -100, 1)
 
-        # Compute FX overvaluation (% above 5Y average)
+        # Real FX overvaluation: latest month's REER vs its trailing 5Y average
         fx_overval: float | None = None
         bis_history = bis_fx_raw.get(iso2, [])
-        if len(bis_history) >= 5:
-            recent = bis_history[-5:]  # last 5 annual values
-            values = [p["value"] for p in recent]
+        if len(bis_history) >= _REER_WINDOW:
+            values = [p["value"] for p in bis_history[-_REER_WINDOW:]]
             avg5y = sum(values) / len(values)
-            latest_fx = values[-1]
-            if avg5y and avg5y != 0:
-                fx_overval = round(((latest_fx - avg5y) / avg5y) * 100, 1)
+            if avg5y:
+                fx_overval = round(((values[-1] - avg5y) / avg5y) * 100, 1)
 
         flags = 0
         factors = []
@@ -144,9 +200,9 @@ async def get_currency_crisis() -> dict:
         # 6. FX overvaluation > 15% above 5Y trend
         if fx_overval is not None and fx_overval > 15:
             flags += 1
-            factors.append(f"FX overvalued {fx_overval:.0f}% vs 5Y avg")
+            factors.append(f"Real FX {fx_overval:.0f}% above 5Y avg")
         elif fx_overval is not None and fx_overval > 10:
-            factors.append(f"FX overvalued {fx_overval:.0f}% vs 5Y avg")
+            factors.append(f"Real FX {fx_overval:.0f}% above 5Y avg")
 
         color = _signal_color(flags)
 
@@ -163,6 +219,16 @@ async def get_currency_crisis() -> dict:
                 "reservesDecline": reserves_decline,
                 "fxOvervaluation": fx_overval,
             },
+            # Observation period behind each KPI (World Bank series lag by
+            # different amounts, so one date for the row would be wrong).
+            "periods": {
+                "currentAccount": _latest_year(ca_map),
+                "inflation": _latest_year(inf_map),
+                "shortTermDebt": _latest_year(std_map),
+                "debtGdp": _latest_year(debt_map),
+                "reservesDecline": _latest_year(res_map) if reserves_decline is not None else None,
+                "fxOvervaluation": bis_history[-1]["date"] if fx_overval is not None else None,
+            },
             "factors": factors,
         })
 
@@ -171,10 +237,14 @@ async def get_currency_crisis() -> dict:
     red_count = sum(1 for c in countries_out if c["signal"] == "red")
     yellow_count = sum(1 for c in countries_out if c["signal"] == "yellow")
 
-    return {
-        "asOf": str(datetime.now().date()),
-        "source": "World Bank / IMF / BIS",
-        "methodology": "Kaminsky-Lizondo-Reinhart (1998) 6-signal extraction model",
+    wb_years = [y for c in countries_out for y in c["periods"].values() if isinstance(y, int)]
+
+    return pv.attach({
+        # Latest World Bank data year in use; per-KPI periods are on each row.
+        "asOf": str(max(wb_years)) if wb_years else None,
+        "source": "World Bank (WDI) / BIS real effective exchange rates",
+        "methodology": ("Six-indicator threshold checklist (indicators after "
+                        "Kaminsky-Lizondo-Reinhart 1998; fixed thresholds)"),
         "countries": countries_out,
         "summary": {
             "redCount": red_count,
@@ -182,4 +252,4 @@ async def get_currency_crisis() -> dict:
             "greenCount": len(countries_out) - red_count - yellow_count,
             "totalCountries": len(countries_out),
         },
-    }
+    }, _provenance(countries_out, cur_year))

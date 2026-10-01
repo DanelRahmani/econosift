@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import type { ValuationFullResponse, FactorResponse } from "@/lib/types";
 import { Card, Skeleton } from "@/components/ui";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 import { fmtNum, fmtPct } from "@/lib/format";
 import { ValuationKpiPanel } from "@/components/markets/ValuationKpiPanel";
 import { ValuationModelsGrid } from "@/components/markets/ValuationModelsGrid";
@@ -28,6 +30,7 @@ export function ValuationEngine({
   const [data, setData] = useState<ValuationFullResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
+  const scope = useSourceScope(provOf(data));
 
   // Keep the active ticker valid as the ticker list changes.
   useEffect(() => {
@@ -53,7 +56,7 @@ export function ValuationEngine({
   if (!tickers.length) return null;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" {...scope} data-prov-ctx={active}>
       {tickers.length > 1 && (
         <div className="flex items-center gap-2" data-hide-print>
           <span className="text-xs text-text-muted">Valuing</span>
@@ -123,6 +126,7 @@ function FamaFrench({ ticker }: { ticker: string }) {
   const [model, setModel] = useState<"3" | "5">("3");
   const [data, setData] = useState<FactorResponse | null>(null);
   const [loading, setLoading] = useState(false);
+  const scope = useSourceScope(provOf(data));
 
   function run() {
     setLoading(true);
@@ -135,7 +139,7 @@ function FamaFrench({ ticker }: { ticker: string }) {
   }
 
   return (
-    <Card>
+    <Card {...scope} data-prov-ctx={ticker}>
       <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
         <h3 className="text-sm font-semibold text-text-secondary">
           Fama-French Factor Attribution
@@ -169,17 +173,17 @@ function FamaFrench({ ticker }: { ticker: string }) {
       )}
       {data && !data.error && data.betas && (
         <div className="space-y-2">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3" data-prov="betas">
             {Object.entries(data.betas).map(([k, v]) => (
-              <div key={k} className="rounded-lg bg-surface-alt px-3 py-2">
+              <div key={k} className="rounded-lg bg-surface-alt px-3 py-2" data-prov-ctx={k}>
                 <div className="text-xs text-text-muted">{k}</div>
                 <div className="font-mono text-sm">{fmtNum(v, 3)}</div>
               </div>
             ))}
           </div>
           <div className="flex flex-wrap gap-4 text-xs text-text-muted">
-            <span>Alpha (ann.): <span className="font-mono text-text-primary">{data.alpha != null ? fmtPct(data.alpha * 100) : "—"}</span></span>
-            <span>R²: <span className="font-mono text-text-primary">{fmtNum(data.rSquared, 3)}</span></span>
+            <span data-prov="alpha">Alpha (ann.): <span className="font-mono text-text-primary">{data.alpha != null ? fmtPct(data.alpha * 100) : "—"}</span></span>
+            <span data-prov="rSquared">R²: <span className="font-mono text-text-primary">{fmtNum(data.rSquared, 3)}</span></span>
             <span>n: <span className="font-mono text-text-primary">{data.nObs ?? "—"}</span></span>
           </div>
         </div>

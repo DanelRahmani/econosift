@@ -38,3 +38,13 @@ def client() -> TestClient:
     from backend.main import app
 
     return TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def _offline_gnp_price_index(monkeypatch):
+    """Ohlson's SIZE scaling reads FRED GDPDEF; pin it so tests stay offline.
+
+    660 ≈ the 2026 GDP deflator rebased to 1968 = 100.
+    """
+    from backend.services import fundamentals
+    monkeypatch.setattr(fundamentals, "_gnp_price_index", lambda: 660.0)

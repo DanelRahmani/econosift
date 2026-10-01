@@ -7,6 +7,7 @@ import pandas as pd
 from ..cache import async_cached
 from ..config import EUROZONE, COUNTRY_NAMES
 from ..models import SeriesResult, make_series
+from ._annual import to_annual
 
 SOURCE_LABEL = "ECB (European Central Bank)"
 
@@ -31,11 +32,7 @@ def _annual(df: pd.DataFrame, start: int, end: int) -> list[tuple[int, float]]:
         ).dropna()
     else:
         return []
-    annual = s.resample("YE").mean()
-    return sorted(
-        (ts.year, float(v)) for ts, v in annual.dropna().items()
-        if start <= ts.year <= end
-    )
+    return to_annual(s, "mean", start, end)
 
 
 def _fetch_series(key: str) -> pd.DataFrame:
@@ -64,10 +61,13 @@ async def fetch(indicator_key: str, countries: tuple[str, ...],
         elif indicator_key == "interest_rate" and euro_countries:
             df = await asyncio.to_thread(_fetch_series, POLICY_RATE_KEY)
             points = _annual(df, start, end)
+            # One euro-area rate: label it as such rather than implying each
+            # member sets its own policy rate (audit D-13).
             for c in euro_countries:
                 if points:
                     results.append(make_series(
-                        c, COUNTRY_NAMES.get(c, c), points, SOURCE_LABEL))
+                        c, COUNTRY_NAMES.get(c, c), points,
+                        "ECB — euro-area main refinancing rate (common to all members)"))
     except Exception:
         return results
     return results

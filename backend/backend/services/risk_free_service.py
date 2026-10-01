@@ -9,24 +9,32 @@ from ..cache import async_cached
 
 log = logging.getLogger(__name__)
 
-# ── Country → FRED series for risk-free rate ────────────────────────────────
-# Preference order: 10Y government bond > interbank rate
-# Falls back to estimate if no FRED series available.
-_COUNTRY_SERIES: dict[str, str] = {
-    "United States":  "DGS10",            # 10Y Treasury (standard for US valuation)
-    "United Kingdom": "IR3TIB01GBM156N",  # 3M interbank (proxy; FRED lacks UK 10Y)
-    "Germany":        "IR3TIB01DEM156N",  # 3M interbank
-    "Japan":          "IR3TIB01JPM156N",  # 3M interbank (Japan 10Y ≈ 1%, 3M ≈ 0.7%)
-    "France":         "IR3TIB01FRM156N",
-    "Switzerland":    "IR3TIB01CHM156N",
-    "Canada":         "IR3TIB01CAM156N",
-    "Australia":      "IR3TIB01AUM156N",
-    "China":          "IR3TIB01CNM156N",
-    "India":          "IRSTCI01INM156N",  # RBI repo rate (central bank policy rate)
-    "Brazil":         "IRSTCI01BRM156N",  # SELIC rate (central bank policy rate)
-    "Russia":         "IRSTCI01RUM156N",  # CBR key rate (central bank policy rate)
-    "Netherlands":    "IR3TIB01NLM156N",
+# ── Country → (FRED series, tenor) for the risk-free rate ───────────────────
+# A DCF/CAPM discount rate needs a long-term government yield, matching the
+# US 10Y Treasury. These were 3-month interbank and overnight policy rates
+# (on the mistaken note that FRED lacks non-US 10Y yields), which understated
+# the rate wherever the curve slopes up (audit D-32). Where FRED publishes no
+# 10Y series the short rate is kept and labelled as a proxy.
+_TENOR_10Y = "10Y government bond"
+_COUNTRY_SERIES: dict[str, tuple[str, str]] = {
+    "United States":  ("DGS10", _TENOR_10Y),
+    "United Kingdom": ("IRLTLT01GBM156N", _TENOR_10Y),
+    "Germany":        ("IRLTLT01DEM156N", _TENOR_10Y),
+    "Japan":          ("IRLTLT01JPM156N", _TENOR_10Y),
+    "France":         ("IRLTLT01FRM156N", _TENOR_10Y),
+    "Switzerland":    ("IRLTLT01CHM156N", _TENOR_10Y),
+    "Canada":         ("IRLTLT01CAM156N", _TENOR_10Y),
+    "Australia":      ("IRLTLT01AUM156N", _TENOR_10Y),
+    "Netherlands":    ("IRLTLT01NLM156N", _TENOR_10Y),
+    "India":          ("INDIRLTLT01STM", _TENOR_10Y),
+    "China":          ("IR3TIB01CNM156N", "3M interbank (proxy)"),
+    "Brazil":         ("IRSTCI01BRM156N", "overnight rate (proxy)"),
+    "Russia":         ("IRSTCI01RUM156N", "overnight rate (proxy)"),
 }
+
+# An observation older than this is reported as stale (monthly OECD series
+# publish with a lag of one to two months).
+_STALE_DAYS = 120
 
 # ── Fallback estimates (updated 2026) ──────────────────────────────────────
 # Used when FRED series is unavailable or returns empty.
@@ -86,10 +94,17 @@ _FALLBACK_ERP: dict[str, float] = {
 
 @async_cached("risk_free_rates")
 async def get_risk_free_rates() -> list[dict]:
-    """Return live risk-free rates per country from FRED, with fallbacks."""
+    """Risk-free rate and ERP per country.
+
+    Each row says what the rate is: ``series`` / ``tenor`` / ``asOf`` for an
+    observed FRED value, ``basis: "fallback"`` when FRED had nothing and a
+    hard-coded estimate stands in, and ``stale`` when the observation is old.
+    """
+    from datetime import date
+
     from .macro_expansion_service import _fetch_fred_series_sync
 
-    series_ids = list(_COUNTRY_SERIES.values())
+    series_ids = [sid for sid, _ in _COUNTRY_SERIES.values()]
     try:
         fred_data = await asyncio.to_thread(
             _fetch_fred_series_sync, series_ids, "2024-01-01"
@@ -99,21 +114,21 @@ async def get_risk_free_rates() -> list[dict]:
         fred_data = {}
 
     result: list[dict] = []
-    for country, sid in _COUNTRY_SERIES.items():
-        rf: float | None = None
-
-        # Try FRED first — take the last (most recent) data point
-        pts = fred_data.get(sid) or []
-        if pts and pts[-1].get("value") is not None:
-            # FRED gives percentage values like 4.40 → convert to decimal 0.044
-            rf = round(float(pts[-1]["value"]) / 100, 4)
+    for country, (sid, tenor) in _COUNTRY_SERIES.items():
+        pts = [p for p in (fred_data.get(sid) or []) if p.get("value") is not None]
+        if pts:
+            obs = str(pts[-1]["date"])[:10]
+            row = {
+                # FRED gives percentage values like 4.40 → convert to decimal 0.044
+                "riskFreeRate": round(float(pts[-1]["value"]) / 100, 4),
+                "basis": "observed", "series": sid, "tenor": tenor, "asOf": obs,
+                "stale": (date.today() - date.fromisoformat(obs)).days > _STALE_DAYS,
+            }
+        elif country in _FALLBACK:
+            row = {"riskFreeRate": _FALLBACK[country], "basis": "fallback", "series": None,
+                   "tenor": "hard-coded estimate", "asOf": None, "stale": None}
         else:
-            rf = _FALLBACK.get(country)
-
-        if rf is None:
             continue
-
-        erp = _get_country_erp(country)
-        result.append({"name": country, "riskFreeRate": rf, "erp": erp})
+        result.append({"name": country, **row, "erp": _get_country_erp(country)})
 
     return result

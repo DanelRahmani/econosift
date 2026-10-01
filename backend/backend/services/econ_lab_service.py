@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 
+from .. import provenance as pv
 from ..cache import async_cached
 from ..config import iso2_to_iso3, COUNTRY_NAMES
 from ..sources import source_worldbank as wb
@@ -116,6 +117,24 @@ def _pooled_ols(y: np.ndarray, X: np.ndarray, names: list[str]) -> dict:
         "bic": _clean(bic),
         "_coeffs": coeffs,
     }
+
+
+def _provenance(dep: str, indep: list[str], panel: pd.DataFrame) -> dict:
+    """``dep`` / ``indep`` name the World Bank series behind each variable; everything else is the fit."""
+    observed = str(int(panel["year"].max()))
+
+    def wb_ref(key: str) -> dict:
+        return pv.ref("worldbank", wb.INDICATOR_MAP.get(key), key.replace("_", " "), frequency="annual",
+                      observed=observed, note="Newest year in the estimation sample.")
+
+    dep_ref = wb_ref(dep)
+    indep_refs = [wb_ref(k) for k in indep]
+    fit = pv.derived(
+        "pooled OLS (numpy least squares with a constant) of the dependent variable on the independent "
+        "variables over the country-year pairs where every variable exists; classical standard errors, "
+        "t-statistics with n - k degrees of freedom",
+        [dep_ref, *indep_refs], title="Pooled OLS regression", observed=observed)
+    return {"*": fit, "dep": dep_ref, "indep": indep_refs}
 
 
 async def regress(
@@ -245,7 +264,7 @@ async def _regress_cached(
         for i, row in enumerate(panel.to_dict("records"))
     ]
 
-    return {
+    return pv.attach({
         "dep": dep,
         "indep": indep_list,
         "countries": countries_list,
@@ -260,5 +279,5 @@ async def _regress_cached(
         "coefficients": ols["coefficients"],
         "residuals": residuals,
         "warning": warning,
-    }
+    }, _provenance(dep, indep_list, panel))
 

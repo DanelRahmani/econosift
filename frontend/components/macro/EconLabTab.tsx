@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import type { Country, RegressResponse } from "@/lib/types";
 import { Card } from "@/components/ui";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 import { CountrySelector } from "./CountrySelector";
 import {
   ScatterChart,
@@ -80,6 +82,7 @@ export function EconLabTab() {
   const [end, setEnd]               = useState(CURRENT_YEAR);
   const [result, setResult]         = useState<RegressResponse | null>(null);
   const [loading, setLoading]       = useState(false);
+  const scope = useSourceScope(provOf(result));
 
   const [allCountries, setAllCountries] = useState<Country[]>([]);
 
@@ -242,7 +245,7 @@ export function EconLabTab() {
       {result && !result.error && (
         <>
           {/* KPI strip */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3" {...scope}>
             <KpiCard label="R²" value={result.rSquared} />
             <KpiCard label="Adj R²" value={result.adjRSquared} />
             <KpiCard label="AIC" value={result.aic} />
@@ -250,7 +253,7 @@ export function EconLabTab() {
           </div>
 
           {/* Summary */}
-          <Card className="p-4 text-xs text-text-secondary">
+          <Card className="p-4 text-xs text-text-secondary" {...scope}>
             <span className="font-medium text-text-primary">Model:</span>{" "}
             {depLabel} ~ {result.indep.map((v) => LAB_INDICATORS.find((i) => i.id === v)?.label ?? v).join(" + ")}
             {" "}·{" "}
@@ -263,7 +266,7 @@ export function EconLabTab() {
           </Card>
 
           {/* Coefficient table */}
-          <Card className="p-5">
+          <Card className="p-5" {...scope}>
             <h3 className="text-sm font-semibold text-text-primary mb-3">Regression Coefficients</h3>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -299,7 +302,7 @@ export function EconLabTab() {
 
           {/* Residual scatter */}
           {scatterData.length > 0 && (
-            <Card className="p-5">
+            <Card className="p-5" {...scope}>
               <h3 className="text-sm font-semibold text-text-primary mb-4">
                 Residuals vs Fitted
               </h3>

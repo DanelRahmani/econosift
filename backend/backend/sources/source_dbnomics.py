@@ -7,8 +7,16 @@ import pandas as pd
 from ..cache import async_cached
 from ..config import iso2_to_iso3, COUNTRY_NAMES
 from ..models import SeriesResult, make_series
+from ._annual import to_annual
 
 SOURCE_LABEL = "DB.nomics (OECD/BIS)"
+
+
+# How each DB.nomics series becomes the indicator: CPI and real GDP arrive as
+# *levels* (an index, a volume) and must be turned into annual % changes —
+# previously the raw index/volume was served as "inflation"/"GDP growth"
+# (audit D-05).
+_METHOD = {"inflation": "yoy", "gdp_growth": "yoy", "unemployment": "mean", "interest_rate": "mean"}
 
 
 def _series_path(indicator_key: str, iso2: str) -> str | None:
@@ -29,18 +37,15 @@ def _fetch_sync(path: str) -> pd.DataFrame:
     return fetch_series(path)
 
 
-def _annual(df: pd.DataFrame, start: int, end: int) -> list[tuple[int, float]]:
+def _annual(df: pd.DataFrame, start: int, end: int, method: str = "mean") -> list[tuple[int, float]]:
     if df is None or df.empty or "period" not in df.columns or "value" not in df.columns:
         return []
     s = pd.Series(
         pd.to_numeric(df["value"], errors="coerce").values,
         index=pd.to_datetime(df["period"], errors="coerce"),
     ).dropna()
-    annual = s.resample("YE").mean()
-    return sorted(
-        (ts.year, float(v)) for ts, v in annual.dropna().items()
-        if start <= ts.year <= end
-    )
+    s = s[s.index.notna()]
+    return to_annual(s, method, start, end)
 
 
 @async_cached("dbnomics_fetch")
@@ -53,7 +58,7 @@ async def fetch(indicator_key: str, countries: tuple[str, ...],
             continue
         try:
             df = await asyncio.to_thread(_fetch_sync, path)
-            points = _annual(df, start, end)
+            points = _annual(df, start, end, _METHOD.get(indicator_key, "mean"))
         except Exception:
             continue
         if points:

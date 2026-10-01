@@ -355,13 +355,6 @@ BIS_DATASETS = {
         "iso2_filter": None,
         "label": "BIS Exchange Rates",
     },
-    "bis_crossborder": {
-        "zip_key": "crossborder",
-        "measure_filter": None,
-        "freq": "Q",
-        "iso2_filter": None,
-        "label": "BIS Cross-Border Claims (LBS)",
-    },
     "bis_credit_gap": {
         "zip_key": "credit_gap",
         "measure_filter": ("CG_DTYPE", "C:"),  # C = credit-to-GDP gap (actual minus trend)
@@ -380,7 +373,6 @@ def _download_bis_dataset(ds: dict) -> dict:
         "cpi":          "https://data.bis.org/static/bulk/WS_LONG_CPI_csv_flat.zip",
         "policy":       "https://data.bis.org/static/bulk/WS_CBPOL_csv_flat.zip",
         "fx":           "https://data.bis.org/static/bulk/WS_XRU_csv_flat.zip",
-        "crossborder":  "https://data.bis.org/static/bulk/WS_LBS_csv_flat.zip",
         "credit_gap":   "https://data.bis.org/static/bulk/WS_CREDIT_GAP_csv_flat.zip",
     }
     url = url_map.get(ds["zip_key"])
@@ -606,7 +598,7 @@ def _download_all_bulk_datasets(status: dict) -> None:
         except Exception as exc:
             status["imf_weo"] = {**status.get("imf_weo", {}), "last_attempt": now, "error": str(exc)}
 
-        # BIS datasets (includes crossborder)
+        # BIS datasets
         total_bis_rows = 0
         for ds_key, ds_config in BIS_DATASETS.items():
             try:

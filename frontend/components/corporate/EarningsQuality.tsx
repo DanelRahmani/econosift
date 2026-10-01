@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import type { EarningsQualityData } from "@/lib/types";
 import { Card, PageSkeleton, ToggleChip } from "@/components/ui";
+import { SourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 
 const UNIVERSES: { key: "dow" | "ndx" | "sp500"; label: string }[] = [
   { key: "dow", label: "Dow 30" },
@@ -13,7 +15,7 @@ const UNIVERSES: { key: "dow" | "ndx" | "sp500"; label: string }[] = [
 
 function KpiCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
-    <Card className="p-4">
+    <Card className="p-4" data-prov="kpis">
       <div className="text-xs text-text-secondary">{label}</div>
       <div className="text-2xl font-bold mt-1">{value}</div>
       {sub && <div className="text-xs text-text-secondary mt-0.5">{sub}</div>}
@@ -79,7 +81,7 @@ export function EarningsQuality() {
       )}
 
       {!loading && data && data.kpis && data.rows && data.rows.length > 0 && (
-        <>
+        <SourceScope prov={provOf(data)} className="space-y-6">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <KpiCard label="Median Accrual Ratio" value={fmtNum(data.kpis.medianAccrual)} />
             <KpiCard label="Median Cash Conversion" value={fmtNum(data.kpis.medianCashConversion)} />
@@ -103,7 +105,7 @@ export function EarningsQuality() {
               </thead>
               <tbody>
                 {data.rows.map((r) => (
-                  <tr key={r.ticker} className="border-b border-border/50">
+                  <tr key={r.ticker} className="border-b border-border/50" data-prov={`rows.${r.ticker}`} data-prov-ctx={r.ticker}>
                     <td className="py-1.5 pr-3 font-medium">{r.ticker}</td>
                     <td className="py-1.5 pr-3 text-text-secondary">{r.sector ?? "—"}</td>
                     <td className="py-1.5 pr-3 text-right">{fmtNum(r.accrualRatio)}</td>
@@ -126,7 +128,7 @@ export function EarningsQuality() {
               </tbody>
             </table>
           </div>
-        </>
+        </SourceScope>
       )}
     </div>
   );

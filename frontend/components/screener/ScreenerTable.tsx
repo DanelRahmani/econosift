@@ -190,6 +190,7 @@ export function ScreenerTable({ rows, tab, sort, dir, onSort }: ScreenerTablePro
                   className={`border-b border-border/50 hover:bg-surface-alt/40 transition-colors ${
                     ri % 2 === 0 ? "" : "bg-surface-alt/20"
                   }`}
+                  data-prov-ctx={row.symbol}
                 >
                   {columns.map((c, i) => {
                     const text = c.render(row);

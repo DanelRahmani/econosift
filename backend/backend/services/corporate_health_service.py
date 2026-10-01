@@ -10,8 +10,10 @@ import math
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date
 
+import pandas as pd
 import yfinance as yf
 
+from .. import provenance as pv
 from ..cache import cached
 from . import constituents
 
@@ -29,6 +31,44 @@ def _latest_val(df, row_name: str) -> float | None:
         if v is None or (isinstance(v, float) and math.isnan(v)):
             return None
         return float(v)
+    except Exception:
+        return None
+
+
+def _prior_value(df_annual, df_quarterly, row_name: str, *, flow: bool) -> float | None:
+    """Prior fiscal-year value (t-1), with a date-matched quarterly fallback.
+
+    Annual column 1 when present. Otherwise, from the quarterly statements:
+      - balance-sheet (stock) items: the quarter dated ~1 year before the
+        latest annual report (±45 days);
+      - income/cash-flow (flow) items: the sum of the 4 quarters ending then,
+        and None if those 4 quarters are not all present.
+    The previous fallback took ``iloc[3]`` — three quarters back — and, for
+    flows, compared a *single quarter* with a full year, e.g. SGI ≈ 4 and a
+    false "likely manipulator" flag (audit C-13).
+    """
+    v = _prior_val(df_annual, row_name)
+    if v is not None:
+        return v
+    try:
+        if (df_quarterly is None or df_quarterly.empty or row_name not in df_quarterly.index
+                or df_annual is None or df_annual.empty):
+            return None
+        target = pd.Timestamp(df_annual.columns[0]) - pd.DateOffset(years=1)
+        cols = pd.to_datetime(df_quarterly.columns)
+        vals = df_quarterly.loc[row_name]
+        if not flow:
+            gaps = abs(cols - target)
+            i = int(gaps.argmin())
+            if gaps[i] > pd.Timedelta(days=45):
+                return None
+            q = float(vals.iloc[i])
+            return None if math.isnan(q) else q
+        window = [float(vals.iloc[i]) for i, c in enumerate(cols)
+                  if target - pd.Timedelta(days=320) <= c <= target + pd.Timedelta(days=45)]
+        if len(window) != 4 or any(math.isnan(x) for x in window):
+            return None
+        return sum(window)
     except Exception:
         return None
 
@@ -144,18 +184,8 @@ def _piotroski(fin, bs, cf, fin_q=None, bs_q=None, cf_q=None) -> dict:
     if shares is None:
         shares = _latest_val(bs, "Share Issued")
 
-    # Helper: try annual _prior_val, fall back to quarterly (4 quarters back)
     def _prior(df_annual, df_quarterly, row_name: str) -> float | None:
-        v = _prior_val(df_annual, row_name)
-        if v is not None:
-            return v
-        if df_quarterly is not None and row_name in df_quarterly.index and df_quarterly.shape[1] >= 4:
-            try:
-                vq = float(df_quarterly.loc[row_name].iloc[3])
-                return vq if not math.isnan(vq) else None
-            except Exception:
-                pass
-        return None
+        return _prior_value(df_annual, df_quarterly, row_name, flow=df_annual is not bs)
 
     criteria: dict[str, bool | None] = {}
     score = 0
@@ -178,7 +208,7 @@ def _piotroski(fin, bs, cf, fin_q=None, bs_q=None, cf_q=None) -> dict:
     ta_prior = _prior(bs, bs_q, "Total Assets")
     roa_prior = _safe_div(ni_prior, ta_prior)
 
-    c3 = roa is not None and (roa_prior is None or roa > roa_prior)
+    c3 = None if roa is None or roa_prior is None else roa > roa_prior
     criteria["roaIncreasing"] = c3
     if c3:
         score += 1
@@ -196,7 +226,7 @@ def _piotroski(fin, bs, cf, fin_q=None, bs_q=None, cf_q=None) -> dict:
     ta_prior2 = _prior(bs, bs_q, "Total Assets")
     ltd_ratio_prior = _safe_div(ltd_prior, ta_prior2)
 
-    c5 = ltd_to_assets is not None and (ltd_ratio_prior is None or ltd_to_assets <= ltd_ratio_prior)
+    c5 = None if ltd_to_assets is None or ltd_ratio_prior is None else ltd_to_assets <= ltd_ratio_prior
     criteria["decreasingLeverage"] = c5
     if c5:
         score += 1
@@ -207,7 +237,7 @@ def _piotroski(fin, bs, cf, fin_q=None, bs_q=None, cf_q=None) -> dict:
     cl_prior = _prior(bs, bs_q, "Current Liabilities")
     cr_prior = _safe_div(ca_prior, cl_prior)
 
-    c6 = cr is not None and (cr_prior is None or cr > cr_prior)
+    c6 = None if cr is None or cr_prior is None else cr > cr_prior
     criteria["increasingCurrentRatio"] = c6
     if c6:
         score += 1
@@ -217,7 +247,7 @@ def _piotroski(fin, bs, cf, fin_q=None, bs_q=None, cf_q=None) -> dict:
     if shares_prior is None:
         shares_prior = _prior(bs, bs_q, "Share Issued")
 
-    c7 = shares is not None and (shares_prior is None or shares <= shares_prior)
+    c7 = None if shares is None or shares_prior is None else shares <= shares_prior
     criteria["noShareDilution"] = c7
     if c7:
         score += 1
@@ -228,7 +258,7 @@ def _piotroski(fin, bs, cf, fin_q=None, bs_q=None, cf_q=None) -> dict:
     rev_prior = _prior(fin, fin_q, "Total Revenue")
     gm_prior = _safe_div(gp_prior, rev_prior)
 
-    c8 = gm is not None and (gm_prior is None or gm > gm_prior)
+    c8 = None if gm is None or gm_prior is None else gm > gm_prior
     criteria["increasingGrossMargin"] = c8
     if c8:
         score += 1
@@ -239,15 +269,20 @@ def _piotroski(fin, bs, cf, fin_q=None, bs_q=None, cf_q=None) -> dict:
     ta_prior3 = _prior(bs, bs_q, "Total Assets")
     turnover_prior = _safe_div(rev_prior2, ta_prior3)
 
-    c9 = turnover is not None and (turnover_prior is None or turnover > turnover_prior)
+    c9 = None if turnover is None or turnover_prior is None else turnover > turnover_prior
     criteria["increasingAssetTurnover"] = c9
     if c9:
         score += 1
 
+    # A criterion without a prior-year comparison is not scored (None) —
+    # previously it counted as a pass, inflating thin-data firms by up to +6
+    # (audit C-14). The interpretation bands scale with what was scored.
+    max_score = sum(1 for v in criteria.values() if v is not None)
+    frac = score / max_score if max_score else 0.0
     return {
         "score": score,
-        "maxScore": 9,
-        "interpretation": "Strong" if score >= 7 else ("Average" if score >= 4 else "Weak"),
+        "maxScore": max_score,
+        "interpretation": ("Strong" if frac >= 7 / 9 else ("Average" if frac >= 4 / 9 else "Weak")) if max_score else "Insufficient data",
         "criteria": criteria,
     }
 
@@ -274,7 +309,7 @@ def _beneish(fin, bs, cf, fin_q=None, bs_q=None, cf_q=None) -> dict:
     current_assets = _latest_val(bs, "Current Assets")
     current_liabilities = _latest_val(bs, "Current Liabilities")
     total_assets = _latest_val(bs, "Total Assets")
-    total_liabilities = _latest_val(bs, "Total Liabilities Net Minority Investment")
+    total_liabilities = _latest_val(bs, "Total Liabilities Net Minority Interest")
     if total_liabilities is None:
         total_liabilities = _latest_val(bs, "Total Liabilities")
     long_term_debt = _latest_val(bs, "Long Term Debt")
@@ -283,22 +318,16 @@ def _beneish(fin, bs, cf, fin_q=None, bs_q=None, cf_q=None) -> dict:
         ppe = _latest_val(bs, "Property Plant and Equipment")
     if ppe is None:
         ppe = _latest_val(bs, "Gross PPE")
-    depreciation = _latest_val(bs, "Accumulated Depreciation")
+    # DEPI uses depreciation *expense* (cash-flow statement), not the
+    # balance-sheet accumulated depreciation (audit C-26).
+    depreciation = _latest_val(cf, "Depreciation And Amortization")
+    if depreciation is None:
+        depreciation = _latest_val(cf, "Depreciation")
     receivables = _latest_val(bs, "Accounts Receivable")
     sga = _latest_val(fin, "Selling General And Administration")
 
-    # Helper: try annual _prior_val, fall back to quarterly (4 quarters back)
     def _prior(df_annual, df_quarterly, row_name: str) -> float | None:
-        v = _prior_val(df_annual, row_name)
-        if v is not None:
-            return v
-        if df_quarterly is not None and row_name in df_quarterly.index and df_quarterly.shape[1] >= 4:
-            try:
-                vq = float(df_quarterly.loc[row_name].iloc[3])
-                return vq if not math.isnan(vq) else None
-            except Exception:
-                pass
-        return None
+        return _prior_value(df_annual, df_quarterly, row_name, flow=df_annual is not bs)
 
     rev_prior = _prior(fin, fin_q, "Total Revenue")
     cogs_prior = _prior(fin, fin_q, "Cost Of Revenue")
@@ -310,7 +339,9 @@ def _beneish(fin, bs, cf, fin_q=None, bs_q=None, cf_q=None) -> dict:
     if ppe_prior is None:
         ppe_prior = _prior(bs, bs_q, "Gross PPE")
     ta_prior = _prior(bs, bs_q, "Total Assets")
-    dep_prior = _prior(bs, bs_q, "Accumulated Depreciation")
+    dep_prior = _prior(cf, cf_q, "Depreciation And Amortization")
+    if dep_prior is None:
+        dep_prior = _prior(cf, cf_q, "Depreciation")
     cl_prior = _prior(bs, bs_q, "Current Liabilities")
     ltd_prior = _prior(bs, bs_q, "Long Term Debt")
     tl_prior = _prior(bs, bs_q, "Total Liabilities Net Minority Interest")
@@ -388,20 +419,30 @@ def _beneish(fin, bs, cf, fin_q=None, bs_q=None, cf_q=None) -> dict:
         "dsri": 0.920, "gmi": 0.528, "aqi": 0.404, "sgi": 0.892,
         "depi": 0.115, "sgai": -0.172, "tata": 4.679, "lvgi": -0.327,
     }
+    # A missing ratio index is imputed at its neutral value 1.0 (no change
+    # vs last year) — adding 0 instead lowered M by up to ~0.9 per missing
+    # index and biased results to "Not flagged" (audit C-12). TATA has no
+    # neutral value and is required; at least 5 of the 7 ratio indexes must
+    # be real.
     m_score = None
     valid_components = 0
+    imputed: list[str] = []
     m_parts: dict[str, float | None] = {}
     running = -4.84  # intercept
     for key, coef in coeffs.items():
         v = indexes.get(key)
+        if v is None and key != "tata":
+            v = 1.0
+            imputed.append(key)
+        elif v is not None:
+            valid_components += 1
         if v is not None:
             running += coef * v
             m_parts[key] = round(coef * v, 4)
-            valid_components += 1
         else:
             m_parts[key] = None
 
-    if valid_components >= 4:  # need at least half the indexes
+    if indexes.get("tata") is not None and len(imputed) <= 2:
         m_score = round(running, 4)
 
     # Interpretation: M > -2.22 suggests earnings manipulation
@@ -415,6 +456,7 @@ def _beneish(fin, bs, cf, fin_q=None, bs_q=None, cf_q=None) -> dict:
         "mComponents": m_parts,
         "validComponents": valid_components,
         "totalComponents": 8,
+        "imputedNeutral": imputed,
     }
 
 
@@ -457,8 +499,10 @@ def get_corporate_health(ticker: str) -> dict:
         piotroski_data = _piotroski(fin, bs, cf, fin_q, bs_q, cf_q)
 
         beneish_data = _beneish(fin, bs, cf, fin_q, bs_q, cf_q)
+        # Fiscal year end of the latest annual statements the scores use.
+        fy_end = str(fin.columns[0])[:10] if len(fin.columns) else None
 
-        return {
+        return pv.attach({
             "ticker": ticker,
             "name": info.get("shortName") or info.get("longName") or ticker,
             "sector": sector or None,
@@ -467,11 +511,38 @@ def get_corporate_health(ticker: str) -> dict:
             "altmanZ": z_data,
             "piotroski": piotroski_data,
             "beneish": beneish_data,
-            "asOf": None,
-        }
+            "asOf": fy_end,
+        }, _health_provenance(ticker, fy_end, bool(fin_q is not None or bs_q is not None or cf_q is not None)))
     except Exception as exc:
         logger.warning("corporate_health failed for %s: %s", ticker, exc)
         return {"ticker": ticker, "error": str(exc)}
+
+
+def _health_provenance(ticker: str, fy_end: str | None, quarterly_fallback: bool) -> dict:
+    statements = pv.yahoo(ticker, "Annual income statement, balance sheet and cash-flow statement",
+                          frequency="annual", observed=fy_end,
+                          note=("The prior year is taken from quarterly statements where Yahoo "
+                                "publishes only one annual column.") if quarterly_fallback else None)
+    market_cap = pv.yahoo(ticker, "info.marketCap (market value of equity)")
+    return {
+        "*": statements,
+        "price": pv.yahoo(ticker, "info.currentPrice (else regularMarketPrice)"),
+        "altmanZ": pv.derived(
+            "Z = 1.2·(working capital/TA) + 1.4·(retained earnings/TA) + 3.3·(EBIT/TA) "
+            "+ 0.6·(market cap/total liabilities) + 1.0·(sales/TA); Safe > 2.99, Distress ≤ 1.81; "
+            "null if any input is missing",
+            [statements, market_cap], title="Altman Z-Score (1968, public manufacturers)", observed=fy_end),
+        "piotroski": pv.derived(
+            "one point per criterion met: ROA > 0, OCF > 0, ΔROA > 0, OCF > net income, Δleverage < 0, "
+            "Δcurrent ratio > 0, no new shares, Δgross margin > 0, Δasset turnover > 0; criteria "
+            "without a prior year are not scored (maxScore shrinks)",
+            [statements], title="Piotroski F-Score", observed=fy_end),
+        "beneish": pv.derived(
+            "M = −4.84 + 0.920·DSRI + 0.528·GMI + 0.404·AQI + 0.892·SGI + 0.115·DEPI − 0.172·SGAI "
+            "+ 4.679·TATA − 0.327·LVGI; missing indexes take their neutral value 1.0 (at most two, "
+            "TATA required); M > −2.22 flags likely manipulation",
+            [statements], title="Beneish M-Score", observed=fy_end),
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -726,4 +797,17 @@ def get_earnings_quality(universe: str = "dow") -> dict:
     if not result:
         return {}
     result["universe"] = universe
-    return result
+    statements = pv.ref("yahoo", None, f"Latest two annual statements of each {universe} member",
+                        frequency="annual", note="Fiscal year ends differ by company.")
+    members_ref = pv.ref("wikipedia", None, f"Current {universe} constituents")
+    return pv.attach(result, {
+        "*": pv.derived("Sloan (1996) accruals screen over the index members", [statements, members_ref],
+                        title="Earnings quality"),
+        "rows": pv.derived(
+            "accrual ratio = (net income − operating cash flow) / average total assets; cash conversion = "
+            "OCF / net income (net income > 0); NOA growth = YoY change in (TA − cash) − (TL − debt); "
+            "quality score 0–100 from those three; flag = accrual ratio in the universe's top decile",
+            [statements], title="Per-company earnings quality"),
+        "kpis": pv.derived("medians and share flagged across the companies with data", ["rows"],
+                           title="Universe summary"),
+    })

@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import type { CotData, CotContract } from "@/lib/types";
 import { Card } from "@/components/ui";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 import {
   BarChart,
   Bar,
@@ -46,6 +48,7 @@ export function PositioningTab() {
   const [data, setData] = useState<CotData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const scope = useSourceScope(provOf(data));
 
   useEffect(() => {
     api
@@ -91,7 +94,7 @@ export function PositioningTab() {
   const isStale = asOfAgeDays != null && asOfAgeDays > 14;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" {...scope}>
       <div>
         <h2 className="font-semibold text-lg">
           Commitments of Traders (CFTC)
@@ -128,12 +131,14 @@ export function PositioningTab() {
                 <tr
                   key={c.code}
                   className="border-b border-border/40 hover:bg-surface-alt/30 transition-colors"
+                  data-prov-ctx={c.name}
                 >
                   <td className="py-2 pr-4">
                     <div className="font-medium">{c.name}</div>
                     <div className="text-xs text-text-secondary">{c.code}</div>
                   </td>
                   <td
+                    data-prov="contracts.net_speculator"
                     className={`py-2 pr-4 text-right font-mono font-semibold ${
                       c.net_speculator != null && c.net_speculator >= 0
                         ? "text-success"
@@ -145,6 +150,7 @@ export function PositioningTab() {
                       : "—"}
                   </td>
                   <td
+                    data-prov="contracts.net_commercial"
                     className={`py-2 pr-4 text-right font-mono ${
                       c.net_commercial != null && c.net_commercial >= 0
                         ? "text-success"
@@ -155,10 +161,10 @@ export function PositioningTab() {
                       ? `${c.net_commercial >= 0 ? "+" : ""}${fmt(c.net_commercial)}`
                       : "—"}
                   </td>
-                  <td className="py-2 pr-4 text-right font-mono text-text-secondary">
+                  <td data-prov="contracts.open_interest" className="py-2 pr-4 text-right font-mono text-text-secondary">
                     {fmt(c.open_interest)}
                   </td>
-                  <td className="py-2">
+                  <td data-prov="contracts.cot_index" className="py-2">
                     <CotIndexBar value={c.cot_index} />
                   </td>
                 </tr>
@@ -181,7 +187,7 @@ export function PositioningTab() {
             "Net Spec": pt.net_spec,
           }));
           return (
-            <Card key={c.code} className="p-4">
+            <Card key={c.code} className="p-4" data-prov="contracts.history" data-prov-ctx={c.name}>
               <h4 className="text-sm font-semibold mb-1">{c.name}</h4>
               <p className="text-xs text-text-secondary mb-2">
                 Net speculator positioning (contracts)

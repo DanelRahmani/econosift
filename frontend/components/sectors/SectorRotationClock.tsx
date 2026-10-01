@@ -33,6 +33,8 @@ function CustomDot({ cx = 0, cy = 0, payload, size = 60, onClick }: DotProps) {
     <g
       onClick={() => onClick && onClick(payload.sector)}
       style={{ cursor: onClick ? "pointer" : undefined }}
+      data-prov="sectors.return3m"
+      data-prov-ctx={payload.sector}
     >
       <circle cx={cx} cy={cy} r={r} fill={color} fillOpacity={0.75} stroke={color} strokeWidth={1} />
       <text x={cx} y={cy - r - 3} textAnchor="middle" fontSize={10} fill="currentColor">
@@ -73,20 +75,21 @@ export function SectorRotationClock({ data, onSectorClick }: Props) {
         <span
           className="px-3 py-1 rounded-full text-sm font-semibold text-white"
           style={{ backgroundColor: color }}
+          data-prov="phase"
         >
-          Phase: {data.phase} ({data.confidence}% confidence)
+          Phase: {data.phase} <span data-prov="confidence">({data.confidence}% confidence)</span>
         </span>
         {data.regimeQuadrant && (
-          <span className="text-sm text-text-secondary">
+          <span className="text-sm text-text-secondary" data-prov="regimeQuadrant">
             Macro regime: {data.regimeQuadrant}
             {data.regimePhase && data.regimePhase !== data.phase && (
-              <span className="text-text-muted ml-1">(suggests {data.regimePhase})</span>
+              <span className="text-text-muted ml-1" data-prov="regimePhase">(suggests {data.regimePhase})</span>
             )}
           </span>
         )}
       </div>
 
-      <div className="relative">
+      <div className="relative" data-prov="sectors">
         <ResponsiveContainer width="100%" height={400}>
           <ScatterChart margin={{ top: 20, right: 40, bottom: 20, left: 20 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(128,128,128,0.15)" />

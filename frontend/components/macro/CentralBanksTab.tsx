@@ -8,6 +8,9 @@ import { api } from "@/lib/api";
 import type { CentralBanksData } from "@/lib/types";
 import { chartPalette, chartTooltipStyle } from "@/components/ui";
 import { useTheme } from "@/components/ThemeProvider";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
+import { legendProv } from "./legendProv";
 
 const CB_COLORS: Record<string, string> = {
   Fed: "#3b82f6",
@@ -46,6 +49,7 @@ export function CentralBanksTab() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [timeSpan, setTimeSpan] = useState<number>(120); // default 10Y
+  const scope = useSourceScope(provOf(data));
 
   useEffect(() => {
     api.macroCentralBanks()
@@ -94,14 +98,14 @@ export function CentralBanksTab() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" {...scope}>
       {/* KPI strip */}
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
         {CB_NAMES.map(cb => {
           const cur = data.current[cb];
           if (!cur) return null;
           return (
-            <div key={cb} className="card p-3">
+            <div key={cb} className="card p-3" data-prov={`current.${cb}`} data-prov-ctx={`${CB_FULL_NAMES[cb]} policy rate`}>
               <div className="flex items-center gap-2 mb-1">
                 <span className="w-2.5 h-2.5 rounded-full flex-shrink-0"
                       style={{ background: CB_COLORS[cb] }} />
@@ -114,7 +118,7 @@ export function CentralBanksTab() {
                 {cur.rate !== null ? `${cur.rate.toFixed(2)}%` : "—"}
               </div>
               {cur.next_meeting && (
-                <div className="text-[10px] text-text-muted mt-1">
+                <div className="text-[10px] text-text-muted mt-1" data-prov={`current.${cb}.next_meeting`} data-prov-ctx={`${CB_FULL_NAMES[cb]} next meeting`}>
                   Next: {cur.next_meeting.slice(5)}{cur.days_until !== null ? ` (${cur.days_until}d)` : ""}
                 </div>
               )}
@@ -151,7 +155,7 @@ export function CentralBanksTab() {
               labelFormatter={(v: string) => v.slice(0, 7)}
               formatter={(v: number, name: string) => [`${v?.toFixed(2)}%`, CB_FULL_NAMES[name] ?? name]}
             />
-            <Legend wrapperStyle={{ fontSize: 12, color: pal.axis }} />
+            <Legend wrapperStyle={{ fontSize: 12, color: pal.axis }} formatter={legendProv(Object.fromEntries(CB_NAMES.map((cb) => [cb, `history.${cb}`])))} />
             {CB_NAMES.map(cb => (
               <Line key={cb} type="monotone" dataKey={cb} stroke={CB_COLORS[cb]}
                     dot={false} strokeWidth={1.5} connectNulls />
@@ -162,7 +166,7 @@ export function CentralBanksTab() {
 
       {/* Fed balance sheet */}
       {data.balance_sheet.length > 0 && (
-        <div className="card p-4">
+        <div className="card p-4" data-prov="balance_sheet" data-prov-ctx="US Federal Reserve balance sheet">
           <h3 className="text-sm font-medium text-text-secondary mb-4">US Federal Reserve Balance Sheet (Total Assets, $T)</h3>
           <ResponsiveContainer width="100%" height={200}>
             <AreaChart data={data.balance_sheet.filter((_, i) => i % 4 === 0)}

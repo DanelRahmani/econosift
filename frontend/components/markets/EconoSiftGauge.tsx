@@ -82,21 +82,21 @@ export function EconoSiftGauge({
         ) : (
           <>
             {/* Verdict */}
-            <p className="text-sm font-semibold" style={{ color: verdictColor }}>
+            <p className="text-sm font-semibold" style={{ color: verdictColor }} data-prov="valuation.axiomFairValue.verdict">
               {composite.verdict}
             </p>
 
             {/* Fair value vs spot */}
             <div className="flex items-center justify-center gap-3 text-sm">
               <span className="text-text-secondary text-xs">Fair Value</span>
-              <span className="font-mono font-semibold text-text-primary">
+              <span className="font-mono font-semibold text-text-primary" data-prov="valuation.axiomFairValue">
                 {fmtPrice(composite.value, sym)}
               </span>
             </div>
             {spotPrice !== null && (
               <div className="flex items-center justify-center gap-3 text-xs text-text-secondary">
                 <span>Spot</span>
-                <span className="font-mono">{fmtPrice(spotPrice, sym)}</span>
+                <span className="font-mono" data-prov="valuation.spotPrice">{fmtPrice(spotPrice, sym)}</span>
               </div>
             )}
 
@@ -105,6 +105,7 @@ export function EconoSiftGauge({
               <p
                 className="text-lg font-bold font-mono"
                 style={{ color: upsideColor }}
+                data-prov="valuation.axiomFairValue.upsidePct"
               >
                 {composite.upsidePct >= 0 ? "+" : ""}
                 {fmtPct(composite.upsidePct * 100, 1)} upside
@@ -116,7 +117,7 @@ export function EconoSiftGauge({
 
       {/* ── Model weights breakdown ── */}
       {weights.length > 0 && (
-        <div className="w-full border-t border-border pt-3">
+        <div className="w-full border-t border-border pt-3" data-prov="valuation.axiomFairValue">
           <p className="text-xs text-text-muted uppercase tracking-wide mb-2">
             Model weights
           </p>

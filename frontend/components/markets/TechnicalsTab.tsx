@@ -7,6 +7,8 @@ import {
 } from "recharts";
 import { Card, chartTooltipStyle, chartPalette } from "@/components/ui";
 import { useTheme } from "@/components/ThemeProvider";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 import { api } from "@/lib/api";
 import type {
   TechnicalsResponse, BollingerPoint, IchimokuPoint, FibLevel, PivotSet,
@@ -141,6 +143,7 @@ export function TechnicalsTab({ ticker }: { ticker: string }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showSubCharts, setShowSubCharts] = useState(true);
+  const scope = useSourceScope(provOf(data));
 
   useEffect(() => {
     if (!ticker) return;
@@ -209,16 +212,16 @@ export function TechnicalsTab({ ticker }: { ticker: string }) {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" {...scope} data-prov-ctx={ticker}>
       {/* ---- Summary KPIs ---- */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-        <div className="rounded-lg border border-border bg-surface-alt p-3">
+        <div className="rounded-lg border border-border bg-surface-alt p-3" data-prov="summary.trend" data-prov-ctx="Trend">
           <p className="text-xs text-text-muted mb-1">Trend (SMA50 vs 200)</p>
           <span className={`text-sm font-semibold px-2 py-0.5 rounded border ${trendBadge(summary.trend)}`}>
             {summary.trend}
           </span>
         </div>
-        <div className="rounded-lg border border-border bg-surface-alt p-3">
+        <div className="rounded-lg border border-border bg-surface-alt p-3" data-prov="summary.rsi" data-prov-ctx="RSI (14)">
           <p className="text-xs text-text-muted mb-1">RSI (14)</p>
           <span className={`text-sm font-semibold px-2 py-0.5 rounded border ${rsiBadge(summary.rsi)}`}>
             {fmt(summary.rsi, 1)}
@@ -229,13 +232,13 @@ export function TechnicalsTab({ ticker }: { ticker: string }) {
             )}
           </span>
         </div>
-        <div className="rounded-lg border border-border bg-surface-alt p-3">
+        <div className="rounded-lg border border-border bg-surface-alt p-3" data-prov="summary.macdSignal" data-prov-ctx="MACD signal">
           <p className="text-xs text-text-muted mb-1">MACD Signal</p>
           <span className={`text-sm font-semibold px-2 py-0.5 rounded border ${trendBadge(summary.macdSignal)}`}>
             {summary.macdSignal}
           </span>
         </div>
-        <div className="rounded-lg border border-border bg-surface-alt p-3">
+        <div className="rounded-lg border border-border bg-surface-alt p-3" data-prov="summary.volumeVs20d" data-prov-ctx="Volume vs 20-day">
           <p className="text-xs text-text-muted mb-1">Volume vs 20D Avg</p>
           <p className={`text-sm font-semibold ${
             summary.volumeVs20d != null && summary.volumeVs20d > 2
@@ -245,7 +248,7 @@ export function TechnicalsTab({ ticker }: { ticker: string }) {
             {summary.volumeVs20d != null ? `${fmt(summary.volumeVs20d, 2)}×` : "—"}
           </p>
         </div>
-        <div className="rounded-lg border border-border bg-surface-alt p-3">
+        <div className="rounded-lg border border-border bg-surface-alt p-3" data-prov="summary.week52Position" data-prov-ctx="52-week position">
           <p className="text-xs text-text-muted mb-1">52W Position</p>
           <p className="text-sm font-semibold text-text-primary">
             {summary.week52Position != null ? `${fmt(summary.week52Position, 1)}%` : "—"}
@@ -256,7 +259,7 @@ export function TechnicalsTab({ ticker }: { ticker: string }) {
               : ""}
           </p>
           {summary.bbSqueeze && (
-            <span className="mt-1 inline-block text-xs px-1.5 py-0.5 rounded bg-warning/15 text-warning border border-warning/30">
+            <span className="mt-1 inline-block text-xs px-1.5 py-0.5 rounded bg-warning/15 text-warning border border-warning/30" data-prov="summary.bbSqueeze">
               BB Squeeze
             </span>
           )}
@@ -298,7 +301,7 @@ export function TechnicalsTab({ ticker }: { ticker: string }) {
       </div>
 
       {/* ---- Main Price Chart ---- */}
-      <Card className="p-4">
+      <Card className="p-4" data-prov="prices">
         <p className="text-sm font-semibold text-text-primary mb-3">{ticker} — Price Chart</p>
         {prices.length === 0 ? (
           <div className="text-text-muted text-sm">No price data available.</div>
@@ -384,12 +387,12 @@ export function TechnicalsTab({ ticker }: { ticker: string }) {
         {showSubCharts && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {macd.length > 0 && (
-              <Card className="p-3">
+              <Card className="p-3" data-prov="macd">
                 <MACDChart data={macd} theme={theme} />
               </Card>
             )}
             {rsi.length > 0 && (
-              <Card className="p-3">
+              <Card className="p-3" data-prov="rsi">
                 <SubChart
                   data={rsi}
                   dataKey="value"
@@ -405,7 +408,7 @@ export function TechnicalsTab({ ticker }: { ticker: string }) {
               </Card>
             )}
             {stochRsi.length > 0 && (
-              <Card className="p-3">
+              <Card className="p-3" data-prov="stochRsi">
                 <SubChart
                   data={stochRsi}
                   dataKey={["k", "d"]}
@@ -420,7 +423,7 @@ export function TechnicalsTab({ ticker }: { ticker: string }) {
               </Card>
             )}
             {williamsR.length > 0 && (
-              <Card className="p-3">
+              <Card className="p-3" data-prov="williamsR">
                 <SubChart
                   data={williamsR}
                   dataKey="value"
@@ -435,7 +438,7 @@ export function TechnicalsTab({ ticker }: { ticker: string }) {
               </Card>
             )}
             {obv.length > 0 && (
-              <Card className="p-3">
+              <Card className="p-3" data-prov="obv">
                 <SubChart
                   data={obv}
                   dataKey="value"
@@ -446,7 +449,7 @@ export function TechnicalsTab({ ticker }: { ticker: string }) {
               </Card>
             )}
             {cmf.length > 0 && (
-              <Card className="p-3">
+              <Card className="p-3" data-prov="cmf">
                 <SubChart
                   data={cmf}
                   dataKey="value"
@@ -458,7 +461,7 @@ export function TechnicalsTab({ ticker }: { ticker: string }) {
               </Card>
             )}
             {atr.length > 0 && (
-              <Card className="p-3">
+              <Card className="p-3" data-prov="atr">
                 <SubChart
                   data={atr}
                   dataKey="value"
@@ -475,7 +478,7 @@ export function TechnicalsTab({ ticker }: { ticker: string }) {
       {/* ---- Fibonacci & Pivot Tables ---- */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {fibLevels.length > 0 && (
-          <Card className="p-4">
+          <Card className="p-4" data-prov="fibLevels">
             <p className="text-sm font-semibold text-text-primary mb-3">Fibonacci Retracement (6M swing)</p>
             <table className="w-full text-sm">
               <thead>
@@ -497,13 +500,13 @@ export function TechnicalsTab({ ticker }: { ticker: string }) {
         )}
 
         {Object.keys(pivotPoints ?? {}).length > 0 && (
-          <Card className="p-4">
+          <Card className="p-4" data-prov="pivotPoints">
             <p className="text-sm font-semibold text-text-primary mb-3">Pivot Points (Classic)</p>
             {(["daily", "weekly", "monthly"] as const).map((tf) => {
               const ps = (pivotPoints as Record<string, PivotSet>)?.[tf];
               if (!ps) return null;
               return (
-                <div key={tf} className="mb-3">
+                <div key={tf} className="mb-3" data-prov={`pivotPoints.${tf}`}>
                   <p className="text-xs text-text-muted uppercase tracking-wide mb-1 capitalize">{tf}</p>
                   <div className="grid grid-cols-5 gap-1 text-xs text-center">
                     {[

@@ -22,6 +22,7 @@ import logging
 
 import numpy as np
 
+from .. import provenance as pv
 from ..cache import async_cached
 from ..config import FRED_API_KEY
 from . import macro_expansion_service as mes
@@ -76,6 +77,59 @@ async def _fetch_ebp() -> list[float]:
 
 def _is_empty(result: dict) -> bool:
     return not result or not result.get("available")
+
+
+def _component_refs(data: dict[str, list[dict]]) -> dict[str, dict]:
+    """Source ref of each dial component, by component key."""
+    def last(sid: str) -> str | None:
+        dates = [p["date"] for p in data.get(sid, []) if p.get("value") is not None]
+        return dates[-1] if dates else None
+
+    sofr_dates = {p["date"] for p in data.get("SOFR", []) if p.get("value") is not None}
+    iorb_dates = {p["date"] for p in data.get("IORB", []) if p.get("value") is not None}
+    sofr = pv.fred("SOFR", "Secured Overnight Financing Rate", units="%", frequency="daily", observed=last("SOFR"))
+    iorb = pv.fred("IORB", "Interest rate on reserve balances", units="%", frequency="daily",
+                   observed=last("IORB"))
+    return {
+        "ebp": pv.ref("fedboard", None, "Excess bond premium (Gilchrist-Zakrajsek)", frequency="monthly",
+                      url=_EBP_URL, note="Monthly CSV published by the Federal Reserve Board (not on FRED)."),
+        "anfci": pv.fred("ANFCI", "Chicago Fed Adjusted National Financial Conditions Index", frequency="weekly",
+                         units="index (0 = average)", observed=last("ANFCI")),
+        "sloos": pv.fred("DRTSCILM", "Net percentage of domestic banks tightening standards for C&I loans to large "
+                         "and middle-market firms (SLOOS)", units="net % of banks", frequency="quarterly",
+                         observed=last("DRTSCILM")),
+        "hy_oas": pv.fred("BAMLH0A0HYM2", "ICE BofA US High Yield Index option-adjusted spread", units="%",
+                          frequency="daily", observed=last("BAMLH0A0HYM2")),
+        "term_spread": pv.fred("T10Y3M", "10-year minus 3-month Treasury constant maturity spread", units="%",
+                               frequency="daily", observed=last("T10Y3M")),
+        "sofr_iorb": pv.derived("SOFR - IORB on dates where both exist (percentage points), differenced before "
+                                "z-scoring", [sofr, iorb], title="SOFR - IORB",
+                                observed=max(sofr_dates & iorb_dates, default=None)),
+    }
+
+
+def _dial_provenance(data: dict[str, list[dict]], result: dict) -> dict:
+    refs = _component_refs(data)
+    prov: dict = {}
+    keys = []
+    for c in result["components"]:
+        prov[f"components.{c['key']}"] = pv.derived(
+            f"z = (latest value - mean of the last {_Z_WINDOW} observations) / sample standard deviation; "
+            f"contribution = {c['sign']:+d} x z",
+            [refs[c["key"]]], title=c["label"], observed=refs[c["key"]].get("observed"))
+        keys.append(f"components.{c['key']}")
+    raw = pv.derived("mean of the components' contribution (sign x z) over the components with enough history",
+                     keys, title="Composite z-score")
+    shrunk = pv.derived(f"compositeZ x {_SHRINKAGE}", ["compositeZ"], title="Shrunk composite z-score")
+    exposure = pv.derived(
+        f"clip(1 - 0.30 x shrunkZ, {_MIN_EXPOSURE}, {_MAX_EXPOSURE})", ["shrunkZ"], title="Exposure multiplier")
+    prov.update({
+        "*": exposure,
+        "compositeZ": raw, "shrunkZ": shrunk, "exposureMultiplier": exposure,
+        "regime": pv.derived("'risk-off' if shrunkZ > 0.5, 'risk-on' if shrunkZ < -0.5, else 'neutral'",
+                             ["shrunkZ"], title="Risk regime"),
+    })
+    return prov
 
 
 @async_cached("composite_risk_dial", skip_if=_is_empty)
@@ -140,7 +194,7 @@ async def get_composite_dial() -> dict:
     else:
         regime = "neutral"
 
-    return {
+    result = {
         "available": True,
         "compositeZ": round(raw, 3),
         "shrunkZ": round(shrunk, 3),
@@ -171,6 +225,7 @@ async def get_composite_dial() -> dict:
             "2008; McLean & Pontiff 2016)."
         ),
     }
+    return pv.attach(result, _dial_provenance(data, result))
 
 
 # ---------------------------------------------------------------------------
@@ -327,6 +382,21 @@ async def get_dial_backtest(cost_bps: float = 10.0) -> dict:
 
     result = await asyncio.to_thread(evaluate_dial, series, signs, spx, cost_bps)
     result["costBps"] = cost_bps
+    if result.get("available"):
+        refs = _component_refs(data)
+        inputs = [refs[k] for k in series]
+        spy = pv.yahoo("SPY", "SPDR S&P 500 ETF, dividend-adjusted daily close", frequency="monthly",
+                       transform="last close of each month", observed=result.get("end"))
+        result = pv.attach(result, {
+            "*": pv.derived(
+                "monthly exposure = clip(1 - 0.30 x 0.5 x mean(sign x rolling z), 0.4, 1.2), z-scored against each "
+                "component's own trailing 120 months; applied to SPY's NEXT-month return; timed = exposure x "
+                "return - |change in exposure| x cost_bps / 10,000; static = SPY return; Sharpe here = CAGR / "
+                "annualised volatility", [*inputs, spy], title="Composite dial walk-forward backtest",
+                observed=result.get("end")),
+            "static": pv.derived("buy-and-hold SPY monthly returns over the same months", [spy],
+                                 title="Buy and hold", observed=result.get("end")),
+        })
     result["note"] = (
         "Walk-forward: each component is z-scored against its own trailing "
         "window at every month, never the full sample, and the exposure applies "

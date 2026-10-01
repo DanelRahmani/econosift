@@ -4,6 +4,8 @@ import { useState, useEffect, useRef } from "react";
 import { api } from "@/lib/api";
 import type { Quote } from "@/lib/types";
 import { Card } from "@/components/ui";
+import { SourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 import { fmtPct, fmtPrice, currencySymbol } from "@/lib/format";
 
 const STORAGE_KEY = "econosift-watchlist";
@@ -159,8 +161,8 @@ export function Watchlist({ onSelect }: Props) {
           const up = (q?.changePercent ?? 0) >= 0;
           const alert = alerts[t];
           return (
-            <div key={t} className="border-b border-border/40 last:border-0">
-              <div className="flex items-center justify-between py-2 group">
+            <SourceScope key={t} prov={provOf(q)} className="border-b border-border/40 last:border-0">
+              <div className="flex items-center justify-between py-2 group" data-prov-ctx={t}>
                 <button
                   onClick={() => onSelect?.(t)}
                   className="text-left flex-1 min-w-0 cursor-pointer"
@@ -184,7 +186,7 @@ export function Watchlist({ onSelect }: Props) {
                       <div className="text-sm">{fmtPrice(q.price, currencySymbol(q.currency))}</div>
                     )}
                     {q?.changePercent != null && (
-                      <div className={`text-xs font-medium ${up ? "text-success" : "text-danger"}`}>
+                      <div className={`text-xs font-medium ${up ? "text-success" : "text-danger"}`} data-prov="changePercent">
                         {up ? "+" : ""}{fmtPct(q.changePercent)}
                       </div>
                     )}
@@ -225,7 +227,7 @@ export function Watchlist({ onSelect }: Props) {
                   <button onClick={() => setEditing(null)} className="px-2 py-1 rounded-md text-xs text-text-muted">Cancel</button>
                 </div>
               )}
-            </div>
+            </SourceScope>
           );
         })}
       </div>

@@ -183,3 +183,35 @@ class TestRegimeSeriesStructure:
 
         result = regime_service.regime_series("US", 2020)
         assert "FRED" in result["source"]
+
+
+class TestCurrentRegime:
+    """Live findings: 'current' was the unclassified in-progress quarter."""
+
+    def _run(self, monkeypatch, gdp, cpi):
+        from backend.services import regime_service
+        monkeypatch.setattr(regime_service, "_gdp_yoy_quarterly", lambda sy: gdp)
+        monkeypatch.setattr(regime_service, "_cpi_yoy_quarterly", lambda sy: cpi)
+        return regime_service.regime_series("US", 2020)
+
+    def test_current_is_latest_period_with_both_readings(self, monkeypatch):
+        # CPI is published a quarter ahead of GDP.
+        gdp = pd.Series([2.5, 2.1], index=pd.to_datetime(["2024-03-31", "2024-06-30"]))
+        cpi = pd.Series([2.0, 2.2, 3.4], index=pd.to_datetime(["2024-03-31", "2024-06-30", "2024-09-30"]))
+        result = self._run(monkeypatch, gdp, cpi)
+        assert result["series"][-1]["quadrant"] is None       # CPI-only row is kept...
+        assert result["current"]["date"] == "2024-06-30"      # ...but is not "current"
+        assert result["current"]["quadrant"] == "Goldilocks"
+        assert result["asOf"] == "2024-06-30"
+
+    def test_unfinished_period_is_dropped(self, monkeypatch):
+        ahead = pd.Timestamp.today().normalize() + pd.offsets.QuarterEnd(1)
+        idx = pd.DatetimeIndex([pd.Timestamp("2024-06-30"), ahead])
+        result = self._run(monkeypatch, pd.Series([2.5, 2.4], index=idx), pd.Series([2.0, 2.1], index=idx))
+        assert [p["date"] for p in result["series"]] == ["2024-06-30"]
+
+    def test_one_missing_input_does_not_wipe_the_other(self, monkeypatch):
+        gdp = pd.Series([2.5, 2.1], index=pd.to_datetime(["2024-03-31", "2024-06-30"]))
+        result = self._run(monkeypatch, gdp, pd.Series(dtype=float))
+        assert [p["gdpGrowth"] for p in result["series"]] == [2.5, 2.1]
+        assert result["current"] is None and result["asOf"] is None

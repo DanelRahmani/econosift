@@ -97,7 +97,7 @@ class TestValuationModelsShape:
 
     def test_top_level_keys(self):
         expected = {"ticker", "currency", "spotPrice", "wacc", "models",
-                    "capmImplied", "axiomFairValue", "asOf"}
+                    "capmImplied", "axiomFairValue", "asOf", "growthInput", "statementFx"}
         assert set(self.result.keys()) == expected
 
     def test_ticker_matches(self):

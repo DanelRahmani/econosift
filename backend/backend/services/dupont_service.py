@@ -11,6 +11,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import yfinance as yf
 
+from .. import provenance as pv
 from ..cache import cached
 from . import constituents
 
@@ -130,9 +131,32 @@ def get_sector_dupont() -> dict:
             "tickerCount": n,
         })
 
-    return {
+    statements = pv.ref(
+        "yahoo", None, "Annual income statement and balance sheet of each S&P 500 member (Net Income, Total Revenue, "
+        "Total Assets, Stockholders Equity)", frequency="annual",
+        note="Each company's most recent fiscal year as Yahoo reports it; fiscal year-ends differ across companies.")
+    members = pv.ref("wikipedia", None, "Current S&P 500 constituents and their GICS sectors")
+    prov: dict = {
+        "*": pv.derived(
+            "Per company: netMargin = Net Income ÷ Total Revenue, assetTurnover = Total Revenue ÷ Total Assets, "
+            "equityMultiplier = Total Assets ÷ Stockholders Equity, roe = the product of the three; each sector "
+            "value is the median across its companies (the upper-middle value when the count is even)",
+            [statements, members], title="Sector DuPont decomposition"),
+    }
+    medians = {
+        "netMargin": ("median of Net Income ÷ Total Revenue across the sector's companies", "Net profit margin"),
+        "assetTurnover": ("median of Total Revenue ÷ Total Assets across the sector's companies", "Asset turnover"),
+        "equityMultiplier": ("median of Total Assets ÷ Stockholders Equity across the sector's companies",
+                             "Equity multiplier"),
+        "roe": ("median of (Net Income ÷ Total Revenue × Revenue ÷ Assets × Assets ÷ Equity) across the sector's "
+                "companies; not the product of the three medians", "Return on equity"),
+    }
+    for row in sectors:
+        for field, (formula, title) in medians.items():
+            prov[f"sectors.{row['sector']}.{field}"] = pv.derived(formula, [statements, members], title=title)
+    return pv.attach({
         "sectors": sectors,
         "asOf": None,  # yfinance financials are as-reported
         "tickerCount": len(all_rows),
         "note": "Median values per GICS sector from S&P 500 constituents",
-    }
+    }, prov)

@@ -8,6 +8,8 @@ import type { PricesResponse, EventsResponse } from "@/lib/types";
 import { CHART_COLORS } from "@/lib/format";
 import { chartTooltipStyle, chartPalette, ToggleChip } from "@/components/ui";
 import { useTheme } from "@/components/ThemeProvider";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 
 const SMA_WINDOWS = [20, 50, 200];
 
@@ -37,12 +39,23 @@ function rollingAvg(values: (number | null)[], window: number): (number | null)[
   });
 }
 
+// One earnings-date chip; its own response (/events) carries the source.
+function EarningsChip({ ev, children }: { ev: EventsResponse; children: React.ReactNode }) {
+  const scope = useSourceScope(provOf(ev));
+  return (
+    <span className="text-xs px-2 py-0.5 rounded-md bg-warning/15 text-warning border border-warning/30" {...scope} data-prov="earnings" data-prov-ctx={ev.ticker}>
+      {children}
+    </span>
+  );
+}
+
 export function PriceChart({ data, events = [], isLoading }: { data: PricesResponse; events?: EventsResponse[]; isLoading?: boolean }) {
   const { theme } = useTheme();
   const pal = chartPalette(theme);
   const { prices, benchmarks } = data;
   const [activeSmas, setActiveSmas] = useState<number[]>([]);
   const [showEvents, setShowEvents] = useState(true);
+  const scope = useSourceScope(provOf(data));
 
   if (isLoading) {
     return <div className="h-96 bg-gray-100 dark:bg-gray-800 rounded animate-pulse" />;
@@ -102,11 +115,11 @@ export function PriceChart({ data, events = [], isLoading }: { data: PricesRespo
   }
   const upcomingEarnings = events
     .filter((e) => e.earnings)
-    .map((e) => ({ ticker: e.ticker, date: e.earnings as string }));
+    .map((e) => ({ ticker: e.ticker, date: e.earnings as string, ev: e }));
   const hasMarkers = markers.length > 0 || upcomingEarnings.length > 0;
 
   return (
-    <div>
+    <div {...scope}>
       <div className="flex flex-wrap items-center gap-2 mb-3">
         <span className="text-xs text-text-muted">SMA:</span>
         {SMA_WINDOWS.map((w) => (
@@ -124,9 +137,9 @@ export function PriceChart({ data, events = [], isLoading }: { data: PricesRespo
       {showEvents && upcomingEarnings.length > 0 && (
         <div className="flex flex-wrap gap-2 mb-3">
           {upcomingEarnings.map((e) => (
-            <span key={e.ticker} className="text-xs px-2 py-0.5 rounded-md bg-warning/15 text-warning border border-warning/30">
+            <EarningsChip key={e.ticker} ev={e.ev}>
               {e.ticker} earnings · {e.date}
-            </span>
+            </EarningsChip>
           ))}
         </div>
       )}

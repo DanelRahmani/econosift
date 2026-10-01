@@ -6,6 +6,8 @@ import {
 } from "recharts";
 import { api } from "@/lib/api";
 import type { Holding, RollingData, DateValuePoint } from "@/lib/types";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 
 interface Props {
   holdings: Holding[];
@@ -19,6 +21,7 @@ export function RollingMetrics({ holdings, period }: Props) {
   const [data, setData] = useState<RollingData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const scope = useSourceScope(provOf(data));
 
   useEffect(() => {
     if (holdings.length === 0) return;
@@ -43,9 +46,10 @@ export function RollingMetrics({ holdings, period }: Props) {
     label: string,
     color: string,
     formatter: (v: number) => string,
+    provKey: string,
   ) {
     return (
-      <div className="rounded-lg border border-border bg-surface-alt p-3">
+      <div data-prov={provKey} className="rounded-lg border border-border bg-surface-alt p-3">
         <p className="text-xs text-text-muted font-medium mb-2">{label}</p>
         <ResponsiveContainer width="100%" height={140}>
           <LineChart data={thin(pts)} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
@@ -81,7 +85,7 @@ export function RollingMetrics({ holdings, period }: Props) {
   }
 
   return (
-    <div className="rounded-xl border border-border bg-surface p-4 space-y-4">
+    <div className="rounded-xl border border-border bg-surface p-4 space-y-4" {...scope}>
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h3 className="font-semibold text-sm">Rolling Metrics</h3>
         <div className="flex gap-1 items-center">
@@ -114,9 +118,9 @@ export function RollingMetrics({ holdings, period }: Props) {
 
       {!loading && data && (
         <div className="space-y-3">
-          {miniChart(data.sharpe, "Rolling Sharpe", "var(--color-accent)", (v) => v.toFixed(2))}
-          {miniChart(data.volatility, "Rolling Volatility (ann.)", "#f59e0b", (v) => `${(v * 100).toFixed(1)}%`)}
-          {miniChart(data.beta, "Rolling Beta", "#6366f1", (v) => v.toFixed(2))}
+          {miniChart(data.sharpe, "Rolling Sharpe", "var(--color-accent)", (v) => v.toFixed(2), "sharpe")}
+          {miniChart(data.volatility, "Rolling Volatility (ann.)", "#f59e0b", (v) => `${(v * 100).toFixed(1)}%`, "volatility")}
+          {miniChart(data.beta, "Rolling Beta", "#6366f1", (v) => v.toFixed(2), "beta")}
         </div>
       )}
     </div>

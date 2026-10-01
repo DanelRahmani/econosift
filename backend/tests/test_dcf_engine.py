@@ -69,7 +69,8 @@ class TestKnownGoodCase:
 
     def test_inputs_keys(self):
         inp = self.result["inputs"]
-        expected_keys = {"ttmFcf", "shares", "netDebt", "fcfGrowth", "terminalGrowth", "wacc", "stage1Years"}
+        expected_keys = {"ttmFcf", "shares", "netDebt", "fcfGrowth", "terminalGrowth", "wacc", "stage1Years",
+                         "fcfBasis", "statementCurrency", "fxRate"}
         assert set(inp.keys()) == expected_keys
 
     def test_inputs_values(self):

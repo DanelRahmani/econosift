@@ -25,10 +25,10 @@ export function SovereignSpreadTable({ countries }: Props) {
         </thead>
         <tbody>
           {countries.map((c) => (
-            <tr key={c.iso3} className="border-b border-border/50 hover:bg-surface/50">
+            <tr key={c.iso3} className="border-b border-border/50 hover:bg-surface/50" data-prov={`countries.${c.iso3}`} data-prov-ctx={c.name}>
               <td className="py-2 pr-4 font-medium">{c.name}</td>
-              <td className="py-2 pr-4 text-right">{fmt(c.yield_10y)}</td>
-              <td className={`py-2 pr-4 text-right ${(c.spread_vs_us ?? 0) > 1 ? "text-red-400" : "text-green-400"}`}>
+              <td className="py-2 pr-4 text-right" data-prov={`countries.${c.iso3}.yield_10y`}>{fmt(c.yield_10y)}</td>
+              <td data-prov={`countries.${c.iso3}.spread_vs_us`} className={`py-2 pr-4 text-right ${(c.spread_vs_us ?? 0) > 1 ? "text-red-400" : "text-green-400"}`}>
                 {fmt(c.spread_vs_us)}
               </td>
               <td className="py-2 pr-4 text-right">{c.composite_score.toFixed(1)}</td>

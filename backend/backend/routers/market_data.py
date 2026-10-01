@@ -5,6 +5,7 @@ import asyncio
 
 from fastapi import APIRouter, HTTPException, Query
 
+from .. import provenance as pv
 from ..services import edgar_service
 from ..services import yfinance_service as yfs
 
@@ -68,7 +69,17 @@ async def market_composite(
     quote_results = await asyncio.gather(*[_get_quote(s) for s in syms])
     quotes = [q for q in quote_results if q is not None]
 
-    return {"prices": prices, "risk": [], "quotes": quotes}
+    adj = "price, split- and dividend-adjusted"
+    prov = {"*": pv.ref("yahoo", None, "Daily adjusted close", units=adj, frequency="daily",
+                        observed=pv.last_date(close_frame))}
+    for c in close_frame.columns:
+        prov[f"prices.{c}"] = pv.yahoo(c, "Daily adjusted close", units=adj, frequency="daily",
+                                       observed=pv.last_date(close_frame[c]))
+    for q in quotes:
+        prov[f"quotes.{q['symbol']}"] = pv.yahoo(q["symbol"], "Quote: last price and previous close",
+                                                 note="Yahoo fast_info, falling back to the info snapshot; "
+                                                      "Yahoo quotes can lag the exchange.")
+    return pv.attach({"prices": prices, "risk": [], "quotes": quotes}, prov)
 
 
 @router.get("/short-interest")

@@ -1,8 +1,12 @@
 "use client";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import { asOf } from "@/lib/series";
 import type { FinancialConditionsData, CreditGapsData } from "@/lib/types";
 import { Card } from "@/components/ui";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
+import { legendProv } from "./legendProv";
 import {
   LineChart,
   Line,
@@ -28,15 +32,17 @@ function KpiCard({
   unit = "",
   color,
   sub,
+  prov,
 }: {
   label: string;
   value: number | null;
   unit?: string;
   color?: string;
   sub?: string;
+  prov?: string;
 }) {
   return (
-    <Card className="p-4">
+    <Card className="p-4" data-prov={prov} data-prov-ctx={label}>
       <div className="text-xs text-text-secondary">{label}</div>
       <div className={`text-2xl font-bold mt-1 ${color ?? ""}`}>
         {value != null ? `${value.toFixed(2)}${unit}` : "—"}
@@ -60,6 +66,9 @@ export function FinancialConditions() {
   const [epuLogScale, setEpuLogScale] = useState(false);
   const [fundingData, setFundingData] = useState<any>(null);
   const [creditGaps, setCreditGaps] = useState<CreditGapsData | null>(null);
+  const scope = useSourceScope(provOf(data));
+  const fundingScope = useSourceScope(provOf(fundingData));
+  const gapsScope = useSourceScope(provOf(creditGaps));
 
   useEffect(() => {
     api
@@ -92,10 +101,11 @@ export function FinancialConditions() {
 
   const { kpis, history } = data;
 
-  const stressData = (history.nfci ?? []).map((pt, i) => ({
+  const stlfsiAt = asOf(history.stlfsi);
+  const stressData = (history.nfci ?? []).map((pt) => ({
     date: pt.date.slice(0, 7),
     NFCI: pt.value,
-    STLFSI: history.stlfsi?.[i]?.value ?? null,
+    STLFSI: stlfsiAt(pt.date),
   }));
 
   // Backend now returns $T for Fed BS
@@ -121,17 +131,19 @@ export function FinancialConditions() {
   }));
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" {...scope}>
       {/* KPI Row */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
         <KpiCard
           label="NFCI"
+          prov="kpis.nfci"
           value={kpis.nfci}
           sub="Negative = loose, Positive = tight"
           color={nfciColor(kpis.nfci)}
         />
         <KpiCard
           label="STLFSI4"
+          prov="kpis.stlfsi"
           value={kpis.stlfsi}
           sub="St. Louis Fed Financial Stress Index"
           color={
@@ -140,12 +152,14 @@ export function FinancialConditions() {
         />
         <KpiCard
           label="US Fed Balance Sheet"
+          prov="kpis.fedBalanceSheet"
           value={kpis.fedBalanceSheet}
           unit="$T"
           sub="Total assets"
         />
         <KpiCard
           label="C&I Loans"
+          prov="kpis.ciLoans"
           value={kpis.ciLoans}
           unit="$T"
           sub="Commercial & Industrial"
@@ -154,7 +168,7 @@ export function FinancialConditions() {
 
       {/* NFCI + STLFSI */}
       {stressData.length > 0 && (
-        <Card className="p-4">
+        <Card className="p-4" data-prov="history.nfci" data-prov-ctx="Financial stress indexes (NFCI, STLFSI4)">
           <h3 className="font-semibold mb-1">Financial Stress Indexes</h3>
           <p className="text-xs text-text-secondary mb-3">
             NFCI (Chicago Fed): 0 = average. Positive = tighter than average.
@@ -166,7 +180,7 @@ export function FinancialConditions() {
               <XAxis dataKey="date" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
               <YAxis tick={{ fontSize: 11 }} />
               <Tooltip />
-              <Legend />
+              <Legend formatter={legendProv({ NFCI: "history.nfci", STLFSI: "history.stlfsi" })} />
               <ReferenceLine y={0} stroke="rgba(255,255,255,0.3)" strokeDasharray="4 4" />
               <Line type="monotone" dataKey="NFCI" stroke="#3b82f6" dot={false} strokeWidth={1.5} />
               <Line type="monotone" dataKey="STLFSI" stroke="#f59e0b" dot={false} strokeWidth={1.5} />
@@ -177,7 +191,7 @@ export function FinancialConditions() {
 
       {/* US Federal Reserve Balance Sheet */}
       {balanceSheetData.length > 0 && (
-        <Card className="p-4">
+        <Card className="p-4" data-prov="history.fedBalanceSheet" data-prov-ctx="US Federal Reserve balance sheet">
           <h3 className="font-semibold mb-1">US Federal Reserve Balance Sheet</h3>
           <p className="text-xs text-text-secondary mb-3">
             Total assets (USD trillions). QE = expansion; QT = contraction.
@@ -204,7 +218,7 @@ export function FinancialConditions() {
 
       {/* Credit Card Delinquency */}
       {delinquencyData.length > 0 && (
-        <Card className="p-4">
+        <Card className="p-4" data-prov="history.creditCardDelinquency" data-prov-ctx="Credit card delinquency rate">
           <h3 className="font-semibold mb-1">Credit Card Delinquency Rate (%)</h3>
           <p className="text-xs text-text-secondary mb-3">
             Share of credit card balances 90+ days overdue — signals consumer stress.
@@ -229,7 +243,7 @@ export function FinancialConditions() {
 
       {/* C&I Loans */}
       {loansData.length > 0 && (
-        <Card className="p-4">
+        <Card className="p-4" data-prov="history.ciLoans" data-prov-ctx="Commercial & industrial loans">
           <h3 className="font-semibold mb-1">Commercial & Industrial Loans ($T)</h3>
           <p className="text-xs text-text-secondary mb-3">
             Bank lending to businesses — slowdown signals tighter credit.
@@ -254,7 +268,7 @@ export function FinancialConditions() {
 
       {/* Economic Policy Uncertainty */}
       {epuData.length > 0 && (
-        <Card className="p-4">
+        <Card className="p-4" data-prov="history.economicPolicyUncertainty" data-prov-ctx="Economic policy uncertainty index">
           <div className="flex items-center justify-between mb-1">
             <h3 className="font-semibold">Economic Policy Uncertainty Index</h3>
             <button
@@ -291,9 +305,9 @@ export function FinancialConditions() {
       {fundingData && !fundingData.error && (
         <>
           <h2 className="font-semibold text-lg border-t border-border pt-6 mt-2">Funding &amp; Liquidity</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4" {...fundingScope}>
             {fundingData.m2?.length > 0 && (
-              <Card className="p-4">
+              <Card className="p-4" data-prov="m2" data-prov-ctx="M2 money supply">
                 <h3 className="font-semibold text-sm mb-2">M2 Money Supply</h3>
                 <ResponsiveContainer width="100%" height={180}>
                   <LineChart data={fundingData.m2}>
@@ -305,7 +319,7 @@ export function FinancialConditions() {
               </Card>
             )}
             {fundingData.sofr?.length > 0 && (
-              <Card className="p-4">
+              <Card className="p-4" data-prov="sofr" data-prov-ctx="SOFR">
                 <h3 className="font-semibold text-sm mb-2">SOFR</h3>
                 <ResponsiveContainer width="100%" height={180}>
                   <LineChart data={fundingData.sofr}>
@@ -317,7 +331,7 @@ export function FinancialConditions() {
               </Card>
             )}
             {fundingData.cp_spread?.length > 0 && (
-              <Card className="p-4">
+              <Card className="p-4" data-prov="cp_spread" data-prov-ctx="3M CP spread vs fed funds">
                 <h3 className="font-semibold text-sm mb-2">3M CP Spread vs Fed Funds</h3>
                 <ResponsiveContainer width="100%" height={180}>
                   <LineChart data={fundingData.cp_spread}>
@@ -334,7 +348,7 @@ export function FinancialConditions() {
 
       {/* ── BIS Credit-to-GDP Gaps ── */}
       {creditGaps && creditGaps.countries.length > 0 && (
-        <Card className="p-4">
+        <Card className="p-4" data-prov-ctx="Global credit-to-GDP gaps" {...gapsScope}>
           <h3 className="font-semibold mb-1">
             🌍 Global Credit-to-GDP Gaps
           </h3>
@@ -343,9 +357,9 @@ export function FinancialConditions() {
           </p>
           <ResponsiveContainer width="100%" height={300}>
             <BarChart
-              data={creditGaps.countries.map((c) => ({
+              data={creditGaps.countries.filter((c) => c.latestGap != null).map((c) => ({
                 name: c.name,
-                gap: c.latestGap ?? 0,
+                gap: c.latestGap,
                 signal: c.signal,
               }))}
               layout="vertical"
@@ -358,7 +372,7 @@ export function FinancialConditions() {
               <ReferenceLine x={10} stroke="#ef4444" strokeDasharray="4 4" label="BIS threshold" />
               <ReferenceLine x={2} stroke="#f59e0b" strokeDasharray="4 4" />
               <Bar dataKey="gap" radius={[0, 4, 4, 0]}>
-                {(creditGaps.countries.map((c) => {
+                {(creditGaps.countries.filter((c) => c.latestGap != null).map((c) => {
                   const color = c.signal === "red" ? "#ef4444" : c.signal === "yellow" ? "#f59e0b" : "#10b981";
                   return <Cell key={c.iso2} fill={color} fillOpacity={0.8} />;
                 }) as any)}

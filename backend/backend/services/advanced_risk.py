@@ -49,13 +49,11 @@ def rolling_sortino(returns: pd.Series, rf_annual: float, window: int) -> pd.Ser
     excess = returns - rf_d
     roll_ann_excess = excess.rolling(window).mean() * TRADING_DAYS
 
-    def _downside_dev(r: pd.Series) -> float:
-        neg = r[r < 0]
-        if len(neg) < 2:
-            return float("nan")
-        return neg.std(ddof=1) * math.sqrt(TRADING_DAYS)
-
-    roll_dd = returns.rolling(window).apply(_downside_dev, raw=False)
+    # Downside deviation vs the daily risk-free MAR over every day in the
+    # window: sqrt(mean(min(r − MAR, 0)²)) — not the std of the negative raw
+    # returns around their own mean (audit C-17).
+    shortfall_sq = np.minimum(excess, 0.0) ** 2
+    roll_dd = np.sqrt(shortfall_sq.rolling(window).mean()) * math.sqrt(TRADING_DAYS)
     return (roll_ann_excess / roll_dd).where(roll_dd > 0)
 
 

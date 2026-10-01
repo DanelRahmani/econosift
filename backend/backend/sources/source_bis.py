@@ -31,7 +31,6 @@ BIS_ZIPS = {
     "fx_effective": "https://data.bis.org/static/bulk/WS_EER_csv_flat.zip",
     "credit_gap":   "https://data.bis.org/static/bulk/WS_CREDIT_GAP_csv_flat.zip",
     "property":     "https://data.bis.org/static/bulk/WS_SPP_csv_flat.zip",
-    "crossborder":  "https://data.bis.org/static/bulk/WS_LBS_csv_flat.zip",
 }
 
 # Currencies where standard quote is "USD per unit" → need to invert BIS value
@@ -67,7 +66,13 @@ def _fetch_bis_zip(dataset_key: str) -> pd.DataFrame | None:
 
 def _parse_bis_flat(df: pd.DataFrame, iso2_filter: str | None = None,
                     freq: str = "A") -> pd.DataFrame:
-    """Convert a BIS flat CSV to our standard {iso2, year, value} format.
+    """Convert a BIS flat CSV to {iso2, year, value, period}.
+
+    ``period`` is the BIS time label at its own resolution ("2024",
+    "2024-Q4", "2024-03"), so sub-annual observations keep distinct dates
+    (previously quarterly points were all labelled with the bare year, and
+    monthly data had no ``year`` at all, so monthly requests always failed —
+    audit D-24/D-25).
 
     Parameters
     ----------
@@ -104,17 +109,18 @@ def _parse_bis_flat(df: pd.DataFrame, iso2_filter: str | None = None,
         df["year"] = pd.to_numeric(time_val, errors="coerce")
         df = df[df["year"].notna()]
         df["year"] = df["year"].astype(int)
-    elif freq == "Q":
-        # Format: 2024-Q4 → year + quarter
-        parts = time_val.str.extract(r"^(\d{4})-Q(\d)$")
+    elif freq in ("Q", "M"):
+        # Formats: 2024-Q4 (quarterly), 2024-03 (monthly)
+        parts = time_val.astype(str).str.extract(r"^(\d{4})-(?:Q\d|\d{2})$")
         df["year"] = pd.to_numeric(parts[0], errors="coerce")
         df = df[df["year"].notna()]
         df["year"] = df["year"].astype(int)
+    df["period"] = df[col_time].astype(str)
 
     if iso2_filter:
         df = df[df["iso2"] == iso2_filter]
 
-    return df[["iso2", "year", "value"]].dropna()
+    return df[["iso2", "year", "value", "period"]].dropna().sort_values("period")
 
 
 # ---------------------------------------------------------------------------
@@ -140,12 +146,8 @@ def _convert_fx(df: pd.DataFrame, iso2: str) -> pd.DataFrame:
 # Public API — cached queries
 # ---------------------------------------------------------------------------
 
-@async_cached("bis_cpi")
-async def get_cpi(iso2: str = "US", freq: str = "A") -> list[dict]:
-    """Get CPI year-on-year % change for a country.
-
-    Returns list of {date, value} dicts where value is YoY % change.
-    """
+def cpi_yoy(iso2: str = "US", freq: str = "A") -> list[dict]:
+    """CPI year-on-year % change for a country: [{date, value}] (synchronous)."""
     try:
         df = _fetch_bis_zip("cpi")
         if df is None:
@@ -155,12 +157,21 @@ async def get_cpi(iso2: str = "US", freq: str = "A") -> list[dict]:
         df = df[df[col_measure].str.startswith("771:", na=False)]
         parsed = _parse_bis_flat(df, iso2_filter=iso2, freq=freq)
         return [
-            {"date": str(int(r["year"])), "value": round(float(r["value"]), 4)}
+            {"date": str(r["period"]), "value": round(float(r["value"]), 4)}
             for _, r in parsed.iterrows()
         ]
     except Exception as exc:
         logger.warning("BIS CPI query failed for %s: %s", iso2, exc)
         return []
+
+
+@async_cached("bis_cpi")
+async def get_cpi(iso2: str = "US", freq: str = "A") -> list[dict]:
+    """Get CPI year-on-year % change for a country.
+
+    Returns list of {date, value} dicts where value is YoY % change.
+    """
+    return cpi_yoy(iso2, freq)
 
 
 @async_cached("bis_policy")
@@ -176,7 +187,7 @@ async def get_policy_rate(iso2: str = "US") -> list[dict]:
         parsed = _parse_bis_flat(df, iso2_filter=iso2, freq="M")
         # Keep monthly time format
         return [
-            {"date": str(r["year"]), "value": round(float(r["value"]), 4)}
+            {"date": str(r["period"]), "value": round(float(r["value"]), 4)}
             for _, r in parsed.iterrows()
         ]
     except Exception as exc:
@@ -201,7 +212,7 @@ async def get_fx_rate(iso2: str, freq: str = "A") -> list[dict]:
         parsed = _parse_bis_flat(df, iso2_filter=iso2, freq=freq)
         parsed = _convert_fx(parsed, iso2)
         return [
-            {"date": str(int(r["year"])), "value": round(float(r["value"]), 6)}
+            {"date": str(r["period"]), "value": round(float(r["value"]), 6)}
             for _, r in parsed.iterrows()
         ]
     except Exception as exc:
@@ -227,7 +238,7 @@ async def get_credit_gap(iso2: str = "US") -> list[dict]:
         df = df[df[col_borrower].str.startswith("P:", na=False)]
         parsed = _parse_bis_flat(df, iso2_filter=iso2, freq="Q")
         return [
-            {"date": str(int(r["year"])), "value": round(float(r["value"]), 4)}
+            {"date": str(r["period"]), "value": round(float(r["value"]), 4)}
             for _, r in parsed.iterrows()
         ]
     except Exception as exc:
@@ -261,7 +272,7 @@ async def get_property_prices(iso2: str = "US", real: bool = True) -> list[dict]
             df = df[df[col_sector].str.startswith("R:", na=False)]
         parsed = _parse_bis_flat(df, iso2_filter=iso2, freq="Q")
         return [
-            {"date": str(r["year"]), "value": round(float(r["value"]), 2)}
+            {"date": str(r["period"]), "value": round(float(r["value"]), 2)}
             for _, r in parsed.iterrows()
         ]
     except Exception as exc:
@@ -297,7 +308,7 @@ async def get_property_prices_bulk(iso2_tuple: tuple[str, ...], real: bool = Tru
             if parsed.empty:
                 continue
             result[iso2] = [
-                {"date": str(r["year"]), "value": round(float(r["value"]), 2)}
+                {"date": str(r["period"]), "value": round(float(r["value"]), 2)}
                 for _, r in parsed.iterrows()
             ]
         return result
@@ -329,7 +340,7 @@ async def get_credit_gaps_bulk(iso2_tuple: tuple[str, ...]) -> dict[str, list[di
             if parsed.empty:
                 continue
             result[iso2] = [
-                {"date": str(r["year"]), "value": round(float(r["value"]), 4)}
+                {"date": str(r["period"]), "value": round(float(r["value"]), 4)}
                 for _, r in parsed.iterrows()
             ]
         return result
@@ -342,121 +353,112 @@ async def get_credit_gaps_bulk(iso2_tuple: tuple[str, ...]) -> dict[str, list[di
 # Cross-border banking claims (Locational Banking Statistics)
 # ---------------------------------------------------------------------------
 
+# Bilateral cross-border claims, latest observation per reporter/counterparty
+# pair, from the BIS SDMX API. Key dimensions: quarterly, amounts outstanding
+# (S), total claims (C), all instruments, all currencies (TO1), all parent
+# countries (5J), all reporting banks, <reporting country>, all counterparty
+# sectors, <counterparty country>, cross-border positions (N).
+_LBS_URL = ("https://stats.bis.org/api/v1/data/WS_LBS_D_PUB/"
+            "Q.S.C.A.TO1.A.5J.A..A..N/all?lastNObservations=1")
+_LBS_ALL_REPORTERS, _LBS_ALL_COUNTRIES = "5A", "5J"
+
+
+def _parse_lbs(csv_text: str, top: int = 60) -> dict:
+    """Latest-quarter bilateral claims from a BIS LBS SDMX-CSV response."""
+    df = pd.read_csv(io.StringIO(csv_text), dtype={"L_REP_CTY": str, "L_CP_COUNTRY": str})
+    df["value"] = pd.to_numeric(df["OBS_VALUE"], errors="coerce")
+    df = df[df["value"].notna()]
+    if df.empty:
+        return {}
+    # Each series reports its own last observation; discontinued pairs carry
+    # years-old quarters, so keep only the latest one.
+    period = df["TIME_PERIOD"].max()
+    df = df[df["TIME_PERIOD"] == period]
+    scale = 10.0 ** 6  # UNIT_MULT=6: values are USD millions
+
+    total = df[(df["L_REP_CTY"] == _LBS_ALL_REPORTERS) & (df["L_CP_COUNTRY"] == _LBS_ALL_COUNTRIES)]
+    # Two-letter alphabetic codes are countries; codes with a digit (5A, 5J,
+    # 1C ...) are BIS aggregates and would double count their members.
+    is_country = lambda col: df[col].str.fullmatch(r"[A-Z]{2}", na=False)  # noqa: E731
+    pairs = df[is_country("L_REP_CTY") & is_country("L_CP_COUNTRY")].sort_values("value", ascending=False)
+    return {
+        "period": str(period),
+        "totalUsd": float(total["value"].iloc[0]) * scale if len(total) else None,
+        "pairCount": int(len(pairs)),
+        "claims": [
+            {"creditor": r.L_REP_CTY, "debtor": r.L_CP_COUNTRY, "value_usd": round(float(r.value) * scale)}
+            for r in pairs.head(top).itertuples()
+        ],
+    }
+
+
 @async_cached("bis_crossborder")
-async def get_crossborder_claims() -> list[dict]:
-    """Get top cross-border banking claims from BIS LBS data.
+async def get_crossborder_claims() -> dict:
+    """Largest bilateral cross-border bank claims (BIS Locational Banking Statistics).
 
-    Parses creditor (REF_AREA) → debtor (COUNTERPART_AREA) claims in USD.
-    Filters to latest quarter, aggregates by country pair, returns top-20.
+    Returns ``{period, totalUsd, pairCount, claims: [{creditor, debtor,
+    value_usd}]}`` (ISO2 codes, claims of banks located in ``creditor`` on
+    residents of ``debtor``, in USD), or ``{}`` when BIS is unreachable.
 
-    Returns list of {creditor, debtor, value_usd} dicts sorted by value descending.
-    """
-    try:
-        df = _fetch_bis_zip("crossborder")
-        if df is None or df.empty:
-            return []
-
-        # Identify columns: creditor = REF_AREA, debtor = COUNTERPART_AREA
-        col_creditor = next((c for c in df.columns if "REF_AREA" in c), None)
-        col_debtor = next((c for c in df.columns if "COUNTERPART_AREA" in c), None)
-        col_time = next((c for c in df.columns if "TIME_PERIOD" in c), None)
-        col_val = next((c for c in df.columns if "OBS_VALUE" in c), None)
-        col_freq = next((c for c in df.columns if "FREQ" in c), None)
-
-        if not (col_creditor and col_debtor and col_time and col_val):
-            logger.warning("BIS crossborder: missing required columns")
-            return []
-
-        df = df.copy()
-
-        # Extract ISO2 codes from "US: United States" format
-        df["creditor"] = df[col_creditor].str.extract(r"^([A-Z]{2}):")
-        df["debtor"] = df[col_debtor].str.extract(r"^([A-Z]{2}):")
-
-        # Filter to quarterly frequency
-        if col_freq:
-            df = df[df[col_freq].str.startswith("Q:", na=False)]
-
-        # Parse value
-        df["value"] = pd.to_numeric(df[col_val], errors="coerce")
-        df = df[df["value"].notna()]
-
-        # Parse time as proper quarterly for latest-quarter filtering
-        parts = df[col_time].str.extract(r"^(\d{4})-Q(\d)$")
-        df["year"] = pd.to_numeric(parts[0], errors="coerce")
-        df["quarter"] = pd.to_numeric(parts[1], errors="coerce")
-        df = df[df["year"].notna() & df["quarter"].notna()]
-        df["year"] = df["year"].astype(int)
-        df["quarter"] = df["quarter"].astype(int)
-
-        if df.empty:
-            return []
-
-        # Get latest quarter
-        max_row = df.loc[df["year"].idxmax()]
-        latest_year = int(max_row["year"])
-        latest_q = int(df[df["year"] == latest_year]["quarter"].max())
-        df = df[(df["year"] == latest_year) & (df["quarter"] == latest_q)]
-
-        # Aggregate by (creditor, debtor) pair
-        grouped = df.groupby(["creditor", "debtor"])["value"].sum().reset_index()
-        grouped = grouped.sort_values("value", ascending=False)
-
-        # Return top-20
-        claims = []
-        for _, row in grouped.head(20).iterrows():
-            claims.append({
-                "creditor": str(row["creditor"]),
-                "debtor": str(row["debtor"]),
-                "value_usd": round(float(row["value"]), 1),
-            })
-
-        return claims
-    except Exception as exc:
-        logger.warning("BIS crossborder query failed: %s", exc)
-        return []
-
-
-# ---------------------------------------------------------------------------
-# Effective exchange rates (nominal broad indices, 2010=100)
-# ---------------------------------------------------------------------------
-
-@async_cached("bis_effective_fx_bulk")
-async def get_effective_fx_bulk(iso2_tuple: tuple[str, ...]) -> dict[str, list[dict]]:
-    """Get BIS nominal effective exchange rate indices for multiple countries.
-
-    The BIS effective FX index is a trade-weighted basket (2010=100).
-    Higher = stronger currency. Used to detect overvaluation vs long-term trend.
-
-    Returns {iso2: [{date, value}, ...]} sorted by date ascending.
-    Uses asyncio.to_thread to avoid blocking the event loop during HTTP fetch.
+    Queries the BIS SDMX API for exactly the total-claims series. The previous
+    implementation downloaded a bulk file that no longer exists and summed
+    every instrument/currency/sector breakdown of a pair together, counting
+    each claim many times over (audit D-26).
     """
     import asyncio as _asyncio
 
-    iso2_list = list(iso2_tuple)
+    def _fetch() -> dict:
+        resp = httpx.get(_LBS_URL, timeout=90,
+                         headers={"Accept": "application/vnd.sdmx.data+csv;version=1.0.0"})
+        resp.raise_for_status()
+        return _parse_lbs(resp.text)
+
+    try:
+        return await _asyncio.to_thread(_fetch)
+    except Exception as exc:
+        logger.warning("BIS cross-border claims query failed: %s", exc)
+        return {}
+
+
+# ---------------------------------------------------------------------------
+# Effective exchange rates (real broad indices, 2020=100, monthly)
+# ---------------------------------------------------------------------------
+
+def _parse_eer(df: pd.DataFrame, iso2_list: list[str]) -> dict[str, list[dict]]:
+    """Monthly real broad EER per country from the BIS WS_EER flat file."""
+    col = lambda name: next(c for c in df.columns if c.startswith(name))  # noqa: E731
+    # The file mixes nominal/real, narrow/broad and monthly/daily series for
+    # every country; pick exactly one of each.
+    df = df[df[col("EER_TYPE")].str.startswith("R:", na=False)
+            & df[col("EER_BASKET")].str.startswith("B:", na=False)]
     result: dict[str, list[dict]] = {}
+    for iso2 in iso2_list:
+        parsed = _parse_bis_flat(df, iso2_filter=iso2, freq="M")
+        if not parsed.empty:
+            result[iso2] = [{"date": str(r.period), "value": round(float(r.value), 2)}
+                            for r in parsed.itertuples()]
+    return result
+
+
+@async_cached("bis_effective_fx_bulk")
+async def get_effective_fx_bulk(iso2_tuple: tuple[str, ...]) -> dict[str, list[dict]]:
+    """BIS real effective exchange rate indices (broad basket) for several countries.
+
+    A CPI-deflated, trade-weighted index (2020=100); higher = stronger in real
+    terms, which is what an overvaluation signal needs. Monthly averages.
+
+    Returns {iso2: [{date: "YYYY-MM", value}, ...]} sorted by date ascending.
+    (Previously this filtered on a ``MEASURE`` column the file does not have
+    and then on annual frequency, which the file does not contain either, so
+    it always returned nothing — audit D-27.)
+    """
+    import asyncio as _asyncio
+
     try:
         df = await _asyncio.to_thread(_fetch_bis_zip, "fx_effective")
         if df is None or df.empty:
-            return result
-
-        # Filter to nominal broad index (measure N: Nominal, B: Broad)
-        col_measure = next((c for c in df.columns if "MEASURE" in c.upper()), None)
-        if col_measure:
-            # EER nominal broad starts with "N:B:" in BIS data
-            df = df[df[col_measure].str.startswith("N:B:", na=False)]
-
-        for iso2 in iso2_list:
-            parsed = _parse_bis_flat(df, iso2_filter=iso2, freq="A")
-            if parsed.empty:
-                continue
-            pts = [
-                {"date": str(int(r["year"])), "value": round(float(r["value"]), 2)}
-                for _, r in parsed.iterrows()
-            ]
-            pts.sort(key=lambda p: p["date"])
-            result[iso2] = pts
-        return result
+            return {}
+        return _parse_eer(df, list(iso2_tuple))
     except Exception as exc:
         logger.warning("BIS effective FX bulk query failed: %s", exc)
-        return result
+        return {}

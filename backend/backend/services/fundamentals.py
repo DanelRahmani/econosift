@@ -29,6 +29,8 @@ from typing import Any
 # Re-use _clean from the sibling metrics module so NaN/Inf/None handling is
 # consistent across the whole backend.
 # ---------------------------------------------------------------------------
+from .. import provenance as pv
+from ..cache import cached
 from .metrics import _clean
 
 
@@ -264,10 +266,10 @@ def piotroski_f(bundle: dict, prior_year: dict | None = None) -> dict:
     if net_income is not None:
         f1 = net_income > 0
 
-    # F2: Positive ROA (net income / total assets)
+    # F2: ROA improved YoY (needs the prior year — set below). Piotroski's
+    # profitability block is ROA > 0, CFO > 0, ΔROA > 0 and accruals; the old
+    # "positive ROA" test only repeated F1 (audit C-24).
     f2: bool | None = None
-    if net_income is not None and total_assets:
-        f2 = (net_income / total_assets) > 0
 
     # F3: Positive operating cash flow
     f3: bool | None = None
@@ -313,10 +315,19 @@ def piotroski_f(bundle: dict, prior_year: dict | None = None) -> dict:
                 and py_cur_assets is not None and py_cur_liab and py_cur_liab > 0):
             f6 = (cur_assets / cur_liab) > (py_cur_assets / py_cur_liab)
 
-        # F7: No dilution — shares outstanding did not increase YoY
-        shares = _clean(info.get("sharesOutstanding") or info.get("impliedSharesOutstanding"))
-        py_info = prior_year.get("info") or {}
-        py_shares = _clean(py_info.get("sharesOutstanding") or py_info.get("impliedSharesOutstanding"))
+        # F2: ΔROA > 0
+        py_net_income = _clean(_g(py_fin, "Net Income", "Net Income Common Stockholders"))
+        py_ta_2 = _clean(_g(py_bs, "Total Assets"))
+        if (net_income is not None and total_assets and total_assets > 0
+                and py_net_income is not None and py_ta_2 and py_ta_2 > 0):
+            f2 = (net_income / total_assets) > (py_net_income / py_ta_2)
+
+        # F7: No dilution — share count did not increase YoY. Both counts come
+        # from the balance-sheet columns (t and t-1): the prior-year "info" is
+        # today's info again, so comparing info share counts always passed
+        # (audit C-10).
+        shares = _clean(_g(bs, "Ordinary Shares Number", "Share Issued"))
+        py_shares = _clean(_g(py_bs, "Ordinary Shares Number", "Share Issued"))
         if shares is not None and py_shares is not None and py_shares > 0:
             f7 = shares <= py_shares * 1.01  # 1% tolerance for rounding
 
@@ -339,7 +350,7 @@ def piotroski_f(bundle: dict, prior_year: dict | None = None) -> dict:
 
     criteria = {
         "positiveNetIncome": f1,
-        "positiveROA": f2,
+        "higherROA": f2,
         "positiveOperatingCF": f3,
         "accrualQuality": f4,
         "lowerLTDebtRatio": f5,
@@ -390,6 +401,29 @@ def beneish_m(bundle: dict) -> dict:
 # 5. Ohlson O-Score
 # ---------------------------------------------------------------------------
 
+def _gnp_price_index() -> float | None:
+    """US GDP price deflator rebased to 1968 = 100 (Ohlson's SIZE scaling).
+
+    Built from FRED GDPDEF: latest quarter / 1968 average × 100. Cached for
+    the process lifetime of the cache TTL; None if FRED is unreachable (the
+    O-score is then not computed rather than mis-scaled).
+    """
+    return _gnp_price_index_cached()
+
+
+@cached("gnp_price_index_1968")
+def _gnp_price_index_cached() -> float | None:
+    try:
+        from .macro_expansion_service import _fetch_fred_series_sync
+        pts = _fetch_fred_series_sync(["GDPDEF"], start="1968-01-01").get("GDPDEF", [])
+    except Exception:
+        return None
+    base = [p["value"] for p in pts if p["date"].startswith("1968")]
+    if not base or not pts:
+        return None
+    return float(pts[-1]["value"]) / (sum(base) / len(base)) * 100.0
+
+
 def ohlson_o(bundle: dict) -> dict:
     """Ohlson O-Score (1980 logit model, 9 coefficients).
 
@@ -431,8 +465,14 @@ def ohlson_o(bundle: dict) -> dict:
     if total_liab is None:
         return {"oScore": None, "probDefault": None}
 
-    # SIZE proxy: log(Total Assets)  [original uses TA/GNP deflator]
-    size = _clean(math.log(abs(total_assets))) if total_assets > 0 else None
+    # SIZE = log(total assets in $ millions / GNP price-level index, 1968=100),
+    # as in Ohlson (1980). log of raw dollars made SIZE ~20 larger, and with
+    # its −0.407 coefficient pushed every O-score so low that the default
+    # probability read ~0 for all firms (audit C-11).
+    price_index = _gnp_price_index()
+    if price_index is None or total_assets <= 0:
+        return {"oScore": None, "probDefault": None}
+    size = _clean(math.log(total_assets / 1e6 / (price_index / 100.0)))
     if size is None:
         return {"oScore": None, "probDefault": None}
 
@@ -587,3 +627,98 @@ def extended_fundamentals(bundle: dict) -> dict:
     except Exception:
         pass
     return result
+
+
+# ---------------------------------------------------------------------------
+# Provenance
+# ---------------------------------------------------------------------------
+
+def _stmt_date(bundle: dict, name: str) -> str | None:
+    """Period end of the latest annual statement column."""
+    df = bundle.get(name)
+    try:
+        return str(df.columns[0])[:10] if df is not None and len(df.columns) else None
+    except Exception:
+        return None
+
+
+def provenance(bundle: dict, root: str = "fundamentals") -> dict:
+    """Provenance keys (under ``root``) for an :func:`extended_fundamentals` result."""
+    def k(*parts: str) -> str:
+        return ".".join(p for p in (root, *parts) if p)
+
+    sym = bundle.get("ticker") or ""
+    info = bundle.get("info") or {}
+    inc = pv.yahoo(sym, "Income statement, latest fiscal year", frequency="annual",
+                   observed=_stmt_date(bundle, "financials_df"))
+    bal = pv.yahoo(sym, "Balance sheet, latest fiscal year", frequency="annual",
+                   observed=_stmt_date(bundle, "balance_sheet_df"))
+    cfs = pv.yahoo(sym, "Cash-flow statement, latest fiscal year", frequency="annual",
+                   observed=_stmt_date(bundle, "cashflow_df"))
+    snap = pv.yahoo(sym, "Quote and key-statistics snapshot (Ticker.info)")
+    prior = "prior fiscal year (the previous annual column)"
+
+    def d(formula: str, inputs: list, title: str, **kw) -> dict:
+        return pv.derived(formula, inputs, title=title, **kw)
+
+    prov: dict = {k(): d("ROIC, DuPont, Piotroski F-Score, Ohlson O-Score and cash conversion cycle from Yahoo's "
+                         "annual statements", [inc, bal, cfs], title="Extended fundamentals")}
+
+    # ROIC: the 21% tax rate is used when info.effectiveTaxRate is missing or 0.
+    tax_fallback = (_clean(info.get("effectiveTaxRate")) or 0.0) == 0.0
+    tax_flag = ("fallback",) if tax_fallback else ()
+    tax_note = "21% tax rate assumed: Yahoo's effectiveTaxRate is missing." if tax_fallback else None
+    prov[k("roic", "nopat")] = d("EBIT (Operating Income if missing) × (1 − info.effectiveTaxRate, 21% if missing)",
+                                 [inc, snap], title="NOPAT", flags=tax_flag, note=tax_note)
+    prov[k("roic", "investedCapital")] = d(
+        "total debt + stockholders' equity − cash (balance sheet, else info.totalDebt / totalStockholderEquity / "
+        "totalCash)", [bal, snap], title="Invested capital")
+    prov[k("roic", "roic")] = d("NOPAT / invested capital", [k("roic", "nopat"), k("roic", "investedCapital")],
+                                title="Return on invested capital", flags=tax_flag, note=tax_note)
+
+    for grp, formula in (
+        ("threeFactor", "ROE = net margin (net income / revenue) × asset turnover (revenue / total assets) × "
+                        "equity multiplier (total assets / equity)"),
+        ("fiveFactor", "ROE = tax burden (net income / pretax income) × interest burden (pretax income / EBIT) × "
+                       "operating margin (EBIT / revenue) × asset turnover × equity multiplier"),
+    ):
+        prov[k("dupont", grp)] = d(formula + "; year-end balance-sheet figures", [inc, bal], title=f"DuPont ({grp})")
+
+    piotroski = {
+        "positiveNetIncome": "net income > 0",
+        "higherROA": "net income / total assets > the prior year's",
+        "positiveOperatingCF": "operating cash flow > 0",
+        "accrualQuality": "operating cash flow > net income",
+        "lowerLTDebtRatio": "long-term debt / total assets < the prior year's",
+        "higherCurrentRatio": "current assets / current liabilities > the prior year's",
+        "noNewShares": "shares outstanding (balance sheet) ≤ the prior year's × 1.01",
+        "higherGrossMargin": "gross profit / revenue > the prior year's",
+        "higherAssetTurnover": "revenue / total assets > the prior year's",
+    }
+    prov[k("piotroski")] = d(
+        f"count of the nine Piotroski tests that pass; a test needing the {prior} is skipped, and dropped from "
+        "maxScore, if that column or a line item is missing", [inc, bal, cfs], title="Piotroski F-Score")
+    for key, test in piotroski.items():
+        prov[k("piotroski", "criteria", key)] = d(f"{test} (latest fiscal year vs {prior})", [inc, bal, cfs],
+                                                  title=key)
+
+    gnp = pv.fred("GDPDEF", "US GDP implicit price deflator", frequency="quarterly",
+                  note="Rebased to 1968 average = 100 and used in place of Ohlson's GNP price index.")
+    prov[k("ohlson", "oScore")] = d(
+        "−1.32 − 0.407·SIZE + 6.03·TLTA − 1.43·WCTA + 0.076·CLCA − 1.72·OENEG − 2.37·NITA − 1.83·FUTL + 0.285·INTWO "
+        "− 0.521·CHIN; SIZE = ln(total assets in $ millions / price index / 100), TLTA = liabilities / assets, "
+        "WCTA = working capital / assets, CLCA = current liabilities / current assets, OENEG = 1 if liabilities > "
+        "assets, NITA = net income / assets, FUTL = operating cash flow / liabilities, INTWO = 1 if net income < 0 "
+        "(this year only), CHIN = 0; a ratio that cannot be computed contributes 0",
+        [inc, bal, cfs, gnp], title="Ohlson O-Score",
+        note="CHIN is fixed at 0 and INTWO uses only the latest year, so this is an approximation of Ohlson (1980).")
+    prov[k("ohlson", "probDefault")] = d("1 / (1 + e^(−O-score))", [k("ohlson", "oScore")],
+                                         title="Ohlson default probability")
+    for key, formula in (
+        ("dso", "accounts receivable / revenue × 365"),
+        ("dio", "inventory / cost of revenue × 365"),
+        ("dpo", "accounts payable / cost of revenue × 365"),
+        ("ccc", "DSO + DIO − DPO (DSO − DPO when there is no inventory)"),
+    ):
+        prov[k("cashConversionCycle", key)] = d(formula, [inc, bal], title=key.upper() + " (days)")
+    return prov

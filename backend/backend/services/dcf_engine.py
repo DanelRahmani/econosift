@@ -5,7 +5,74 @@ import logging
 import math
 from datetime import date
 
+from .. import provenance as pv
 from .metrics import _clean
+
+log = logging.getLogger(__name__)
+
+# yfinance ``info`` fields reported in the *statement* currency
+# (``financialCurrency``) rather than the trading currency (``currency``).
+_STATEMENT_INFO_FIELDS = (
+    "freeCashflow", "operatingCashflow", "totalDebt", "totalCash", "ebitda",
+    "totalRevenue", "grossProfits", "netIncomeToCommon",
+)
+
+
+def _fx_rate(from_ccy: str, to_ccy: str) -> float | None:
+    """Latest price of 1 ``from_ccy`` in ``to_ccy`` (Yahoo ``XXXYYY=X``)."""
+    from . import yfinance_service as yfs
+    sym = f"{from_ccy}{to_ccy}=X"
+    try:
+        frame = yfs.get_close_frame((sym,), "5d")
+        s = frame[sym].dropna() if sym in frame.columns else None
+        return float(s.iloc[-1]) if s is not None and len(s) else None
+    except Exception:
+        log.debug("FX %s unavailable", sym, exc_info=True)
+        return None
+
+
+def to_price_currency(bundle: dict) -> dict:
+    """Return a copy of ``bundle`` with statement figures in the price currency.
+
+    ADRs and other cross-listings (TSM, NVO, BABA) quote in USD but report
+    FCF, debt, cash and statements in TWD/DKK/CNY; valuing those as dollars
+    produced intrinsic values tens of times off (audit C-16). Monetary
+    ``info`` fields and every statement line except share counts and rates
+    are converted at the latest FX rate; book value per share is taken from
+    price / (price-to-book), which Yahoo keeps in the trading currency.
+
+    Sets ``_fx = {"from", "to", "rate"}`` (rate None when unavailable, in
+    which case the caller must not value the company).
+    """
+    if bundle.get("_fx") is not None:
+        return bundle  # already normalised
+    info = dict(bundle.get("info") or {})
+    fin_ccy = info.get("financialCurrency")
+    px_ccy = info.get("currency")
+    out = dict(bundle)
+    if not fin_ccy or not px_ccy or fin_ccy == px_ccy:
+        out["_fx"] = {"from": fin_ccy or px_ccy, "to": px_ccy, "rate": 1.0}
+        return out
+    rate = _fx_rate(fin_ccy, px_ccy)
+    out["_fx"] = {"from": fin_ccy, "to": px_ccy, "rate": rate}
+    if rate is None:
+        return out
+    for k in _STATEMENT_INFO_FIELDS:
+        v = _clean(info.get(k))
+        if v is not None:
+            info[k] = v * rate
+    price, ptb = _clean(info.get("currentPrice") or info.get("regularMarketPrice")), _clean(info.get("priceToBook"))
+    info["bookValue"] = price / ptb if price and ptb else None
+    out["info"] = info
+
+    def _scale(stmt: dict) -> dict:
+        return {k: (v * rate if isinstance(v, (int, float)) and "Share" not in k and "Rate" not in k else v)
+                for k, v in (stmt or {}).items()}
+
+    for key in ("financials", "balance_sheet", "cashflow"):
+        if isinstance(bundle.get(key), dict):
+            out[key] = _scale(bundle[key])
+    return out
 
 
 def _single_dcf(
@@ -63,11 +130,16 @@ def two_stage_dcf(
     stage1_years : int
         Number of years in Stage 1 (default 10).
     """
+    bundle = to_price_currency(bundle)
     info: dict = bundle.get("info") or {}
     ticker: str = bundle.get("ticker") or ""
+    fx = bundle.get("_fx") or {}
 
     # --- Extract inputs ---
-    fcf_raw = info.get("freeCashflow") or info.get("operatingCashflow")
+    # Yahoo's freeCashflow is *levered* FCF (after interest). Operating cash
+    # flow is not FCF at all and is no longer substituted (audit C-27); the
+    # levered-FCF-at-WACC approximation is disclosed in the inputs.
+    fcf_raw = info.get("freeCashflow")
     shares_raw = info.get("sharesOutstanding")
     total_debt_raw = info.get("totalDebt") or 0
     total_cash_raw = info.get("totalCash") or 0
@@ -119,12 +191,17 @@ def two_stage_dcf(
                 "terminalGrowth": terminal_growth,
                 "wacc": wacc,
                 "stage1Years": stage1_years,
+                "fcfBasis": "levered FCF (Yahoo freeCashflow), TTM",
+                "statementCurrency": fx.get("from"),
+                "fxRate": fx.get("rate"),
             },
             "scenarios": [],
             "sensitivity": {},
             "asOf": as_of,
         }
 
+    if fx.get("rate") is None:
+        return _locked(f"No FX rate to convert {fx.get('from')} statements to {fx.get('to')}")
     if fcf is None:
         return _locked("TTM free cash flow unavailable")
     if shares is None:
@@ -203,8 +280,69 @@ def two_stage_dcf(
             "terminalGrowth": terminal_growth,
             "wacc": wacc,
             "stage1Years": stage1_years,
+            "fcfBasis": "levered FCF (Yahoo freeCashflow), TTM",
+            "statementCurrency": fx.get("from"),
+            "fxRate": fx.get("rate"),
         },
         "scenarios": scenarios,
         "sensitivity": sensitivity,
         "asOf": as_of,
     }
+
+
+def _assumption(text: str) -> dict:
+    """A user-supplied or model-default assumption rather than observed data."""
+    r = pv.ref("other", None, text)
+    r["providerName"] = "Assumption (request parameter or model default)"
+    return r
+
+
+def provenance(sym: str, result: dict, root: str = "", *, growth=None, wacc=None) -> dict:
+    """Provenance for a successful :func:`two_stage_dcf` result.
+
+    Keys sit under ``root`` (``""`` = the response root). ``growth`` / ``wacc`` are
+    provenance keys or refs for those inputs when they are not plain request parameters.
+    """
+    def k(*parts: str) -> str:
+        return ".".join(p for p in (root, *parts) if p) or "*"
+
+    inp = result.get("inputs") or {}
+    from_ccy, rate = inp.get("statementCurrency"), inp.get("fxRate")
+    to_ccy = result.get("currency")
+    converted = bool(from_ccy and to_ccy and from_ccy != to_ccy and rate not in (None, 1.0))
+    fx = [pv.yahoo(f"{from_ccy}{to_ccy}=X", f"Latest close, {from_ccy} to {to_ccy}", frequency="daily")] if converted else []
+    conv = f" × FX rate ({from_ccy}→{to_ccy})" if converted else ""
+
+    fcf = pv.yahoo(sym, "info.freeCashflow: trailing-twelve-month levered free cash flow (Yahoo)")
+    prov = {
+        k("inputs", "ttmFcf"): pv.derived(f"Yahoo freeCashflow{conv}", [fcf, *fx], title="Free cash flow used")
+        if converted else fcf,
+        k("inputs", "shares"): pv.yahoo(
+            sym, "info.sharesOutstanding",
+            note="Replaced by marketCap / price when the two disagree by more than 5x."),
+        k("inputs", "netDebt"): pv.derived(
+            f"(info.totalDebt − info.totalCash, a missing one counted as 0){conv}",
+            [pv.yahoo(sym, "info.totalDebt"), pv.yahoo(sym, "info.totalCash"), *fx], title="Net debt"),
+        k("inputs", "fcfGrowth"): growth or _assumption("Stage-1 free-cash-flow growth (fcf_growth parameter)"),
+        k("inputs", "terminalGrowth"): _assumption("Terminal growth rate (terminal_growth parameter)"),
+        k("inputs", "wacc"): wacc or _assumption("Discount rate (wacc parameter)"),
+        k("inputs", "stage1Years"): _assumption("Length of stage 1 in years (stage1_years parameter)"),
+        k("spotPrice"): pv.yahoo(sym, "info.currentPrice (else regularMarketPrice)", units=to_ccy),
+    }
+    prov[k()] = pv.derived(
+        "Σ FCF₀(1+g)ᵗ/(1+w)ᵗ for t = 1…N  +  FCF_N(1+gₜ)/(w−gₜ)/(1+w)ᴺ, minus net debt, divided by shares "
+        "(g = stage-1 growth, w = discount rate, gₜ = terminal growth, N = stage-1 years)",
+        [k("inputs", n) for n in ("ttmFcf", "netDebt", "shares", "fcfGrowth", "terminalGrowth", "wacc", "stage1Years")],
+        title="Two-stage DCF intrinsic value per share",
+        note="Levered FCF is discounted at the WACC (an approximation).")
+    prov[k("upsidePct")] = pv.derived("(intrinsic value − spot price) / spot price", [k(), k("spotPrice")],
+                                      title="Upside vs spot price")
+    prov[k("scenarios")] = pv.derived(
+        "Bear: growth −3pp, discount rate +1pp; Base: as given; Bull: growth +3pp, discount rate −1pp "
+        "(never below terminal growth + 0.5pp); each re-runs the two-stage DCF",
+        [k()], title="DCF scenarios")
+    prov[k("sensitivity")] = pv.derived(
+        "7×7 grid re-running the DCF: growth = base + (−3…+3) × 1pp down the rows, discount rate = "
+        "base + (−3…+3) × 0.5pp across; blank where the discount rate ≤ terminal growth",
+        [k()], title="DCF sensitivity grid")
+    return prov

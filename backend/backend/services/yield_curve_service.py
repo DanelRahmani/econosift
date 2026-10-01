@@ -9,6 +9,7 @@ import asyncio
 import logging
 from datetime import datetime
 
+from .. import provenance as pv
 from ..cache import async_cached
 from . import macro_expansion_service as mes
 from . import atlas_service
@@ -67,12 +68,16 @@ _FOREIGN: dict[str, dict[str, str]] = {
     "ZA": {"name": "South Africa", "fred": "IRLTLT01ZAM156N"},
 }
 
+_TERM_PREMIUM_SERIES = "THREEFYTP10"
+
 _ALL_SERIES = tuple(
     [sid for _, sid, _ in _US_TENORS]
     + [sid for _, sid, _ in _REAL_TENORS]
     + list(_BREAKEVEN_SERIES.values())
     + [_FWD_BREAKEVEN_SERIES]
-    + ["ACMTP10"]
+    # 10y term premium: Kim-Wright (Fed Board) on FRED. "ACMTP10" is not a
+    # FRED series, so the ACM premium requested here was always empty (D-18).
+    + [_TERM_PREMIUM_SERIES]
     + [info["fred"] for info in _FOREIGN.values()]
 )
 _START = "2000-01-01"
@@ -90,6 +95,95 @@ def _latest(pts: list[dict]) -> float | None:
             except (TypeError, ValueError):
                 continue
     return None
+
+
+def _last_obs(pts: list[dict]) -> str | None:
+    """Date of the most recent non-null point of a FRED series list."""
+    for pt in reversed(pts or []):
+        if pt.get("value") is not None:
+            return str(pt["date"])[:10]
+    return None
+
+
+def _provenance(data: dict, cpi_map: dict) -> dict:
+    """Source map for the yield-curve payload (see provenance.py)."""
+    prov: dict = {
+        "*": pv.ref("fred", None, "US Treasury and OECD government-bond yields", units="percent"),
+    }
+    us10 = "us_curve.points.10y"
+
+    # US spot curve: Treasury constant-maturity yields, daily.
+    for label, sid, _ in _US_TENORS:
+        prov[f"us_curve.points.{label}"] = pv.fred(
+            sid, f"US Treasury {label} constant-maturity yield", units="percent",
+            frequency="daily", observed=_last_obs(data.get(sid, [])))
+    prov["us_curve.spread_2y10y"] = pv.derived(
+        "DGS10 - DGS2 (latest available value of each series)",
+        ["us_curve.points.10y", "us_curve.points.2y"], title="10y minus 2y Treasury spread")
+    prov["us_curve.spread_3m10y"] = pv.derived(
+        "DGS10 - DGS3MO (latest available value of each series)",
+        ["us_curve.points.10y", "us_curve.points.3m"], title="10y minus 3m Treasury spread")
+    prov["us_curve.inverted"] = pv.derived(
+        "true when the 2y10y spread is negative", ["us_curve.spread_2y10y"], title="Curve inverted")
+
+    # TIPS real yields.
+    for label, sid, _ in _REAL_TENORS:
+        prov[f"real_yields.{label}"] = pv.fred(
+            sid, f"US Treasury {label} inflation-indexed (TIPS) real yield", units="percent",
+            frequency="daily", observed=_last_obs(data.get(sid, [])))
+
+    # Breakevens; the 30y falls back to nominal minus TIPS when T30YIE is empty.
+    for tenor, sid in _BREAKEVEN_SERIES.items():
+        if tenor == "30y" and _last_obs(data.get(sid, [])) is None:
+            prov["breakevens.30y"] = pv.derived(
+                "DGS30 - DFII30 (nominal 30y minus 30y TIPS yield); used because T30YIE returned no data",
+                ["us_curve.points.30y", "real_yields.30y"], title="30y breakeven inflation",
+                note="T30YIE was empty, so the breakeven was computed instead of read.")
+            continue
+        prov[f"breakevens.{tenor}"] = pv.fred(
+            sid, f"{tenor} breakeven inflation rate", units="percent", frequency="daily",
+            observed=_last_obs(data.get(sid, [])))
+    prov["forward_breakeven_5y5y"] = pv.fred(
+        _FWD_BREAKEVEN_SERIES, "5-year, 5-year forward inflation expectation rate",
+        units="percent", frequency="daily", observed=_last_obs(data.get(_FWD_BREAKEVEN_SERIES, [])),
+        note="Includes an inflation risk premium, so it is not a pure expectation.")
+    prov["term_premium"] = pv.fred(
+        _TERM_PREMIUM_SERIES, "10-year Treasury term premium (Kim-Wright)", units="percent",
+        frequency="daily", observed=_last_obs(data.get(_TERM_PREMIUM_SERIES, [])),
+        note="Kim-Wright model estimated by the Federal Reserve Board, distributed on FRED.")
+
+    # Non-US 10y yields: OECD monthly series on FRED.
+    today = datetime.now()
+    for iso2, info in _FOREIGN.items():
+        sid = info["fred"]
+        obs = _last_obs(data.get(sid, []))
+        flags = ()
+        if obs and (today - datetime.strptime(obs, "%Y-%m-%d")).days > 120:
+            flags = ("stale",)
+        yld = pv.fred(sid, f"{info['name']} 10-year government bond yield (OECD)", units="percent",
+                      frequency="monthly", observed=obs, flags=flags,
+                      note="OECD monthly average, so it lags the daily US yield it is compared with.")
+        row = f"global_yields.{iso2}"
+        prov[f"foreign_10y.{info['name']}"] = yld
+        prov[f"foreign_10y.{info['name']}.spread_vs_us"] = pv.derived(
+            "foreign 10y yield - DGS10", [f"foreign_10y.{info['name']}", us10],
+            title=f"{info['name']} 10y spread vs US")
+        prov[row] = pv.fred(sid, f"{info['name']} 10-year government bond yield (OECD)", units="percent",
+                            frequency="monthly", observed=obs, flags=flags,
+                            note="OECD monthly average; history holds the last 60 monthly values.")
+        prov[f"{row}.inflation"] = pv.ref(
+            "worldbank", atlas_service._WB_CODES["inflation"], "Inflation, consumer prices (annual %)",
+            units="% per year", frequency="annual",
+            note="Latest annual value within the last three calendar years; the year is not returned per country.")
+        prov[f"{row}.real_yield"] = pv.derived(
+            "10y nominal yield - latest annual CPI inflation (ex-post, backward-looking; "
+            "not a market TIPS real yield)", [row, f"{row}.inflation"],
+            title=f"{info['name']} ex-post real 10y yield")
+        for other, label in (("us", "DGS10"), ("de", "German 10y yield"), ("jp", "Japanese 10y yield")):
+            ref_key = us10 if other == "us" else f"global_yields.{'DE' if other == 'de' else 'JP'}"
+            prov[f"{row}.spread_vs_{other}"] = pv.derived(
+                f"10y yield - {label}", [row, ref_key], title=f"{info['name']} 10y spread vs {other.upper()}")
+    return prov
 
 
 async def _fetch_series() -> dict:
@@ -166,11 +260,13 @@ async def get_yield_curves() -> dict:
         "history": fwd_be_hist[-500:],
     }
 
-    # ACM term premium
-    tp_hist = [p for p in data.get("ACMTP10", []) if p.get("value") is not None]
+    # 10y term premium (Kim-Wright, daily)
+    tp_hist = [p for p in data.get(_TERM_PREMIUM_SERIES, []) if p.get("value") is not None]
     term_premium = {
-        "current": _latest(data.get("ACMTP10", [])),
+        "current": _latest(data.get(_TERM_PREMIUM_SERIES, [])),
         "history": tp_hist[-120:],
+        "model": "Kim-Wright (Federal Reserve Board), FRED THREEFYTP10",
+        "asOf": tp_hist[-1]["date"][:10] if tp_hist else None,
     }
 
     # Legacy foreign_10y (backward compat)
@@ -204,14 +300,19 @@ async def get_yield_curves() -> dict:
         history = [{"date": p["date"][:10], "value": round(float(p["value"]), 4)} for p in history_vals[-60:]]
         global_yields.append({
             "iso2": iso2, "name": info["name"],
-            "yield_10y": nominal, "real_yield": real, "inflation": cpi,
+            # Monthly OECD average vs the daily US yield: dated so the lag is visible.
+            "yieldAsOf": history_vals[-1]["date"][:10] if history_vals else None,
+            # Ex-post: nominal minus the latest *annual* CPI (backward-looking),
+            # not a market (TIPS-style) real yield.
+            "yield_10y": nominal, "real_yield": real, "realYieldBasis": "ex-post (nominal − latest annual CPI)",
+            "inflation": cpi,
             "spread_vs_us": spread_us, "spread_vs_de": spread_de, "spread_vs_jp": spread_jp,
             "history": history,
         })
 
     global_yields.sort(key=lambda c: c["yield_10y"] or float("-inf"), reverse=True)
 
-    return {
+    return pv.attach({
         "us_curve": {
             "points":       curve_points,
             "spread_2y10y": spread_2y10y,
@@ -224,4 +325,4 @@ async def get_yield_curves() -> dict:
         "term_premium": term_premium,
         "foreign_10y":  foreign,
         "global_yields": global_yields,
-    }
+    }, _provenance(data, cpi_map))

@@ -369,3 +369,26 @@ def test_no_fx_data_graceful(monkeypatch):
     assert "series" in result
     # With no FX data, series should be empty or there's an error key
     assert len(result["series"]) == 0 or "error" in result
+
+
+def test_backtest_accrues_rate_differential_with_flat_fx(monkeypatch):
+    """Audit C-06: a carry trade earns the rate differential even if FX is flat.
+
+    Long NZD/AUD/GBP (+2.50, +1.35, +0.50) and short EUR/CHF/JPY (−0.50,
+    −1.50, −2.90) at 1/3 each → (4.35 + 4.90) / 3 = 3.0833 %/yr accrued daily.
+    """
+    import pandas as pd
+    import backend.services.carry_service as cs
+    _patch_services(monkeypatch)
+
+    def _flat_fx(symbols, period):
+        idx = pd.date_range(end=date.today(), periods=756, freq="B")
+        return pd.DataFrame({s: [1.0] * len(idx) for s in symbols}, index=idx)
+
+    monkeypatch.setattr(cs.yfs, "get_close_frame", _flat_fx)
+    result = cs.get_carry_backtest("3y")
+    daily = (4.35 + 4.90) / 3 / 100 / 252
+    expected_cagr = ((1 + daily) ** 252 - 1) * 100
+    assert result["metrics"]["cagr"] == pytest.approx(expected_cagr, rel=1e-3)
+    assert result["legs"]["long"] == ["NZD", "AUD", "GBP"]
+    assert result["legs"]["short"] == ["EUR", "CHF", "JPY"]

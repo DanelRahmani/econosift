@@ -2,12 +2,37 @@
 from __future__ import annotations
 
 import re
+from datetime import datetime, timezone
+
 from .finnhub_service import _get
+from .. import provenance as pv
 from ..cache import cached
 
 # Simple macro-finance sentiment keywords
 POSITIVE_WORDS = {"surge", "growth", "rebound", "soar", "jump", "rally", "easing", "stimulus", "cut", "upbeat", "strong", "gains", "bull"}
 NEGATIVE_WORDS = {"crash", "plunge", "recession", "slump", "fear", "panic", "tightening", "hike", "downbeat", "weak", "losses", "bear", "crisis", "inflation"}
+
+def _provenance(articles: list[dict]) -> dict:
+    """``score`` / ``overall`` and the per-article label (``articles.sentiment``) are keyword counts
+    computed here over the Finnhub general-news headlines and summaries."""
+    stamps = [a["datetime"] for a in articles if isinstance(a.get("datetime"), (int, float))]
+    feed = pv.ref("finnhub", "news?category=general", "General market news (latest 50 items)",
+                  observed=datetime.fromtimestamp(max(stamps), timezone.utc).strftime("%Y-%m-%d") if stamps else None,
+                  note="Headlines and summaries as published by Finnhub's news feed; not an EconoSift view.")
+    score = pv.derived(
+        "(positive keyword hits - negative keyword hits) / (total hits) over the headline and summary text of "
+        "the latest 50 articles, counting each keyword once per article; 0 when there are no hits",
+        ["articles"], title="Keyword sentiment score", observed=feed.get("observed"))
+    return {
+        "*": feed, "articles": feed,
+        "articles.sentiment": pv.derived(
+            "'positive' if the article contains more positive than negative keywords, 'negative' if more "
+            "negative, else 'neutral'", ["articles"], title="Article keyword label"),
+        "score": score,
+        "overall": pv.derived("'Bullish' if score > 0.2, 'Bearish' if score < -0.2, else 'Neutral'", ["score"],
+                              title="Overall sentiment label"),
+    }
+
 
 @cached("macro_sentiment")
 def get_macro_sentiment() -> dict:
@@ -68,8 +93,9 @@ def get_macro_sentiment() -> dict:
     else:
         overall = "Neutral"
 
-    return {
+    result = {
         "score": round(score, 2),
         "overall": overall,
         "articles": scored_news
     }
+    return pv.attach(result, _provenance(scored_news)) if scored_news else result

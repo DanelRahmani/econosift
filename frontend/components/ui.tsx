@@ -1,9 +1,13 @@
 "use client";
-import { useRef, useState, useEffect, type ReactNode } from "react";
+import { useRef, useState, useEffect, type HTMLAttributes, type ReactNode } from "react";
 import { RadialBarChart, RadialBar, PolarAngleAxis, ResponsiveContainer } from "recharts";
 
-export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return <div className={`card ${className}`}>{children}</div>;
+export function Card({
+  children,
+  className = "",
+  ...rest
+}: { children: ReactNode; className?: string } & HTMLAttributes<HTMLDivElement>) {
+  return <div className={`card ${className}`} {...rest}>{children}</div>;
 }
 
 export function Skeleton({ className = "" }: { className?: string }) {

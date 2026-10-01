@@ -10,6 +10,7 @@ from datetime import date
 import pandas as pd
 import requests
 
+from .. import provenance as pv
 from ..cache import async_cached
 
 log = logging.getLogger(__name__)
@@ -49,6 +50,8 @@ LONG_COLS = ["NonComm_Positions_Long_All", "Noncommercial Long", "Non-Commercial
              "NonComm_Long", "Noncommercial_Positions_Long", "NonComm_Pos_Long"]
 SHORT_COLS = ["NonComm_Positions_Short_All", "Noncommercial Short", "Non-Commercial Short",
               "NonComm_Short", "Noncommercial_Positions_Short", "NonComm_Pos_Short"]
+COMM_LONG_COLS = ["Comm_Positions_Long_All", "Commercial Long", "Comm_Long"]
+COMM_SHORT_COLS = ["Comm_Positions_Short_All", "Commercial Short", "Comm_Short"]
 OI_COLS = ["Open_Interest_All", "Open Interest", "Open_Interest", "Tot_Open_Interest"]
 
 
@@ -135,6 +138,8 @@ def _parse_cot(df: pd.DataFrame) -> list[dict]:
     long_col = _pick_col(df, LONG_COLS)
     short_col = _pick_col(df, SHORT_COLS)
     oi_col = _pick_col(df, OI_COLS)
+    comm_long_col = _pick_col(df, COMM_LONG_COLS)
+    comm_short_col = _pick_col(df, COMM_SHORT_COLS)
 
     if not all([date_col, code_col, long_col, short_col]):
         log.warning("COT: could not identify required columns. Columns: %s", df.columns.tolist())
@@ -153,13 +158,14 @@ def _parse_cot(df: pd.DataFrame) -> list[dict]:
         mask = df[code_col].astype(str).str.contains(code_clean, na=False, regex=False)
         sub = df[mask].copy()
         if sub.empty:
+            # Not in the report: unknown, not zero.
             contracts_out.append({
                 "name": contract["name"],
                 "code": code,
-                "net_speculator": 0,
-                "net_commercial": 0,
+                "net_speculator": None,
+                "net_commercial": None,
                 "cot_index": None,
-                "open_interest": 0,
+                "open_interest": None,
                 "history": [],
             })
             continue
@@ -171,14 +177,22 @@ def _parse_cot(df: pd.DataFrame) -> list[dict]:
             sub = sub[sub[code_col].astype(str) == top_code]
 
         sub = sub.sort_values("_date")
-        sub["_long"] = pd.to_numeric(sub[long_col], errors="coerce").fillna(0)
-        sub["_short"] = pd.to_numeric(sub[short_col], errors="coerce").fillna(0)
+        # A report with a missing leg is dropped rather than read as 0 contracts.
+        sub["_long"] = pd.to_numeric(sub[long_col], errors="coerce")
+        sub["_short"] = pd.to_numeric(sub[short_col], errors="coerce")
+        sub = sub.dropna(subset=["_long", "_short"])
+        if sub.empty:
+            contracts_out.append({"name": contract["name"], "code": code, "net_speculator": None,
+                                  "net_commercial": None, "cot_index": None, "open_interest": None,
+                                  "history": []})
+            continue
         sub["_net"] = sub["_long"] - sub["_short"]
-
-        if oi_col:
-            sub["_oi"] = pd.to_numeric(sub[oi_col], errors="coerce").fillna(0)
+        sub["_oi"] = pd.to_numeric(sub[oi_col], errors="coerce") if oi_col else float("nan")
+        if comm_long_col and comm_short_col:
+            sub["_comm"] = (pd.to_numeric(sub[comm_long_col], errors="coerce")
+                            - pd.to_numeric(sub[comm_short_col], errors="coerce"))
         else:
-            sub["_oi"] = 0
+            sub["_comm"] = float("nan")
 
         # 2-year weekly history (last 104 rows). NB: itertuples() renames
         # underscore-prefixed columns, so iterate the Series directly.
@@ -191,7 +205,8 @@ def _parse_cot(df: pd.DataFrame) -> list[dict]:
         # Latest values
         latest = sub.iloc[-1]
         net_spec = int(latest["_net"])
-        oi = int(latest["_oi"])
+        oi = int(latest["_oi"]) if pd.notna(latest["_oi"]) else None
+        net_comm = int(latest["_comm"]) if pd.notna(latest["_comm"]) else None
 
         # COT Index: (current - min_52w) / (max_52w - min_52w) * 100
         last_52 = sub.tail(52)["_net"]
@@ -204,7 +219,7 @@ def _parse_cot(df: pd.DataFrame) -> list[dict]:
             "name": contract["name"],
             "code": code,
             "net_speculator": net_spec,
-            "net_commercial": 0,  # not always split in legacy COT
+            "net_commercial": net_comm,
             "cot_index": cot_index,
             "open_interest": oi,
             "history": history,
@@ -221,6 +236,31 @@ def _cot_failed(result) -> bool:
             or not result.get("contracts"))
 
 
+def _provenance(as_of: str) -> dict:
+    """Row fields are keyed ``contracts.<field>`` (one source for every contract)."""
+    src = pv.ref("cftc", None, "Commitments of Traders, legacy report, futures only", frequency="weekly",
+                 observed=as_of, note="Socrata open-data API (publicreporting.cftc.gov, dataset 6dca-aqww), "
+                                      "falling back to the annual deacotYYYY.zip archives; as_of is the newest "
+                                      "report date across contracts.")
+    net = pv.derived("non-commercial long - non-commercial short futures contracts, at the latest report date",
+                     [src], title="Net speculator position (contracts)", observed=as_of)
+    return {
+        "*": src,
+        "contracts.net_speculator": net,
+        "contracts.history": net,
+        "contracts.cot_index": pv.derived(
+            "(latest net position - lowest of the last 52 weekly reports) / (highest - lowest) x 100; empty "
+            "when the 52-week range is flat", ["contracts.net_speculator"], title="COT index (52-week)",
+            observed=as_of),
+        "contracts.open_interest": pv.derived("total open interest (all), latest report date", [src],
+                                              title="Open interest (contracts)", observed=as_of),
+        "contracts.net_commercial": pv.derived(
+            "commercial long - commercial short futures contracts, at the latest report date; empty when "
+            "the report carries no commercial columns", [src], title="Net commercial position (contracts)",
+            observed=as_of),
+    }
+
+
 @async_cached("cot_data", skip_if=_cot_failed)
 async def get_cot_data() -> dict:
     """Download and parse CFTC COT data for 6 key futures contracts."""
@@ -235,12 +275,12 @@ async def get_cot_data() -> dict:
         ]
         if latest_dates:
             as_of = max(latest_dates)
-        return {
+        return pv.attach({
             "asOf": as_of,
             "contracts": contracts,
             "source": "CFTC",
             "error": None,
-        }
+        }, _provenance(as_of))
     except Exception as exc:
         log.warning("get_cot_data failed: %s", exc)
         return {

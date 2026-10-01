@@ -6,14 +6,15 @@ a business (days), and historical Doing Business scores.
 """
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 from datetime import datetime
 from pathlib import Path
 
+from .. import provenance as pv
 from ..cache import async_cached
 from . import atlas_service
+from .fiscal_service import wb_country_provenance
 
 log = logging.getLogger(__name__)
 
@@ -65,6 +66,25 @@ def _load_doing_business() -> dict:
         return {"countries": {}}
 
 
+def _provenance(countries: list[dict]) -> dict:
+    prov = wb_country_provenance(countries, [
+        ("newBusinessDensity", "IC.BUS.NDNS.ZS",
+         "New business density (new registrations per 1,000 people ages 15-64)", "per 1,000 people"),
+    ])
+    years = [str(c["periods"]["doingBusinessScore"]) for c in countries
+             if (c.get("periods") or {}).get("doingBusinessScore")]
+    db = pv.ref("worldbank", None, "Doing Business score (0-100)", units="score 0-100", frequency="annual",
+                observed=max(years) if years else None, flags=("stale",),
+                note="Bundled snapshot (backend/data/doing_business.json) of the World Bank Doing Business "
+                     "reports 2015-2019; the series was discontinued in 2021.")
+    prov["kpis.doingBusinessScore"] = prov["history.doingBusinessScore"] = db
+    prov["summary"] = pv.derived(
+        "simple mean of the countries' latest newBusinessDensity and doingBusinessScore values "
+        "(avgStartupDays has no data: the World Bank discontinued it)",
+        ["kpis.newBusinessDensity", "kpis.doingBusinessScore"], title="Cross-country summary")
+    return prov
+
+
 @async_cached("business_dynamism")
 async def get_business_data() -> dict:
     """Fetch business dynamism KPIs for major economies."""
@@ -72,10 +92,10 @@ async def get_business_data() -> dict:
     start, end = 2010, cur_year - 1
 
     # Fetch World Bank indicators
-    wb_density, wb_startup = await asyncio.gather(
-        atlas_service._wb_timeline("new_business_density", start, end),
-        atlas_service._wb_timeline("startup_time", start, end),
-    )
+    wb_density = await atlas_service._wb_timeline("new_business_density", start, end)
+    # "Time to start a business" (IC.REG.DURS) came from Doing Business, which
+    # the World Bank discontinued in 2021 and has since archived: no source.
+    wb_startup: dict = {}
 
     universe = atlas_service._country_universe()
     iso3_to_name = {c["iso3"]: c["name"] for c in universe}
@@ -129,9 +149,10 @@ async def get_business_data() -> dict:
     startup_values = [c["kpis"]["startupTime"] for c in countries_out if c["kpis"]["startupTime"] is not None]
     db_scores_all = [c["kpis"]["doingBusinessScore"] for c in countries_out if c["kpis"]["doingBusinessScore"] is not None]
 
-    return {
-        "asOf": str(datetime.now().date()),
+    result = {
+        "asOf": atlas_service.stamp_periods(countries_out),
         "source": "World Bank",
+        "unavailable": {"startupTime": "Discontinued by the World Bank (Doing Business, 2021)"},
         "countries": countries_out,
         "summary": {
             "avgBusinessDensity": round(sum(density_values) / len(density_values), 2) if density_values else None,
@@ -140,3 +161,4 @@ async def get_business_data() -> dict:
             "totalCountries": len(countries_out),
         },
     }
+    return pv.attach(result, _provenance(countries_out))

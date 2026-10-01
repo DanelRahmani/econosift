@@ -14,6 +14,7 @@ import numpy as np
 import pandas as pd
 import yfinance as yf
 
+from .. import provenance as pv
 from . import yfinance_service as yfs
 from ..cache import cached
 
@@ -276,4 +277,19 @@ def run_event_study(
         return result
 
     result["eventType"] = event_type
-    return result
+    last = pv.last_date(px)
+    prices = [pv.yahoo(ticker, "Daily adjusted close", frequency="daily", observed=last),
+              pv.yahoo(_MARKET_COL, "S&P 500 index, daily close (market return)", frequency="daily", observed=last)]
+    events = (pv.yahoo(ticker, "Earnings announcement dates (Ticker.earnings_dates)")
+              if event_type == "earnings" else
+              pv.ref("fedboard", None, "Scheduled FOMC decision dates (list maintained in EconoSift)",
+                     url="https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm"))
+    car = pv.derived(
+        f"abnormal return = return − (α + β·market return), α and β fitted by OLS over {est_window} sessions "
+        f"ending {_GAP_BEFORE_EVENT} sessions before the event; CAR = sum over −{window}…+{window} sessions",
+        [*prices, events], title="Cumulative abnormal return (market model)")
+    return pv.attach(result, {
+        "*": car, "carPath": car, "events": car,
+        "kpis": pv.derived("mean / median CAR across events, share of events with CAR > 0, and the t-statistic "
+                           "of the mean CAR", ["events"], title="Event study summary"),
+    })

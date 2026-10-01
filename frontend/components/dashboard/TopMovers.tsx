@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import type { MoversResponse, MoverRow } from "@/lib/types";
 import { Card, Skeleton } from "@/components/ui";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 import { fmtNum, fmtLarge } from "@/lib/format";
 
 const TABS = [
@@ -20,6 +22,7 @@ export function TopMovers({ index = "sp500" }: { index?: string }) {
   const [data, setData] = useState<MoversResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<TabKey>("gainers");
+  const scope = useSourceScope(provOf(data));
 
   useEffect(() => {
     let alive = true;
@@ -37,7 +40,7 @@ export function TopMovers({ index = "sp500" }: { index?: string }) {
   const rows = data?.[tab] ?? [];
 
   return (
-    <Card>
+    <Card {...scope}>
       <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
         <h2 className="text-sm font-semibold text-text-secondary">Top Movers</h2>
         <span className="text-xs text-text-muted font-mono">{data.asOf ?? "—"}</span>
@@ -70,7 +73,7 @@ export function TopMovers({ index = "sp500" }: { index?: string }) {
                 {tab === "unusualVolume" && <th className="text-right font-medium">Vol ×Avg</th>}
               </tr>
             </thead>
-            <tbody>
+            <tbody data-prov={tab}>
               {rows.map((row) => (
                 <MoverTr key={row.ticker} row={row} showVol={tab === "unusualVolume"} />
               ))}
@@ -85,7 +88,7 @@ export function TopMovers({ index = "sp500" }: { index?: string }) {
 function MoverTr({ row, showVol }: { row: MoverRow; showVol: boolean }) {
   const up = (row.changePercent ?? 0) >= 0;
   return (
-    <tr className="border-b border-border/50 hover:bg-surface-alt/50">
+    <tr className="border-b border-border/50 hover:bg-surface-alt/50" data-prov-ctx={row.ticker}>
       <td className="py-2">
         <span className="font-mono font-semibold text-text-primary">{row.ticker}</span>
         <span className="text-xs text-text-muted ml-2 truncate">{row.name}</span>

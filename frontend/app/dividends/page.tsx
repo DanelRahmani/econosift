@@ -6,6 +6,8 @@ import type { DividendAnalysisResponse } from "@/lib/types";
 import { Card, PageSkeleton } from "@/components/ui";
 import { TickerSearch } from "@/components/TickerSearch";
 import { useUrlState } from "@/lib/useUrlState";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine,
@@ -13,11 +15,11 @@ import {
 
 const GRID = "rgba(255,255,255,0.08)";
 
-function KpiCard({ label, value, sub, color }: {
-  label: string; value: string; sub?: string; color?: string;
+function KpiCard({ label, value, sub, color, prov }: {
+  label: string; value: string; sub?: string; color?: string; prov?: string;
 }) {
   return (
-    <Card className="p-4">
+    <Card className="p-4" data-prov={prov}>
       <div className="text-xs text-text-secondary">{label}</div>
       <div className={`text-2xl font-bold mt-1 ${color ?? ""}`}>{value}</div>
       {sub && <div className="text-xs text-text-secondary mt-0.5">{sub}</div>}
@@ -32,6 +34,7 @@ function DividendsPageInner() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searched, setSearched] = useState(false);
+  const scope = useSourceScope(provOf(data));
 
   const fetchAnalysis = useCallback((t: string) => {
     const trimmed = t.trim().toUpperCase();
@@ -104,24 +107,25 @@ function DividendsPageInner() {
       )}
 
       {data && !loading && (
-        <div className="space-y-6">
+        <div className="space-y-6" {...scope}>
           <div className="flex items-baseline justify-between">
             <div>
               <h2 className="text-xl font-semibold">{data.name}</h2>
               <p className="text-sm text-text-secondary">{data.sector || ""}</p>
             </div>
             {data.price != null && (
-              <div className="text-2xl font-bold">${data.price.toFixed(2)}</div>
+              <div className="text-2xl font-bold" data-prov="price">${data.price.toFixed(2)}</div>
             )}
           </div>
 
           {/* KPI Row */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-            <KpiCard label="Dividend Yield" value={data.dividendYield != null ? `${data.dividendYield.toFixed(2)}%` : "—"} />
-            <KpiCard label="5Y CAGR" value={data.cagr5y != null ? `${data.cagr5y.toFixed(1)}%` : "—"} />
-            <KpiCard label="10Y CAGR" value={data.cagr10y != null ? `${data.cagr10y.toFixed(1)}%` : "—"} />
-            <KpiCard label="Payout Ratio" value={data.payoutRatio != null ? `${(data.payoutRatio * 100).toFixed(0)}%` : "—"} />
+            <KpiCard prov="dividendYield" label="Dividend Yield" value={data.dividendYield != null ? `${data.dividendYield.toFixed(2)}%` : "—"} />
+            <KpiCard prov="cagr5y" label="5Y CAGR" value={data.cagr5y != null ? `${data.cagr5y.toFixed(1)}%` : "—"} />
+            <KpiCard prov="cagr10y" label="10Y CAGR" value={data.cagr10y != null ? `${data.cagr10y.toFixed(1)}%` : "—"} />
+            <KpiCard prov="payoutRatio" label="Payout Ratio" value={data.payoutRatio != null ? `${(data.payoutRatio * 100).toFixed(0)}%` : "—"} />
             <KpiCard
+              prov="consecutiveGrowthYears"
               label="Consecutive Growth"
               value={`${data.consecutiveGrowthYears}y`}
               color={data.consecutiveGrowthYears >= 25 ? "text-success" : data.consecutiveGrowthYears >= 10 ? "text-warning" : ""}
@@ -129,7 +133,7 @@ function DividendsPageInner() {
           </div>
 
           {/* Sustainability Score */}
-          <Card className="p-4">
+          <Card className="p-4" data-prov="sustainabilityScore">
             <h3 className="font-semibold mb-1">Dividend Sustainability</h3>
             <div className="flex items-center gap-4">
               <div className={`text-4xl font-bold ${data.sustainabilityLabel === "Strong" ? "text-success" : data.sustainabilityLabel === "Adequate" ? "text-warning" : "text-danger"}`}>
@@ -145,14 +149,14 @@ function DividendsPageInner() {
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3 mt-4 text-sm">
-              <div className="flex justify-between"><span className="text-text-secondary">EPS Payout</span><span>{data.payoutRatio != null ? `${(data.payoutRatio * 100).toFixed(1)}%` : "—"}</span></div>
-              <div className="flex justify-between"><span className="text-text-secondary">FCF Payout</span><span>{data.fcfPayoutRatio != null ? `${(data.fcfPayoutRatio * 100).toFixed(1)}%` : "—"}</span></div>
+              <div className="flex justify-between" data-prov="payoutRatio"><span className="text-text-secondary">EPS Payout</span><span>{data.payoutRatio != null ? `${(data.payoutRatio * 100).toFixed(1)}%` : "—"}</span></div>
+              <div className="flex justify-between" data-prov="fcfPayoutRatio"><span className="text-text-secondary">FCF Payout</span><span>{data.fcfPayoutRatio != null ? `${(data.fcfPayoutRatio * 100).toFixed(1)}%` : "—"}</span></div>
             </div>
           </Card>
 
           {/* Annual Dividends Chart */}
           {annualData.length > 0 && (
-            <Card className="p-4">
+            <Card className="p-4" data-prov="annualDividends">
               <h3 className="font-semibold mb-1">Annual Dividends</h3>
               <p className="text-xs text-text-secondary mb-3">
                 Total dividends paid per share per year
@@ -175,13 +179,13 @@ function DividendsPageInner() {
 
           {/* DDM Fair Value */}
           {data.ddmFairValue != null && data.price != null && (
-            <Card className="p-4">
+            <Card className="p-4" data-prov="ddmFairValue">
               <h3 className="font-semibold mb-1">Gordon Growth DDM Fair Value</h3>
               <p className="text-xs text-text-secondary mb-3">
-                Assumed discount rate: 9.5% · Growth rate: {data.ddmGrowthRate}% (capped 5Y CAGR, min 1%)
+                Discount rate: {data.ddmDiscountRate != null ? `${data.ddmDiscountRate}%` : "—"} (US 10Y Treasury + 5% equity risk premium) · Growth rate: {data.ddmGrowthRate}% (5Y CAGR, capped at risk-free + 2%, min 1%)
               </p>
               <div className="grid grid-cols-2 gap-4">
-                <div>
+                <div data-prov="price">
                   <div className="text-xs text-text-secondary">Current Price</div>
                   <div className="text-2xl font-bold">${data.price.toFixed(2)}</div>
                 </div>
@@ -189,7 +193,7 @@ function DividendsPageInner() {
                   <div className="text-xs text-text-secondary">DDM Fair Value</div>
                   <div className="text-2xl font-bold">${data.ddmFairValue.toFixed(2)}</div>
                 </div>
-                <div className="col-span-2">
+                <div className="col-span-2" data-prov="ddmUpsidePct">
                   <div className="text-xs text-text-secondary">Upside/Downside</div>
                   <div className={`text-xl font-bold ${(data.ddmUpsidePct ?? 0) >= 0 ? "text-success" : "text-danger"}`}>
                     {(data.ddmUpsidePct ?? 0) >= 0 ? "+" : ""}{data.ddmUpsidePct?.toFixed(1)}%

@@ -8,6 +8,8 @@ import Link from "next/link";
 import { Card } from "@/components/ui";
 import { api } from "@/lib/api";
 import type { MomentumResponse, MomentumRank } from "@/lib/types";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 
 const UNIVERSES = [
   { key: "dow", label: "Dow 30" },
@@ -35,14 +37,14 @@ function pct(v: number | null): string {
   return v === null || v === undefined ? "—" : `${(v * 100).toFixed(1)}%`;
 }
 
-function RankTable({ title, rows, accent }: { title: string; rows: MomentumRank[]; accent: string }) {
+function RankTable({ title, rows, accent, prov }: { title: string; rows: MomentumRank[]; accent: string; prov: string }) {
   return (
-    <div>
+    <div data-prov={prov}>
       <h4 className={`text-xs font-semibold mb-2 ${accent}`}>{title}</h4>
       <table className="w-full text-sm">
         <tbody>
           {rows.map((r) => (
-            <tr key={r.ticker} className="border-b border-border/40">
+            <tr key={r.ticker} data-prov-ctx={r.ticker} className="border-b border-border/40">
               <td className="py-1.5">
                 <Link href={`/markets?ticker=${r.ticker}`} className="font-mono font-semibold hover:text-accent">
                   {r.ticker}
@@ -66,6 +68,7 @@ export function MomentumTab() {
   const [loading, setLoading] = useState(false);
   // Tracks the param combo currently loaded, so the heavy universes only fetch on demand.
   const [loadedKey, setLoadedKey] = useState<string>("");
+  const scope = useSourceScope(provOf(data));
 
   const fetchData = useCallback((u: Universe, s: Signal) => {
     setLoading(true);
@@ -136,7 +139,7 @@ export function MomentumTab() {
 
       {!loading && data && !data.error && data.deciles.length > 0 && (
         <>
-          <Card>
+          <Card data-prov="deciles" {...scope}>
             <h3 className="text-sm font-semibold text-text-secondary mb-3">
               Decile Average Prior Return {data.asOf && <span className="text-text-muted font-normal">· {data.asOf}</span>}
             </h3>
@@ -153,10 +156,10 @@ export function MomentumTab() {
             </ResponsiveContainer>
           </Card>
 
-          <Card>
+          <Card {...scope}>
             <div className="grid md:grid-cols-2 gap-8">
-              <RankTable title="Top Momentum" rows={data.top} accent="text-success" />
-              <RankTable title="Bottom Momentum" rows={data.bottom} accent="text-danger" />
+              <RankTable title="Top Momentum" rows={data.top} accent="text-success" prov="top" />
+              <RankTable title="Bottom Momentum" rows={data.bottom} accent="text-danger" prov="bottom" />
             </div>
             {data.missing.length > 0 && (
               <p className="text-xs text-text-muted mt-3">Excluded (insufficient history): {data.missing.join(", ")}</p>

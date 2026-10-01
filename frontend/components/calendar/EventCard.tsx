@@ -34,6 +34,14 @@ const CATEGORY_STYLES: Record<
   },
 };
 
+// Provenance map key per event category (events carry no per-row source).
+const PROV_KEYS: Record<CalendarEvent["category"], string> = {
+  macro: "macro",
+  earnings: "earnings",
+  dividend: "dividends",
+  ipo: "ipos",
+};
+
 // ─────────────────────────────────────────────
 // Countdown logic
 // ─────────────────────────────────────────────
@@ -146,6 +154,8 @@ export function EventCard({ event }: { event: CalendarEvent }) {
   return (
     <div
       className={`border-l-2 ${style.border} bg-surface rounded-r-md px-2 py-1.5 text-xs space-y-0.5`}
+      data-prov={PROV_KEYS[event.category]}
+      data-prov-ctx={event.title}
     >
       {/* Title row */}
       <div className="flex items-start justify-between gap-1">
@@ -219,7 +229,7 @@ export function EventCard({ event }: { event: CalendarEvent }) {
       {/* Dividend detail */}
       {event.category === "dividend" && event.amount !== null && (
         <div className="text-text-muted text-[10px]">
-          Amt: ${fmtNum(event.amount, 4)}
+          Annual rate: ${fmtNum(event.amount, 4)}/sh
         </div>
       )}
 

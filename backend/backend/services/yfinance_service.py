@@ -486,11 +486,13 @@ def _safe(d, key):
 
 
 @cached("yf_ohlc")
-def get_ohlc_frame(symbols: tuple[str, ...], period: str) -> dict[str, pd.DataFrame]:
+def get_ohlc_frame(symbols: tuple[str, ...], period: str, adjust: bool = True) -> dict[str, pd.DataFrame]:
     """Return {symbol: DataFrame[Open,High,Low,Close]} for the requested symbols.
 
     auto_adjust scales Open/High/Low/Close by the same split/dividend factor so
     Garman-Klass high/low/open/close ratios remain valid after adjustment.
+    ``adjust=False`` returns prices as traded (split-adjusted only), which is
+    what published breadth counts — advancers, 52-week highs/lows — are based on.
     """
     if not symbols:
         return {}
@@ -498,7 +500,7 @@ def get_ohlc_frame(symbols: tuple[str, ...], period: str) -> dict[str, pd.DataFr
         list(symbols),
         period=period,
         interval="1d",
-        auto_adjust=True,
+        auto_adjust=adjust,
         progress=False,
         threads=True,
     )

@@ -370,3 +370,18 @@ def test_router_snapshot_bad_indicator(client_with_patches):
         "/api/atlas/snapshot?indicator=bogus&year=2021"
     )
     assert resp.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_wb_timeline_restores_int_year_keys_after_sqlite_round_trip(monkeypatch):
+    """Audit D-08: the SQLite cache tier returns JSON, so int year keys come
+    back as strings after a restart. The public wrapper must restore ints."""
+    from backend.services import atlas_service
+
+    async def from_sqlite(ind, s, e):
+        return {"USA": {"2020": 2.3, "2021": 5.9}}
+
+    monkeypatch.setattr(atlas_service, "_wb_timeline_cached", from_sqlite)
+    out = await atlas_service._wb_timeline("gdp_growth", 2020, 2021)
+    assert out == {"USA": {2020: 2.3, 2021: 5.9}}
+    assert 2020 in out["USA"]

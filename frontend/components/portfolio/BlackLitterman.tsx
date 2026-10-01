@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { api } from "@/lib/api";
 import type { Holding, BLData } from "@/lib/types";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 
 interface Props {
   holdings: Holding[];
@@ -15,6 +17,7 @@ export function BlackLitterman({ holdings, period }: Props) {
   const [data, setData] = useState<BLData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const scope = useSourceScope(provOf(data));
 
   function updateView(ticker: string, val: string) {
     setViewInputs((prev) => ({ ...prev, [ticker]: val }));
@@ -50,7 +53,7 @@ export function BlackLitterman({ holdings, period }: Props) {
   );
 
   return (
-    <div className="rounded-xl border border-border bg-surface p-4 space-y-4">
+    <div className="rounded-xl border border-border bg-surface p-4 space-y-4" {...scope}>
       <div className="flex items-center justify-between">
         <h3 className="font-semibold text-sm">Black-Litterman Optimization</h3>
         <button
@@ -102,15 +105,15 @@ export function BlackLitterman({ holdings, period }: Props) {
               {(data.blReturns ?? []).map((row) => {
                 const optW = optWeightMap.get(row.ticker) ?? null;
                 return (
-                  <tr key={row.ticker} className="border-b border-border/50">
+                  <tr key={row.ticker} data-prov-ctx={row.ticker} className="border-b border-border/50">
                     <td className="py-2 pr-4 font-mono font-medium text-text-primary">{row.ticker}</td>
-                    <td className="py-2 pr-4 text-right text-text-secondary">
+                    <td data-prov={`blReturns.${row.ticker}.equilibriumReturn`} className="py-2 pr-4 text-right text-text-secondary">
                       {row.equilibriumReturn !== null ? `${(row.equilibriumReturn * 100).toFixed(2)}%` : "—"}
                     </td>
-                    <td className={`py-2 pr-4 text-right font-medium ${row.blReturn !== null && row.blReturn >= 0 ? "text-green-500" : "text-red-500"}`}>
+                    <td data-prov={`blReturns.${row.ticker}.blReturn`} className={`py-2 pr-4 text-right font-medium ${row.blReturn !== null && row.blReturn >= 0 ? "text-green-500" : "text-red-500"}`}>
                       {row.blReturn !== null ? `${(row.blReturn * 100).toFixed(2)}%` : "—"}
                     </td>
-                    <td className="py-2 text-right font-medium text-accent">
+                    <td data-prov="optimalWeights" className="py-2 text-right font-medium text-accent">
                       {optW !== null ? `${(optW * 100).toFixed(2)}%` : "—"}
                     </td>
                   </tr>

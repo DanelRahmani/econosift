@@ -14,6 +14,7 @@ import numpy as np
 import pandas as pd
 import yfinance as yf
 
+from .. import provenance as pv
 from ..cache import cached
 
 try:
@@ -409,7 +410,7 @@ def get_technicals(ticker: str, period: str = "1y") -> dict:
         except Exception:
             pass
 
-    return {
+    return pv.attach({
         "ticker": ticker,
         "period": period,
         "asOf": str(df.index[-1].date()),
@@ -435,6 +436,55 @@ def get_technicals(ticker: str, period: str = "1y") -> dict:
         "atr": atr_series,
         "fibLevels": fib_levels,
         "pivotPoints": pivot_points,
+    }, _provenance(ticker, str(df.index[-1].date())))
+
+
+def _provenance(ticker: str, as_of: str) -> dict:
+    """One key per indicator block; every indicator is computed from the same adjusted daily bars."""
+    bars = pv.yahoo(ticker, "Daily OHLCV, split- and dividend-adjusted", frequency="daily", observed=as_of,
+                    note="Fetched from a start date covering the period plus warm-up history; indicators are "
+                         "computed on the full fetch and displayed for the requested period.")
+
+    def d(formula: str, title: str) -> dict:
+        return pv.derived(formula, [bars], title=title, observed=as_of)
+
+    pivot = "P = (H + L + C) / 3; R1 = 2P − L; R2 = P + (H − L); S1 = 2P − H; S2 = P − (H − L)"
+    return {
+        "*": bars,
+        "prices": bars,
+        "summary.trend": d("Bullish if the 50-day SMA is above the 200-day SMA, else Bearish; if there is no "
+                           "50-day SMA, close vs the 200-day SMA; Neutral if neither", "Trend"),
+        "summary.rsi": d("RSI(14) of the close, pandas_ta (Wilder smoothing)", "RSI (14)"),
+        "summary.macdSignal": d("Bullish if the MACD line (EMA12 − EMA26 of the close) is above its 9-day EMA "
+                                "signal line, else Bearish", "MACD signal"),
+        "summary.volumeVs20d": d("last session's volume / mean volume of the last 20 sessions", "Volume vs 20-day"),
+        "summary.week52Position": d("(close − 52-week low) / (52-week high − 52-week low) × 100, high and low "
+                                    "taken from closing prices of the last 252 sessions", "52-week position"),
+        "summary.week52High": d("highest close of the last 252 sessions (not the intraday high)", "52-week high"),
+        "summary.week52Low": d("lowest close of the last 252 sessions (not the intraday low)", "52-week low"),
+        "summary.bbSqueeze": d("true when the latest Bollinger bandwidth (20-day, 2σ) is below 5%", "Bollinger squeeze"),
+        "bollinger": d("Bollinger Bands (20, 2σ): mid = 20-day SMA of the close, upper / lower = mid ± 2 × standard "
+                       "deviation; %B = (close − lower) / (upper − lower); bandwidth = (upper − lower) / mid × 100",
+                       "Bollinger Bands"),
+        "ichimoku": d("Ichimoku (9, 26, 52), pandas_ta: Tenkan = mid of 9-day high/low, Kijun = mid of 26-day "
+                      "high/low, Senkou A = (Tenkan + Kijun)/2 and Senkou B = mid of 52-day high/low both shifted "
+                      "26 days ahead, Chikou = close shifted 26 days back", "Ichimoku Cloud"),
+        "macd": d("MACD (12, 26, 9): line = EMA12 − EMA26 of the close, signal = 9-day EMA of the line, "
+                  "histogram = line − signal", "MACD"),
+        "rsi": d("RSI(14) of the close, pandas_ta (Wilder smoothing)", "RSI (14)"),
+        "stochRsi": d("Stochastic RSI (RSI length 14, stochastic length 14, %K smoothing 3, %D smoothing 3), "
+                      "pandas_ta", "Stochastic RSI"),
+        "williamsR": d("Williams %R (14) = (highest high − close) / (highest high − lowest low) × −100", "Williams %R"),
+        "obv": d("On-balance volume: running sum of volume, added on up-closes and subtracted on down-closes", "OBV"),
+        "cmf": d("Chaikin Money Flow (20) = Σ money-flow volume / Σ volume over 20 sessions", "CMF (20)"),
+        "atr": d("Average True Range (14), pandas_ta: Wilder-smoothed mean of the true range", "ATR (14)"),
+        "fibLevels": d("swing high / low = highest / lowest close of the last 126 sessions; level price = swing high "
+                       "− (swing high − swing low) × ratio for 0, 23.6, 38.2, 50, 61.8, 78.6 and 100%",
+                       "Fibonacci retracement"),
+        "pivotPoints": d(pivot, "Classic pivot points"),
+        "pivotPoints.daily": d(pivot + ", from the previous session's high / low / close", "Daily pivot points"),
+        "pivotPoints.weekly": d(pivot + ", from the previous complete week (Friday close)", "Weekly pivot points"),
+        "pivotPoints.monthly": d(pivot + ", from the previous complete month", "Monthly pivot points"),
     }
 
 

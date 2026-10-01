@@ -39,7 +39,7 @@ _PACKAGES = [
     "dbnomics", "ecbdata", "eurostat", "wikitextparser", "edgar",
     "edgartools", "financedatabase", "pycountry",
     # Persistence / IO / net
-    "sqlalchemy", "apscheduler", "openpyxl", "httpx", "httpcore", "requests",
+    "sqlalchemy", "apscheduler", "openpyxl", "xlrd", "httpx", "httpcore", "requests",
     "certifi", "charset_normalizer", "urllib3", "idna", "dotenv", "tqdm",
     "dateutil", "pytz", "multitasking",
 ]

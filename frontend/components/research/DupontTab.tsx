@@ -8,6 +8,8 @@ import {
 import { Card, PageSkeleton } from "@/components/ui";
 import { api } from "@/lib/api";
 import type { DupontResponse } from "@/lib/types";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 
 const GRID = "rgba(255,255,255,0.08)";
 
@@ -37,14 +39,15 @@ function fmtMult(v: number | null): string {
   return `${v.toFixed(2)}×`;
 }
 
-function KpiCard({ label, value, fmt, sub }: {
+function KpiCard({ label, value, fmt, sub, prov }: {
   label: string;
   value: number | null;
   fmt: (v: number | null) => string;
   sub?: string;
+  prov?: string;
 }) {
   return (
-    <Card className="p-4">
+    <Card className="p-4" data-prov={prov} data-prov-ctx={sub}>
       <div className="text-xs text-text-secondary">{label}</div>
       <div className="text-2xl font-bold mt-1">{fmt(value)}</div>
       {sub && <div className="text-xs text-text-secondary mt-0.5">{sub}</div>}
@@ -56,6 +59,7 @@ export function DupontTab() {
   const [data, setData] = useState<DupontResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const scope = useSourceScope(provOf(data));
 
   useEffect(() => {
     api
@@ -109,7 +113,7 @@ export function DupontTab() {
   , sectors[0]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" {...scope}>
       <p className="text-sm text-text-secondary">
         Median DuPont decomposition per GICS sector from {data.tickerCount} S&P 500
         constituents. ROE = Net Profit Margin × Asset Turnover × Equity Multiplier.
@@ -119,18 +123,21 @@ export function DupontTab() {
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         <KpiCard
           label="Highest ROE"
+          prov={`sectors.${bestRoe?.sector}.roe`}
           value={bestRoe?.roe ?? null}
           fmt={fmtPct}
           sub={bestRoe?.sector}
         />
         <KpiCard
           label="Highest Margin"
+          prov={`sectors.${bestMargin?.sector}.netMargin`}
           value={bestMargin?.netMargin ?? null}
           fmt={fmtPct}
           sub={bestMargin?.sector}
         />
         <KpiCard
           label="Highest Asset Turnover"
+          prov={`sectors.${bestTurnover?.sector}.assetTurnover`}
           value={bestTurnover?.assetTurnover ?? null}
           fmt={fmtMult}
           sub={bestTurnover?.sector}
@@ -195,13 +202,13 @@ export function DupontTab() {
             </thead>
             <tbody>
               {sectors.map((s) => (
-                <tr key={s.sector} className="border-b border-border/40 hover:bg-surface-alt/50">
+                <tr key={s.sector} data-prov-ctx={s.sector} className="border-b border-border/40 hover:bg-surface-alt/50">
                   <td className="py-2 pr-4 font-medium">{s.sector}</td>
                   <td className="py-2 px-2 text-right text-text-secondary">{s.tickerCount}</td>
-                  <td className="py-2 px-2 text-right font-mono">{fmtPct(s.netMargin)}</td>
-                  <td className="py-2 px-2 text-right font-mono">{fmtMult(s.assetTurnover)}</td>
-                  <td className="py-2 px-2 text-right font-mono">{fmtMult(s.equityMultiplier)}</td>
-                  <td className="py-2 pl-2 text-right font-mono font-semibold">{fmtPct(s.roe)}</td>
+                  <td data-prov={`sectors.${s.sector}.netMargin`} className="py-2 px-2 text-right font-mono">{fmtPct(s.netMargin)}</td>
+                  <td data-prov={`sectors.${s.sector}.assetTurnover`} className="py-2 px-2 text-right font-mono">{fmtMult(s.assetTurnover)}</td>
+                  <td data-prov={`sectors.${s.sector}.equityMultiplier`} className="py-2 px-2 text-right font-mono">{fmtMult(s.equityMultiplier)}</td>
+                  <td data-prov={`sectors.${s.sector}.roe`} className="py-2 pl-2 text-right font-mono font-semibold">{fmtPct(s.roe)}</td>
                 </tr>
               ))}
             </tbody>

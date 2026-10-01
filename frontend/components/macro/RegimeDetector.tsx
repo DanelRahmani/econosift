@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf, resolveRefs, type Provenance, type SourceRef } from "@/lib/provenance";
 
 interface RegimeInfo {
   label: string;
@@ -53,11 +55,15 @@ export function RegimeDetector({ country, countryName }: Props) {
   const [gdp, setGdp] = useState<number | null>(null);
   const [cpi, setCpi] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
+  const [gdpProv, setGdpProv] = useState<Provenance | undefined>(undefined);
+  const [cpiProv, setCpiProv] = useState<Provenance | undefined>(undefined);
 
   useEffect(() => {
     setLoading(true);
     setGdp(null);
     setCpi(null);
+    setGdpProv(undefined);
+    setCpiProv(undefined);
     const year = new Date().getFullYear();
     Promise.all([
       api.macroData(country, "gdp_growth", year - 3, year),
@@ -68,6 +74,8 @@ export function RegimeDetector({ country, countryName }: Props) {
         const cpiPts = cpiRes.series.find((s) => s.country === country)?.data ?? [];
         setGdp(gdpPts.length ? gdpPts[gdpPts.length - 1].value : null);
         setCpi(cpiPts.length ? cpiPts[cpiPts.length - 1].value : null);
+        setGdpProv(provOf(gdpRes));
+        setCpiProv(provOf(cpiRes));
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -75,8 +83,21 @@ export function RegimeDetector({ country, countryName }: Props) {
 
   const regime = classify(gdp, cpi);
 
+  // The regime label is derived from both series, so its source is both refs.
+  const prov = useMemo<Provenance | undefined>(() => {
+    const label = (prefix: string) => (r: SourceRef) => ({
+      ...r, title: `${prefix}: ${r.title ?? r.providerName ?? r.provider}`,
+    });
+    const refs = [
+      ...resolveRefs(gdpProv, `series.${country}`).map(label("GDP growth")),
+      ...resolveRefs(cpiProv, `series.${country}`).map(label("CPI inflation")),
+    ];
+    return refs.length ? { "*": refs } : undefined;
+  }, [gdpProv, cpiProv, country]);
+  const scope = useSourceScope(prov);
+
   return (
-    <div className="flex items-center gap-2 flex-wrap">
+    <div className="flex items-center gap-2 flex-wrap" data-prov-ctx={`${countryName} regime`} {...scope}>
       <span className="text-xs text-text-muted">{countryName}:</span>
       {loading ? (
         <span className="text-xs px-2 py-0.5 rounded-md bg-surface-alt text-text-muted animate-pulse">

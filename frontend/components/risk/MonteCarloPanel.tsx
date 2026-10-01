@@ -10,6 +10,8 @@ import { chartTooltipStyle, chartPalette } from "@/components/ui";
 import { fmtPct, fmtNum } from "@/lib/format";
 import { api } from "@/lib/api";
 import type { MonteCarloResult } from "@/lib/types";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 
 interface Props {
   ticker: string;
@@ -21,6 +23,7 @@ export function MonteCarloPanel({ ticker, theme }: Props) {
   const [result, setResult] = useState<MonteCarloResult | null>(null);
   const [sims, setSims] = useState(10000);
   const [horizon, setHorizon] = useState(1);
+  const scope = useSourceScope(provOf(result));
 
   const palette = chartPalette(theme);
   const tooltip = chartTooltipStyle(theme);
@@ -36,7 +39,7 @@ export function MonteCarloPanel({ ticker, theme }: Props) {
   }
 
   return (
-    <Card className="p-4 space-y-4">
+    <Card className="p-4 space-y-4" {...scope}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <h3 className="text-sm font-semibold">Monte Carlo VaR</h3>
@@ -47,7 +50,7 @@ export function MonteCarloPanel({ ticker, theme }: Props) {
       </div>
 
       <p className="text-xs text-text-muted">
-        GBM simulation of {ticker}&apos;s 1-day P&L distribution. Parameterised from 2 years of
+        GBM simulation of {ticker}&apos;s {horizon}-day P&L distribution. Parameterised from 2 years of
         historical returns. Each run draws N random paths.
       </p>
 
@@ -99,12 +102,12 @@ export function MonteCarloPanel({ ticker, theme }: Props) {
         <div className="space-y-4">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             {[
-              { label: "VaR 95%", value: fmtPct((result.var95 ?? 0) * 100), danger: true },
-              { label: "VaR 99%", value: fmtPct((result.var99 ?? 0) * 100), danger: true },
-              { label: "Expected", value: fmtPct((result.expected ?? 0) * 100), danger: false },
-              { label: "Worst Case", value: fmtPct((result.worstCase ?? 0) * 100), danger: true },
-            ].map(({ label, value, danger }) => (
-              <div key={label}>
+              { label: "VaR 95%", value: fmtPct((result.var95 ?? 0) * 100), danger: true, prov: "var95" },
+              { label: "VaR 99%", value: fmtPct((result.var99 ?? 0) * 100), danger: true, prov: "var99" },
+              { label: "Expected", value: fmtPct((result.expected ?? 0) * 100), danger: false, prov: "expected" },
+              { label: "Worst Case", value: fmtPct((result.worstCase ?? 0) * 100), danger: true, prov: "worstCase" },
+            ].map(({ label, value, danger, prov }) => (
+              <div key={label} data-prov={prov}>
                 <div className="text-xs text-text-muted">{label}</div>
                 <div className={`text-lg font-bold tabular-nums ${danger ? "text-danger" : "text-text-primary"}`}>
                   {value}

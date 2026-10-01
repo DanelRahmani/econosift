@@ -9,6 +9,8 @@ import { api } from "@/lib/api";
 import type { SnowflakeResponse } from "@/lib/types";
 import { Card, Skeleton, chartPalette } from "@/components/ui";
 import { useTheme } from "@/components/ThemeProvider";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 
 // Axis display names and which Markets tab to navigate to on click
 const AXES = [
@@ -40,6 +42,7 @@ export function SnowflakeChart({ ticker, onAxisClick, compact = false }: Props) 
   const [data, setData] = useState<SnowflakeResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const scope = useSourceScope(provOf(data));
 
   useEffect(() => {
     if (!ticker) return;
@@ -70,6 +73,7 @@ export function SnowflakeChart({ ticker, onAxisClick, compact = false }: Props) 
 
   const radarData = AXES.map(({ key, label }) => ({
     axis: label,
+    axisKey: key,
     score: data.scores[key] ?? 0,
     fullMark: 10,
     tabTarget: AXES.find(a => a.key === key)?.tab ?? "Ratios",
@@ -83,22 +87,23 @@ export function SnowflakeChart({ ticker, onAxisClick, compact = false }: Props) 
   const strokeColor = theme === "dark" ? "#2F8F83" : "#142A43";
 
   return (
-    <Card className="p-4 space-y-3">
+    <Card className="p-4 space-y-3" {...scope} data-prov-ctx={ticker}>
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-sm font-semibold text-text-primary">Snowflake Score</h3>
           <p className="text-xs text-text-muted">
-            {data.sectorPeers} sector peers · {data.sector ?? "Unknown sector"}
+            <span data-prov="sectorPeers">{data.sectorPeers} sector peers</span> · <span data-prov="sector">{data.sector ?? "Unknown sector"}</span>
           </p>
         </div>
         <div className="text-right">
-          <div className="text-2xl font-bold" style={{ color: verdictColor }}>
+          <div className="text-2xl font-bold" style={{ color: verdictColor }} data-prov="overallScore">
             {overall}<span className="text-sm font-normal text-text-muted">/10</span>
           </div>
           <span
             className="text-xs font-semibold px-2 py-0.5 rounded-md"
             style={{ backgroundColor: `${verdictColor}22`, color: verdictColor }}
+            data-prov="verdict"
           >
             {data.verdict}
           </span>
@@ -126,6 +131,8 @@ export function SnowflakeChart({ ticker, onAxisClick, compact = false }: Props) 
                     fill={palette.axis}
                     style={{ cursor: onAxisClick ? "pointer" : "default" }}
                     onClick={() => onAxisClick?.(tabTarget)}
+                    data-prov={`scores.${item?.axisKey}`}
+                    data-prov-ctx={item?.axis}
                   >
                     {payload.value}
                     {" "}
@@ -169,7 +176,7 @@ export function SnowflakeChart({ ticker, onAxisClick, compact = false }: Props) 
         <div className="grid grid-cols-2 gap-3 pt-1 items-start">
           <div>
             <p className="text-xs font-semibold text-success mb-1">✓ Strengths</p>
-            <ul className="space-y-0.5">
+            <ul className="space-y-0.5" data-prov="rewards">
               {data.rewards.map((r, i) => (
                 <li key={i} className="text-xs text-text-secondary flex justify-between">
                   <span>{r.label}</span>
@@ -180,7 +187,7 @@ export function SnowflakeChart({ ticker, onAxisClick, compact = false }: Props) 
           </div>
           <div>
             <p className="text-xs font-semibold text-danger mb-1">⚠ Risks</p>
-            <ul className="space-y-0.5">
+            <ul className="space-y-0.5" data-prov="risks">
               {data.risks.map((r, i) => (
                 <li key={i} className="text-xs text-text-secondary flex justify-between">
                   <span>{r.label}</span>

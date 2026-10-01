@@ -9,6 +9,8 @@ import { Card } from "@/components/ui";
 import { SearchBar } from "@/components/SearchBar";
 import { api } from "@/lib/api";
 import type { RiskParityWeights, RiskParityBacktest } from "@/lib/types";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 
 const PERIODS = ["1y", "3y", "5y"] as const;
 const COLORS = ["#6366f1", "#f59e0b", "#10b981", "#ef4444", "#3b82f6", "#a855f7", "#ec4899", "#14b8a6"];
@@ -34,6 +36,9 @@ export function RiskParityTab() {
 
   const [backtest, setBacktest] = useState<RiskParityBacktest | null>(null);
   const [btLoading, setBtLoading] = useState(false);
+
+  const weightsScope = useSourceScope(provOf(weights));
+  const backtestScope = useSourceScope(provOf(backtest));
 
   const tickers = input.split(",").map((t) => t.trim().toUpperCase()).filter(Boolean);
 
@@ -123,7 +128,7 @@ export function RiskParityTab() {
       </Card>
 
       <div className="grid md:grid-cols-2 gap-6">
-        <Card>
+        <Card {...weightsScope}>
           <h3 className="text-sm font-semibold text-text-secondary mb-3">
             {mode === "erc" ? "Equal Risk Contribution" : "Inverse-Volatility"} Weights
           </h3>
@@ -144,7 +149,7 @@ export function RiskParityTab() {
           )}
         </Card>
 
-        <Card>
+        <Card data-prov="riskContrib" {...weightsScope}>
           <h3 className="text-sm font-semibold text-text-secondary mb-3">Risk Contribution (%)</h3>
           {loading ? <div className="h-56 animate-pulse bg-surface-alt rounded-lg" />
             : rcRows.length === 0 ? <p className="text-sm text-text-muted">No data.</p>
@@ -167,7 +172,7 @@ export function RiskParityTab() {
         </Card>
       </div>
 
-      <Card>
+      <Card {...backtestScope}>
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-sm font-semibold text-text-secondary">
             Backtest vs 60/40 <span className="text-text-muted">(monthly rebalance, base 100)</span>
@@ -203,8 +208,8 @@ export function RiskParityTab() {
               ] as const).map(([label, s, b]) => (
                 <div key={label} className="rounded-lg border border-border p-2.5">
                   <div className="text-xs text-text-muted">{label}</div>
-                  <div className="text-sm font-mono text-accent">{s}</div>
-                  <div className="text-xs font-mono text-text-secondary">60/40: {b}</div>
+                  <div data-prov="metrics.strategy" className="text-sm font-mono text-accent">{s}</div>
+                  <div data-prov="metrics.benchmark" className="text-xs font-mono text-text-secondary">60/40: {b}</div>
                 </div>
               ))}
             </div>

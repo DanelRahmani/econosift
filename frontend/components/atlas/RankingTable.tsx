@@ -62,7 +62,7 @@ export function RankingTable({ countries, year, unit, indicatorLabel, region, me
             </thead>
             <tbody>
               {top10.map((c, i) => (
-                <tr key={c.iso3} className="border-b border-border/40 hover:bg-surface-alt/40 transition-colors">
+                <tr key={c.iso3} className="border-b border-border/40 hover:bg-surface-alt/40 transition-colors" data-prov-ctx={`${c.name} · ${year} · ${indicatorLabel}`}>
                   <td className="py-1.5 pr-2 text-text-muted">{i + 1}</td>
                   <td className="py-1.5 text-text-primary font-medium max-w-[140px] truncate" title={c.name}>{c.name}</td>
                   <td className="py-1.5 text-right font-mono text-success">{fmtNum(c.value)}</td>
@@ -85,7 +85,7 @@ export function RankingTable({ countries, year, unit, indicatorLabel, region, me
             </thead>
             <tbody>
               {bottom10.map((c, i) => (
-                <tr key={c.iso3} className="border-b border-border/40 hover:bg-surface-alt/40 transition-colors">
+                <tr key={c.iso3} className="border-b border-border/40 hover:bg-surface-alt/40 transition-colors" data-prov-ctx={`${c.name} · ${year} · ${indicatorLabel}`}>
                   <td className="py-1.5 pr-2 text-text-muted">{visible.length - i}</td>
                   <td className="py-1.5 text-text-primary font-medium max-w-[140px] truncate" title={c.name}>{c.name}</td>
                   <td className="py-1.5 text-right font-mono text-danger">{fmtNum(c.value)}</td>

@@ -260,7 +260,6 @@ class TestPiotroskiF:
         result = piotroski_f(bundle)
         assert result["score"] == result["maxScore"]
         assert result["criteria"]["positiveNetIncome"] is True
-        assert result["criteria"]["positiveROA"] is True
         assert result["criteria"]["positiveOperatingCF"] is True
         assert result["criteria"]["accrualQuality"] is True
 
@@ -272,7 +271,6 @@ class TestPiotroskiF:
         )
         result = piotroski_f(bundle)
         assert result["criteria"]["positiveNetIncome"] is False
-        assert result["criteria"]["positiveROA"] is False
         assert result["criteria"]["positiveOperatingCF"] is False
         assert result["criteria"]["accrualQuality"] is False
         assert result["score"] == 0
@@ -280,7 +278,7 @@ class TestPiotroskiF:
     def test_yor_criteria_are_none(self):
         """Prior-year dependent criteria must be None (not fabricated)."""
         result = piotroski_f(_FULL)
-        for key in ("lowerLTDebtRatio", "higherCurrentRatio", "noNewShares",
+        for key in ("higherROA", "lowerLTDebtRatio", "higherCurrentRatio", "noNewShares",
                     "higherGrossMargin", "higherAssetTurnover"):
             assert result["criteria"][key] is None
 
@@ -294,6 +292,23 @@ class TestPiotroskiF:
         result = piotroski_f(_EMPTY)
         assert result["score"] == 0
         assert result["maxScore"] == 0
+
+    def test_prior_year_dilution_and_roa_change(self):
+        """Audit C-10/C-24: F7 compares balance-sheet share counts at t and
+        t-1 (not today's info twice); F2 is ΔROA, not a repeat of F1."""
+        cur = _make_bundle(net_income=10_000, total_assets=100_000)
+        cur["balance_sheet"]["Ordinary Shares Number"] = 1_100
+        prior = _make_bundle(net_income=12_000, total_assets=100_000)
+        prior["balance_sheet"]["Ordinary Shares Number"] = 1_000
+        r = piotroski_f(cur, prior_year=prior)
+        assert r["criteria"]["noNewShares"] is False   # 10% more shares
+        assert r["criteria"]["higherROA"] is False     # ROA 10% vs 12%
+
+        prior["balance_sheet"]["Ordinary Shares Number"] = 1_100
+        prior["financials"]["Net Income"] = 8_000
+        r = piotroski_f(cur, prior_year=prior)
+        assert r["criteria"]["noNewShares"] is True
+        assert r["criteria"]["higherROA"] is True
 
     def test_criteria_has_nine_keys(self):
         result = piotroski_f(_FULL)
@@ -498,3 +513,25 @@ class TestExtendedFundamentals:
         assert result["piotroski"]["score"] is not None
         assert result["ohlson"]["oScore"] is not None
         assert result["cashConversionCycle"]["ccc"] is not None
+
+
+
+def test_ohlson_size_uses_millions_over_price_index():
+    """Audit C-11: SIZE = log(TA[$mn] / (index/100)); a $66bn firm with the
+    index at 660 gives log(66_000 / 6.6) = log(10_000)."""
+    import backend.services.fundamentals as f
+    bundle = _make_bundle(total_assets=66_000_000_000, total_liabilities=30_000_000_000,
+                          net_income=5_000_000_000, operating_cf=7_000_000_000,
+                          current_assets=20_000_000_000, current_liabilities=10_000_000_000)
+    r = ohlson_o(bundle)
+    assert r["oScore"] is not None
+    size_term = -0.407 * math.log(10_000)
+    # Reconstruct O without SIZE to isolate the SIZE contribution.
+    f_orig = f._gnp_price_index
+    try:
+        f._gnp_price_index = lambda: 660.0 * 10  # SIZE falls by log(10)
+        r10 = ohlson_o(bundle)
+    finally:
+        f._gnp_price_index = f_orig
+    assert r10["oScore"] - r["oScore"] == pytest.approx(0.407 * math.log(10), abs=1e-6)
+    assert size_term < 0

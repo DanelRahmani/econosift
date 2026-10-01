@@ -7,6 +7,7 @@ import pandas as pd
 from ..cache import async_cached
 from ..config import COUNTRY_NAMES
 from ..models import SeriesResult, make_series
+from ._annual import to_annual
 
 SOURCE_LABEL = "Frankfurter (ECB FX data)"
 BASE_URL = "https://api.frankfurter.dev/v1"
@@ -30,8 +31,9 @@ async def latest(base: str, targets: tuple[str, ...]) -> dict:
             data = r.json()
         return {"base": data.get("base", base), "date": data.get("date"),
                 "rates": data.get("rates", {})}
-    except Exception:
-        return {"base": base, "date": None, "rates": {}}
+    except Exception as exc:
+        # `error` marks this as a failure envelope so it is never cached.
+        return {"base": base, "date": None, "rates": {}, "error": str(exc)}
 
 
 @async_cached("fx_history")
@@ -53,8 +55,8 @@ async def history(base: str, targets: tuple[str, ...],
             "base": data.get("base", base),
             "series": [{"currency": k, "data": v} for k, v in series.items()],
         }
-    except Exception:
-        return {"base": base, "series": []}
+    except Exception as exc:
+        return {"base": base, "series": [], "error": str(exc)}
 
 
 @async_cached("frankfurter_fetch")
@@ -64,12 +66,14 @@ async def fetch(indicator_key: str, countries: tuple[str, ...],
     if indicator_key != "exchange_rates":
         return []
     targets = []
-    ccy_to_country: dict[str, str] = {}
+    # Several countries can share a currency (the euro): keep all of them —
+    # a plain dict overwrote all but the last euro member (audit D-12).
+    ccy_to_countries: dict[str, list[str]] = {}
     for c in countries:
         ccy = COUNTRY_CCY.get(c)
         if ccy and ccy != "USD":
             targets.append(ccy)
-            ccy_to_country[ccy] = c
+            ccy_to_countries.setdefault(ccy, []).append(c)
     if not targets:
         return []
     try:
@@ -83,24 +87,17 @@ async def fetch(indicator_key: str, countries: tuple[str, ...],
         return []
 
     rates = data.get("rates", {})
-    # Build per-currency annual mean.
-    frames: dict[str, list[tuple[int, float]]] = {}
-    raw: dict[str, dict[int, list[float]]] = {}
-    for date, day in rates.items():
-        try:
-            year = int(date[:4])
-        except (ValueError, TypeError):
-            continue
+    # Per-currency annual mean over complete years only.
+    raw: dict[str, dict[str, float]] = {}
+    for day_str, day in rates.items():
         for ccy, val in day.items():
-            raw.setdefault(ccy, {}).setdefault(year, []).append(float(val))
-    for ccy, by_year in raw.items():
-        frames[ccy] = sorted((y, sum(v) / len(v)) for y, v in by_year.items())
+            raw.setdefault(ccy, {})[day_str] = float(val)
 
     results: list[SeriesResult] = []
-    for ccy, points in frames.items():
-        country = ccy_to_country.get(ccy)
-        if not country:
-            continue
-        results.append(make_series(
-            country, COUNTRY_NAMES.get(country, country), points, SOURCE_LABEL))
+    for ccy, by_day in raw.items():
+        points = to_annual(pd.Series(by_day), "mean", start, end)
+        for country in ccy_to_countries.get(ccy, []):
+            if points:
+                results.append(make_series(
+                    country, COUNTRY_NAMES.get(country, country), points, SOURCE_LABEL))
     return results

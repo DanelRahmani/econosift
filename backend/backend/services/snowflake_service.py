@@ -15,6 +15,7 @@ from typing import Any
 
 import yfinance as yf
 
+from .. import provenance as pv
 from ..cache import cached
 from . import screener_cache
 from .fundamentals import piotroski_f, ohlson_o, _unpack
@@ -128,10 +129,16 @@ def _payout_score(payout: float | None) -> float | None:
 
 
 def _fcf_coverage_score(div_yield: float | None, fcf_yield: float | None) -> float | None:
-    """Score FCF coverage of dividend. Coverage = fcfYield / divYield."""
+    """Score FCF coverage of dividend. Coverage = fcfYield / divYield.
+
+    ``div_yield`` is in percent (yfinance ``dividendYield``, e.g. 2.43) while
+    ``fcf_yield`` is a fraction (FCF / market cap, e.g. 0.014); dividing them
+    as-is made coverage ~100x too small, so every payer got the minimum
+    score (audit C-03).
+    """
     if div_yield is None or div_yield <= 0 or fcf_yield is None or fcf_yield <= 0:
         return None
-    coverage = fcf_yield / div_yield
+    coverage = fcf_yield / (div_yield / 100.0)
     thresholds = [(3.0, 10.0), (2.0, 8.0), (1.5, 6.0), (1.0, 4.0), (0.7, 2.0)]
     for minimum, score in thresholds:
         if coverage >= minimum:
@@ -620,7 +627,7 @@ def compute_snowflake(ticker: str) -> dict:
 
     rewards, risks = _rewards_risks(axis_details)
 
-    return {
+    return pv.attach({
         "ticker": ticker,
         "sector": sector,
         "industry": industry,
@@ -631,7 +638,9 @@ def compute_snowflake(ticker: str) -> dict:
         "rewards": rewards,
         "risks": risks,
         "axisDetails": axis_details,
-    }
+    }, _provenance(
+        ticker, bool(cache_rows),
+        _peer_scope(sector if cache_rows else None, industry if cache_rows else None, all_peers), n_peers))
 
 
 # ---------------------------------------------------------------------------
@@ -725,3 +734,111 @@ def compute_snowflake_batch(tickers_key: str) -> dict:
         }
 
     return result
+
+
+# ---------------------------------------------------------------------------
+# Provenance
+# ---------------------------------------------------------------------------
+
+_PCT = "percentile rank among peers = share of peers with a strictly lower value × 10"
+
+# axis -> [(component label, weight, formula)]
+_COMPONENT_FORMULAS: dict[str, list[tuple[str, float, str]]] = {
+    "value": [
+        ("P/E", 0.25, f"{_PCT}, inverted (lower P/E scores higher); trailing P/E"),
+        ("EV/EBITDA", 0.20, f"{_PCT}, inverted; enterpriseToEbitda"),
+        ("EV/FCF", 0.15, f"{_PCT}, inverted; enterprise value / free cash flow"),
+        ("FCF Yield", 0.20, f"{_PCT}; free cash flow / market cap"),
+        ("P/B", 0.10, f"{_PCT}, inverted; priceToBook"),
+        ("PEG", 0.10, f"{_PCT}, inverted; PEG = P/E / (earnings growth × 100), capped at 50, only if growth > 0"),
+    ],
+    "growth": [
+        ("Revenue Growth", 0.30, f"{_PCT}; revenueGrowth (latest quarter vs the same quarter a year earlier)"),
+        ("EPS Growth", 0.30, f"{_PCT}; earningsGrowth (latest quarter year over year)"),
+        ("Fwd PE Improvement", 0.20, f"{_PCT}; trailing P/E − forward P/E"),
+        ("R&D Intensity", 0.20, "info.researchAndDevelopment / info.totalRevenue ÷ 15% × 10, capped at 10"),
+    ],
+    "performance": [
+        ("ROE", 0.25, f"{_PCT}; returnOnEquity"),
+        ("Gross Margin", 0.20, f"{_PCT}; annual gross profit / revenue"),
+        ("Net Margin", 0.15, f"{_PCT}; profitMargins"),
+        ("3Y Revenue CAGR", 0.20, "(newest annual revenue / revenue three fiscal years earlier)^(1/3) − 1, then "
+                                  "≥20% → 10, ≥15% → 8, ≥10% → 6, ≥5% → 4, ≥0% → 2, else 0"),
+        ("3Y Earnings CAGR", 0.20, "the same CAGR on annual net income (not per share), same thresholds"),
+    ],
+    "health": [
+        ("Altman Z", 0.15, f"{_PCT}; Altman Z-Score"),
+        ("Piotroski F-Score", 0.20, "Piotroski tests passed / tests evaluated × 10"),
+        ("Ohlson O-Score", 0.15, "(1 − Ohlson default probability) × 10"),
+        ("ROIC", 0.10, f"{_PCT}; return on invested capital"),
+        ("ROIC−WACC Spread", 0.15, "ROIC − WACC: ≥15pp → 10, ≥10pp → 8, ≥5pp → 6, ≥0 → 4, ≥ −5pp → 2, else 0"),
+        ("Current Ratio", 0.10, f"{_PCT}; current ratio capped at 4"),
+        ("D/E Ratio", 0.10, f"{_PCT}, inverted; debtToEquity"),
+        ("Interest Coverage", 0.10, "info.ebit / |info.interestExpense| (999 if no debt, −1 if EBIT ≤ 0): ≥10 → 10, "
+                                    "≥5 → 7, ≥3 → 4.5, ≥1 → 2, ≥0 → 0.5, else 0"),
+    ],
+    "dividend": [
+        ("Dividend Yield", 0.30, f"{_PCT} among dividend-paying peers"),
+        ("Payout Ratio", 0.25, "payoutRatio ≤25% → 10, ≤40% → 8, ≤60% → 5, ≤80% → 2, else 1"),
+        ("FCF Coverage", 0.25, "FCF yield / dividend yield: ≥3 → 10, ≥2 → 8, ≥1.5 → 6, ≥1 → 4, ≥0.7 → 2, else 0.5"),
+        ("Dividend Consistency", 0.20, "number of the last five 12-month windows containing a dividend ÷ 5 × 10"),
+        ("No Dividend", 1.0, "non-payers score 0 on this axis"),
+    ],
+}
+
+
+def _provenance(ticker: str, in_cache: bool, peer_scope: str, n_peers: int) -> dict:
+    """Keys for /snowflake: ``scores.<axis>``, ``axisDetails.<axis>[.components.<label>]`` and the headline fields."""
+    yahoo = pv.yahoo(ticker, "Quote, key statistics and annual statements (Ticker.info, financials, balance sheet, "
+                             "cash flow, dividends)")
+    peers = pv.ref("econosift", "screener_cache", "Screener universe cache: Yahoo fundamentals for the Dow 30, "
+                   "Nasdaq-100 and S&P 500, refreshed nightly")
+    row = peers if in_cache else yahoo
+    cols = {"value": "P/E, EV/EBITDA, EV/FCF, FCF yield, P/B, PEG", "growth": "revenue and EPS growth, forward P/E",
+            "performance": "ROE and margins, 3-year CAGRs", "health": "Altman, Piotroski, Ohlson, ROIC, WACC, ratios",
+            "dividend": "yield, payout, FCF coverage, dividend history"}
+    prov: dict = {
+        "*": pv.derived(
+            "five 0-10 axis scores (value, growth, performance, health, dividend), each a weighted mean of its "
+            "component scores; most components are percentile ranks against sector peers in the screener cache",
+            [row, peers, yahoo], title="Snowflake composite score"),
+        "overallScore": pv.derived("mean of the available axis scores, equally weighted",
+                                   [f"scores.{a}" for a in cols], title="Overall score"),
+        "verdict": pv.derived("overall ≥ 8 Exceptional; ≥ 6 Strong; ≥ 4 Moderate; ≥ 2 Weak; else Poor",
+                              ["overallScore"], title="Verdict"),
+        "sectorPeers": pv.derived(
+            f"number of screener-cache stocks in the peer group; the group is the sector, or the industry, or "
+            f"the whole cache when the sector has fewer than 10 members (here: {peer_scope})", [peers],
+            title="Peer group size"),
+        "rewards": pv.derived("the three highest component scores across all axes", ["*"],
+                              title="Top rewards"),
+        "risks": pv.derived("the three lowest component scores across all axes", ["*"],
+                            title="Top risks"),
+        "sector": pv.ref("econosift", "screener_cache", "Sector from the screener cache (index constituent list, "
+                         "else Yahoo)") if in_cache else pv.yahoo(ticker, "info.sector"),
+        "industry": pv.ref("econosift", "screener_cache", "Industry from the screener cache (index constituent "
+                           "list, else Yahoo)") if in_cache else pv.yahoo(ticker, "info.industry"),
+    }
+    if not in_cache:
+        prov["*"]["note"] = ("Ticker is not in the screener cache: its fields come straight from Yahoo, with "
+                             "returnOnAssets standing in for ROIC and no EV/FCF, FCF yield or Altman Z.")
+    for axis, what in cols.items():
+        prov[f"scores.{axis}"] = prov[f"axisDetails.{axis}"] = pv.derived(
+            "weighted mean of the component scores below, weights renormalised over the components that could be "
+            f"scored ({what})", [f"axisDetails.{axis}.components.{c[0]}" for c in _COMPONENT_FORMULAS[axis]],
+            title=f"{axis.capitalize()} axis")
+        for label, weight, formula in _COMPONENT_FORMULAS[axis]:
+            comp_flags = ("proxy",) if (not in_cache and label == "ROIC") else ()
+            prov[f"axisDetails.{axis}.components.{label}"] = pv.derived(
+                f"{formula} (weight {weight:g})", [row, peers, yahoo], title=label, flags=comp_flags,
+                note="Uses returnOnAssets as a stand-in for ROIC." if comp_flags else None)
+    return prov
+
+
+def _peer_scope(sector: str | None, industry: str | None, all_peers: list[dict]) -> str:
+    """Which peer group :func:`_peers_for` picks: sector, industry or the whole cache."""
+    if sector and len([r for r in all_peers if r.get("sector") == sector]) >= 10:
+        return "sector"
+    if industry and len([r for r in all_peers if r.get("industry") == industry]) >= 10:
+        return "industry"
+    return "whole cache"

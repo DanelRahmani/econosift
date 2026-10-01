@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import type { FxResponse } from "@/lib/types";
 import { Card, Skeleton } from "@/components/ui";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 import { fmtNum } from "@/lib/format";
 
 const BASES = ["USD", "EUR", "GBP", "JPY", "CHF"];
@@ -13,6 +15,7 @@ export function FxWidget() {
   const [base, setBase] = useState("USD");
   const [data, setData] = useState<FxResponse | null>(null);
   const [loading, setLoading] = useState(false);
+  const scope = useSourceScope(provOf(data));
 
   useEffect(() => {
     let active = true;
@@ -27,7 +30,7 @@ export function FxWidget() {
   }, [base]);
 
   return (
-    <Card>
+    <Card {...scope}>
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-sm font-semibold text-text-secondary">
           FX Rates {data?.date ? `· ${data.date}` : ""}
@@ -47,7 +50,7 @@ export function FxWidget() {
       ) : (
         <div className="flex flex-wrap gap-3">
           {data && Object.entries(data.rates).map(([ccy, rate]) => (
-            <div key={ccy} className="chip">
+            <div key={ccy} className="chip" data-prov={`rates.${ccy}`} data-prov-ctx={`${base}/${ccy}`}>
               <span className="text-text-muted">{base}/{ccy}</span>
               <span className="text-text-primary">{fmtNum(rate, 4)}</span>
             </div>

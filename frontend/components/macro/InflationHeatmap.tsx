@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import type { MacroResponse, Country } from "@/lib/types";
 import { Card, Skeleton } from "@/components/ui";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 
 // Map a CPI inflation value to a colour: blue (low/deflation) → red (high).
 function heatColor(v: number | null): string {
@@ -30,6 +32,7 @@ export function InflationHeatmap({ selected, countries }: { selected: string[]; 
   const [data, setData] = useState<MacroResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const key = selected.join(",");
+  const scope = useSourceScope(provOf(data));
 
   useEffect(() => {
     if (!selected.length) { setData(null); return; }
@@ -62,7 +65,7 @@ export function InflationHeatmap({ selected, countries }: { selected: string[]; 
   }, [data]);
 
   return (
-    <Card>
+    <Card {...scope}>
       <h2 className="text-sm font-semibold mb-1 text-text-secondary">Inflation Heatmap</h2>
       <p className="text-xs text-text-muted mb-4">
         Annual CPI inflation by country · blue = deflation, green = low, red = high.
@@ -86,7 +89,7 @@ export function InflationHeatmap({ selected, countries }: { selected: string[]; 
             </thead>
             <tbody>
               {selected.map((iso) => (
-                <tr key={iso}>
+                <tr key={iso} data-prov={`series.${iso}`} data-prov-ctx={nameOf(iso)}>
                   <td className="px-2 py-1 text-text-primary whitespace-nowrap sticky left-0 bg-surface">{nameOf(iso)}</td>
                   {years.map((y) => {
                     const v = lookup.get(iso)?.get(y) ?? null;

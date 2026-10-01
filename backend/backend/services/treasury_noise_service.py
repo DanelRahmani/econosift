@@ -24,6 +24,7 @@ import logging
 import numpy as np
 import pandas as pd
 
+from .. import provenance as pv
 from ..cache import async_cached
 from ..config import FRED_API_KEY
 from . import macro_expansion_service as mes
@@ -97,6 +98,29 @@ def _percentile_rank(series: list[dict], value: float | None) -> float | None:
     return round(float((vals <= value).mean() * 100.0), 1)
 
 
+def _provenance(observed: str) -> dict:
+    """Source map for the curve-fit noise payload (see provenance.py)."""
+    ids = ", ".join(sid for sid, _ in _TENORS)
+    return {
+        "*": pv.derived(
+            "RMSE (in bp) of the residuals from a daily Nelson-Siegel fit (lambda=0.7308) "
+            "to the Treasury constant-maturity yields",
+            ["cmt_yields"], title="Treasury curve-fit noise", observed=observed,
+            note="Fitted to CMT yields, which are already Treasury's smoothed curve, so levels are not "
+                 "comparable to the Hu-Pan-Wang bond-level measure."),
+        "cmt_yields": pv.ref("fred", None, f"Treasury constant-maturity yields ({ids})", units="percent",
+                             frequency="daily", observed=observed),
+        "kpis.ma20": pv.derived("mean of the last 20 daily noise values", ["*"],
+                                title="20-day average noise", observed=observed),
+        "kpis.percentile": pv.derived("share of all daily noise values since 2000 that are <= the latest, x100",
+                                      ["*"], title="Percentile of latest noise", observed=observed),
+        "kpis.median": pv.derived("median of all daily noise values since 2000", ["*"],
+                                  title="Median noise", observed=observed),
+        "kpis.max": pv.derived("maximum of all daily noise values since 2000", ["*"],
+                               title="Maximum noise", observed=observed),
+    }
+
+
 def _is_empty(result: dict) -> bool:
     return not result or not result.get("history")
 
@@ -127,7 +151,7 @@ async def get_treasury_noise() -> dict:
     recent = [p for p in history if p["date"] >= "2020-01-01"]
     ma20 = float(np.mean(vals[-20:])) if len(vals) >= 20 else float(np.mean(vals))
 
-    return {
+    return pv.attach({
         "kpis": {
             "latest": latest,
             "asOf": history[-1]["date"],
@@ -156,4 +180,4 @@ async def get_treasury_noise() -> dict:
             "events."
         ),
         "sources": "FRED constant-maturity Treasury series (DGS1MO..DGS30)",
-    }
+    }, _provenance(history[-1]["date"]))

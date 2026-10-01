@@ -9,6 +9,8 @@ import { Card } from "@/components/ui";
 import { SearchBar } from "@/components/SearchBar";
 import { api } from "@/lib/api";
 import type { MomentsResponse, MomentsCrossSection } from "@/lib/types";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 
 const PERIODS = ["1y", "2y", "3y", "5y"] as const;
 type Period = (typeof PERIODS)[number];
@@ -53,6 +55,9 @@ export function RealizedMomentsTab() {
   const [window_, setWindow] = useState(21);
   const [xs, setXs] = useState<MomentsCrossSection | null>(null);
   const [xsLoading, setXsLoading] = useState(false);
+
+  const scope = useSourceScope(provOf(data));
+  const xsScope = useSourceScope(provOf(xs));
 
   const loadMoments = useCallback((t: string, p: Period) => {
     if (!t.trim()) return;
@@ -151,7 +156,7 @@ export function RealizedMomentsTab() {
             ["Skewness (1M)",     fmt(data.latest.skew21), "log-return skew"],
             ["Excess Kurtosis (1M)", fmt(data.latest.kurt21), "log-return kurt"],
           ] as const).map(([label, value, sub]) => (
-            <Card key={label}>
+            <Card key={label} data-prov="latest" {...scope}>
               <div className="text-xs text-text-muted">{label}</div>
               <div className="text-2xl font-mono font-semibold text-accent mt-1">{value}</div>
               <div className="text-xs text-text-muted mt-0.5">{sub}</div>
@@ -164,7 +169,7 @@ export function RealizedMomentsTab() {
 
       {/* ── Time-series chart ─────────────────────────────────────────────── */}
       {!loading && data && !data.error && chartData.length > 0 && (
-        <Card>
+        <Card data-prov={`series.${view}`} {...scope}>
           <h3 className="text-sm font-semibold text-text-secondary mb-3">
             {view === "rvol" ? "Annualised Realized Volatility (%)"
               : view === "skew" ? "Realized Skewness"
@@ -241,7 +246,7 @@ export function RealizedMomentsTab() {
       {xsLoading && <div className="h-72 animate-pulse bg-surface-alt rounded-lg" />}
 
       {!xsLoading && xs && !xs.error && xs.deciles.length > 0 && (
-        <Card>
+        <Card data-prov="deciles" {...xsScope}>
           <h3 className="text-sm font-semibold text-text-secondary mb-3">
             Decile Avg Forward Return by Prior Skewness
             {xs.asOf && <span className="text-text-muted font-normal"> · {xs.asOf}</span>}

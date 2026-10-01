@@ -33,6 +33,10 @@ def _clean(x: Any) -> Any:
     return x
 
 
+# Sessions of recorded IV30 required before IV Rank / Percentile are shown.
+_IV_RANK_MIN_HISTORY = 60
+
+
 def _risk_free_rate() -> float:
     """Annualised 3-month T-bill rate from ^IRX; fallback 0.05."""
     try:
@@ -43,6 +47,15 @@ def _risk_free_rate() -> float:
     except Exception:
         pass
     return 0.05
+
+
+def _dividend_yield(ticker: str) -> float:
+    """Underlying's dividend yield as a decimal (yfinance reports percent)."""
+    try:
+        dy = yf.Ticker(ticker).info.get("dividendYield")
+        return float(dy) / 100.0 if dy and dy > 0 else 0.0
+    except Exception:
+        return 0.0
 
 
 def _dte(expiry_str: str) -> int:
@@ -77,8 +90,9 @@ def bs_price(
     r: float,
     sigma: float,
     opt_type: str,
+    q: float = 0.0,
 ) -> float | None:
-    """Black-Scholes theoretical price.
+    """Black-Scholes-Merton theoretical price.
 
     Parameters
     ----------
@@ -88,6 +102,9 @@ def bs_price(
     r       : risk-free rate (annualised)
     sigma   : implied volatility (annualised, e.g. 0.25 for 25 %)
     opt_type: 'call' or 'put'
+    q       : continuous dividend yield (annualised decimal). Ignoring it
+              biases IVs and Greeks for dividend payers and breaks put/call
+              IV consistency (audit C-30).
 
     Returns None on any domain error.
     """
@@ -95,12 +112,13 @@ def bs_price(
         return None
     try:
         sqrt_T = math.sqrt(T)
-        d1 = (math.log(S / K) + (r + 0.5 * sigma ** 2) * T) / (sigma * sqrt_T)
+        d1 = (math.log(S / K) + (r - q + 0.5 * sigma ** 2) * T) / (sigma * sqrt_T)
         d2 = d1 - sigma * sqrt_T
+        fwd_disc = S * math.exp(-q * T)
         if opt_type.lower() == "call":
-            price = S * norm.cdf(d1) - K * math.exp(-r * T) * norm.cdf(d2)
+            price = fwd_disc * norm.cdf(d1) - K * math.exp(-r * T) * norm.cdf(d2)
         else:
-            price = K * math.exp(-r * T) * norm.cdf(-d2) - S * norm.cdf(-d1)
+            price = K * math.exp(-r * T) * norm.cdf(-d2) - fwd_disc * norm.cdf(-d1)
         return _clean(price)
     except Exception:
         return None
@@ -113,8 +131,9 @@ def bs_greeks(
     r: float,
     sigma: float,
     opt_type: str,
+    q: float = 0.0,
 ) -> dict:
-    """Standard Black-Scholes Greeks.
+    """Black-Scholes-Merton Greeks (continuous dividend yield ``q``).
 
     Returns
     -------
@@ -126,32 +145,35 @@ def bs_greeks(
         return null
     try:
         sqrt_T = math.sqrt(T)
-        d1 = (math.log(S / K) + (r + 0.5 * sigma ** 2) * T) / (sigma * sqrt_T)
+        d1 = (math.log(S / K) + (r - q + 0.5 * sigma ** 2) * T) / (sigma * sqrt_T)
         d2 = d1 - sigma * sqrt_T
         pdf_d1 = norm.pdf(d1)
         disc = math.exp(-r * T)
+        qdisc = math.exp(-q * T)
         is_call = opt_type.lower() == "call"
 
         # Delta
-        delta = norm.cdf(d1) if is_call else norm.cdf(d1) - 1
+        delta = qdisc * norm.cdf(d1) if is_call else qdisc * (norm.cdf(d1) - 1)
 
         # Gamma (same for call and put)
-        gamma = pdf_d1 / (S * sigma * sqrt_T)
+        gamma = qdisc * pdf_d1 / (S * sigma * sqrt_T)
 
         # Theta (per calendar day; divide by 365)
         if is_call:
             theta = (
-                -(S * pdf_d1 * sigma) / (2 * sqrt_T)
+                -(S * qdisc * pdf_d1 * sigma) / (2 * sqrt_T)
                 - r * K * disc * norm.cdf(d2)
+                + q * S * qdisc * norm.cdf(d1)
             ) / 365.0
         else:
             theta = (
-                -(S * pdf_d1 * sigma) / (2 * sqrt_T)
+                -(S * qdisc * pdf_d1 * sigma) / (2 * sqrt_T)
                 + r * K * disc * norm.cdf(-d2)
+                - q * S * qdisc * norm.cdf(-d1)
             ) / 365.0
 
         # Vega per 1 % change in vol (raw vega * 0.01)
-        vega = S * pdf_d1 * sqrt_T * 0.01
+        vega = S * qdisc * pdf_d1 * sqrt_T * 0.01
 
         # Rho per 1 % change in rates
         if is_call:
@@ -177,6 +199,7 @@ def iv_backsolve(
     T: float,
     r: float,
     opt_type: str,
+    q: float = 0.0,
 ) -> float | None:
     """Back-solve implied volatility via Brent's method.
 
@@ -187,7 +210,7 @@ def iv_backsolve(
         return None
     try:
         def objective(sigma: float) -> float:
-            p = bs_price(S, K, T, r, sigma, opt_type)
+            p = bs_price(S, K, T, r, sigma, opt_type, q)
             if p is None:
                 return float("nan")
             return p - market_price
@@ -268,6 +291,7 @@ def _hydrate_chain_rows(
     T: float,
     r: float,
     opt_type: str,
+    q: float = 0.0,
 ) -> list[dict]:
     """Convert a yfinance calls/puts DataFrame to a list of OptionRow dicts."""
     rows = []
@@ -292,7 +316,7 @@ def _hydrate_chain_rows(
 
         # Fix 2: When yfinance IV is bogus (~0.001%), backsolve from mid-price
         if (iv_raw is None or iv_raw <= 0.001) and mid > 0 and T > 0:
-            backsolved = iv_backsolve(mid, S, float(strike), T, r, opt_type)
+            backsolved = iv_backsolve(mid, S, float(strike), T, r, opt_type, q)
             if backsolved is not None:
                 iv_raw = backsolved
                 iv_pct = backsolved * 100.0
@@ -301,9 +325,9 @@ def _hydrate_chain_rows(
         delta = None
         bs_p = None
         if iv_pct and iv_pct > 0 and T > 0:
-            greeks = bs_greeks(S, float(strike), T, r, iv_raw, opt_type)
+            greeks = bs_greeks(S, float(strike), T, r, iv_raw, opt_type, q)
             delta = greeks.get("delta")
-            bs_p = bs_price(S, float(strike), T, r, iv_raw, opt_type)
+            bs_p = bs_price(S, float(strike), T, r, iv_raw, opt_type, q)
 
         rows.append({
             "strike": float(strike),
@@ -349,8 +373,9 @@ def get_chain(ticker: str, expiry: str) -> dict:
         if calls_df is None or calls_df.empty:
             return {"error": f"No chain data for {ticker} expiry {expiry}"}
 
-        calls = _hydrate_chain_rows(calls_df, spot, T, r, "call")
-        puts = _hydrate_chain_rows(puts_df, spot, T, r, "put") if puts_df is not None else []
+        q = _dividend_yield(ticker)
+        calls = _hydrate_chain_rows(calls_df, spot, T, r, "call", q)
+        puts = _hydrate_chain_rows(puts_df, spot, T, r, "put", q) if puts_df is not None else []
 
         return {
             "ticker": ticker,
@@ -494,21 +519,21 @@ def get_iv_metrics(ticker: str) -> dict:
         result["iv30Approximate"] = iv30_approx
 
         # ── IV Rank and IV Percentile ──
-        valid_ivs = [iv for iv in atm_ivs if iv is not None]
-        if valid_ivs and iv30 is not None:
-            iv_min = min(valid_ivs)
-            iv_max = max(valid_ivs)
-            if iv_max > iv_min:
-                iv_rank = (iv30 - iv_min) / (iv_max - iv_min) * 100.0
-                result["ivRank"] = _clean(iv_rank)
-            else:
-                result["ivRank"] = 50.0  # all equal
-
-            below_count = sum(1 for iv in valid_ivs if iv < iv30)
-            result["ivPercentile"] = _clean(below_count / len(valid_ivs) * 100.0)
-
-            if len(expiries) < 4:
-                result["ivRankApproximate"] = True
+        # Both compare today's IV30 with its own trailing year of IV30. Free
+        # data has no IV history, so each day's IV30 is recorded and the
+        # ranks appear once enough sessions exist. (Previously they ranked
+        # IV30 against the ATM IVs of *other expiries on the same day* — the
+        # term structure — which is not IV Rank at all; audit C-07.)
+        if iv30 is not None and not iv30_approx:
+            from . import snapshots
+            snapshots.record("iv30", ticker.upper(), float(iv30), date.today())
+            hist = [v for _, v in snapshots.history("iv30", ticker.upper(), 252)]
+            result["ivHistoryDays"] = len(hist)
+            if len(hist) >= _IV_RANK_MIN_HISTORY:
+                lo, hi = min(hist), max(hist)
+                result["ivRank"] = _clean((iv30 - lo) / (hi - lo) * 100.0) if hi > lo else None
+                result["ivPercentile"] = _clean(sum(1 for v in hist if v < iv30) / len(hist) * 100.0)
+                result["ivRankApproximate"] = len(hist) < 252
 
         # ── Put/Call OI Ratio — nearest 4 expiries ──
         total_call_oi = 0

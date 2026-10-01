@@ -4,6 +4,8 @@ import { api } from "@/lib/api";
 import type { HousingData, GlobalHousingData } from "@/lib/types";
 import { Card } from "@/components/ui";
 import { shortCountryName } from "@/lib/format";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 import {
   LineChart,
   Line,
@@ -27,14 +29,16 @@ function KpiCard({
   value,
   unit = "%",
   color,
+  prov,
 }: {
   label: string;
   value: number | null;
   unit?: string;
   color?: string;
+  prov?: string;
 }) {
   return (
-    <Card className="p-4">
+    <Card className="p-4" data-prov={prov} data-prov-ctx={label}>
       <div className="text-xs text-text-secondary">{label}</div>
       <div className={`text-2xl font-bold mt-1 ${color ?? ""}`}>
         {value != null ? `${value.toFixed(2)}${unit}` : "—"}
@@ -48,6 +52,8 @@ export function HousingTab() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [globalHousing, setGlobalHousing] = useState<GlobalHousingData | null>(null);
+  const scope = useSourceScope(provOf(data));
+  const globalScope = useSourceScope(provOf(globalHousing));
 
   useEffect(() => {
     api
@@ -116,26 +122,30 @@ export function HousingTab() {
   }));
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" {...scope}>
       {/* KPI Row */}
       <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <KpiCard
           label="Case-Shiller HPI YoY"
+          prov="kpis.caseShillerYoY"
           value={kpis.caseShillerYoY}
           color={kpis.caseShillerYoY != null && kpis.caseShillerYoY < 0 ? "text-danger" : "text-success"}
         />
         <KpiCard
           label="Housing Starts (K)"
+          prov="kpis.housingStarts"
           value={kpis.housingStarts}
           unit="K"
         />
         <KpiCard
           label="30Y Mortgage Rate"
+          prov="kpis.mortgageRate"
           value={kpis.mortgageRate}
           color={kpis.mortgageRate != null && kpis.mortgageRate > 7 ? "text-danger" : "text-text-primary"}
         />
         <KpiCard
           label="Existing Home Sales (M)"
+          prov="kpis.existingHomeSales"
           value={kpis.existingHomeSales != null ? kpis.existingHomeSales / 1_000_000 : null}
           unit="M"
         />
@@ -143,7 +153,7 @@ export function HousingTab() {
 
       {/* Case-Shiller HPI */}
       {csData.length > 0 && (
-        <Card className="p-4">
+        <Card className="p-4" data-prov="history.caseShillerYoY" data-prov-ctx="S&P/Case-Shiller home price index (YoY %)">
           <h3 className="font-semibold mb-3">
             S&P/Case-Shiller Home Price Index (YoY %)
           </h3>
@@ -169,7 +179,7 @@ export function HousingTab() {
 
       {/* Housing Starts */}
       {startsData.length > 0 && (
-        <Card className="p-4">
+        <Card className="p-4" data-prov="history.housingStarts" data-prov-ctx="Housing starts">
           <h3 className="font-semibold mb-3">Housing Starts (thousands, SAAR)</h3>
           <ResponsiveContainer width="100%" height={220}>
             <LineChart data={startsData}>
@@ -192,7 +202,7 @@ export function HousingTab() {
 
       {/* 30Y Mortgage Rate */}
       {mortgageData.length > 0 && (
-        <Card className="p-4">
+        <Card className="p-4" data-prov="history.mortgageRate" data-prov-ctx="30-year mortgage rate">
           <h3 className="font-semibold mb-3">30-Year Mortgage Rate (%)</h3>
           <ResponsiveContainer width="100%" height={220}>
             <LineChart data={mortgageData}>
@@ -214,7 +224,7 @@ export function HousingTab() {
 
       {/* Existing Home Sales */}
       {salesData.length > 0 && (
-        <Card className="p-4">
+        <Card className="p-4" data-prov="history.existingHomeSales" data-prov-ctx="Existing home sales">
           <h3 className="font-semibold mb-3">
             Existing Home Sales (millions, SAAR)
           </h3>
@@ -239,7 +249,7 @@ export function HousingTab() {
 
       {/* Global Property Prices (BIS) */}
       {globalHousing && globalHousing.countries.length > 0 && (
-        <Card className="p-4">
+        <Card className="p-4" {...globalScope}>
           <h3 className="font-semibold mb-1">
             🌍 Global Real House Price Index (2010=100)
           </h3>
@@ -248,9 +258,9 @@ export function HousingTab() {
           </p>
           <ResponsiveContainer width="100%" height={320}>
             <BarChart
-              data={globalHousing.countries.map((c) => ({
+              data={globalHousing.countries.filter((c) => c.yoyChange != null).map((c) => ({
                 name: c.name,
-                yoy: c.yoyChange ?? 0,
+                yoy: c.yoyChange,
               }))}
               layout="vertical"
               margin={{ left: 80, right: 40 }}
@@ -260,7 +270,7 @@ export function HousingTab() {
               <YAxis type="category" interval={0} dataKey="name" tick={{ fontSize: 11 }} width={90} tickFormatter={shortCountryName} />
               <Tooltip formatter={(v: number) => [`${v?.toFixed(2)}%`, "YoY Change"]} />
               <Bar dataKey="yoy" radius={[0, 4, 4, 0]}>
-                {(globalHousing.countries.map((c) => (
+                {(globalHousing.countries.filter((c) => c.yoyChange != null).map((c) => (
                   <Cell
                     key={c.iso2}
                     fill={(c.yoyChange ?? 0) >= 0 ? "#10b981" : "#ef4444"}
@@ -272,7 +282,7 @@ export function HousingTab() {
           </ResponsiveContainer>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3">
             {globalHousing.countries.slice(0, 8).map((c) => (
-              <div key={c.iso2} className="text-xs">
+              <div key={c.iso2} className="text-xs" data-prov={`countries.${c.iso2}.yoyChange`} data-prov-ctx={c.name}>
                 <span className="text-text-secondary">{c.name}</span>{" "}
                 <span className={(c.yoyChange ?? 0) >= 0 ? "text-success font-medium" : "text-danger font-medium"}>
                   {c.yoyChange != null ? `${c.yoyChange > 0 ? "+" : ""}${c.yoyChange.toFixed(1)}%` : "—"}

@@ -3,6 +3,8 @@ import { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import type { CrossborderData, FactbookCountry } from "@/lib/types";
 import { Card, PageSkeleton } from "@/components/ui";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 
 function fmtUsd(v: number): string {
   if (v >= 1e12) return `$${(v / 1e12).toFixed(1)}T`;
@@ -16,6 +18,7 @@ export default function CrossborderPage() {
   const [countries, setCountries] = useState<FactbookCountry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const scope = useSourceScope(provOf(data));
 
   useEffect(() => {
     Promise.all([api.crossborderClaims(), api.factbookCountries()])
@@ -52,7 +55,7 @@ export default function CrossborderPage() {
     );
   }
 
-  if (error || !data) {
+  if (error || !data || data.claims.length === 0) {
     return (
       <div className="max-w-7xl mx-auto px-4 py-6">
         <h1 className="text-2xl font-bold text-text-primary">Cross-Border Finance</h1>
@@ -67,7 +70,6 @@ export default function CrossborderPage() {
   }
 
   const { claims, source } = data;
-  const totalClaims = claims.reduce((s, c) => s + c.value_usd, 0);
 
   // Build unique country lists
   const creditors = [...new Set(claims.map((c) => c.creditor))].sort();
@@ -100,7 +102,7 @@ export default function CrossborderPage() {
   });
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
+    <div className="max-w-7xl mx-auto px-4 py-6 space-y-6" {...scope}>
       <div>
         <h1 className="text-2xl font-bold text-text-primary">Cross-Border Finance</h1>
         <p className="text-sm text-text-secondary mt-1">
@@ -111,13 +113,16 @@ export default function CrossborderPage() {
 
       {/* Summary KPIs */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <Card className="p-4">
-          <div className="text-xs text-text-secondary">Total Cross-Border Claims</div>
-          <div className="text-2xl font-bold mt-1">{fmtUsd(totalClaims)}</div>
+        <Card className="p-4" data-prov="totalUsd">
+          <div className="text-xs text-text-secondary">Global Cross-Border Claims</div>
+          <div className="text-2xl font-bold mt-1">{data.totalUsd != null ? fmtUsd(data.totalUsd) : "—"}</div>
         </Card>
-        <Card className="p-4">
-          <div className="text-xs text-text-secondary">Country Pairs</div>
-          <div className="text-2xl font-bold mt-1">{claims.length}</div>
+        <Card className="p-4" data-prov="pairCount">
+          <div className="text-xs text-text-secondary">Largest Pairs Shown</div>
+          <div className="text-2xl font-bold mt-1">
+            {claims.length}
+            {data.pairCount != null && <span className="text-sm font-normal text-text-muted"> of {data.pairCount}</span>}
+          </div>
         </Card>
         <Card className="p-4">
           <div className="text-xs text-text-secondary">Creditor Countries</div>
@@ -133,7 +138,7 @@ export default function CrossborderPage() {
       <Card className="p-4 overflow-x-auto">
         <h3 className="font-semibold mb-3 text-text-primary">Claims Heatmap (Creditors → Debtors)</h3>
         <div className="text-xs text-text-muted mb-3">
-          Rows = creditor countries (lenders) · Columns = debtor countries (borrowers)
+          Rows = creditor countries (lenders) · Columns = debtor countries (borrowers) · largest {claims.length} pairs only
         </div>
         <div className="inline-block min-w-max">
           {/* Header row */}
@@ -182,7 +187,7 @@ export default function CrossborderPage() {
               <tr className="border-b border-border text-text-secondary text-xs">
                 <th className="py-2 text-left">#</th>
                 <th className="py-2 text-left">Country</th>
-                <th className="py-2 text-right">Total Claims</th>
+                <th className="py-2 text-right">Claims (pairs shown)</th>
               </tr>
             </thead>
             <tbody>
@@ -203,7 +208,7 @@ export default function CrossborderPage() {
               <tr className="border-b border-border text-text-secondary text-xs">
                 <th className="py-2 text-left">#</th>
                 <th className="py-2 text-left">Country</th>
-                <th className="py-2 text-right">Total Owed</th>
+                <th className="py-2 text-right">Owed (pairs shown)</th>
               </tr>
             </thead>
             <tbody>

@@ -10,6 +10,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+from .. import provenance as pv
 from ..cache import cached
 from ..services import yfinance_service as yfs
 from ..services.fx_service import fx_rates
@@ -117,7 +118,17 @@ async def get_cross_asset_correlations(tickers: list[str], period: str = "3y") -
     if len(present) < 2:
         return {"assets": present, "labels": present, "matrix": [], "rolling": {"dates": [], "values": []}}
 
-    return _get_correlation_matrix(frame[present])
+    result = _get_correlation_matrix(frame[present])
+    if not result.get("matrix"):
+        return result
+    return pv.attach(result, {
+        "*": pv.derived(
+            "Pearson correlation of daily simple returns (close-to-close % change) over the requested period; "
+            "'rolling' is the 60-session correlation of the first two tickers",
+            [pv.ref("yahoo", None, "Daily adjusted close of the requested tickers", units="price (split/dividend "
+                    "adjusted)", frequency="daily", observed=pv.last_date(frame[present]))],
+            title="Cross-asset correlation"),
+    })
 
 
 async def get_fx_macro_link() -> dict:
@@ -168,16 +179,14 @@ async def get_fx_macro_link() -> dict:
         roll_corr = rets[fx].rolling(60).corr(rets[comm]).dropna()
         current_corr = float(roll_corr.iloc[-1]) if len(roll_corr) > 0 else None
 
-        # Cross-correlation: does comm lead FX?
+        # Cross-correlation: does comm lead FX? corr(FX_t, comm_{t-lag}), so a
+        # positive lag means the commodity moves first. (Correlating two
+        # .iloc slices realigned them by date, undoing the shift: every "lag"
+        # compared the same days.)
         max_lag = 21
         cross_corrs = []
         for lag in range(-max_lag, max_lag + 1):
-            if lag < 0:
-                c = rets[fx].iloc[-lag:].corr(rets[comm].iloc[:lag]) if lag != 0 else None
-            elif lag > 0:
-                c = rets[fx].iloc[:-lag].corr(rets[comm].iloc[lag:]) if lag != 0 else None
-            else:
-                c = rets[fx].corr(rets[comm])
+            c = rets[fx].corr(rets[comm].shift(lag))
             if c is not None and not np.isnan(c):
                 cross_corrs.append({"lag": lag, "correlation": round(float(c), 4)})
 
@@ -206,12 +215,43 @@ async def get_fx_macro_link() -> dict:
             "bestLagCorrelation": best["correlation"],
             "rollingCorrelation": {
                 "dates": [str(d.date()) for d in roll_corr.index],
-                "values": [round(float(v), 4) if not np.isnan(v) else 0.0 for v in roll_corr.values],
+                "values": [round(float(v), 4) if not np.isnan(v) else None for v in roll_corr.values],
             },
             "series": series,
         })
 
-    return {"links": results}
+    commodity_names = {"DBA": "Invesco DB Agriculture Fund", "USO": "United States Oil Fund",
+                       "GLD": "SPDR Gold Shares"}
+    prov: dict = {}
+    for r in results:
+        fx, comm = r["fxPair"], r["commodity"]
+        pair_frame = frame[[fx, comm]].dropna()
+        obs = pv.last_date(pair_frame)
+        inputs = [
+            pv.yahoo(fx, "FX pair, daily close", frequency="daily", observed=obs),
+            pv.yahoo(comm, f"{commodity_names.get(comm, comm)} ETF, daily adjusted close", frequency="daily",
+                     observed=obs, flags=("proxy",),
+                     note="A commodity ETF stands in for the commodity price itself."),
+        ]
+        key = f"links.{r['label']}"
+        prov[key] = pv.derived("Statistics of the daily simple returns of the FX pair and the commodity ETF over "
+                               "the last 5 years", inputs, title=r["label"], observed=obs)
+        prov[f"{key}.currentCorrelation"] = pv.derived(
+            "latest value of the rolling 60-session correlation of daily returns", inputs,
+            title="Current correlation", observed=obs)
+        prov[f"{key}.bestLag"] = pv.derived(
+            "lag (−21 to +21 sessions) with the largest absolute corr(FX return at t, commodity return at "
+            "t − lag); positive = the commodity moves first, negative = FX moves first", inputs,
+            title="Best lead/lag", observed=obs)
+        prov[f"{key}.bestLagCorrelation"] = pv.derived("cross-correlation at bestLag", [f"{key}.bestLag"],
+                                                       title="Correlation at best lag", observed=obs)
+        prov[f"{key}.series"] = pv.derived("close ÷ close at the start of the last 504 sessions × 100, for both",
+                                           inputs, title="Rebased price series", observed=obs)
+    if not results:
+        return {"links": results}
+    return pv.attach({"links": results}, prov | {"*": pv.derived(
+        "FX / commodity linkage from Yahoo prices only (no BIS or macro series is used)", [],
+        title="FX-commodity link")})
 
 
 async def get_multi_country_portfolio(holdings: list[dict], period: str = "3y") -> dict:
@@ -333,7 +373,37 @@ async def get_multi_country_portfolio(holdings: list[dict], period: str = "3y") 
             "annVolatility": round(ann_hvol * 100, 2) if ann_hvol is not None else None,
         })
 
-    return {
+    obs = pv.last_date(all_rets)
+    px = pv.ref("yahoo", None, "Daily adjusted close of the requested tickers (in their local currency)",
+                units="local-currency price (split/dividend adjusted)", frequency="daily", observed=obs)
+    inputs = [px]
+    if fx_data:
+        inputs.append(pv.ref("yahoo", None, "Daily close of CCYUSD=X (or 1 ÷ USDCCY=X) for each non-USD currency",
+                             units="USD per unit", frequency="daily", observed=obs))
+    weights_in = pv.ref("other", None, "Weights and currencies entered by the user", note="User input.")
+    prov: dict = {
+        "*": pv.derived(
+            "USD-normalised portfolio: each holding's daily return = local simple return + FX simple return "
+            "(additive approximation; missing returns count as 0%), weighted by the normalised request weights",
+            inputs + [weights_in], title="Multi-country portfolio", observed=obs),
+        "series": pv.derived("cumulative product of (1 + daily portfolio return), starting at 1", ["*"],
+                             title="Portfolio value", observed=obs),
+        "metrics.annReturn": pv.derived("mean daily portfolio return × 252, in percent", ["*"],
+                                        title="Annualised return", observed=obs),
+        "metrics.annVolatility": pv.derived("sample std of daily portfolio returns × √252, in percent", ["*"],
+                                            title="Annualised volatility", observed=obs),
+        "metrics.sharpe": pv.derived("annualised return ÷ annualised volatility (no risk-free rate deducted; 0 when "
+                                     "the volatility is 0)", ["*"], title="Sharpe ratio", observed=obs),
+        "holdings": pv.derived(
+            "weight = normalised request weight in percent; annReturn = mean daily USD return × 252 and "
+            "annVolatility = std × √252, both in percent", ["*"], title="Per-holding statistics", observed=obs),
+        "countryAllocation": pv.derived(
+            "sum of normalised request weights by holding currency (a currency split, not a country split)",
+            [weights_in], title="Allocation by currency"),
+        "currencyExposure": pv.derived("sum of normalised request weights by holding currency", [weights_in],
+                                       title="Currency exposure"),
+    }
+    return pv.attach({
         "holdings": holding_returns,
         "series": series,
         "metrics": {
@@ -343,4 +413,4 @@ async def get_multi_country_portfolio(holdings: list[dict], period: str = "3y") 
         },
         "countryAllocation": country_alloc,
         "currencyExposure": currency_exposure,
-    }
+    }, prov)

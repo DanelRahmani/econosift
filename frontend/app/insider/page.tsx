@@ -9,12 +9,14 @@ import {
   ResponsiveContainer, Cell,
 } from "recharts";
 import Link from "next/link";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 
 const GRID = "rgba(255,255,255,0.08)";
 
-function KpiCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
+function KpiCard({ label, value, sub, prov }: { label: string; value: string; sub?: string; prov?: string }) {
   return (
-    <Card className="p-4">
+    <Card className="p-4" data-prov={prov}>
       <div className="text-xs text-text-secondary">{label}</div>
       <div className="text-2xl font-bold mt-1">{value}</div>
       {sub && <div className="text-xs text-text-secondary mt-0.5">{sub}</div>}
@@ -27,6 +29,7 @@ function InsiderPageInner() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasRun, setHasRun] = useState(false);
+  const scope = useSourceScope(provOf(data));
 
   const runAnalysis = useCallback(() => {
     setLoading(true);
@@ -73,22 +76,23 @@ function InsiderPageInner() {
       )}
 
       {data && !loading && (
-        <div className="space-y-6">
+        <div className="space-y-6" {...scope}>
           {/* Summary KPIs */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <KpiCard label="Tickers with Data" value={`${data.tickersWithData}/${data.tickersChecked}`} />
             <KpiCard
+              prov="buySellRatio"
               label="Buy/Sell Ratio"
               value={data.buySellRatio != null ? data.buySellRatio.toFixed(2) : "—"}
               sub={data.buySellRatio != null && data.buySellRatio > 1 ? "More buys than sells" : "More sells than buys"}
             />
-            <KpiCard label="Total Buy Value" value={`$${(data.totalBuyValue / 1e6).toFixed(0)}M`} />
-            <KpiCard label="Total Sell Value" value={`$${(data.totalSellValue / 1e6).toFixed(0)}M`} />
+            <KpiCard prov="valueRatio" label="Total Buy Value" value={`$${(data.totalBuyValue / 1e6).toFixed(0)}M`} />
+            <KpiCard prov="valueRatio" label="Total Sell Value" value={`$${(data.totalSellValue / 1e6).toFixed(0)}M`} />
           </div>
 
           {/* Sector Sentiment */}
           {data.sectorSentiment.length > 0 && (
-            <Card className="p-4">
+            <Card className="p-4" data-prov="sectorSentiment">
               <h3 className="font-semibold mb-1">Sector Insider Sentiment</h3>
               <p className="text-xs text-text-secondary mb-3">
                 Net buy ratio = (buys − sells) / total. Positive = net buying, negative = net selling.
@@ -114,7 +118,7 @@ function InsiderPageInner() {
 
           {/* Cluster Buys */}
           {data.clusterBuys.length > 0 && (
-            <Card className="p-4">
+            <Card className="p-4" data-prov="clusterBuys">
               <h3 className="font-semibold mb-1">🟢 Cluster Buys</h3>
               <p className="text-xs text-text-secondary mb-3">
                 Stocks with ≥3 unique insiders buying within the last 30 days — potential bullish signal.
@@ -132,7 +136,7 @@ function InsiderPageInner() {
                   </thead>
                   <tbody>
                     {data.clusterBuys.map((c) => (
-                      <tr key={c.ticker} className="border-b border-border/40">
+                      <tr key={c.ticker} className="border-b border-border/40" data-prov-ctx={c.ticker}>
                         <td className="py-2 pr-4">
                           <Link href={`/markets?ticker=${c.ticker}`} className="font-mono font-semibold hover:text-accent">{c.ticker}</Link>
                         </td>
@@ -150,7 +154,7 @@ function InsiderPageInner() {
 
           {/* Top Trades */}
           {data.topTrades.length > 0 && (
-            <Card className="p-4">
+            <Card className="p-4" data-prov="topTrades">
               <h3 className="font-semibold mb-1">Top Individual Insider Trades</h3>
               <p className="text-xs text-text-secondary mb-3">Largest Form 4 transactions by total value across the S&P 500.</p>
               <div className="overflow-x-auto">
@@ -166,7 +170,7 @@ function InsiderPageInner() {
                   </thead>
                   <tbody>
                     {data.topTrades.slice(0, 15).map((tx, i) => (
-                      <tr key={i} className="border-b border-border/40">
+                      <tr key={i} className="border-b border-border/40" data-prov-ctx={`${tx.insiderName} · ${tx.ticker}`}>
                         <td className="py-2 pr-2 max-w-[180px] truncate" title={tx.insiderName}>{tx.insiderName}</td>
                         <td className="py-2 px-2">
                           <Link href={`/markets?ticker=${tx.ticker}`} className="font-mono hover:text-accent">{tx.ticker}</Link>

@@ -2,6 +2,7 @@
 import { useState, useEffect, Suspense } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { asOf } from "@/lib/series";
 import { useUrlState } from "@/lib/useUrlState";
 import type { RatesData, GlobalYieldCountry } from "@/lib/types";
 import { MultiCountryYieldChart } from "@/components/yield/MultiCountryYieldChart";
@@ -11,6 +12,8 @@ import { PolicyDivergenceTable } from "@/components/policy/PolicyDivergenceTable
 import { SovereignSpreadTable } from "@/components/sovereign/SovereignSpreadTable";
 import { CentralBanksTab } from "@/components/macro/CentralBanksTab";
 import { CurveNoiseTab } from "@/components/yield/CurveNoiseTab";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   BarChart, Bar, ReferenceLine,
@@ -18,9 +21,9 @@ import {
 
 const TABS = ["US Curve", "Foreign Spreads", "Global Yields", "Real & Breakeven", "Curve Noise", "US Rates Detail", "Policy Tracker", "Sovereign Risk", "Central Banks", "Default Risk"] as const;
 
-function KpiCard({ label, value, badge }: { label: string; value: string; badge?: string }) {
+function KpiCard({ label, value, badge, prov, ctx }: { label: string; value: string; badge?: string; prov?: string; ctx?: string }) {
   return (
-    <div className="bg-surface rounded-lg p-4 border border-border">
+    <div className="bg-surface rounded-lg p-4 border border-border" data-prov={prov} data-prov-ctx={ctx}>
       <div className="text-xs text-muted mb-1">{label}</div>
       <div className="text-xl font-semibold">{value}</div>
       {badge && (
@@ -34,6 +37,7 @@ function KpiCard({ label, value, badge }: { label: string; value: string; badge?
 function USRatesDetailTab() {
   const [data, setData] = useState<RatesData | null>(null);
   const [loading, setLoading] = useState(true);
+  const scope = useSourceScope(provOf(data));
 
   useEffect(() => {
     api.macroRates().then(setData).catch(() => {}).finally(() => setLoading(false));
@@ -56,33 +60,40 @@ function USRatesDetailTab() {
   const hist10y = data.history["DGS10"] ?? [];
   const hist2y = data.history["DGS2"] ?? [];
   const hist3m = data.history["DGS3MO"] ?? [];
-  const histData = hist10y.map((pt, i) => ({ date: pt.date.slice(0, 7), "10Y": pt.value, "2Y": hist2y[i]?.value ?? null, "3M": hist3m[i]?.value ?? null }));
+  // Pair series by date, not array position (lengths and start dates differ).
+  const at2y = asOf(hist2y);
+  const at3m = asOf(hist3m);
+  const histData = hist10y.map((pt) => ({ date: pt.date.slice(0, 7), "10Y": pt.value, "2Y": at2y(pt.date), "3M": at3m(pt.date) }));
 
   const histBe5 = data.history["T5YIE"] ?? [];
   const histBe10 = data.history["T10YIE"] ?? [];
-  const breakevenData = histBe5.map((pt, i) => ({ date: pt.date.slice(0, 7), "5Y BE": pt.value, "10Y BE": histBe10[i]?.value ?? null }));
+  const atBe10 = asOf(histBe10);
+  const breakevenData = histBe5.map((pt) => ({ date: pt.date.slice(0, 7), "5Y BE": pt.value, "10Y BE": atBe10(pt.date) }));
 
   const histHY = data.history["BAMLH0A0HYM2"] ?? [];
   const histIG = data.history["BAMLC0A0CM"] ?? [];
-  const spreadHistoryData = histHY.map((pt, i) => ({ date: pt.date.slice(0, 7), "HY OAS": pt.value, "IG OAS": histIG[i]?.value ?? null }));
+  const atIG = asOf(histIG);
+  const spreadHistoryData = histHY.map((pt) => ({ date: pt.date.slice(0, 7), "HY OAS": pt.value, "IG OAS": atIG(pt.date) }));
 
   const taylorImplied = data.taylor_rule?.implied ?? [];
   const taylorActual = data.taylor_rule?.actual ?? [];
-  const taylorData = taylorImplied.map((pt, i) => ({ date: pt.date.slice(0, 7), "Taylor Rule": pt.value, Actual: taylorActual[i]?.value ?? null }));
+  const atActual = asOf(taylorActual);
+  const taylorData = taylorImplied.map((pt) => ({ date: pt.date.slice(0, 7), "Taylor Rule": pt.value, Actual: atActual(pt.date) }));
 
   const acmExp = data.acm?.expectations ?? [];
   const acmTP = data.acm?.term_premium ?? [];
-  const acmData = acmExp.map((pt, i) => ({ date: pt.date.slice(0, 7), Expectations: pt.value, "Term Premium": acmTP[i]?.value ?? null }));
+  const atTP = asOf(acmTP);
+  const acmData = acmExp.map((pt) => ({ date: pt.date.slice(0, 7), Expectations: pt.value, "Term Premium": atTP(pt.date) }));
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" {...scope}>
       {/* KPI Row */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-        <KpiCard label="Fed Funds Rate" value={data.yields["FEDFUNDS"] != null ? `${data.yields["FEDFUNDS"].toFixed(2)}%` : "N/A"} />
-        <KpiCard label="10Y Treasury" value={data.yields["DGS10"] != null ? `${data.yields["DGS10"].toFixed(2)}%` : "N/A"} />
-        <KpiCard label="2Y Treasury" value={data.yields["DGS2"] != null ? `${data.yields["DGS2"].toFixed(2)}%` : "N/A"} />
-        <KpiCard label="2Y/10Y Spread" value={spread != null ? `${spread.toFixed(2)}%` : "N/A"} badge={data.inverted ? "INVERTED" : undefined} />
-        <KpiCard label="30Y Mortgage" value={data.yields["MORTGAGE30US"] != null ? `${data.yields["MORTGAGE30US"].toFixed(2)}%` : "N/A"} />
+        <KpiCard prov="yields.FEDFUNDS" label="Fed Funds Rate" value={data.yields["FEDFUNDS"] != null ? `${data.yields["FEDFUNDS"].toFixed(2)}%` : "N/A"} />
+        <KpiCard prov="yields.DGS10" label="10Y Treasury" value={data.yields["DGS10"] != null ? `${data.yields["DGS10"].toFixed(2)}%` : "N/A"} />
+        <KpiCard prov="yields.DGS2" label="2Y Treasury" value={data.yields["DGS2"] != null ? `${data.yields["DGS2"].toFixed(2)}%` : "N/A"} />
+        <KpiCard prov="spread_2y10y" label="2Y/10Y Spread" value={spread != null ? `${spread.toFixed(2)}%` : "N/A"} badge={data.inverted ? "INVERTED" : undefined} />
+        <KpiCard prov="yields.MORTGAGE30US" label="30Y Mortgage" value={data.yields["MORTGAGE30US"] != null ? `${data.yields["MORTGAGE30US"].toFixed(2)}%` : "N/A"} />
       </div>
 
       {/* Yield Curve Snapshot */}
@@ -122,13 +133,13 @@ function USRatesDetailTab() {
         <UiCard className="p-4">
           <h3 className="font-semibold mb-3">Breakeven Inflation Rates</h3>
           <div className="flex gap-6 mb-3">
-            <div>
+            <div data-prov="history.T5YIE">
               <span className="text-xs text-text-muted">5Y BE</span>
               <span className="ml-2 text-sm font-mono font-semibold" style={{color: "#8b5cf6"}}>
                 {histBe5.length ? `${histBe5[histBe5.length - 1].value?.toFixed(2)}%` : "—"}
               </span>
             </div>
-            <div>
+            <div data-prov="history.T10YIE">
               <span className="text-xs text-text-muted">10Y BE</span>
               <span className="ml-2 text-sm font-mono font-semibold" style={{color: "#ec4899"}}>
                 {histBe10.length ? `${histBe10[histBe10.length - 1].value?.toFixed(2)}%` : "—"}
@@ -167,7 +178,7 @@ function USRatesDetailTab() {
 
       {/* Taylor Rule */}
       {taylorData.length > 0 && (
-        <UiCard className="p-4">
+        <UiCard className="p-4" data-prov="taylor_rule.implied">
           <h3 className="font-semibold mb-3">Taylor Rule — Implied vs Actual Fed Funds</h3>
           <ResponsiveContainer width="100%" height={260}>
             <LineChart data={taylorData}>
@@ -185,7 +196,7 @@ function USRatesDetailTab() {
 
       {/* ACM Decomposition */}
       {acmData.length > 0 && (
-        <UiCard className="p-4">
+        <UiCard className="p-4" data-prov="acm.term_premium">
           <h3 className="font-semibold mb-3">ACM Term Premium Decomposition</h3>
           <ResponsiveContainer width="100%" height={260}>
             <LineChart data={acmData}>
@@ -255,28 +266,28 @@ function GlobalYieldsTab({ data: countries }: { data: GlobalYieldCountry[] }) {
           </thead>
           <tbody>
             {countries.filter(c => c.yield_10y != null).map((c) => (
-              <tr key={c.iso2} className="border-b border-border/50 hover:bg-surface-alt/50">
+              <tr key={c.iso2} className="border-b border-border/50 hover:bg-surface-alt/50" data-prov={`global_yields.${c.iso2}`} data-prov-ctx={c.name}>
                 <td className="py-2 pr-4 font-medium">{c.name}</td>
                 <td className={`py-2 px-2 text-right font-mono ${(c.yield_10y ?? 0) > 6 ? "text-red-400" : (c.yield_10y ?? 0) < 1 ? "text-green-400" : ""}`}>
                   {fmtPct(c.yield_10y)}
                 </td>
-                <td className={`py-2 px-2 text-right font-mono ${(c.real_yield ?? 0) < -1 ? "text-red-400" : (c.real_yield ?? 0) > 2 ? "text-green-400" : ""}`}>
+                <td data-prov={`global_yields.${c.iso2}.real_yield`} className={`py-2 px-2 text-right font-mono ${(c.real_yield ?? 0) < -1 ? "text-red-400" : (c.real_yield ?? 0) > 2 ? "text-green-400" : ""}`}>
                   {fmtPct(c.real_yield)}
                 </td>
-                <td className="py-2 px-2 text-right font-mono text-text-secondary">{fmtPct(c.inflation)}</td>
-                <td className={`py-2 px-2 text-right font-mono ${(c.spread_vs_us ?? 0) > 3 ? "text-red-400" : ""}`}>
+                <td data-prov={`global_yields.${c.iso2}.inflation`} className="py-2 px-2 text-right font-mono text-text-secondary">{fmtPct(c.inflation)}</td>
+                <td data-prov={`global_yields.${c.iso2}.spread_vs_us`} className={`py-2 px-2 text-right font-mono ${(c.spread_vs_us ?? 0) > 3 ? "text-red-400" : ""}`}>
                   {fmt(c.spread_vs_us)}
                 </td>
-                <td className={`py-2 px-2 text-right font-mono ${(c.spread_vs_de ?? 0) > 2 ? "text-amber-400" : ""}`}>
+                <td data-prov={`global_yields.${c.iso2}.spread_vs_de`} className={`py-2 px-2 text-right font-mono ${(c.spread_vs_de ?? 0) > 2 ? "text-amber-400" : ""}`}>
                   {fmt(c.spread_vs_de)}
                 </td>
-                <td className={`py-2 px-2 text-right font-mono ${(c.spread_vs_jp ?? 0) > 4 ? "text-amber-400" : ""}`}>
+                <td data-prov={`global_yields.${c.iso2}.spread_vs_jp`} className={`py-2 px-2 text-right font-mono ${(c.spread_vs_jp ?? 0) > 4 ? "text-amber-400" : ""}`}>
                   {fmt(c.spread_vs_jp)}
                 </td>
               </tr>
             ))}
             {countries.filter(c => c.yield_10y == null).map((c) => (
-              <tr key={c.iso2} className="border-b border-border/50 text-text-secondary">
+              <tr key={c.iso2} className="border-b border-border/50 text-text-secondary" data-prov={`global_yields.${c.iso2}`} data-prov-ctx={c.name}>
                 <td className="py-2 pr-4">{c.name}</td>
                 <td colSpan={6} className="py-2 px-2 text-center text-xs">Data unavailable</td>
               </tr>
@@ -313,6 +324,7 @@ function YieldPageInner() {
     queryKey: ["yieldCurves"],
     queryFn: api.yieldCurves,
   });
+  const scope = useSourceScope(provOf(data));
 
   if (isLoading) return <div className="p-8 text-muted">Loading yield curve data…</div>;
   if (error || !data) return <div className="p-8 text-red-400">Failed to load yield data.</div>;
@@ -322,19 +334,20 @@ function YieldPageInner() {
   const fmt = (v: number | null, decimals = 2) => v != null ? `${v.toFixed(decimals)}%` : "N/A";
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6" {...scope}>
       <h1 className="text-2xl font-bold">Rates &amp; Policy</h1>
 
       {/* KPI Strip */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <KpiCard label="US 10Y Yield" value={fmt(us_curve.points.find(p => p.tenor === "10y")?.yield ?? null)} />
+        <KpiCard prov="us_curve.points.10y" label="US 10Y Yield" value={fmt(us_curve.points.find(p => p.tenor === "10y")?.yield ?? null)} />
         <KpiCard
+          prov="us_curve.spread_2y10y"
           label="2Y–10Y Spread"
           value={fmt(us_curve.spread_2y10y)}
           badge={us_curve.inverted ? "INVERTED" : undefined}
         />
-        <KpiCard label="10Y Breakeven" value={fmt(breakevens["10y"] ?? null)} />
-        <KpiCard label="Term Premium (ACM)" value={fmt(term_premium.current)} />
+        <KpiCard prov="breakevens.10y" label="10Y Breakeven" value={fmt(breakevens["10y"] ?? null)} />
+        <KpiCard prov="term_premium" label="10Y Term Premium (Kim-Wright)" value={fmt(term_premium.current)} />
       </div>
 
       {/* Tabs */}
@@ -382,14 +395,14 @@ function YieldPageInner() {
           </ResponsiveContainer>
           <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3">
             {Object.entries(breakevens).map(([tenor, val]) => (
-              <KpiCard key={tenor} label={`${tenor} Breakeven`} value={fmt(val)} />
+              <KpiCard key={tenor} prov={`breakevens.${tenor}`} label={`${tenor} Breakeven`} value={fmt(val)} />
             ))}
-            <KpiCard label="5y5y Forward Breakeven" value={fmt(fwdBreakeven?.current ?? null)} />
+            <KpiCard prov="forward_breakeven_5y5y" label="5y5y Forward Breakeven" value={fmt(fwdBreakeven?.current ?? null)} />
           </div>
 
           {/* 5y5y forward breakeven — the FOMC's preferred anchor measure */}
           {(fwdBreakeven?.history?.length ?? 0) > 0 && (
-            <div className="mt-6">
+            <div className="mt-6" data-prov="forward_breakeven_5y5y">
               <h2 className="text-sm font-medium mb-1 text-muted">5y5y Forward Breakeven Inflation</h2>
               <p className="text-xs text-text-secondary mb-3">
                 Inflation compensation priced for the five years starting five years out.
@@ -430,6 +443,7 @@ function PolicyTrackerTab() {
     queryKey: ["policyTracker"],
     queryFn: api.policyTracker,
   });
+  const scope = useSourceScope(provOf(data));
 
   if (isLoading) return <div className="p-8 text-muted">Loading policy data…</div>;
   if (error || !data) return <div className="p-8 text-red-400">Failed to load policy data.</div>;
@@ -443,24 +457,28 @@ function PolicyTrackerTab() {
     .sort(([, a], [, b]) => Math.abs(b as number) - Math.abs(a as number))[0];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" {...scope}>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <KpiCard
+          prov="divergence.Fed"
           label="Fed Funds Rate"
           value={fed?.current_rate != null ? `${fed.current_rate.toFixed(2)}%` : "N/A"}
           badge={fed ? `${fed.stance.replace("_", " ")} (12M: ${(fed.change_12m ?? 0).toFixed(2)}%)` : undefined}
         />
         <KpiCard
+          prov={tightening ? `divergence.${tightening.cb}` : undefined}
           label="Most Tightening"
           value={tightening?.cb ?? "None"}
           badge={tightening ? `+${(tightening.change_12m ?? 0).toFixed(2)}% (12M)` : undefined}
         />
         <KpiCard
+          prov={easing ? `divergence.${easing.cb}` : undefined}
           label="Most Easing"
           value={easing?.cb ?? "None"}
           badge={easing ? `${(easing.change_12m ?? 0).toFixed(2)}% (12M)` : undefined}
         />
         <KpiCard
+          prov={maxCarryEntry ? `carry_differentials.${maxCarryEntry[0]}` : undefined}
           label="Max Carry Differential"
           value={maxCarryEntry ? maxCarryEntry[0] : "N/A"}
           badge={maxCarryEntry && maxCarryEntry[1] != null ? `${(maxCarryEntry[1] as number).toFixed(2)}%` : undefined}
@@ -476,7 +494,7 @@ function PolicyTrackerTab() {
         <h2 className="text-sm font-medium mb-3 text-muted">G10 Carry Differentials vs USD</h2>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
           {Object.entries(carry_differentials).map(([pair, val]) => (
-            <div key={pair} className="flex justify-between px-3 py-2 rounded bg-background border border-border/50">
+            <div key={pair} className="flex justify-between px-3 py-2 rounded bg-background border border-border/50" data-prov={`carry_differentials.${pair}`} data-prov-ctx={pair}>
               <span className="text-sm">{pair}</span>
               <span className={`text-sm font-medium ${(val as number ?? 0) > 0 ? "text-red-400" : "text-green-400"}`}>
                 {val != null ? `${(val as number) > 0 ? "+" : ""}${(val as number).toFixed(2)}%` : "N/A"}
@@ -495,6 +513,7 @@ function SovereignRiskTab() {
     queryKey: ["sovereignRisk"],
     queryFn: api.sovereignRisk,
   });
+  const scope = useSourceScope(provOf(data));
 
   if (isLoading) return <div className="p-8 text-muted">Loading sovereign risk data…</div>;
   if (error || !data) return <div className="p-8 text-red-400">Failed to load sovereign data.</div>;
@@ -507,20 +526,22 @@ function SovereignRiskTab() {
     countries.reduce((s: number, c: { spread_vs_us: number | null }) => s + (c.spread_vs_us ?? 0), 0) / (countries.length || 1);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" {...scope}>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <KpiCard
+          prov={riskiest ? `countries.${riskiest.iso3}` : undefined}
           label="Highest Risk"
           value={riskiest?.name ?? "N/A"}
           badge={riskiest ? `Score: ${riskiest.composite_score.toFixed(1)}` : undefined}
         />
         <KpiCard
+          prov={safest ? `countries.${safest.iso3}` : undefined}
           label="Lowest Risk"
           value={safest?.name ?? "N/A"}
           badge={safest ? `Score: ${safest.composite_score.toFixed(1)}` : undefined}
         />
-        <KpiCard label="Avg Spread vs US" value={`${avgSpread.toFixed(2)}%`} />
-        <KpiCard label="Red-Signal Countries" value={String(redCount)} />
+        <KpiCard prov="countries" label="Avg Spread vs US" value={`${avgSpread.toFixed(2)}%`} />
+        <KpiCard prov="countries" label="Red-Signal Countries" value={String(redCount)} />
       </div>
 
       <div className="grid md:grid-cols-2 gap-4">
@@ -548,6 +569,7 @@ function DefaultRiskTab() {
     queryKey: ["sovereignDefault"],
     queryFn: api.sovereignDefaultProb,
   });
+  const scope = useSourceScope(provOf(data));
 
   if (isLoading) return <div className="p-8 text-muted">Computing default probabilities…</div>;
   if (error || !data) return <div className="p-8 text-red-400">Failed to load default model.</div>;
@@ -558,16 +580,16 @@ function DefaultRiskTab() {
   const yellowCount = countries.filter((c) => c.signal === "yellow").length;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" {...scope}>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <KpiCard label="Countries" value={String(countries.length)} />
-        <KpiCard label="High Risk" value={String(redCount)} badge=">20%" />
-        <KpiCard label="Medium Risk" value={String(yellowCount)} badge="5-20%" />
-        <KpiCard label="Pseudo R²" value={model?.pseudoR2?.toFixed(3) ?? "—"} />
+        <KpiCard prov="countries" label="Countries" value={String(countries.length)} />
+        <KpiCard prov="countries" label="High Risk" value={String(redCount)} badge=">20%" />
+        <KpiCard prov="countries" label="Medium Risk" value={String(yellowCount)} badge="5-20%" />
+        <KpiCard prov="model" label="Pseudo R²" value={model?.pseudoR2?.toFixed(3) ?? "—"} />
       </div>
 
       {model && (
-        <UiCard className="p-4">
+        <UiCard className="p-4" data-prov="model">
           <h2 className="text-sm font-medium mb-3 text-muted">Model Summary · {model.nObs} observations</h2>
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
@@ -610,7 +632,7 @@ function DefaultRiskTab() {
             </thead>
             <tbody>
               {countries.map((c) => (
-                <tr key={c.iso3} className="border-b border-border/30 hover:bg-surface-alt/50">
+                <tr key={c.iso3} className="border-b border-border/30 hover:bg-surface-alt/50" data-prov="countries" data-prov-ctx={c.name}>
                   <td className="py-1.5">
                     <span className="font-mono text-xs text-text-muted mr-2">{c.iso3}</span>
                     {c.name}

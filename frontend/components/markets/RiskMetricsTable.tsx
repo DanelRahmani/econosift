@@ -42,14 +42,14 @@ export function RiskMetricsTable({ metrics }: { metrics: RiskMetric[] }) {
           </thead>
           <tbody>
             {metrics.map((m) => (
-              <tr key={m.ticker} className="border-b border-border/50">
+              <tr key={m.ticker} className="border-b border-border/50" data-prov={`metrics.${m.ticker}`} data-prov-ctx={m.ticker}>
                 <td className="py-2 px-3 font-mono">{m.ticker}</td>
-                <td className="py-2 px-3">{fmtPctFromFraction(m.annVolatility)}</td>
-                <td className="py-2 px-3 text-danger">{fmtPctFromFraction(m.var95)}</td>
-                <td className="py-2 px-3 text-danger">{fmtPctFromFraction(m.cvar95)}</td>
-                <td className="py-2 px-3">{fmtNum(m.sharpe)}</td>
-                <td className="py-2 px-3">{fmtNum(m.sortino)}</td>
-                <td className="py-2 px-3">{fmtNum(m.beta)}</td>
+                <td className="py-2 px-3" data-prov={`metrics.${m.ticker}.annVolatility`}>{fmtPctFromFraction(m.annVolatility)}</td>
+                <td className="py-2 px-3 text-danger" data-prov={`metrics.${m.ticker}.var95`}>{fmtPctFromFraction(m.var95)}</td>
+                <td className="py-2 px-3 text-danger" data-prov={`metrics.${m.ticker}.cvar95`}>{fmtPctFromFraction(m.cvar95)}</td>
+                <td className="py-2 px-3" data-prov={`metrics.${m.ticker}.sharpe`}>{fmtNum(m.sharpe)}</td>
+                <td className="py-2 px-3" data-prov={`metrics.${m.ticker}.sortino`}>{fmtNum(m.sortino)}</td>
+                <td className="py-2 px-3" data-prov={`metrics.${m.ticker}.beta`}>{fmtNum(m.beta)}</td>
               </tr>
             ))}
           </tbody>

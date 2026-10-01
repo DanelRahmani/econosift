@@ -10,6 +10,7 @@ import asyncio
 import logging
 from datetime import datetime
 
+from .. import provenance as pv
 from ..cache import async_cached
 from . import atlas_service
 
@@ -51,6 +52,51 @@ def _latest(year_map: dict[int, float]) -> float | None:
 def _to_timeseries(year_map: dict[int, float]) -> list[dict]:
     """Convert {year: value} to [{date, value}] for frontend."""
     return [{"date": str(y), "value": v} for y, v in sorted(year_map.items())]
+
+
+def wb_country_provenance(countries: list[dict], specs: list[tuple[str, str, str, str]],
+                          prefixes: tuple[str, ...] = ("kpis.", "history.")) -> dict:
+    """Provenance for a World Bank country-comparison table.
+
+    ``specs`` is ``(field, World Bank series code, title, units)``; each field
+    gets ``<prefix><field>`` for every prefix. ``observed`` is the newest year
+    of that field across rows (``periods`` is set by ``stamp_periods``); the
+    year differs by country, so each row's own ``periods`` is authoritative.
+    """
+    prov: dict = {"*": pv.ref("worldbank", None, "World Development Indicators", frequency="annual")}
+    for field, code, title, units in specs:
+        years = [str(c["periods"][field]) for c in countries if (c.get("periods") or {}).get(field)]
+        r = pv.ref("worldbank", code, title, units=units, frequency="annual",
+                   observed=max(years) if years else None,
+                   note="Latest year available per country; each row's `periods` gives its own year.")
+        for prefix in prefixes:
+            prov[f"{prefix}{field}"] = r
+    return prov
+
+
+_WB_SPECS = [
+    ("debtGdp", "GC.DOD.TOTL.GD.ZS", "Central government debt, total", "% of GDP"),
+    ("fiscalBalance", "GC.NLD.TOTL.GD.ZS", "Net lending (+) / net borrowing (-)", "% of GDP"),
+    ("taxRevenue", "GC.TAX.TOTL.GD.ZS", "Tax revenue", "% of GDP"),
+    ("govtRevenue", "GC.REV.XGRT.GD.ZS", "Revenue, excluding grants", "% of GDP"),
+    ("govtExpenditure", "GC.XPN.TOTL.GD.ZS", "Expense", "% of GDP"),
+    ("grossSavings", "NY.GNS.ICTR.ZS", "Gross savings", "% of GDP"),
+    ("gdpGrowth", "NY.GDP.MKTP.KD.ZG", "GDP growth", "annual %"),
+]
+
+
+def _provenance(countries: list[dict]) -> dict:
+    prov = wb_country_provenance(countries, _WB_SPECS)
+    prov["kpis.primaryBalance"] = pv.derived(
+        "equals kpis.fiscalBalance (World Bank net lending/borrowing); interest costs are not separated out",
+        ["kpis.fiscalBalance"], title="Primary balance (as computed here)")
+    prov["kpis.adverseDynamics"] = pv.derived(
+        "true when debtGdp > 90 and gdpGrowth < 2.0 (a heuristic flag, not an r-g calculation)",
+        ["kpis.debtGdp", "kpis.gdpGrowth"], title="Adverse debt dynamics flag")
+    prov["summary"] = pv.derived(
+        "simple mean (avgDebtGdp, avgFiscalBalance) or count (adverseDynamicsCount) of the countries' latest KPI values",
+        ["kpis.debtGdp", "kpis.fiscalBalance", "kpis.adverseDynamics"], title="Cross-country summary")
+    return prov
 
 
 @async_cached("fiscal_sustainability")
@@ -147,8 +193,8 @@ async def get_fiscal_data() -> dict:
     fisc_values = [c["kpis"]["fiscalBalance"] for c in countries_out if c["kpis"]["fiscalBalance"] is not None]
     adverse_count = sum(1 for c in countries_out if c["kpis"]["adverseDynamics"])
 
-    return {
-        "asOf": str(datetime.now().date()),
+    result = {
+        "asOf": atlas_service.stamp_periods(countries_out),
         "source": "World Bank",
         "countries": countries_out,
         "summary": {
@@ -158,3 +204,4 @@ async def get_fiscal_data() -> dict:
             "totalCountries": len(countries_out),
         },
     }
+    return pv.attach(result, _provenance(countries_out))

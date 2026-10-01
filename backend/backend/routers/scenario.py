@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+from .. import provenance as pv
 from ..services import scenario_lab, yfinance_service, portfolio
 
 router = APIRouter(prefix="/api/scenario", tags=["Scenario Lab"])
@@ -26,7 +27,23 @@ async def stress_historical(req: PortfolioRequest):
     try:
         frame = yfinance_service.get_close_frame(tuple(tickers), period="max")
         results = portfolio.stress_test_portfolio(req.holdings, frame, "^GSPC")
-        return {"episodes": results}
+        if not results:
+            return {"episodes": results}
+        px = pv.ref("yahoo", None, "Daily adjusted close of the holdings, full available history",
+                    units="price (split/dividend adjusted)", frequency="daily", observed=pv.last_date(frame))
+        prov: dict = {"*": pv.derived(
+            "Historical stress replay: the portfolio's weighted daily simple returns inside fixed calendar windows",
+            [px], title="Historical stress test")}
+        for ep in results:
+            if "error" in ep:
+                continue
+            prov[f"episodes.{ep['scenario']}"] = pv.derived(
+                f"totalReturn = compounded weighted daily returns from {ep['start']} to {ep['end']}; maxDrawdown = "
+                "worst (value ÷ running peak − 1) inside the window; weights normalised over holdings that traded",
+                [px], title=ep.get("label"), observed=ep["end"],
+                note=None if "^GSPC" in frame.columns else
+                "The benchmark series is empty: the price frame holds only the portfolio's tickers, not ^GSPC.")
+        return pv.attach({"episodes": results}, prov)
     except Exception as e:
         raise HTTPException(500, f"Stress test failed: {str(e)}")
 

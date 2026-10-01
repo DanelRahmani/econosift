@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import type { Holders13FResponse, Holder13F } from "@/lib/types";
 import { Card } from "@/components/ui";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 
 function fmt(v: number | null, decimals = 0): string {
   if (v == null) return "—";
@@ -35,6 +37,7 @@ export function InstitutionalHolders({ ticker }: { ticker: string }) {
   const [data, setData] = useState<Holders13FResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const scope = useSourceScope(provOf(data));
 
   useEffect(() => {
     if (!ticker) return;
@@ -51,7 +54,7 @@ export function InstitutionalHolders({ ticker }: { ticker: string }) {
   }, [ticker]);
 
   return (
-    <Card className="p-4">
+    <Card className="p-4" {...scope} data-prov-ctx={ticker}>
       <div className="flex items-center justify-between mb-3">
         <h3 className="font-semibold">Institutional Holders (13F)</h3>
         <span className="text-xs bg-warning/20 text-warning px-2 py-0.5 rounded">
@@ -87,6 +90,7 @@ export function InstitutionalHolders({ ticker }: { ticker: string }) {
                   <tr
                     key={i}
                     className="border-b border-border/40 hover:bg-surface-alt/30 transition-colors"
+                    data-prov-ctx={h.name}
                   >
                     <td className="py-2 pr-4 font-medium">{h.name}</td>
                     <td className="py-2 pr-4 text-right font-mono">

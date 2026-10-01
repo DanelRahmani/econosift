@@ -5,6 +5,8 @@ import { LineChart, Line, ResponsiveContainer, YAxis } from "recharts";
 import { api } from "@/lib/api";
 import type { IndicesResponse, IndexRow } from "@/lib/types";
 import { Card, Skeleton } from "@/components/ui";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 import { fmtNum } from "@/lib/format";
 
 /** Global equity indices (compute tier 🟢) with region tabs and sparklines. */
@@ -12,6 +14,7 @@ export function GlobalIndices() {
   const [data, setData] = useState<IndicesResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [region, setRegion] = useState<string>("Americas");
+  const scope = useSourceScope(provOf(data));
 
   useEffect(() => {
     let alive = true;
@@ -31,7 +34,7 @@ export function GlobalIndices() {
   if (!data) return <Card><div className="text-text-muted text-sm">Indices unavailable.</div></Card>;
 
   return (
-    <Card>
+    <Card {...scope}>
       <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
         <h2 className="text-sm font-semibold text-text-secondary">Global Indices</h2>
         <div className="flex gap-1" data-hide-print>
@@ -75,7 +78,7 @@ export function GlobalIndices() {
 function Row({ row }: { row: IndexRow }) {
   const up = (row.change1d ?? 0) >= 0;
   return (
-    <tr className="border-b border-border/50 hover:bg-surface-alt/50">
+    <tr className="border-b border-border/50 hover:bg-surface-alt/50" data-prov={`indices.${row.symbol}`} data-prov-ctx={row.name}>
       <td className="py-2">
         <div className="font-medium text-text-primary">{row.name}</div>
         <div className="text-xs text-text-muted font-mono">{row.symbol}</div>

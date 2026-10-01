@@ -11,6 +11,7 @@ import time
 from collections import defaultdict
 from datetime import date, timedelta
 
+from .. import provenance as pv
 from ..cache import cached
 from . import constituents
 from . import edgar_service
@@ -21,7 +22,7 @@ logger = logging.getLogger(__name__)
 def _form4_for_ticker(ticker: str, sector: str) -> list[dict]:
     """Fetch Form 4 transactions for a ticker and attach sector info."""
     try:
-        result = edgar_service._fetch_form4_sync(ticker)
+        result = edgar_service._fetch_form4_sync(ticker, max_transactions=None)
         time.sleep(0.15)  # rate-limit EDGAR
         transactions = result.get("transactions", [])
         for tx in transactions:
@@ -41,6 +42,8 @@ def get_insider_aggregate() -> dict:
     First run is slow (100+ seconds due to EDGAR rate limiting).
     Subsequent calls use cache.
     """
+    if not edgar_service._edgar_ready():
+        return {"error": edgar_service._NO_IDENTITY, "asOf": None}
     sp500 = constituents.get_constituents("sp500")
     if not sp500:
         return {"error": "No S&P 500 constituents available", "asOf": None}
@@ -142,7 +145,20 @@ def get_insider_aggregate() -> dict:
             "sector": tx.get("sector"),
         })
 
-    return {
+    filings = pv.ref("sec_edgar", None, "Form 4 filings of S&P 500 companies, last 90 days, non-derivative "
+                     "transactions", frequency="event", url="https://www.sec.gov/cgi-bin/browse-edgar?type=4")
+    members = pv.ref("wikipedia", None, "Current S&P 500 constituents with GICS sector")
+    prov = {
+        "*": pv.derived("open-market purchases (code P) and sales (code S) across S&P 500 insiders",
+                        [filings, members], title="Insider activity"),
+        "buySellRatio": pv.derived("number of buys / number of sells", ["*"], title="Buy/sell ratio"),
+        "valueRatio": pv.derived("buy value / sell value (value = shares × price)", ["*"], title="Value ratio"),
+        "clusterBuys": pv.derived("companies where 3 or more different insiders bought in the last 30 days",
+                                  ["*"], title="Cluster buys"),
+        "sectorSentiment": pv.derived("buys and sells per GICS sector", ["*"], title="Sector sentiment"),
+        "topTrades": pv.derived("largest transactions by value", ["*"], title="Top trades"),
+    }
+    return pv.attach({
         "asOf": str(date.today()),
         "tickersChecked": total,
         "tickersWithData": len(set(tx.get("ticker") for tx in all_txs)),
@@ -156,4 +172,4 @@ def get_insider_aggregate() -> dict:
         "clusterBuys": cluster_buys[:10],
         "sectorSentiment": sector_sentiment,
         "topTrades": top_trades_clean[:20],
-    }
+    }, prov)

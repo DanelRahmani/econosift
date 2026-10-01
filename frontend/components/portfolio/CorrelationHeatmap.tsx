@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import type { CorrelationData } from "@/lib/types";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 
 interface Props {
   data: CorrelationData | null;
@@ -19,6 +21,7 @@ function corrColor(v: number): string {
 
 export function CorrelationHeatmap({ data, loading }: Props) {
   const [hover, setHover] = useState<{ r: number; c: number; v: number } | null>(null);
+  const scope = useSourceScope(provOf(data));
 
   if (loading) {
     return (
@@ -40,7 +43,7 @@ export function CorrelationHeatmap({ data, loading }: Props) {
   const { tickers, matrix } = data;
 
   return (
-    <div className="rounded-xl border border-border bg-surface p-4">
+    <div className="rounded-xl border border-border bg-surface p-4" {...scope}>
       <h3 className="font-semibold text-sm mb-3">Correlation Matrix</h3>
       <div className="overflow-x-auto">
         <table className="border-collapse text-xs">
@@ -64,6 +67,7 @@ export function CorrelationHeatmap({ data, loading }: Props) {
                   return (
                     <td
                       key={ci}
+                      data-prov-ctx={`${row} ↔ ${tickers[ci]}`}
                       className="w-16 h-10 text-center rounded cursor-default transition-opacity"
                       style={{
                         backgroundColor: v !== null ? corrColor(v) : undefined,

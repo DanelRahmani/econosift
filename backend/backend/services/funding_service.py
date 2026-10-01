@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import logging
+from datetime import date
 
+from .. import provenance as pv
 from ..cache import async_cached
 from ..config import FRED_API_KEY
 from . import macro_expansion_service as mes
@@ -22,6 +24,35 @@ def _latest(pts: list[dict]) -> float | None:
             except (TypeError, ValueError):
                 continue
     return None
+
+
+def _provenance(m2_pts: list[dict], sofr_pts: list[dict], cpf3m_pts: list[dict], ff_pts: list[dict],
+                cp_spread: list[dict], sofr_ff_spread: list[dict]) -> dict:
+    def last(pts: list[dict]) -> str | None:
+        dates = [p["date"] for p in pts if p.get("value") is not None]
+        return dates[-1] if dates else None
+
+    m2 = pv.fred("M2SL", "M2 money stock", units="billions of USD", frequency="monthly", observed=last(m2_pts))
+    sofr = pv.fred("SOFR", "Secured Overnight Financing Rate", units="%", frequency="daily",
+                   observed=last(sofr_pts))
+    cpf3m = pv.fred("CPF3M", "3-month AA financial commercial paper rate", units="%", frequency="monthly",
+                    observed=last(cpf3m_pts))
+    ff = pv.fred("FEDFUNDS", "Effective federal funds rate", units="%", frequency="monthly",
+                 observed=last(ff_pts))
+    cp_obs = last(cp_spread)
+    if cp_obs and (date.today() - date.fromisoformat(cp_obs[:10])).days > 120:
+        cpf3m["flags"] = ["stale"]
+    cp = pv.derived("CPF3M - FEDFUNDS, on dates where both have a value (percentage points)", [cpf3m, ff],
+                    title="Commercial paper spread", observed=cp_obs, flags=cpf3m.get("flags", ()))
+    sf = pv.derived("SOFR - FEDFUNDS, on dates where both have a value (percentage points); FEDFUNDS is "
+                    "monthly, so only its dates are compared", [sofr, ff],
+                    title="SOFR - fed funds spread", observed=last(sofr_ff_spread))
+    return {
+        "*": pv.ref("fred", None, "Federal Reserve Economic Data"),
+        "m2": m2, "sofr": sofr, "cp_spread": cp, "sofr_ff_spread": sf,
+        "kpis.m2_latest": m2, "kpis.sofr_latest": sofr, "kpis.cp_spread_latest": cp,
+        "kpis.sofr_ff_latest": sf,
+    }
 
 
 @async_cached("funding_liquidity")
@@ -57,7 +88,7 @@ async def get_funding_liquidity() -> dict:
                 "value": round(sofr_map[p["date"]] - p["value"], 4),
             })
 
-    return {
+    return pv.attach({
         "m2": m2_pts,
         "sofr": sofr_pts,
         "cp_spread": cp_spread,
@@ -68,4 +99,4 @@ async def get_funding_liquidity() -> dict:
             "cp_spread_latest": _latest(cp_spread),
             "sofr_ff_latest": _latest(sofr_ff_spread),
         },
-    }
+    }, _provenance(m2_pts, sofr_pts, cpf3m_pts, ff_pts, cp_spread, sofr_ff_spread))

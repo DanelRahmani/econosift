@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
+from .. import provenance as pv
 from ..cache import async_cached
 from . import macro_expansion_service as mes
 
@@ -70,6 +71,15 @@ def _pick_series(data: dict, candidates: tuple[str, ...]) -> list[dict]:
     return best_pts
 
 
+def _is_stale(pts: list[dict]) -> bool:
+    """True when the chosen series' last observation is past the cutoff
+    (the picker returns a stale series when no fresh one exists)."""
+    if not pts:
+        return False
+    last = datetime.strptime(pts[-1]["date"][:10], "%Y-%m-%d")
+    return (datetime.now(timezone.utc).replace(tzinfo=None) - last).days > _MAX_STALE_DAYS
+
+
 def _rate_n_months_ago(pts: list[dict], months: int) -> float | None:
     """Find the last value at or before `months` months before the final point."""
     if not pts:
@@ -102,6 +112,65 @@ def _stance(change_12m: float | None) -> str:
     return "on_hold"
 
 
+# Series that are the bank's own policy rate; the rest are OECD money-market rates.
+_POLICY_RATE_SERIES = {
+    "FEDFUNDS": ("Effective federal funds rate", "monthly"),
+    "ECBMRRFR": ("ECB main refinancing operations rate", "daily"),
+}
+
+
+def _picked_sid(data: dict, candidates: tuple[str, ...]) -> str | None:
+    """Series id ``_pick_series`` chose: the candidate with the latest last point
+    (first listed wins ties)."""
+    best_sid, best_date = None, ""
+    for sid in candidates:
+        pts = [p for p in data.get(sid, []) if p.get("value") is not None]
+        if pts and pts[-1]["date"][:10] > best_date:
+            best_sid, best_date = sid, pts[-1]["date"][:10]
+    return best_sid
+
+
+def _provenance(data: dict, divergence: list[dict], pairs: list[tuple]) -> dict:
+    """Source map for the policy tracker (see provenance.py)."""
+    prov: dict = {
+        "*": pv.ref("fred", None, "Central-bank policy / short-term interest rates", units="percent"),
+    }
+    for d in divergence:
+        cb = d["cb"]
+        sid = _picked_sid(data, _CB_CONFIG[cb])
+        row = f"divergence.{cb}"
+        if sid:
+            if sid in _POLICY_RATE_SERIES:
+                title, freq = _POLICY_RATE_SERIES[sid]
+                flags, note = [], None
+            else:
+                title = ("OECD immediate (call money/interbank) rate" if sid.startswith("IRSTCI")
+                         else "OECD 3-month interbank rate")
+                freq = "monthly"
+                flags = ["proxy"]
+                note = (f"This is the OECD money-market rate for {cb}'s market, not the announced "
+                        f"policy rate, and can differ from it.")
+            if d.get("stale"):
+                flags.append("stale")
+            prov[row] = pv.fred(sid, f"{cb}: {title}", units="percent", frequency=freq,
+                                observed=d.get("asOf"), flags=flags, note=note)
+        for key, months in (("change_3m", 3), ("change_12m", 12)):
+            prov[f"{row}.{key}"] = pv.derived(
+                f"latest rate - rate {months} months (30-day months) before the last observation",
+                [row], title=f"{cb} {months}-month rate change", observed=d.get("asOf"))
+        prov[f"{row}.stance"] = pv.derived(
+            "tightening if 12m change > +0.25pp, easing if < -0.25pp, otherwise on_hold; unknown without a 12m change",
+            [f"{row}.change_12m"], title=f"{cb} policy stance", observed=d.get("asOf"))
+        prov[f"{row}.divergence_rank"] = pv.derived(
+            "rank of the 12-month rate change, most tightening = 1", [f"{row}.change_12m"],
+            title=f"{cb} divergence rank", observed=d.get("asOf"))
+    for pair, base_cb, quote_cb in pairs:
+        prov[f"carry_differentials.{pair}"] = pv.derived(
+            f"{base_cb} rate - {quote_cb} rate (latest values; ECB/BoE/BoJ/BoC/RBA/SNB minus Fed)",
+            [f"divergence.{base_cb}", f"divergence.{quote_cb}"], title=f"{pair} carry differential")
+    return prov
+
+
 async def _fetch_cb_series() -> dict:
     """Fetch all CB FRED series (async — fetch_fred_series is already async)."""
     return await mes.fetch_fred_series(_ALL_SERIES, start=_START)
@@ -132,6 +201,8 @@ async def get_policy_tracker() -> dict:
                 "change_3m": ch3,
                 "change_12m": ch12,
                 "stance": _stance(ch12),
+                "asOf": pts[-1]["date"][:10] if pts else None,
+                "stale": _is_stale(pts),
             }
         )
 
@@ -154,4 +225,5 @@ async def get_policy_tracker() -> dict:
         b, q = rates.get(base_cb), rates.get(quote_cb)
         carry[pair] = round(b - q, 4) if b is not None and q is not None else None
 
-    return {"divergence": divergence, "carry_differentials": carry}
+    return pv.attach({"divergence": divergence, "carry_differentials": carry},
+                     _provenance(data, divergence, pairs))

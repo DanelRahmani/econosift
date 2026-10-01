@@ -16,6 +16,7 @@ from datetime import date
 import numpy as np
 from scipy import optimize, special, stats
 
+from .. import provenance as pv
 from ..cache import async_cached
 
 logger = logging.getLogger(__name__)
@@ -134,6 +135,52 @@ def _pseudo_r2(y, y_pred, beta, X):
     if ll_null == 0:
         return 1.0
     return 1.0 - ll_model / ll_null
+
+
+_PREDICTOR_TITLES = {
+    "debt_gdp": ("Central government debt (% of GDP)", "% of GDP"),
+    "fiscal_balance": ("Net lending (+) / net borrowing (-) (% of GDP)", "% of GDP"),
+    "current_account": ("Current account balance (% of GDP)", "% of GDP"),
+    "inflation": ("Inflation, consumer prices (annual %)", "% per year"),
+    "gdp_growth": ("GDP growth (annual %)", "% per year"),
+}
+
+
+def _provenance(pred_data: dict, countries: list[dict], n_obs: int) -> dict:
+    """Source map for the default-probability model (see provenance.py)."""
+    from . import atlas_service
+
+    prov: dict = {}
+    for p in PREDICTORS:
+        years = [max(pred_data[p][c["iso3"]]) for c in countries if pred_data[p].get(c["iso3"])]
+        title, units = _PREDICTOR_TITLES[p]
+        prov[f"predictors.{p}"] = pv.ref(
+            "worldbank", atlas_service._WB_CODES[p], title, units=units, frequency="annual",
+            observed=str(max(years)) if years else None,
+            note="Each country uses its own latest available year; the World Bank series only, no IMF gap-fill.")
+    prov["training_data"] = pv.ref(
+        "econosift", None, "Bundled sovereign default episodes, 1970-2020",
+        note="A hand-compiled list of (country, year, default 0/1) attributed to Reinhart & Rogoff's "
+             "'This Time Is Different'; it ships with the app and is not fetched from a live source.")
+    prov["*"] = pv.derived(
+        "Logistic regression (BFGS) of the default flag on five standardised World Bank predictors, fitted on "
+        f"the {n_obs} bundled default / non-default observations that have predictor data (nearest year within "
+        "+/-2 accepted). prob1y = sigmoid(intercept + sum(coef x standardised latest predictor)).",
+        [f"predictors.{p}" for p in PREDICTORS] + ["training_data"], title="Sovereign default probability model")
+    prov["model"] = prov["*"]
+    prov["countries"] = pv.derived(
+        "prob1y = model probability from each country's latest predictors; prob5y = 1 - (1 - prob1y)^5 "
+        "(constant annual hazard); signal green < 5%, yellow 5-20%, red > 20% on prob1y.",
+        ["*"], title="Default probabilities")
+    prov["asOf"] = pv.derived(
+        "the date the model was run; the predictor data behind it is older (see predictors.*)",
+        title="Model run date")
+    return prov
+
+
+def _with_provenance(result: dict, pred_data: dict, countries: list[dict], n_obs: int) -> dict:
+    # A module-level wrapper: get_default_probabilities() has a local named ``pv`` (a p-value).
+    return pv.attach(result, _provenance(pred_data, countries, n_obs))
 
 
 @async_cached("sovereign_default")
@@ -342,9 +389,9 @@ async def get_default_probabilities() -> dict:
 
     countries_out.sort(key=lambda c: c["prob5y"], reverse=True)
 
-    return {
+    return _with_provenance({
         "model": model,
         "countries": countries_out,
         "asOf": as_of,
         "source": "Reinhart & Rogoff (bundled training data) + World Bank predictors",
-    }
+    }, pred_data, countries_out, n)

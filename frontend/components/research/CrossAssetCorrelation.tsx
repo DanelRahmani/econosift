@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import { Card } from "@/components/ui";
 import { api } from "@/lib/api";
 import type { CrossAssetCorrelation } from "@/lib/types";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 
 const ASSET_PRESETS: Record<string, string[]> = {
   "Stocks": ["SPY", "QQQ", "IWM", "EFA", "EEM"],
@@ -20,6 +22,7 @@ export function CrossAssetCorrelation() {
   const [error, setError] = useState<string | null>(null);
   const [period, setPeriod] = useState<string>("3y");
   const [selectedAssets, setSelectedAssets] = useState<string[]>(["SPY", "TLT", "GLD", "EURUSD=X"]);
+  const scope = useSourceScope(provOf(data));
 
   const fetchData = () => {
     if (selectedAssets.length < 2) return;
@@ -111,7 +114,7 @@ export function CrossAssetCorrelation() {
 
       {/* Correlation matrix */}
       {data && data.matrix.length > 0 && (
-        <Card>
+        <Card {...scope}>
           <h3 className="text-sm font-semibold mb-3">Correlation Matrix</h3>
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
@@ -132,6 +135,7 @@ export function CrossAssetCorrelation() {
                     {row.map((val, ci) => (
                       <td
                         key={ci}
+                        data-prov-ctx={`${data.labels[ri] || data.assets[ri]} × ${data.labels[ci] || data.assets[ci]}`}
                         className={`py-1 px-2 text-center font-mono font-medium rounded ${corrColor(val)} ${bgColor(val)}`}
                       >
                         {val !== null ? val.toFixed(2) : "—"}

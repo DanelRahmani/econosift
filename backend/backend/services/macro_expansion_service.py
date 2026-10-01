@@ -9,6 +9,7 @@ import pandas as pd
 
 from ..cache import async_cached
 from ..config import FRED_API_KEY
+from ..sources._annual import yoy_pct
 from .ratelimit import fred_limiter
 
 log = logging.getLogger(__name__)
@@ -81,7 +82,16 @@ def _fetch_fred_series_sync(
     return result
 
 
-@async_cached("fred_multi_series")
+def _all_series_empty(result) -> bool:
+    """Skip caching when every requested series came back empty (an outage).
+
+    A partially-empty result is still cached: a discontinued series is
+    legitimately empty and must not force a refetch of the rest each call.
+    """
+    return not isinstance(result, dict) or not any(result.values())
+
+
+@async_cached("fred_multi_series", skip_if=_all_series_empty)
 async def fetch_fred_series(
     series_ids: list[str] | tuple[str, ...],
     start: str = "2000-01-01",
@@ -109,12 +119,10 @@ async def fetch_fred_series(
             if not series:
                 continue
             df = pd.DataFrame(series).set_index("date")
-            df.index = pd.to_datetime(df.index)
-            df = df.sort_index()
-            df["value"] = df["value"].pct_change(12) * 100
+            # Lag matched by date, not row count (missing months exist).
             raw[sid] = [
                 {"date": str(d.date()), "value": round(float(v), 4)}
-                for d, v in df["value"].dropna().items()
+                for d, v in yoy_pct(df["value"]).items()
             ]
         return raw
     except Exception as exc:

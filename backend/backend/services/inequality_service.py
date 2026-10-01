@@ -1,7 +1,12 @@
 """Inequality & Development service — Phase 29.
 
 Cross-country inequality indicators: Gini coefficient, income shares,
-poverty headcount ratios at $2.15/$3.65/$6.85/day, GDP per capita.
+poverty headcount ratios, GDP per capita.
+
+The World Bank re-based its poverty lines to 2021 PPP in June 2025: the series
+behind ``poverty_215`` / ``poverty_365`` / ``poverty_685`` (SI.POV.DDAY / LMIC /
+UMIC) now measure $3.00 / $4.20 / $8.30 a day. The keys keep their old names
+for API compatibility; labels must use the new lines.
 """
 from __future__ import annotations
 
@@ -9,8 +14,10 @@ import asyncio
 import logging
 from datetime import datetime
 
+from .. import provenance as pv
 from ..cache import async_cached
 from . import atlas_service
+from .fiscal_service import wb_country_provenance
 
 log = logging.getLogger(__name__)
 
@@ -49,6 +56,25 @@ def _to_timeseries(year_map: dict[int, float]) -> list[dict]:
     return [{"date": str(y), "value": v} for y, v in sorted(year_map.items())]
 
 
+_WB_SPECS = [
+    ("gini", "SI.POV.GINI", "Gini index", "index 0-100"),
+    ("incomeTop10", "SI.DST.10TH.10", "Income share held by highest 10%", "% of income"),
+    ("poverty215", "SI.POV.DDAY", "Poverty headcount ratio at $3.00 a day (2021 PPP)", "% of population"),
+    ("poverty365", "SI.POV.LMIC", "Poverty headcount ratio at $4.20 a day (2021 PPP)", "% of population"),
+]
+
+
+def _provenance(countries: list[dict]) -> dict:
+    prov = wb_country_provenance(countries, _WB_SPECS)
+    for field, *_ in _WB_SPECS:
+        prov[f"kpis.{field}"]["frequency"] = "irregular (household surveys)"
+    prov["summary"] = pv.derived(
+        "simple mean (avgGini, avgPoverty215) or count (highGiniCount: Gini above 45) of the countries' "
+        "latest KPI values",
+        ["kpis.gini", "kpis.poverty215"], title="Cross-country summary")
+    return prov
+
+
 @async_cached("inequality_data")
 async def get_inequality_data() -> dict:
     cur_year = datetime.now().year
@@ -64,7 +90,7 @@ async def get_inequality_data() -> dict:
     from ..config import iso2_to_iso3, COUNTRY_NAMES
 
     countries_out = []
-    for iso2 in INEQUALITY_COUNTRIES:
+    for iso2 in INEQ_COUNTRIES:
         iso3 = iso2_to_iso3(iso2)
         name = COUNTRY_NAMES.get(iso2, iso2)
 
@@ -104,8 +130,8 @@ async def get_inequality_data() -> dict:
     with_p215 = [c["kpis"]["poverty215"] for c in countries_out if c["kpis"]["poverty215"] is not None]
     high_gini = sum(1 for c in countries_out if c["kpis"]["giniSignal"] == "red")
 
-    return {
-        "asOf": str(datetime.now().date()),
+    result = {
+        "asOf": atlas_service.stamp_periods(countries_out),
         "source": "World Bank",
         "countries": countries_out,
         "summary": {
@@ -115,3 +141,4 @@ async def get_inequality_data() -> dict:
             "totalCountries": len(countries_out),
         },
     }
+    return pv.attach(result, _provenance(countries_out))

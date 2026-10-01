@@ -14,6 +14,7 @@ from typing import Optional
 import numpy as np
 import pandas as pd
 
+from .. import provenance as pv
 from . import constituents
 from . import yfinance_service as yfs
 from ..cache import cached
@@ -131,13 +132,27 @@ def get_moments(ticker: str, period: str = "3y") -> dict:
         "kurt21": _last_finite(kurt[21]),
     }
 
-    return {
+    ohlc_ref = pv.yahoo(ticker, "Daily open/high/low/close (adjusted)", units="price (split/dividend adjusted)",
+                        frequency="daily", observed=pv.last_date(df))
+    return pv.attach({
         "ticker": ticker,
         "period": period,
-        "asOf":   date.today().isoformat(),
+        "asOf":   pv.last_date(df),  # last price session, not today
         "series": series,
         "latest": latest,
-    }
+    }, {
+        "*": pv.derived("Rolling realised moments over 21, 63 and 252 sessions from daily prices", [ohlc_ref],
+                        title="Realised moments", observed=pv.last_date(df)),
+        "series.rvol": pv.derived(
+            "√(252 × mean over the window of max(Garman-Klass daily variance, 0)), where daily variance = "
+            "0.5·ln(High/Low)² − (2·ln2 − 1)·ln(Close/Open)²", [ohlc_ref], title="Realised volatility (Garman-Klass)"),
+        "series.skew": pv.derived("sample skewness of daily log returns of the close over the window", [ohlc_ref],
+                                  title="Realised skewness"),
+        "series.kurt": pv.derived("sample excess kurtosis of daily log returns of the close over the window",
+                                  [ohlc_ref], title="Realised excess kurtosis"),
+        "latest": pv.derived("the most recent finite 21-session values of the three series above", ["series.rvol"],
+                             title="Latest 21-session moments", observed=pv.last_date(df)),
+    })
 
 
 @cached("moments_crosssection")
@@ -267,11 +282,26 @@ def get_crosssection(universe: str = "dow", window: int = 21) -> dict:
         for r in valid
     ]
 
-    return {
+    name = {"sp500": "S&P 500", "ndx": "Nasdaq-100", "dow": "Dow Jones Industrial Average"}.get(universe, universe)
+    last_session = max((str(o.index[-1])[:10] for o in ohlc.values()), default=None)
+    inputs = [
+        pv.ref("yahoo", None, f"Daily adjusted close of each {name} member", units="price (split/dividend adjusted)",
+               frequency="daily", observed=last_session),
+        pv.ref("wikipedia", None, f"Current {name} constituents"),
+    ]
+    return pv.attach({
         "universe": universe,
         "window":   window,
-        "asOf":     date.today().isoformat(),
+        "asOf":     last_session,  # last price session, not today
         "deciles":  deciles,
         "names":    names,
         "missing":  missing,
-    }
+    }, {
+        "*": pv.derived(
+            f"Skewness sort over today's {name} members: priorSkew = sample skewness of the {window} daily log "
+            f"returns before the split point, fwdReturn = close-to-close return over the last {window} sessions; "
+            "names are ranked by priorSkew into up to 10 equal-count deciles (one formation/forward pair, not a "
+            "time series)", inputs, title="Skewness cross-section"),
+        "deciles": pv.derived("mean priorSkew and mean fwdReturn of the names in each decile", inputs,
+                              title="Skewness deciles"),
+    })

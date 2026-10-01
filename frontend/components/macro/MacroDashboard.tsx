@@ -2,9 +2,12 @@
 
 import type { MacroResponse } from "@/lib/types";
 import { Card } from "@/components/ui";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 import { fmtNum } from "@/lib/format";
 
 export function MacroDashboard({ data }: { data: MacroResponse }) {
+  const scope = useSourceScope(provOf(data));
   const cards = data.series
     .map((s) => {
       const pts = s.data;
@@ -12,18 +15,18 @@ export function MacroDashboard({ data }: { data: MacroResponse }) {
       const latest = pts[pts.length - 1];
       const prev = pts.length > 1 ? pts[pts.length - 2] : null;
       const delta = prev ? latest.value - prev.value : null;
-      return { country: s.countryName, year: latest.year, value: latest.value, delta };
+      return { iso: s.country, country: s.countryName, year: latest.year, value: latest.value, delta };
     })
     .filter((c): c is NonNullable<typeof c> => c !== null);
 
   if (!cards.length) return null;
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-4" {...scope}>
       {cards.map((c) => {
         const up = (c.delta ?? 0) >= 0;
         return (
-          <Card key={c.country} className="p-4">
+          <Card key={c.country} className="p-4" data-prov={`series.${c.iso}`} data-prov-ctx={`${c.country} · ${c.year}`}>
             <div className="text-sm text-text-secondary">{c.country}</div>
             <div className="text-2xl font-semibold mt-1">
               {fmtNum(c.value)}{data.unit === "%" ? "%" : ""}

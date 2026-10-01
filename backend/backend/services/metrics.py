@@ -46,8 +46,9 @@ def risk_metrics(asset_prices: pd.Series, bench_prices: pd.Series,
     tail = r[r <= var95]
     cvar95 = tail.mean() if len(tail) else var95
 
-    downside = r[r < 0]
-    downside_dev = downside.std(ddof=1) * math.sqrt(TRADING_DAYS) if len(downside) > 1 else None
+    # Downside deviation vs the daily risk-free MAR over all days (audit C-17).
+    shortfall = np.minimum(r - risk_free / TRADING_DAYS, 0.0)
+    downside_dev = math.sqrt(float((shortfall ** 2).mean())) * math.sqrt(TRADING_DAYS) if len(r) > 1 else None
 
     sharpe = (ann_return - risk_free) / ann_vol if ann_vol and ann_vol > 0 else None
     sortino = ((ann_return - risk_free) / downside_dev
@@ -127,13 +128,16 @@ def altman_z(info: dict, balance: dict, financials: dict):
 
     if not ta or ta == 0:
         return None
+    # Every input is required: substituting 0 for a missing line item silently
+    # drags the score toward the distress zone instead of admitting no score.
+    if any(v is None for v in (ca, cl, re, ebit, mcap, tl, sales)) or not tl:
+        return None
     try:
-        wc = (ca or 0) - (cl or 0)
-        x1 = wc / ta
-        x2 = (re or 0) / ta
-        x3 = (ebit or 0) / ta
-        x4 = (mcap or 0) / tl if tl else 0
-        x5 = (sales or 0) / ta
+        x1 = (ca - cl) / ta
+        x2 = re / ta
+        x3 = ebit / ta
+        x4 = mcap / tl
+        x5 = sales / ta
         z = 1.2 * x1 + 1.4 * x2 + 3.3 * x3 + 0.6 * x4 + 1.0 * x5
         return _clean(z)
     except Exception:
@@ -172,7 +176,14 @@ def compute_ratios(bundle: dict) -> dict:
     equity = g(bs, "Stockholders Equity", "Common Stock Equity") or info.get("totalStockholderEquity")
 
     op_cf = g(cf, "Operating Cash Flow", "Total Cash From Operating Activities")
-    fcf = info.get("freeCashflow") or g(cf, "Free Cash Flow")
+    cogs = g(fin, "Cost Of Revenue", "Reconciled Cost Of Revenue")
+    # Statement FCF first so the margin divides figures from the same fiscal
+    # year; Yahoo's info["freeCashflow"] is TTM and was being divided by
+    # annual revenue (audit C-28).
+    fcf = g(cf, "Free Cash Flow")
+    fcf_revenue = revenue
+    if fcf is None:
+        fcf, fcf_revenue = info.get("freeCashflow"), info.get("totalRevenue")
 
     def ratio(n, d):
         if n is None or not d:
@@ -196,7 +207,8 @@ def compute_ratios(bundle: dict) -> dict:
     }
     efficiency = {
         "assetTurnover": ratio(revenue, total_assets),
-        "inventoryTurnover": ratio(revenue, inventory),
+        # Inventory is carried at cost, so turnover uses COGS, not revenue.
+        "inventoryTurnover": ratio(cogs, inventory),
         "receivablesTurnover": ratio(revenue, receivables),
         "dso": ratio((receivables or 0) * 365, revenue) if receivables and revenue else None,
     }
@@ -207,7 +219,7 @@ def compute_ratios(bundle: dict) -> dict:
         "ebitdaMargin": ratio(ebitda, revenue),
         "roa": ratio(net_income, total_assets),
         "roe": ratio(net_income, equity),
-        "fcfMargin": ratio(fcf, revenue),
+        "fcfMargin": ratio(fcf, fcf_revenue),
     }
     valuation = {
         "peRatio": _clean(info.get("trailingPE")),

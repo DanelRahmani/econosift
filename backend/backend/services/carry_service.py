@@ -13,6 +13,7 @@ from datetime import date, timedelta
 import numpy as np
 import pandas as pd
 
+from .. import provenance as pv
 from ..cache import cached
 from . import rates_service
 from . import yfinance_service as yfs
@@ -68,13 +69,9 @@ def _clean(v) -> float | None:
         return None
 
 
-def _resolve_policy_rates(start: str) -> tuple[dict[str, float], dict[str, str]]:
-    """Fetch FRED policy rates for all G10 currencies.
-
-    Returns:
-        rates:   CCY -> latest rate (%)
-        sources: CCY -> FRED series id that resolved
-    """
+def _resolve_policy_rate_series(start: str) -> tuple[dict[str, pd.Series], dict[str, str]]:
+    """Per currency, the full history of the first candidate FRED series whose
+    latest observation is recent. Returns (CCY -> series in %, CCY -> id)."""
     all_series: list[str] = []
     for series_list in _POLICY_RATE_SERIES.values():
         all_series.extend(series_list)
@@ -84,7 +81,7 @@ def _resolve_policy_rates(start: str) -> tuple[dict[str, float], dict[str, str]]
 
     fred_data = rates_service._fetch_many_fred_sync(unique_series, start)
 
-    rates: dict[str, float] = {}
+    out: dict[str, pd.Series] = {}
     sources: dict[str, str] = {}
     cutoff = date.today() - timedelta(days=_MAX_STALE_DAYS)
 
@@ -101,14 +98,25 @@ def _resolve_policy_rates(start: str) -> tuple[dict[str, float], dict[str, str]]
             if last_date < cutoff:
                 log.debug("FRED %s for %s last obs %s is stale (>%d days)", sid, ccy, last_date, _MAX_STALE_DAYS)
                 continue
-            rates[ccy] = round(float(clean.iloc[-1]), 4)
+            clean.index = pd.to_datetime(clean.index)
+            out[ccy] = clean.sort_index()
             sources[ccy] = sid
-            log.info("Carry: %s resolved via %s (last obs %s, rate %.4f%%)", ccy, sid, last_date, rates[ccy])
+            log.info("Carry: %s resolved via %s (last obs %s)", ccy, sid, last_date)
             break
         else:
             log.warning("Carry: could not resolve policy rate for %s", ccy)
 
-    return rates, sources
+    return out, sources
+
+
+def _resolve_policy_rates(start: str, observed: dict[str, str] | None = None) -> tuple[dict[str, float], dict[str, str]]:
+    """Latest policy rate per currency (%), and the FRED id that resolved.
+
+    If ``observed`` is given it is filled with CCY -> date of the latest observation."""
+    series, sources = _resolve_policy_rate_series(start)
+    if observed is not None:
+        observed.update({ccy: str(s.index[-1])[:10] for ccy, s in series.items()})
+    return {ccy: round(float(s.iloc[-1]), 4) for ccy, s in series.items()}, sources
 
 
 def _compute_fx_vol(close: pd.DataFrame, ticker: str, min_rows: int = 20) -> float | None:
@@ -125,6 +133,19 @@ def _compute_fx_vol(close: pd.DataFrame, ticker: str, min_rows: int = 20) -> flo
     return round(vol, 4) if math.isfinite(vol) else None
 
 
+def _rate_ref(ccy: str, sid: str, observed: str | None) -> dict:
+    """FRED ref for the rate series that resolved for ``ccy``."""
+    interbank = sid.startswith("IR3TIB01")
+    primary = _POLICY_RATE_SERIES[ccy][0]
+    note = None
+    if sid != primary:
+        note = f"Primary series {primary} was missing or stale, so {sid} stood in."
+    return pv.fred(
+        sid, f"{ccy} short-term interest rate" + (" (3-month interbank, not a policy rate)" if interbank else ""),
+        units="% p.a.", frequency="daily" if sid.startswith("ECB") else "monthly", observed=observed,
+        flags=("proxy",) if interbank else (), note=note)
+
+
 def _metrics_from_series(cum: pd.Series) -> dict:
     """Compute CAGR, vol, Sharpe, maxDrawdown from a base-100 cumulative series."""
     if cum.empty or len(cum) < 2:
@@ -135,7 +156,9 @@ def _metrics_from_series(cum: pd.Series) -> dict:
     total_return = float(cum.iloc[-1] / cum.iloc[0]) - 1.0
     cagr = round(((1 + total_return) ** (1 / years) - 1) * 100, 4) if years > 0 else None
     ann_vol = round(float(log_rets.std() * math.sqrt(252) * 100), 4) if n > 1 else None
-    sharpe = round(cagr / ann_vol, 4) if (cagr is not None and ann_vol and ann_vol > 0) else None
+    # Sharpe (rf = 0): annualised mean daily return over annualised vol.
+    ann_mean = float((cum / cum.shift(1) - 1).dropna().mean() * 252 * 100)
+    sharpe = round(ann_mean / ann_vol, 4) if (ann_vol and ann_vol > 0) else None
     rolling_max = cum.cummax()
     dd = (cum - rolling_max) / rolling_max
     max_dd = round(float(dd.min() * 100), 4)
@@ -177,7 +200,8 @@ def get_carry_table(period: str = "3y") -> dict:
     try:
         # 5-year start to ensure we have recent observations
         start = (date.today() - timedelta(days=5 * 365)).strftime("%Y-%m-%d")
-        rates, sources = _resolve_policy_rates(start)
+        rate_obs: dict[str, str] = {}
+        rates, sources = _resolve_policy_rates(start, rate_obs)
 
         usd_rate = rates.get("USD")
         if usd_rate is None:
@@ -229,11 +253,32 @@ def get_carry_table(period: str = "3y") -> dict:
                 d = last_idx[-1]
                 as_of = str(d.date()) if hasattr(d, "date") else str(d)[:10]
 
-        return {
+        fx_input = pv.ref("yahoo", None, "Daily adjusted close of the G10 pairs quoted as USD per unit of currency",
+                          units="USD per unit", frequency="daily", observed=as_of if not close.empty else None)
+        prov: dict = {
+            "*": pv.derived("Carry = foreign short-term rate - US rate (percentage points), with FX spot and volatility "
+                            "from Yahoo pairs", [fx_input, "usdRate"], title="G10 FX carry table", observed=as_of),
+            "usdRate": _rate_ref("USD", sources["USD"], rate_obs.get("USD")),
+        }
+        for r in rows:
+            c = r["ccy"]
+            pair = _fx_ticker(c)
+            prov[f"rows.{c}.foreignRate"] = _rate_ref(c, sources[c], rate_obs.get(c))
+            prov[f"rows.{c}.spot"] = pv.yahoo(
+                pair, f"{c}/USD spot (last close)", units="USD per unit", frequency="daily",
+                observed=pv.last_date(close[pair]) if pair in close.columns else None)
+            prov[f"rows.{c}.carry"] = pv.derived("foreignRate - usdRate (percentage points)",
+                                                 [f"rows.{c}.foreignRate", "usdRate"], title="Carry")
+            prov[f"rows.{c}.fxVol"] = pv.derived(
+                f"sample std of daily log returns of {pair} over the requested period × √252 × 100 (percent)",
+                [f"rows.{c}.spot"], title="FX volatility")
+            prov[f"rows.{c}.volAdjCarry"] = pv.derived("carry ÷ fxVol", [f"rows.{c}.carry", f"rows.{c}.fxVol"],
+                                                       title="Vol-adjusted carry")
+        return pv.attach({
             "asOf": as_of,
             "usdRate": _clean(usd_rate),
             "rows": rows,
-        }
+        }, prov)
     except Exception as exc:
         log.exception("get_carry_table failed: %s", exc)
         return {"error": str(exc), "asOf": str(date.today()), "usdRate": None, "rows": []}
@@ -256,54 +301,67 @@ def get_carry_backtest(period: str = "3y") -> dict:
         "metrics": {"cagr": None, "vol": None, "sharpe": None, "maxDrawdown": None},
     }
     try:
-        table = get_carry_table(period)
-        rows = table.get("rows", [])
-        if not rows:
-            return {**_EMPTY, "error": table.get("error", "no carry data")}
+        # Walk-forward: at each month start, rank currencies by the carry
+        # known *then* and hold long top-3 / short bottom-3 for the month.
+        # Earlier versions ranked by today's carry and applied those legs to
+        # the whole history (look-ahead), and earned FX moves only — never
+        # the interest differential that is the point of a carry trade (C-06).
+        start = (date.today() - timedelta(days=8 * 365)).strftime("%Y-%m-%d")
+        rate_series, rate_sources = _resolve_policy_rate_series(start)
+        if "USD" not in rate_series:
+            return {**_EMPTY, "error": "USD policy rate unavailable"}
+        ccys = [c for c in _NON_USD_CCYS if c in rate_series]
+        if len(ccys) < 6:
+            return {**_EMPTY, "error": f"not enough currencies with carry data (need 6, got {len(ccys)})"}
 
-        # Rank by carry — rows already sorted desc
-        ranked = [r for r in rows if r["carry"] is not None]
-        if len(ranked) < 6:
-            return {**_EMPTY, "error": f"not enough currencies with carry data (need 6, got {len(ranked)})"}
+        close = yfs.get_close_frame(tuple(_fx_ticker(c) for c in ccys), period)
+        if close.empty:
+            return {**_EMPTY, "error": "no FX price data"}
+        close.index = pd.to_datetime(close.index)
+        # Daily return of holding each currency vs USD (tickers are USD per unit).
+        fx_rets = close.ffill().pct_change().rename(columns={_fx_ticker(c): c for c in ccys})
 
-        long_ccys = [r["ccy"] for r in ranked[:3]]
-        short_ccys = [r["ccy"] for r in ranked[-3:]]
+        def _rate_known(ccy: str, when: pd.Timestamp) -> float | None:
+            # Monthly FRED policy/interbank rates are averages dated the 1st of
+            # the month and published after it ends: lag one month.
+            s = rate_series[ccy].loc[: when - pd.DateOffset(months=1) - pd.Timedelta(days=1)]
+            return float(s.iloc[-1]) if len(s) else None
 
-        # Fetch FX price histories
-        all_ccys = long_ccys + short_ccys
-        fx_tickers = tuple(_fx_ticker(ccy) for ccy in all_ccys)
-        close = yfs.get_close_frame(fx_tickers, period)
+        weight = 1.0 / 3.0
+        strategy_parts: list[pd.Series] = []
+        long_ccys: list[str] = []
+        short_ccys: list[str] = []
+        months = fx_rets.index.to_period("M")
+        for month in months.unique():
+            seg = fx_rets[months == month].dropna(how="all")
+            if seg.empty:
+                continue
+            t0 = seg.index[0]
+            usd = _rate_known("USD", t0)
+            carry = {c: _rate_known(c, t0) - usd for c in ccys
+                     if usd is not None and _rate_known(c, t0) is not None}
+            if len(carry) < 6:
+                continue
+            ranked = sorted(carry, key=carry.get, reverse=True)
+            long_ccys, short_ccys = ranked[:3], ranked[-3:]
+            leg = pd.Series(0.0, index=seg.index)
+            for c in long_ccys:
+                leg += weight * (seg[c].fillna(0.0) + carry[c] / 100.0 / 252)
+            for c in short_ccys:
+                leg -= weight * (seg[c].fillna(0.0) + carry[c] / 100.0 / 252)
+            strategy_parts.append(leg)
 
-        # Fetch DXY benchmark
+        strategy_rets = pd.concat(strategy_parts).dropna() if strategy_parts else pd.Series(dtype=float)
+        if strategy_rets.empty:
+            return {**_EMPTY, "error": "strategy returns are empty"}
+
         dxy_close: pd.Series | None = None
         for dxy_sym in _DXY_TICKERS:
             dxy_frame = yfs.get_close_frame((dxy_sym,), period)
             if dxy_sym in dxy_frame.columns and not dxy_frame[dxy_sym].dropna().empty:
                 dxy_close = dxy_frame[dxy_sym].dropna()
+                dxy_close.index = pd.to_datetime(dxy_close.index)
                 break
-
-        if close.empty:
-            return {**_EMPTY, "error": "no FX price data"}
-
-        # Daily returns for each leg
-        rets = close.pct_change().dropna(how="all")
-
-        # Strategy return = Σ weight_i * daily_return
-        # long: +1/3 each, short: -1/3 each
-        weight = 1.0 / 3.0
-        strategy_rets = pd.Series(0.0, index=rets.index)
-        for ccy in long_ccys:
-            tk = _fx_ticker(ccy)
-            if tk in rets.columns:
-                strategy_rets = strategy_rets.add(rets[tk].fillna(0) * weight)
-        for ccy in short_ccys:
-            tk = _fx_ticker(ccy)
-            if tk in rets.columns:
-                strategy_rets = strategy_rets.add(rets[tk].fillna(0) * (-weight))
-
-        strategy_rets = strategy_rets.dropna()
-        if strategy_rets.empty:
-            return {**_EMPTY, "error": "strategy returns are empty"}
 
         cum_strategy = (1 + strategy_rets).cumprod() * 100
 
@@ -336,11 +394,39 @@ def get_carry_backtest(period: str = "3y") -> dict:
 
         metrics = _metrics_from_series(cum_strategy)
 
-        return {
+        obs = series_records[-1]["date"] if series_records else None
+        fx_input = pv.ref("yahoo", None, "Daily adjusted close of the G10 pairs quoted as USD per unit of currency",
+                          units="USD per unit", frequency="daily", observed=pv.last_date(close))
+        rate_inputs = [_rate_ref(c, rate_sources[c], str(rate_series[c].index[-1])[:10]) for c in ["USD"] + ccys]
+        if dxy_close is not None:
+            bench_ref = pv.yahoo(dxy_sym, "US dollar index proxy, daily close", frequency="daily",
+                                 observed=pv.last_date(dxy_close),
+                                 flags=("proxy",) if dxy_sym == "UUP" else (),
+                                 note="UUP (an ETF) stands in for the dollar index." if dxy_sym == "UUP" else None)
+        else:
+            bench_ref = pv.derived("flat 100 line: neither DX-Y.NYB nor UUP returned data, so there is no benchmark",
+                                   [], title="Benchmark unavailable", flags=("fallback",))
+        prov = {
+            "*": pv.derived(
+                "Walk-forward carry strategy: each month start, rank the 7 non-USD G10 currencies by (foreign - USD "
+                "policy rate) known then (rates lagged one month), go long the top 3 and short the bottom 3 at 1/3 "
+                "each; daily return = FX return ± carry ÷ 100 ÷ 252", rate_inputs + [fx_input],
+                title="G10 carry backtest", observed=obs),
+            "series": pv.derived("base-100 compounding of the daily strategy return", ["*"], title="Strategy value",
+                                 observed=obs),
+            "series.benchmark": bench_ref,
+            "legs": pv.derived("the top-3 (long) and bottom-3 (short) currencies at the last month start", ["*"],
+                               title="Current legs", observed=obs),
+            "metrics": pv.derived(
+                "in percent: cagr = (final ÷ first)^(252/n) - 1; vol = std of daily log returns × √252; sharpe = mean "
+                "daily return × 252 ÷ vol (no risk-free deduction); maxDrawdown = worst value ÷ running peak - 1",
+                ["series"], title="Strategy statistics", observed=obs),
+        }
+        return pv.attach({
             "series": series_records,
             "legs": {"long": long_ccys, "short": short_ccys},
             "metrics": metrics,
-        }
+        }, prov)
     except Exception as exc:
         log.exception("get_carry_backtest failed: %s", exc)
         return {**_EMPTY, "error": str(exc)}

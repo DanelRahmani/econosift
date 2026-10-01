@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import type { Form4Response, InsiderTransaction } from "@/lib/types";
 import { Card } from "@/components/ui";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 
 function fmt(v: number | null): string {
   if (v == null) return "—";
@@ -35,6 +37,7 @@ export function InsiderActivity({ ticker }: { ticker: string }) {
   const [data, setData] = useState<Form4Response | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const scope = useSourceScope(provOf(data));
 
   useEffect(() => {
     if (!ticker) return;
@@ -51,7 +54,7 @@ export function InsiderActivity({ ticker }: { ticker: string }) {
   }, [ticker]);
 
   return (
-    <Card className="p-4">
+    <Card className="p-4" {...scope} data-prov-ctx={ticker}>
       <div className="flex items-center justify-between mb-3">
         <h3 className="font-semibold">Insider Activity (Form 4)</h3>
         <span className="text-xs bg-surface-alt text-text-secondary px-2 py-0.5 rounded">
@@ -90,6 +93,7 @@ export function InsiderActivity({ ticker }: { ticker: string }) {
                 <tr
                   key={i}
                   className="border-b border-border/40 hover:bg-surface-alt/30 transition-colors"
+                  data-prov-ctx={tx.insiderName}
                 >
                   <td className="py-2 pr-4 text-text-secondary text-xs">
                     {tx.date}
@@ -98,7 +102,7 @@ export function InsiderActivity({ ticker }: { ticker: string }) {
                   <td className="py-2 pr-4 text-text-secondary text-xs">
                     {tx.title ?? "—"}
                   </td>
-                  <td className="py-2 pr-4">
+                  <td className="py-2 pr-4" data-prov="transactions.transactionType">
                     <TypeBadge type={tx.transactionType} />
                   </td>
                   <td className="py-2 pr-4 text-right font-mono">
@@ -110,6 +114,7 @@ export function InsiderActivity({ ticker }: { ticker: string }) {
                       : "—"}
                   </td>
                   <td
+                    data-prov="transactions.totalValue"
                     className={`py-2 text-right font-mono font-semibold ${
                       tx.transactionType === "Buy" ? "text-success" : "text-danger"
                     }`}

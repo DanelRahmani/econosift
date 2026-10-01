@@ -3,12 +3,16 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { Card, PageSkeleton, chartPalette } from "@/components/ui";
 import { CHART_COLORS } from "@/lib/format";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf, type Provenance } from "@/lib/provenance";
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend } from "recharts";
 
 export function TaylorRuleWidget() {
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [prov, setProv] = useState<Provenance | undefined>(undefined);
+  const scope = useSourceScope(prov);
   // Use dark as default since chartPalette dark values work reasonably in both themes
   const pal = chartPalette("dark");
 
@@ -17,7 +21,7 @@ export function TaylorRuleWidget() {
     api.macroTaylorRule()
       .then(res => {
         if (res.error) setError(res.error);
-        else setData(res.data || []);
+        else { setData(res.data || []); setProv(provOf(res)); }
       })
       .catch(e => setError(e.toString()))
       .finally(() => setLoading(false));
@@ -28,14 +32,14 @@ export function TaylorRuleWidget() {
   if (!data.length) return null;
 
   return (
-    <Card className="p-5 space-y-4">
+    <Card className="p-5 space-y-4" {...scope}>
       <h2 className="text-base font-semibold text-text-primary">US Taylor Rule & Output Gap</h2>
       <p className="text-sm text-text-secondary">
         Compares the Effective Federal Funds Rate against a standard Taylor Rule prescription (r* = 2%, π* = 2%) and tracks the US output gap.
       </p>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="h-64">
+        <div className="h-64" data-prov="data.taylorRate" data-prov-ctx="Taylor rule implied rate">
           <h3 className="text-xs font-semibold text-text-secondary mb-2">Policy Rate vs Taylor Rule</h3>
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={data}>
@@ -50,7 +54,7 @@ export function TaylorRuleWidget() {
           </ResponsiveContainer>
         </div>
 
-        <div className="h-64">
+        <div className="h-64" data-prov="data.outputGap" data-prov-ctx="US output gap">
           <h3 className="text-xs font-semibold text-text-secondary mb-2">US Output Gap (%)</h3>
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={data}>

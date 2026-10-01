@@ -7,6 +7,7 @@ import logging
 import os
 from datetime import date
 
+from .. import provenance as pv
 from ..cache import async_cached
 from . import macro_expansion_service as mes
 
@@ -64,6 +65,51 @@ def _pick_series(cb: str, all_data: dict[str, list[dict]]) -> str:
     return CB_SERIES[cb][0]
 
 
+# FRED series -> (title, frequency, is_proxy). The OECD call-money / interbank
+# series stand in for the policy rate of banks that have no FRED policy-rate series.
+_SERIES_INFO = {
+    "FEDFUNDS": ("Effective federal funds rate", "monthly", False),
+    "ECBMRRFR": ("ECB main refinancing operations rate, euro area", "daily", False),
+    "ECBDFR": ("ECB deposit facility rate, euro area", "daily", False),
+}
+
+
+def _series_info(sid: str) -> tuple[str, str, bool]:
+    if sid in _SERIES_INFO:
+        return _SERIES_INFO[sid]
+    if sid.startswith("IRSTCI01"):
+        return f"Overnight call-money / interbank rate ({sid[8:10]}), OECD via FRED", "monthly", True
+    if sid.startswith("IR3TIB01"):
+        return f"3-month interbank rate ({sid[8:10]}), OECD via FRED", "monthly", True
+    return sid, "unknown", False
+
+
+def _provenance(current: dict[str, dict], balance_sheet: list[dict]) -> dict:
+    """``current.<bank>`` (rate) and ``history.<bank>`` share a ref naming the FRED series actually picked."""
+    prov: dict = {"*": pv.ref("fred", None, "Federal Reserve Economic Data")}
+    for cb, cur in current.items():
+        if cur["rate"] is not None:
+            title, freq, proxy = _series_info(cur["series"])
+            flags = (["proxy"] if proxy else []) + (["stale"] if cur.get("stale") else [])
+            r = pv.fred(cur["series"], title, units="%", frequency=freq, observed=cur.get("asOf"), flags=flags,
+                        note="Interbank/call-money rate used as a proxy: no FRED policy-rate series is wired "
+                             "up for this bank." if proxy else None)
+            prov[f"current.{cb}"] = prov[f"history.{cb}"] = r
+        if cur.get("next_meeting"):
+            cal = pv.ref("other", None, "Central bank meeting calendar",
+                         note="Static file bundled with the app (backend/data/cb_meetings.json), not fetched.")
+            cal["providerName"] = "Bundled meeting calendar (cb_meetings.json)"
+            prov[f"current.{cb}.next_meeting"] = cal
+            prov[f"current.{cb}.days_until"] = pv.derived(
+                "next meeting date minus today, in days", [f"current.{cb}.next_meeting"],
+                title="Days until next meeting")
+    if balance_sheet:
+        prov["balance_sheet"] = pv.fred(
+            "WALCL", "Federal Reserve total assets", units="trillions of USD", frequency="weekly",
+            observed=balance_sheet[-1]["date"], transform="FRED value in millions of USD divided by 1,000,000")
+    return prov
+
+
 def _to_float(v) -> float | None:
     try:
         return float(v)
@@ -91,9 +137,14 @@ async def get_centralbanks() -> dict:
         records = raw.get(sid, [])
         rate = _to_float(records[-1]["value"]) if records else None
         nxt_date, days = _next_meeting(cb, meetings)
+        # The picker falls back to a stale series when nothing fresh exists;
+        # date it and flag it so an old print is never read as current.
+        last_date = records[-1]["date"] if records else None
         current[cb] = {
             "rate":         round(rate, 4) if rate is not None else None,
             "series":       sid,
+            "asOf":         last_date,
+            "stale":        bool(last_date and (date.today() - date.fromisoformat(last_date[:10])).days > _MAX_STALE_DAYS),
             "next_meeting": nxt_date,
             "days_until":   days,
         }
@@ -114,4 +165,5 @@ async def get_centralbanks() -> dict:
         if v is not None:
             balance_sheet.append({"date": rec["date"], "value": round(v / 1_000_000, 4)})
 
-    return {"history": history, "current": current, "balance_sheet": balance_sheet}
+    return pv.attach({"history": history, "current": current, "balance_sheet": balance_sheet},
+                     _provenance(current, balance_sheet))

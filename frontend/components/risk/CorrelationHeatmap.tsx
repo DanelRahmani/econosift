@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { Card } from "@/components/ui";
 import type { CorrelationResponse } from "@/lib/types";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 
 interface Props {
   data: CorrelationResponse | null;
@@ -23,6 +25,7 @@ function corrColor(v: number | null): string {
 
 export function CorrelationHeatmap({ data, loading }: Props) {
   const [snapshotIdx, setSnapshotIdx] = useState<number | null>(null);
+  const scope = useSourceScope(provOf(data));
 
   if (loading) {
     return (
@@ -48,7 +51,7 @@ export function CorrelationHeatmap({ data, loading }: Props) {
   const snapshot = data.snapshots[idx];
 
   return (
-    <Card className="p-4 space-y-4">
+    <Card className="p-4 space-y-4" {...scope}>
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold">Rolling Pairwise Correlation</h3>
         <span className="text-xs text-text-muted">as of {snapshot.date}</span>
@@ -93,6 +96,7 @@ export function CorrelationHeatmap({ data, loading }: Props) {
                   return (
                     <td
                       key={col}
+                      data-prov-ctx={`${row} × ${col}`}
                       className={`px-3 py-2 text-center rounded-sm ${isDiag ? "bg-accent/20 font-bold" : corrColor(v)}`}
                       title={v !== null ? `${row} × ${col}: ${v.toFixed(3)}` : "—"}
                     >

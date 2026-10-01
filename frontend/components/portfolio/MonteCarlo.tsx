@@ -7,6 +7,8 @@ import {
 } from "recharts";
 import { api } from "@/lib/api";
 import type { Holding, MCData, MCPortfolioPoint } from "@/lib/types";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 
 interface Props {
   holdings: Holding[];
@@ -36,6 +38,7 @@ export function MonteCarlo({ holdings, period }: Props) {
   const [data, setData] = useState<MCData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const scope = useSourceScope(provOf(data));
 
   async function run() {
     setLoading(true);
@@ -73,7 +76,7 @@ export function MonteCarlo({ holdings, period }: Props) {
     : [];
 
   return (
-    <div className="rounded-xl border border-border bg-surface p-4 space-y-3">
+    <div className="rounded-xl border border-border bg-surface p-4 space-y-3" {...scope}>
       <div className="flex items-center justify-between">
         <h3 className="font-semibold text-sm">Monte Carlo Portfolio Simulation</h3>
         <button
@@ -140,13 +143,13 @@ export function MonteCarlo({ holdings, period }: Props) {
               ))}
             </div>
             <span>High Sharpe</span>
-            <span className="ml-auto flex items-center gap-1">
+            <span data-prov="maxSharpe" className="ml-auto flex items-center gap-1">
               <span className="w-3 h-3 bg-amber-500 rounded-full inline-block" /> Max Sharpe
             </span>
           </div>
 
           {data.maxSharpe && (
-            <div className="bg-surface-alt rounded-lg p-3 text-sm">
+            <div data-prov="maxSharpe" className="bg-surface-alt rounded-lg p-3 text-sm">
               <span className="text-text-muted">Max Sharpe Portfolio: </span>
               <span className="font-medium">
                 Vol {((data.maxSharpe.vol ?? 0) * 100).toFixed(2)}%

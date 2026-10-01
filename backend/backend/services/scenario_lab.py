@@ -5,6 +5,7 @@ import pandas as pd
 import numpy as np
 from datetime import datetime
 
+from .. import provenance as pv
 from .advanced_risk import _STRESS_SCENARIOS
 from .portfolio import analyze, _clean
 
@@ -96,8 +97,35 @@ def simulate_custom_shock(
         impacts.append({"factor": "Credit", "beta": _clean(beta_credit), "impact": _clean(credit_impact)})
         total_impact += credit_impact
 
-    return {
+    def px(sym: str) -> dict:
+        return pv.yahoo(sym, "Daily adjusted close", units="price (split/dividend adjusted)", frequency="daily",
+                        observed=pv.last_date(frame[sym]))
+
+    holdings_px = pv.ref("yahoo", None, "Daily adjusted close of the holdings", units="price (split/dividend adjusted)",
+                         frequency="daily", observed=pv.last_date(frame[cols]))
+    proxies = {
+        "Equities": ("^GSPC", "impact = beta × the equity shock (a fraction, e.g. −0.10)"),
+        "Rates": ("TLT", "impact = beta × (−(rate shock in bp ÷ 100) × 0.17), i.e. the shock is translated into a TLT "
+                         "price move with an assumed 17-year duration"),
+        "Credit": ("HYG", "impact = beta × (−(credit shock in bp ÷ 100) × 0.04), i.e. the shock is translated into an "
+                          "HYG price move with an assumed 4-year spread duration"),
+    }
+    prov: dict = {
+        "*": pv.derived(
+            "Beta-based shock simulation: the portfolio's exposure to each factor proxy times the shock",
+            [holdings_px], title="Custom scenario"),
+        "shocks": pv.ref("other", None, "Shocks entered by the user", note="User input, not provider data."),
+        "totalImpactPct": pv.derived(
+            "sum of the factor impacts; a fraction of portfolio value (−0.12 = −12%), not a percent number",
+            ["*"], title="Total impact"),
+    }
+    for row in impacts:
+        proxy, rule = proxies[row["factor"]]
+        prov[f"impacts.{row['factor']}"] = pv.derived(
+            f"beta = cov(daily portfolio simple return, daily {proxy} return) ÷ var({proxy} return), over the "
+            f"5-year window; {rule}", [holdings_px, px(proxy)], title=f"{row['factor']} impact")
+    return pv.attach({
         "shocks": shocks,
         "impacts": impacts,
         "totalImpactPct": _clean(total_impact),
-    }
+    }, prov)

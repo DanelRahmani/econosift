@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import pandas as pd
 
+from .. import provenance as pv
 from ..cache import cached
 from . import yfinance_service as yfs
 
@@ -64,13 +65,15 @@ def global_indices() -> dict:
 
     for sym, name, region in INDICES:
         row = {"symbol": sym, "name": name, "region": region,
-               "price": None, "change1d": None, "spark": [],
+               "price": None, "asOf": None, "change1d": None, "spark": [],
                "change1m": None, "changeYtd": None}
         if frame is not None and not frame.empty and sym in frame.columns:
             s = frame[sym].dropna()
             if len(s):
                 cur = float(s.iloc[-1])
                 row["price"] = round(cur, 2)
+                # Markets close at different times: date each index by its own last bar.
+                row["asOf"] = s.index[-1].strftime("%Y-%m-%d")
                 row["change1d"] = _pct(cur, float(s.iloc[-2]) if len(s) > 1 else None)
                 row["spark"] = [round(float(x), 2) for x in s.tail(5)]
                 row["change1m"] = _pct(cur, float(s.iloc[-22]) if len(s) > 21 else None)
@@ -79,4 +82,10 @@ def global_indices() -> dict:
         rows.append(row)
 
     regions = ["Americas", "EMEA", "Asia-Pacific"]
-    return {"asOf": as_of, "regions": regions, "indices": rows}
+    prov: dict = {"*": pv.ref("yahoo", None, "Index levels, latest daily bar", frequency="daily", observed=as_of,
+                              note="Markets close at different times; each index carries its own session date.")}
+    for r in rows:
+        prov[f"indices.{r['symbol']}"] = pv.yahoo(
+            r["symbol"], f"{r['name']} — latest daily bar", frequency="daily", observed=r["asOf"],
+            note="The last trade while that market's session is open.")
+    return pv.attach({"asOf": as_of, "regions": regions, "indices": rows}, prov)

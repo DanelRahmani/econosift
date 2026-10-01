@@ -11,8 +11,8 @@ router = APIRouter(prefix="/api/stability", tags=["stability"])
 
 @router.get("/currency-crisis")
 async def currency_crisis():
-    """Currency crisis early warning system: KLR composite model
-    with traffic-light output per country."""
+    """Currency crisis early warning: six vulnerability indicators checked
+    against fixed thresholds, with traffic-light output per country."""
     return await get_currency_crisis()
 
 

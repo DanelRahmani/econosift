@@ -2,32 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import type { DcfResponse, DcfSensitivity } from "@/lib/types";
+import type { CountryRate, DcfResponse, DcfSensitivity } from "@/lib/types";
 import { Card, Skeleton } from "@/components/ui";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 import { fmtNum, fmtPct, fmtPrice, fmtLarge, currencySymbol } from "@/lib/format";
-
-// ── Regional discount rates ─────────────────────────────────────────────────
-interface CountryRate {
-  name: string;
-  riskFreeRate: number;
-  erp: number;
-}
-
-const DEFAULT_COUNTRY_RATES: CountryRate[] = [
-  { name: "United States", riskFreeRate: 0.04, erp: 0.05 },
-  { name: "Germany", riskFreeRate: 0.025, erp: 0.05 },
-  { name: "Japan", riskFreeRate: 0.01, erp: 0.05 },
-  { name: "United Kingdom", riskFreeRate: 0.04, erp: 0.05 },
-  { name: "Netherlands", riskFreeRate: 0.0275, erp: 0.05 },
-  { name: "France", riskFreeRate: 0.03, erp: 0.05 },
-  { name: "Switzerland", riskFreeRate: 0.01, erp: 0.05 },
-  { name: "Canada", riskFreeRate: 0.035, erp: 0.05 },
-  { name: "Australia", riskFreeRate: 0.04, erp: 0.05 },
-  { name: "China", riskFreeRate: 0.025, erp: 0.05 },
-  { name: "India", riskFreeRate: 0.065, erp: 0.08 },
-  { name: "Brazil", riskFreeRate: 0.10, erp: 0.08 },
-  { name: "Russia", riskFreeRate: 0.16, erp: 0.10 },
-];
 
 // ── Slider config ──────────────────────────────────────────────────────────
 interface Params {
@@ -45,11 +24,12 @@ const SLIDERS: {
   step: number;
   isPct: boolean;
   isInt: boolean;
+  prov: string;
 }[] = [
-  { key: "wacc",           label: "WACC",            min: 0.04, max: 0.15, step: 0.0025, isPct: true,  isInt: false },
-  { key: "fcf_growth",     label: "FCF Growth",      min: 0,    max: 0.20, step: 0.005,  isPct: true,  isInt: false },
-  { key: "terminal_growth",label: "Terminal Growth", min: 0,    max: 0.05, step: 0.0025, isPct: true,  isInt: false },
-  { key: "stage1_years",   label: "Stage-1 Years",   min: 5,    max: 15,   step: 1,      isPct: false, isInt: true  },
+  { key: "wacc",           label: "WACC",            min: 0.04, max: 0.15, step: 0.0025, isPct: true,  isInt: false, prov: "inputs.wacc" },
+  { key: "fcf_growth",     label: "FCF Growth",      min: 0,    max: 0.20, step: 0.005,  isPct: true,  isInt: false, prov: "inputs.fcfGrowth" },
+  { key: "terminal_growth",label: "Terminal Growth", min: 0,    max: 0.05, step: 0.0025, isPct: true,  isInt: false, prov: "inputs.terminalGrowth" },
+  { key: "stage1_years",   label: "Stage-1 Years",   min: 5,    max: 15,   step: 1,      isPct: false, isInt: true,  prov: "inputs.stage1Years" },
 ];
 
 // ── Sensitivity heatmap helpers ───────────────────────────────────────────
@@ -91,8 +71,9 @@ export function DcfPanel({ tickers, sharedWacc = null }: { tickers: string[]; pe
   const [data, setData] = useState<DcfResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
-  const [countryRates, setCountryRates] = useState<CountryRate[]>(DEFAULT_COUNTRY_RATES);
+  const [countryRates, setCountryRates] = useState<CountryRate[]>([]);
   const [selectedCountry, setSelectedCountry] = useState<string>("");
+  const scope = useSourceScope(provOf(data));
 
   // Load live risk-free rates from backend
   useEffect(() => {
@@ -200,7 +181,7 @@ export function DcfPanel({ tickers, sharedWacc = null }: { tickers: string[]; pe
         {/* Sliders */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {SLIDERS.map((s) => (
-            <div key={s.key}>
+            <div key={s.key} data-prov={s.prov} data-prov-ctx={s.label}>
               <div className="flex justify-between text-sm mb-1">
                 <span className="text-text-secondary">{s.label}</span>
                 <span className="font-mono">
@@ -285,7 +266,7 @@ export function DcfPanel({ tickers, sharedWacc = null }: { tickers: string[]; pe
   const sensitivity = isSensitivityFull(data.sensitivity) ? data.sensitivity : null;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" {...scope} data-prov-ctx={selectedTicker}>
       {controls}
 
       {/* ── KPI row ──────────────────────────────────────────────────────── */}
@@ -300,21 +281,25 @@ export function DcfPanel({ tickers, sharedWacc = null }: { tickers: string[]; pe
             label="Spot Price"
             value={fmtPrice(data.spotPrice, sym)}
             valueClass="text-text-primary"
+            prov="spotPrice"
           />
           <KpiTile
             label="Upside"
             value={upside !== null ? fmtPct(upside * 100) : "—"}
             valueClass={upsideColor}
+            prov="upsidePct"
           />
           <KpiTile
             label="TTM FCF"
             value={data.inputs.ttmFcf !== null ? fmtLarge(data.inputs.ttmFcf) : "—"}
             valueClass="text-text-primary"
+            prov="inputs.ttmFcf"
           />
           <KpiTile
             label="Net Debt"
             value={data.inputs.netDebt !== null ? fmtLarge(data.inputs.netDebt) : "—"}
             valueClass="text-text-primary"
+            prov="inputs.netDebt"
           />
         </div>
         <p className="text-xs text-text-muted mt-3">as of {data.asOf}</p>
@@ -322,7 +307,7 @@ export function DcfPanel({ tickers, sharedWacc = null }: { tickers: string[]; pe
 
       {/* ── Scenario table ───────────────────────────────────────────────── */}
       {data.scenarios.length > 0 && (
-        <Card>
+        <Card data-prov="scenarios">
           <h3 className="text-sm font-semibold text-text-primary mb-3">Scenarios</h3>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -371,7 +356,7 @@ export function DcfPanel({ tickers, sharedWacc = null }: { tickers: string[]; pe
 
       {/* ── Sensitivity heatmap ──────────────────────────────────────────── */}
       {sensitivity && (
-        <Card>
+        <Card data-prov="sensitivity">
           <h3 className="text-sm font-semibold text-text-primary mb-1">Sensitivity Analysis</h3>
           <p className="text-xs text-text-muted mb-4">
             Intrinsic value per share — rows: FCF growth, cols: WACC.
@@ -434,13 +419,15 @@ function KpiTile({
   label,
   value,
   valueClass,
+  prov,
 }: {
   label: string;
   value: string;
   valueClass: string;
+  prov?: string;
 }) {
   return (
-    <div className="space-y-0.5">
+    <div className="space-y-0.5" data-prov={prov} data-prov-ctx={label}>
       <p className="text-xs text-text-muted">{label}</p>
       <p className={`text-base font-mono font-semibold ${valueClass}`}>{value}</p>
     </div>

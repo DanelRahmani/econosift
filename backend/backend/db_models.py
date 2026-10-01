@@ -82,6 +82,26 @@ class DailyMacro(Base):
     )
 
 
+class MetricSnapshot(Base):
+    """Daily snapshot of a metric that has no free historical source.
+
+    Live-only readings (SPY put/call open interest, a ticker's IV30) can only
+    be ranked against their own past, so we record one value per day and
+    build that history ourselves.
+    """
+
+    __tablename__ = "metric_snapshot"
+
+    metric = Column(String, nullable=False)   # e.g. "spy_pcr_oi", "iv30"
+    key = Column(String, nullable=False)      # e.g. "SPY", "AAPL"
+    date = Column(Date, nullable=False)
+    value = Column(Float, nullable=False)
+
+    __table_args__ = (
+        PrimaryKeyConstraint("metric", "key", "date"),
+    )
+
+
 class DailyFX(Base):
     """FX spot rates per currency pair/date."""
 

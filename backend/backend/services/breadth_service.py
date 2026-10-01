@@ -1,49 +1,119 @@
 """Market breadth metrics over an index's constituents.
 
-Everything derives from one batched adjusted-close download of the index
-members (compute tier 🟢, runs on page load). We compute the classic breadth
+Everything derives from one batched OHLC download of the index members
+(compute tier 🟢, runs on page load). We compute the classic breadth
 internals — advancers/decliners, new highs/lows, % above SMA50/200, the
 ratio-adjusted McClellan Oscillator/Summation index, and the cumulative
-advance-decline line — and expose the daily A/D + McClellan series so the
-Fear & Greed engine can reuse them without re-downloading.
+advance-decline line — and expose the daily A/D, new-high/low and McClellan
+series so the Fear & Greed engine can reuse them without re-downloading.
+
+Session alignment (audit P2-24 / C-22): every count describes one completed
+US session, ``asOf``. A bar for a session that is still trading is dropped,
+and a symbol whose latest bar is older than ``asOf`` is left out of that
+session's counts instead of contributing a stale reading.
+
+New 52-week highs/lows use the intraday High/Low — the convention of published
+counts — with ties counting (a session that matches its 52-week extreme has
+reached it).
+
+Limitation: membership is today's constituent list applied to the whole
+two-year window (the A/D line and McClellan history carry mild survivorship);
+the session-level counts are unaffected.
 """
 from __future__ import annotations
+
+from datetime import datetime, time
+from zoneinfo import ZoneInfo
 
 import numpy as np
 import pandas as pd
 
+from .. import provenance as pv
 from ..cache import cached
 from . import yfinance_service as yfs
 from . import constituents
 
+_NY = ZoneInfo("America/New_York")
+_CLOSE = time(16, 0)
+# A session counts as complete only if at least this share of the universe
+# has a bar for it (guards against a half-published final row).
+_MIN_COVERAGE = 0.9
+_LOOKBACK_52W = 252
+# McClellan EMAs are seeded from the first observation; discard this many
+# sessions before using the series so the seed no longer matters.
+_MCCLELLAN_WARMUP = 120
 
-def _close_frame(index: str) -> pd.DataFrame:
-    """One year of constituent closes; columns are members with data."""
+
+def _now_ny() -> datetime:
+    return datetime.now(_NY)
+
+
+def _ohlc_frames(index: str) -> dict[str, pd.DataFrame]:
+    """Two years of constituent OHLC as ``{"close","high","low"}`` frames.
+
+    Columns are members with data; the index is session dates. Trailing
+    sessions that are still in progress or thinly covered are dropped.
+    """
     syms = tuple(constituents.constituent_symbols(index))
     if not syms:
-        return pd.DataFrame()
-    frame = yfs.get_close_frame(syms, "1y")
-    if frame is None or frame.empty:
-        return pd.DataFrame()
-    return frame.sort_index()
+        return {}
+    raw = yfs.get_ohlc_frame(syms, "2y", adjust=False)
+    if not raw:
+        return {}
+    close = pd.DataFrame({s: df["Close"] for s, df in raw.items()}).sort_index()
+    high = pd.DataFrame({s: df["High"] for s, df in raw.items()}).reindex(close.index)
+    low = pd.DataFrame({s: df["Low"] for s, df in raw.items()}).reindex(close.index)
+    idx = pd.to_datetime(close.index)
+    close.index = (idx.tz_localize(None) if idx.tz is not None else idx).normalize()
+    high.index = low.index = close.index
+
+    # Drop a bar for today's session while the market is still open.
+    now = _now_ny()
+    if len(close) and close.index[-1].date() == now.date() and now.time() < _CLOSE:
+        close, high, low = close.iloc[:-1], high.iloc[:-1], low.iloc[:-1]
+
+    # Drop trailing rows that too few members have printed yet.
+    coverage = close.notna().sum(axis=1) / max(close.shape[1], 1)
+    complete = coverage[coverage >= _MIN_COVERAGE]
+    if complete.empty:
+        return {}
+    last = complete.index[-1]
+    return {"close": close.loc[:last], "high": high.loc[:last], "low": low.loc[:last]}
 
 
 def _adv_decl_series(frame: pd.DataFrame) -> pd.DataFrame:
     """Daily advancers/decliners across the universe.
 
     Returns a frame indexed by date with columns adv, dec, net (adv-dec) and
-    the ratio-adjusted net advance ``rana = (adv-dec)/(adv+dec)``.
+    the ratio-adjusted net advance ``rana = (adv-dec)/(adv+dec)``. Only
+    symbols with a bar on both consecutive sessions are compared.
     """
     if frame.empty:
         return pd.DataFrame(columns=["adv", "dec", "net", "rana"])
-    delta = frame.diff()
+    delta = frame - frame.shift(1)
     adv = (delta > 0).sum(axis=1)
     dec = (delta < 0).sum(axis=1)
     out = pd.DataFrame({"adv": adv, "dec": dec})
     out["net"] = out["adv"] - out["dec"]
     total = (out["adv"] + out["dec"]).replace(0, np.nan)
     out["rana"] = (out["net"] / total).fillna(0.0)
-    return out.iloc[1:]  # first row is all-NaN diff
+    return out.iloc[1:]  # first row has no prior session
+
+
+def _highs_lows_series(high: pd.DataFrame, low: pd.DataFrame,
+                       close: pd.DataFrame) -> pd.DataFrame:
+    """Daily count of members at a new 52-week intraday high / low.
+
+    A member is counted on a session only if it traded that session and has
+    at least 30 sessions of history in the trailing window.
+    """
+    traded = close.notna()
+    enough = close.notna().rolling(_LOOKBACK_52W, min_periods=1).sum() >= 30
+    hi_max = high.rolling(_LOOKBACK_52W, min_periods=1).max()
+    lo_min = low.rolling(_LOOKBACK_52W, min_periods=1).min()
+    is_hi = (high >= hi_max - 1e-9) & traded & enough
+    is_lo = (low <= lo_min + 1e-9) & traded & enough
+    return pd.DataFrame({"highs": is_hi.sum(axis=1), "lows": is_lo.sum(axis=1)})
 
 
 def mcclellan(adv_decl: pd.DataFrame) -> pd.DataFrame:
@@ -51,7 +121,8 @@ def mcclellan(adv_decl: pd.DataFrame) -> pd.DataFrame:
 
     Oscillator = 1000·(EMA19(RANA) − EMA39(RANA)); Summation = cumulative sum
     of the oscillator. Scaling by 1000 puts the oscillator on its conventional
-    ±100 range.
+    ±100 range. The Summation *level* is relative to the window start (a
+    constant offset); percentile ranks of it are unaffected by that offset.
     """
     if adv_decl.empty:
         return pd.DataFrame(columns=["oscillator", "summation"])
@@ -59,26 +130,37 @@ def mcclellan(adv_decl: pd.DataFrame) -> pd.DataFrame:
     ema19 = rana.ewm(span=19, adjust=False).mean()
     ema39 = rana.ewm(span=39, adjust=False).mean()
     osc = (ema19 - ema39) * 1000.0
-    return pd.DataFrame({"oscillator": osc, "summation": osc.cumsum()})
+    out = pd.DataFrame({"oscillator": osc, "summation": osc.cumsum()})
+    # Drop the EMA seeding period when enough history exists.
+    return out.iloc[_MCCLELLAN_WARMUP:] if len(out) > _MCCLELLAN_WARMUP + 60 else out
 
 
-@cached("breadth")
-def breadth(index: str = "sp500") -> dict:
-    """Full breadth snapshot for an index (compute tier 🟢)."""
-    frame = _close_frame(index)
-    empty = {
-        "index": index, "asOf": None, "total": 0,
-        "advancing": 0, "declining": 0, "unchanged": 0,
-        "newHighs": 0, "newLows": 0,
+def _unavailable(index: str) -> dict:
+    # Unknown is None, never 0 — a zero would be displayed (and read) as a
+    # real "no stocks advanced" reading. The status marks it uncacheable.
+    return {
+        "index": index, "asOf": None, "status": "unavailable", "total": None,
+        "advancing": None, "declining": None, "unchanged": None,
+        "newHighs": None, "newLows": None,
         "pctAboveSma50": None, "pctAboveSma200": None,
         "mcclellanOscillator": None, "mcclellanSummation": None,
         "cumulativeAdLine": [], "advDeclHistory": [],
     }
-    if frame.empty:
-        return empty
 
-    last = frame.iloc[-1]
-    prev = frame.iloc[-2] if len(frame) > 1 else last
+
+@cached("breadth")
+def breadth(index: str = "sp500") -> dict:
+    """Full breadth snapshot for an index's last completed session (🟢)."""
+    frames = _ohlc_frames(index)
+    if not frames:
+        return _unavailable(index)
+    close, high, low = frames["close"], frames["high"], frames["low"]
+    if len(close) < 2:
+        return _unavailable(index)
+
+    as_of = close.index[-1]
+    last = close.iloc[-1]
+    prev = close.iloc[-2]
     valid = last.notna() & prev.notna()
     diff = last[valid] - prev[valid]
     advancing = int((diff > 0).sum())
@@ -86,29 +168,18 @@ def breadth(index: str = "sp500") -> dict:
     unchanged = int((diff == 0).sum())
     total = int(valid.sum())
 
-    # 52-week highs / lows: today's close at the extreme of the trailing window.
-    window = frame.tail(252)
-    highs = lows = 0
-    for col in frame.columns:
-        s = window[col].dropna()
-        if len(s) < 30:
-            continue
-        cur = s.iloc[-1]
-        if cur >= s.max() - 1e-9:
-            highs += 1
-        elif cur <= s.min() + 1e-9:
-            lows += 1
+    hl = _highs_lows_series(high, low, close)
 
-    # % above SMA50 / SMA200.
+    # % above SMA50 / SMA200 — members that printed on the as-of session.
     def _pct_above(n: int) -> float | None:
-        if len(frame) < n:
+        if len(close) < n:
             return None
-        sma = frame.tail(n).mean()
-        comp = (last > sma) & last.notna() & sma.notna()
-        denom = (last.notna() & sma.notna()).sum()
-        return round(float(comp.sum()) / float(denom) * 100.0, 1) if denom else None
+        sma = close.rolling(n, min_periods=int(n * 0.9)).mean().iloc[-1]
+        ok = last.notna() & sma.notna()
+        denom = int(ok.sum())
+        return round(float((last[ok] > sma[ok]).sum()) / denom * 100.0, 1) if denom else None
 
-    ad = _adv_decl_series(frame)
+    ad = _adv_decl_series(close)
     mc = mcclellan(ad)
     cum_ad = ad["net"].cumsum()
 
@@ -117,15 +188,16 @@ def breadth(index: str = "sp500") -> dict:
         return [{"date": d.strftime("%Y-%m-%d"), "value": round(float(v), 2)}
                 for d, v in s.items()]
 
-    return {
+    return pv.attach({
         "index": index,
-        "asOf": frame.index[-1].strftime("%Y-%m-%d"),
+        "asOf": as_of.strftime("%Y-%m-%d"),
+        "session": "close",
         "total": total,
         "advancing": advancing,
         "declining": declining,
         "unchanged": unchanged,
-        "newHighs": highs,
-        "newLows": lows,
+        "newHighs": int(hl["highs"].iloc[-1]),
+        "newLows": int(hl["lows"].iloc[-1]),
         "pctAboveSma50": _pct_above(50),
         "pctAboveSma200": _pct_above(200),
         "mcclellanOscillator": (round(float(mc["oscillator"].iloc[-1]), 2)
@@ -137,18 +209,58 @@ def breadth(index: str = "sp500") -> dict:
             {"date": d.strftime("%Y-%m-%d"), "adv": int(r.adv), "dec": int(r.dec)}
             for d, r in ad.tail(90).iterrows()
         ],
+    }, _provenance(index, as_of.strftime("%Y-%m-%d")))
+
+
+_INDEX_NAMES = {"sp500": "S&P 500", "ndx": "Nasdaq-100", "dow": "Dow Jones Industrial Average"}
+
+
+def _provenance(index: str, as_of: str) -> dict:
+    name = _INDEX_NAMES.get(index, index)
+    inputs = [
+        pv.ref("yahoo", None, f"Daily open/high/low/close of each {name} member",
+               units="price as traded (split-adjusted, not dividend-adjusted)",
+               frequency="daily", observed=as_of),
+        pv.ref("wikipedia", None, f"Current {name} constituents"),
+    ]
+
+    def d(formula: str, title: str) -> dict:
+        return pv.derived(formula, inputs, title=title, observed=as_of)
+
+    adv = d("count of members whose close is above / below / equal to the previous session's close",
+            "Advancers, decliners, unchanged")
+    hilo = d("count of members whose session high (low) is the highest (lowest) of the trailing 252 sessions",
+             "New 52-week highs / lows")
+    return {
+        "*": d("breadth statistics over the index's current members, last completed session", f"{name} breadth"),
+        "advancing": adv, "declining": adv, "unchanged": adv, "total": adv, "advDeclHistory": adv,
+        "newHighs": hilo, "newLows": hilo,
+        "pctAboveSma50": d("share of members closing above their 50-session simple moving average",
+                           "% above 50-day SMA"),
+        "pctAboveSma200": d("share of members closing above their 200-session simple moving average",
+                            "% above 200-day SMA"),
+        "mcclellanOscillator": d("1000 × (EMA19 − EMA39) of (advancers − decliners) / (advancers + decliners)",
+                                 "McClellan Oscillator (ratio-adjusted)"),
+        "mcclellanSummation": d("running sum of the McClellan Oscillator from the start of the 2-year window",
+                                "McClellan Summation Index"),
+        "cumulativeAdLine": d("running sum of (advancers − decliners)", "Cumulative advance-decline line"),
     }
 
 
 def breadth_internals(index: str = "sp500") -> dict:
     """Series the Fear & Greed engine needs without a second download.
 
-    Returns the McClellan summation series and the daily new-high / new-low
-    ratio context derived from the same constituent frame.
+    Returns the McClellan summation series, the daily new-high / new-low
+    counts and the as-of session, all from the same session-aligned frame.
     """
-    frame = _close_frame(index)
-    if frame.empty:
-        return {"summation": pd.Series(dtype=float)}
-    ad = _adv_decl_series(frame)
-    mc = mcclellan(ad)
-    return {"summation": mc["summation"] if not mc.empty else pd.Series(dtype=float)}
+    frames = _ohlc_frames(index)
+    empty = {"summation": pd.Series(dtype=float), "highsLows": pd.DataFrame(), "asOf": None}
+    if not frames or len(frames["close"]) < 2:
+        return empty
+    close = frames["close"]
+    mc = mcclellan(_adv_decl_series(close))
+    return {
+        "summation": mc["summation"] if not mc.empty else pd.Series(dtype=float),
+        "highsLows": _highs_lows_series(frames["high"], frames["low"], close),
+        "asOf": close.index[-1],
+    }

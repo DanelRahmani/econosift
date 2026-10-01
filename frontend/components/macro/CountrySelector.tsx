@@ -15,7 +15,8 @@ function useCountryNames() {
   const lookup = async (iso2: string): Promise<string> => {
     if (mapRef.current.has(iso2)) return mapRef.current.get(iso2)!;
     try {
-      const res = await fetch(`/api/macro/search-countries?q=${iso2}`);
+      // Same base URL as lib/api.ts: a bare "/api/..." misses the backend in the desktop build.
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/macro/search-countries?q=${encodeURIComponent(iso2)}`);
       const data = await res.json();
       const match = (data.countries || []).find(
         (r: WbResult) => r.iso2.toLowerCase() === iso2.toLowerCase()

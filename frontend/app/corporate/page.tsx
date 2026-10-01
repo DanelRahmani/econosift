@@ -7,6 +7,8 @@ import { Card, PageSkeleton } from "@/components/ui";
 import { TickerSearch } from "@/components/TickerSearch";
 import { useUrlState } from "@/lib/useUrlState";
 import { EarningsQuality } from "@/components/corporate/EarningsQuality";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 
 function KpiCard({ label, value, sub, color }: {
   label: string; value: string; sub?: string; color?: string;
@@ -37,6 +39,7 @@ function CorporatePageInner() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searched, setSearched] = useState(false);
+  const scope = useSourceScope(provOf(data));
 
   const fetchHealth = useCallback((t: string) => {
     const trimmed = t.trim().toUpperCase();
@@ -109,7 +112,7 @@ function CorporatePageInner() {
 
       {/* Results */}
       {data && !loading && (
-        <div className="space-y-6">
+        <div className="space-y-6" {...scope}>
           {/* Company header */}
           <div className="flex items-baseline justify-between">
             <div>
@@ -117,14 +120,14 @@ function CorporatePageInner() {
               <p className="text-sm text-text-secondary">{data.sector}{data.industry ? ` · ${data.industry}` : ""}</p>
             </div>
             {data.price != null && (
-              <div className="text-right">
+              <div className="text-right" data-prov="price">
                 <div className="text-2xl font-bold text-text-primary">${data.price.toFixed(2)}</div>
               </div>
             )}
           </div>
 
           {/* Altman Z-Score */}
-          <Card className="p-6">
+          <Card className="p-6" data-prov="altmanZ">
             <h3 className="font-semibold text-lg mb-4">Altman Z-Score</h3>
             {data.altmanZ.isFinancial && (
               <p className="text-xs text-warning mb-3">⚠ {data.altmanZ.note || "Altman Z-Score is not applicable to financial firms."}</p>
@@ -168,7 +171,7 @@ function CorporatePageInner() {
           </Card>
 
           {/* Piotroski F-Score */}
-          <Card className="p-6">
+          <Card className="p-6" data-prov="piotroski">
             <h3 className="font-semibold text-lg mb-4">Piotroski F-Score</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="flex flex-col items-center justify-center">
@@ -210,7 +213,7 @@ function CorporatePageInner() {
           </Card>
 
           {/* Beneish M-Score */}
-          <Card className="p-6">
+          <Card className="p-6" data-prov="beneish">
             <h3 className="font-semibold text-lg mb-4">Beneish M-Score</h3>
             {data.beneish.validComponents < 8 && (
               <p className="text-xs text-text-muted mb-3">

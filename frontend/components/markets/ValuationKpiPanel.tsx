@@ -45,9 +45,9 @@ function fmtWacc(v: number | null | undefined): string {
 // ---------------------------------------------------------------------------
 
 /** A single KPI tile in the top strip. */
-function KpiTile({ label, value }: { label: string; value: string }) {
+function KpiTile({ label, value, prov }: { label: string; value: string; prov?: string }) {
   return (
-    <div className="flex flex-col gap-0.5 rounded-lg bg-surface-alt px-3 py-2.5 min-w-[6rem]">
+    <div className="flex flex-col gap-0.5 rounded-lg bg-surface-alt px-3 py-2.5 min-w-[6rem]" data-prov={prov} data-prov-ctx={label}>
       <span className="text-xs text-text-muted truncate">{label}</span>
       <span className="font-mono text-xs lg:text-sm text-text-primary truncate" title={value}>{value}</span>
     </div>
@@ -55,11 +55,11 @@ function KpiTile({ label, value }: { label: string; value: string }) {
 }
 
 /** A two-column label/value row used inside extended tables. */
-function Row({ label, value, valueClass }: { label: string; value: string; valueClass?: string }) {
+function Row({ label, value, valueClass, prov }: { label: string; value: string; valueClass?: string; prov?: string }) {
   return (
     <>
-      <dt className="text-text-secondary text-sm">{label}</dt>
-      <dd className={`text-right font-mono text-sm ${valueClass ?? ""}`}>{value}</dd>
+      <dt className="text-text-secondary text-sm" data-prov={prov} data-prov-ctx={label}>{label}</dt>
+      <dd className={`text-right font-mono text-sm ${valueClass ?? ""}`} data-prov={prov} data-prov-ctx={label}>{value}</dd>
     </>
   );
 }
@@ -173,16 +173,16 @@ export function ValuationKpiPanel({ kpis, wacc, fundamentals }: Props) {
       : `${nil(kpis.fiftyTwoWeekLow) ? DASH : fmtPrice(kpis.fiftyTwoWeekLow, sym)} – ${nil(kpis.fiftyTwoWeekHigh) ? DASH : fmtPrice(kpis.fiftyTwoWeekHigh, sym)}`;
 
   // ── KPI strip tiles ───────────────────────────────────────────────────────
-  const kpiTiles: { label: string; value: string }[] = [
-    { label: "Price", value: fmtPrice(kpis.price, sym) },
-    { label: "Market Cap", value: nil(kpis.marketCap) ? DASH : `${sym}${fmtLarge(kpis.marketCap)}` },
-    { label: "P/E (TTM)", value: fmtNum(kpis.trailingPE) },
-    { label: "Forward P/E", value: fmtNum(kpis.forwardPE) },
-    { label: "EPS (TTM)", value: nil(kpis.trailingEps) ? DASH : `${sym}${fmtNum(kpis.trailingEps)}` },
-    { label: "Fwd EPS", value: nil(kpis.forwardEps) ? DASH : `${sym}${fmtNum(kpis.forwardEps)}` },
-    { label: "Div. Yield", value: nil(kpis.dividendYield) ? DASH : fmtPct(kpis.dividendYield) },
-    { label: "52W Range", value: rangeStr },
-    { label: "Beta", value: fmtNum(kpis.beta) },
+  const kpiTiles: { label: string; value: string; prov: string }[] = [
+    { label: "Price", value: fmtPrice(kpis.price, sym), prov: "kpis.price" },
+    { label: "Market Cap", value: nil(kpis.marketCap) ? DASH : `${sym}${fmtLarge(kpis.marketCap)}`, prov: "kpis.marketCap" },
+    { label: "P/E (TTM)", value: fmtNum(kpis.trailingPE), prov: "kpis.trailingPE" },
+    { label: "Forward P/E", value: fmtNum(kpis.forwardPE), prov: "kpis.forwardPE" },
+    { label: "EPS (TTM)", value: nil(kpis.trailingEps) ? DASH : `${sym}${fmtNum(kpis.trailingEps)}`, prov: "kpis.trailingEps" },
+    { label: "Fwd EPS", value: nil(kpis.forwardEps) ? DASH : `${sym}${fmtNum(kpis.forwardEps)}`, prov: "kpis.forwardEps" },
+    { label: "Div. Yield", value: nil(kpis.dividendYield) ? DASH : fmtPct(kpis.dividendYield), prov: "kpis.dividendYield" },
+    { label: "52W Range", value: rangeStr, prov: "kpis.fiftyTwoWeekLow" },
+    { label: "Beta", value: fmtNum(kpis.beta), prov: "kpis.beta" },
   ];
 
   // ── Short float color ─────────────────────────────────────────────────────
@@ -208,7 +208,7 @@ export function ValuationKpiPanel({ kpis, wacc, fundamentals }: Props) {
       {/* ── KPI Strip ─────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
         {kpiTiles.map((t) => (
-          <KpiTile key={t.label} label={t.label} value={t.value} />
+          <KpiTile key={t.label} label={t.label} value={t.value} prov={t.prov} />
         ))}
       </div>
 
@@ -216,10 +216,10 @@ export function ValuationKpiPanel({ kpis, wacc, fundamentals }: Props) {
       {(kpis.sector || kpis.industry) && (
         <div className="flex flex-wrap gap-2 text-xs text-text-secondary">
           {kpis.sector && (
-            <span className="px-2 py-0.5 rounded bg-surface-alt">{kpis.sector}</span>
+            <span className="px-2 py-0.5 rounded bg-surface-alt" data-prov="kpis.sector">{kpis.sector}</span>
           )}
           {kpis.industry && (
-            <span className="px-2 py-0.5 rounded bg-surface-alt">{kpis.industry}</span>
+            <span className="px-2 py-0.5 rounded bg-surface-alt" data-prov="kpis.industry">{kpis.industry}</span>
           )}
         </div>
       )}
@@ -236,30 +236,35 @@ export function ValuationKpiPanel({ kpis, wacc, fundamentals }: Props) {
               Valuation &amp; Quality
             </h3>
             <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5">
-              <Row label="EV / FCF" value={fmtNum(kpis.evToFcf)} />
-              <Row label="FCF Yield" value={fmtDecPct(kpis.fcfYield)} />
+              <Row label="EV / FCF" value={fmtNum(kpis.evToFcf)} prov="kpis.evToFcf" />
+              <Row label="FCF Yield" value={fmtDecPct(kpis.fcfYield)} prov="kpis.fcfYield" />
               <Row
                 label="Short Float %"
                 value={nil(kpis.shortPercentOfFloat) ? DASH : fmtDecPct(kpis.shortPercentOfFloat)}
                 valueClass={sfClass}
+                prov="kpis.shortPercentOfFloat"
               />
-              <Row label="Short Ratio" value={fmtNum(kpis.shortRatio)} />
+              <Row label="Short Ratio" value={fmtNum(kpis.shortRatio)} prov="kpis.shortRatio" />
               <Row
                 label="ROIC"
                 value={nil(roicVal) ? DASH : fmtPctFromFraction(roicVal)}
+                prov="fundamentals.roic.roic"
               />
-              <Row label="Book Value / Sh." value={nil(kpis.bookValue) ? DASH : `${sym}${fmtNum(kpis.bookValue)}`} />
+              <Row label="Book Value / Sh." value={nil(kpis.bookValue) ? DASH : `${sym}${fmtNum(kpis.bookValue)}`} prov="kpis.bookValue" />
               <Row
                 label="CAPM Required Ret."
                 value={fmtDecPct(wacc.costOfEquity)}
+                prov="valuation.wacc.costOfEquity"
               />
               <Row
                 label="Cash Conv. Cycle"
                 value={nil(ccc) ? DASH : `${fmtNum(ccc, 1)} days`}
+                prov="fundamentals.cashConversionCycle.ccc"
               />
               <Row
                 label="Avg. Volume"
                 value={nil(kpis.averageVolume) ? DASH : fmtLarge(kpis.averageVolume)}
+                prov="kpis.averageVolume"
               />
             </dl>
             <p className="mt-3 text-xs text-text-muted">
@@ -273,24 +278,27 @@ export function ValuationKpiPanel({ kpis, wacc, fundamentals }: Props) {
               WACC Breakdown
             </h3>
             <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5">
-              <Row label="WACC" value={fmtWacc(wacc.wacc)} />
-              <Row label="Cost of Equity" value={fmtWacc(wacc.costOfEquity)} />
-              <Row label="Cost of Debt" value={fmtWacc(wacc.costOfDebt)} />
-              <Row label="Tax Rate" value={fmtWacc(wacc.taxRate)} />
-              <Row label="ERP" value={fmtWacc(wacc.erp)} />
-              <Row label="Risk-Free" value={fmtWacc(wacc.riskFree)} />
-              <Row label="Beta" value={fmtNum(wacc.beta)} />
+              <Row label="WACC" value={fmtWacc(wacc.wacc)} prov="valuation.wacc.wacc" />
+              <Row label="Cost of Equity" value={fmtWacc(wacc.costOfEquity)} prov="valuation.wacc.costOfEquity" />
+              <Row label="Cost of Debt" value={fmtWacc(wacc.costOfDebt)} prov="valuation.wacc.costOfDebt" />
+              <Row label="Tax Rate" value={fmtWacc(wacc.taxRate)} prov="valuation.wacc.taxRate" />
+              <Row label="ERP" value={fmtWacc(wacc.erp)} prov="valuation.wacc.erp" />
+              <Row label="Risk-Free" value={fmtWacc(wacc.riskFree)} prov="valuation.wacc.riskFree" />
+              <Row label="Beta" value={fmtNum(wacc.beta)} prov="valuation.wacc.beta" />
               <Row
                 label="Wt. Equity"
                 value={nil(wacc.weightEquity) ? DASH : fmtPct((wacc.weightEquity as number) * 100)}
+                prov="valuation.wacc.weightEquity"
               />
               <Row
                 label="Wt. Debt"
                 value={nil(wacc.weightDebt) ? DASH : fmtPct((wacc.weightDebt as number) * 100)}
+                prov="valuation.wacc.weightDebt"
               />
               <Row
                 label="Country"
                 value={wacc.country || DASH}
+                prov="valuation.wacc.country"
               />
             </dl>
           </Card>
@@ -319,6 +327,7 @@ export function ValuationKpiPanel({ kpis, wacc, fundamentals }: Props) {
                           key={k}
                           label={DUPONT_3_LABELS[k] ?? k}
                           value={formatDupontValue(k, v)}
+                          prov={`fundamentals.dupont.threeFactor.${k}`}
                         />
                       ))}
                   </dl>
@@ -341,6 +350,7 @@ export function ValuationKpiPanel({ kpis, wacc, fundamentals }: Props) {
                           key={k}
                           label={DUPONT_5_LABELS[k] ?? k}
                           value={formatDupontValue(k, v)}
+                          prov={`fundamentals.dupont.fiveFactor.${k}`}
                         />
                       ))}
                   </dl>
@@ -359,7 +369,7 @@ export function ValuationKpiPanel({ kpis, wacc, fundamentals }: Props) {
             <div className="space-y-3">
 
               {/* Piotroski */}
-              <div className="flex items-start justify-between gap-2">
+              <div className="flex items-start justify-between gap-2" data-prov="fundamentals.piotroski">
                 <div className="min-w-0">
                   <p className="text-sm text-text-secondary">Piotroski F-Score</p>
                   <p className="text-xs text-text-muted mt-0.5">
@@ -376,7 +386,7 @@ export function ValuationKpiPanel({ kpis, wacc, fundamentals }: Props) {
               {piotroski?.criteria && Object.keys(piotroski.criteria).length > 0 && (
                 <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 pl-1">
                   {Object.entries(piotroski.criteria).map(([k, v]) => (
-                    <div key={k} className="flex items-center gap-1.5 text-xs">
+                    <div key={k} className="flex items-center gap-1.5 text-xs" data-prov={`fundamentals.piotroski.criteria.${k}`}>
                       <span
                         className={
                           v === true ? "text-success" :
@@ -413,7 +423,7 @@ export function ValuationKpiPanel({ kpis, wacc, fundamentals }: Props) {
               <div className="border-t border-border" />
 
               {/* Ohlson */}
-              <div className="flex items-start justify-between gap-2">
+              <div className="flex items-start justify-between gap-2" data-prov="fundamentals.ohlson.oScore">
                 <div className="min-w-0">
                   <p className="text-sm text-text-secondary">Ohlson O-Score</p>
                   <p className="text-xs text-text-muted mt-0.5">

@@ -8,6 +8,7 @@ from __future__ import annotations
 import asyncio
 from fastapi import APIRouter, Query
 
+from .. import provenance as pv
 from ..services import breadth_service, indices_service, feargreed_service, movers_service
 from ..services import constituents
 
@@ -46,4 +47,6 @@ async def constituents_endpoint(index: str = "sp500"):
     """Index membership (yfinance-ready symbols); cached weekly. Reused by the
     treemap and screener universes in later phases."""
     members = await asyncio.to_thread(constituents.get_constituents, _norm_index(index))
-    return {"index": _norm_index(index), "count": len(members), "constituents": members}
+    return pv.attach(
+        {"index": _norm_index(index), "count": len(members), "constituents": members},
+        {"*": pv.ref("wikipedia", None, "Index constituents (MediaWiki API)")})

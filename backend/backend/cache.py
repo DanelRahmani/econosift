@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextvars
 import functools
 import json
 import threading
@@ -59,16 +60,82 @@ def _make_key(args, kwargs) -> tuple:
     return args + tuple(sorted(kwargs.items()))
 
 
+# ---------------------------------------------------------------------------
+# Fetch times — "when was the data in this response actually fetched?"
+#
+# A response assembled at 14:05 from an entry cached at 13:10 was fetched at
+# 13:10. Each cached entry remembers when it was computed (or, if it was built
+# from older cached inputs, the oldest of those), and every cache read during
+# a request reports that time to a request-scoped log. ``oldest_fetch()`` then
+# gives the age of the stalest data the response contains.
+# ---------------------------------------------------------------------------
+
+_fetch_times: dict[str, TTLCache] = {}
+_fetch_log: contextvars.ContextVar[list[float] | None] = contextvars.ContextVar("fetch_log", default=None)
+
+
+def start_fetch_log() -> None:
+    """Begin collecting fetch times for the current request/context."""
+    _fetch_log.set([])
+
+
+def oldest_fetch() -> float | None:
+    """Epoch seconds of the oldest data read since ``start_fetch_log()``, or
+    None if nothing cached was read (or no log was started)."""
+    log = _fetch_log.get()
+    return min(log) if log else None
+
+
+def _note_fetch(ts: float | None) -> None:
+    log = _fetch_log.get()
+    if log is not None and ts is not None:
+        log.append(ts)
+
+
+def _times(name: str) -> TTLCache:
+    if name not in _fetch_times:
+        _fetch_times[name] = TTLCache(maxsize=_CACHE_MAXSIZE, ttl=_CACHE_TTL)
+    return _fetch_times[name]
+
+
+def _hit(name: str, raw_key) -> None:
+    """Record a cache hit and report when that entry's data was fetched."""
+    _record(name, True)
+    _note_fetch(_times(name).get(raw_key))
+
+
+class _Computing:
+    """Collects the fetch times of whatever a cached function reads while it
+    computes, so the new entry is dated by its oldest input."""
+
+    def __enter__(self):
+        self._inner: list[float] = []
+        self._token = _fetch_log.set(self._inner)
+        return self
+
+    def __exit__(self, *exc):
+        _fetch_log.reset(self._token)
+        return False
+
+    def fetched_at(self) -> float:
+        return min(self._inner, default=time.time())
+
+
 def _is_empty_result(result) -> bool:
-    """Default predicate: treat None and empty containers as 'no data'.
+    """Default predicate: treat None, empty containers and failure envelopes
+    as 'no data'.
 
     Empty/failed results must never be cached — otherwise a transient source
     failure (or a fetch made before API keys were entered) poisons the cache
-    permanently, since the persistent tier survives restarts.
+    permanently, since the persistent tier survives restarts. A dict carrying
+    a truthy ``error`` key or ``status == "unavailable"`` is a failure envelope
+    even though it is non-empty.
     """
     if result is None:
         return True
     if isinstance(result, (dict, list, tuple, set, str)) and len(result) == 0:
+        return True
+    if isinstance(result, dict) and (result.get("error") or result.get("status") == "unavailable"):
         return True
     return False
 
@@ -96,30 +163,35 @@ def cached(name: str | None = None, skip_if=None):
             cache = _get_cache(cache_name)
             raw_key = _make_key(args, kwargs)
             if raw_key in cache:
-                _record(cache_name, True)
+                _hit(cache_name, raw_key)
                 return cache[raw_key]
 
             # Single-flight: on a cold cache, concurrent callers would each hit
             # the upstream source (thundering herd against rate-limited APIs).
             with lock:
                 if raw_key in cache:
-                    _record(cache_name, True)
+                    _hit(cache_name, raw_key)
                     return cache[raw_key]
 
                 # Tier 2: SQLite (survives restarts)
                 str_key = _json.dumps(raw_key, default=str, sort_keys=True)
                 db_val = persistent.get(str_key)
                 if db_val is not None:
-                    _record(cache_name, True)
                     cache[raw_key] = db_val  # promote to memory
+                    _times(cache_name)[raw_key] = persistent.loaded_at(str_key)
+                    _hit(cache_name, raw_key)
                     return db_val
 
                 _record(cache_name, False)
-                result = func(*args, **kwargs)
+                with _Computing() as computing:
+                    result = func(*args, **kwargs)
+                fetched = computing.fetched_at()
+                _note_fetch(fetched)
                 if is_empty(result):
                     return result  # don't cache empty/failed results
                 cache[raw_key] = result
-                persistent.set(str_key, result)  # persist to DB
+                _times(cache_name)[raw_key] = fetched
+                persistent.set(str_key, result, fetched)  # persist to DB
                 return result
 
         return wrapper
@@ -150,28 +222,33 @@ def async_cached(name: str | None = None, skip_if=None):
             cache = _get_cache(cache_name)
             raw_key = _make_key(args, kwargs)
             if raw_key in cache:
-                _record(cache_name, True)
+                _hit(cache_name, raw_key)
                 return cache[raw_key]
 
             async with lock:
                 if raw_key in cache:
-                    _record(cache_name, True)
+                    _hit(cache_name, raw_key)
                     return cache[raw_key]
 
                 # Tier 2: SQLite (survives restarts)
                 str_key = _json.dumps(raw_key, default=str, sort_keys=True)
                 db_val = persistent.get(str_key)
                 if db_val is not None:
-                    _record(cache_name, True)
                     cache[raw_key] = db_val  # promote to memory
+                    _times(cache_name)[raw_key] = persistent.loaded_at(str_key)
+                    _hit(cache_name, raw_key)
                     return db_val
 
                 _record(cache_name, False)
-                result = await func(*args, **kwargs)
+                with _Computing() as computing:
+                    result = await func(*args, **kwargs)
+                fetched = computing.fetched_at()
+                _note_fetch(fetched)
                 if is_empty(result):
                     return result  # don't cache empty/failed results
                 cache[raw_key] = result
-                persistent.set(str_key, result)  # persist to DB
+                _times(cache_name)[raw_key] = fetched
+                persistent.set(str_key, result, fetched)  # persist to DB
                 return result
 
         return wrapper
@@ -190,7 +267,13 @@ class HybridCache:
         self._name = name
         self._ttl_sec = ttl_sec
         self._hit_miss = {"hits_mem": 0, "hits_db": 0, "misses": 0}
+        # key -> epoch seconds the value held for that key was fetched
+        self._fetched = TTLCache(maxsize=maxsize, ttl=ttl_sec)
         _hybrid_caches.append(self)
+
+    def loaded_at(self, key: str) -> float | None:
+        """When the value held for ``key`` was fetched, if known."""
+        return self._fetched.get(key)
 
     def _get_from_db(self, key: str):
         """Return deserialized value from SQLite, or None on miss/failure."""
@@ -213,24 +296,32 @@ class HybridCache:
                         db.delete(row)
                         db.commit()
                         return None
+                    self._fetched[key] = created.replace(tzinfo=timezone.utc).timestamp()
                 return json.loads(row.value_json)
             finally:
                 db.close()
         except Exception:
             return None  # DB unavailable — degrade gracefully
 
-    def _set_in_db(self, key: str, value) -> None:
-        """Persist value to SQLite; non-fatal on failure."""
+    def _set_in_db(self, key: str, value, fetched_at: float | None = None) -> None:
+        """Persist value to SQLite; non-fatal on failure.
+
+        ``fetched_at`` (epoch seconds) dates the row by when its data was
+        fetched, which can be earlier than now if it was built from older
+        cached inputs; the row then also expires with those inputs.
+        """
         try:
             from backend.database import SessionLocal
             from backend.db_models import CacheEntry
+            created = (datetime.fromtimestamp(fetched_at, timezone.utc).replace(tzinfo=None)
+                       if fetched_at is not None else _utcnow())
             db = SessionLocal()
             try:
                 entry = CacheEntry(
                     cache_name=self._name,
                     key=key,
                     value_json=json.dumps(value, default=str),
-                    created_at=_utcnow(),
+                    created_at=created,
                 )
                 db.merge(entry)
                 db.commit()
@@ -276,15 +367,16 @@ class HybridCache:
         self._hit_miss["misses"] += 1
         return None
 
-    def set(self, key: str, value) -> None:
+    def set(self, key: str, value, fetched_at: float | None = None) -> None:
         """Write to both memory and DB.  Skips DB for non-JSON-serializable types (e.g. DataFrames)."""
         self._memory[key] = value
+        self._fetched[key] = fetched_at if fetched_at is not None else time.time()
         # Only persist JSON-serializable values — DataFrames/numpy arrays can't round-trip
         try:
             json.dumps(value)
         except (TypeError, ValueError):
             return  # non-serializable — memory-only is fine
-        self._set_in_db(key, value)
+        self._set_in_db(key, value, fetched_at)
 
     def get_stale_while_revalidate(self, key: str, max_age_sec: int = 300):
         """
@@ -327,7 +419,8 @@ def clear_all(name: str | None = None) -> dict:
 
     Pass ``name`` to flush a single cache; ``None`` flushes everything. Used by
     the Admin "Clear cache & re-warm" action to purge poisoned/empty entries.
-    Returns ``{"entries": <db rows deleted>, "memory_caches": <caches cleared>}``.
+    Returns ``{"entries": <db rows deleted>, "memory_caches": <caches cleared>}``,
+    plus ``"error"`` when the SQLite tier could not be flushed.
     """
     mem_cleared = 0
     for cname, c in list(_caches.items()):
@@ -337,8 +430,13 @@ def clear_all(name: str | None = None) -> dict:
     for hc in list(_hybrid_caches):
         if name is None or hc._name == name:
             hc._memory.clear()
+            hc._fetched.clear()
+    for tname, t in list(_fetch_times.items()):
+        if name is None or tname == name:
+            t.clear()
 
     entries = 0
+    result: dict = {}
     try:
         from backend.database import SessionLocal
         from backend.db_models import CacheEntry
@@ -351,7 +449,10 @@ def clear_all(name: str | None = None) -> dict:
             db.commit()
         finally:
             db.close()
-    except Exception:
-        pass
+    except Exception as exc:
+        # The persistent rows are still there and will be served again, so a
+        # failed flush (e.g. SQLite locked by a running job) must not read as
+        # a successful one.
+        result["error"] = f"persistent cache not cleared: {exc}"
 
-    return {"entries": entries, "memory_caches": mem_cleared}
+    return {"entries": entries, "memory_caches": mem_cleared, **result}
