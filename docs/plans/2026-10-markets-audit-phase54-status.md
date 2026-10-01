@@ -23,7 +23,7 @@ M-18 / M-17 / M-22 contract, shared by backend and frontend:
 | Agent | Findings | State |
 |---|---|---|
 | G | M-07, M-08 | ✅ done, committed in the checkpoint. XLE YTD 38.38 % → 41.29 % (prior year-end base); XLK 3M 7.14 % → 8.91 % (63 sessions, = chart). Tests `tests/test_sector_returns_m07_m08.py`. Shared helpers `ytd_base`, `session_base` in `sector_service.py`; treemap YTD drops a symbol with no prior-year close. |
-| E | M-06, M-12, M-20 (`yfinance_service.py`) | was in progress — check working tree / redo |
+| E | M-06, M-12, M-20 (`yfinance_service.py`) | ✅ done, committed `827004b`. AAPL quote −1.53 % → −1.22 % (last two daily bars, = treemap); Samsung fwd EPS 47,965 → 71,030 (+1y); `get_market_caps(…, one_per_issuer=True)` drops GOOG/BRK-A/FOX/NWS/… (portfolio BL passes False). Tests `tests/test_yf_quotes_m06_m12_m20.py`. |
 | F | M-09, M-11, M-10 options, `short_risk_free_rate` | in progress (helper already on disk, uncommitted). **M-10 → ask the owner** with F's options. |
 | H | M-19 (+ P3-16 Bollinger ddof, P3-17 Ichimoku shift 26) | ✅ done, committed in the checkpoint. AAPL monthly pivot now from the last *completed* period (`_last_completed`, injectable `_today()`); Bollinger ddof=0 (upper 346.39 → 346.01); Senkou A/B displaced 26 (`_displace_senkou`). Tests `tests/test_technicals_m19.py` (2 need pandas_ta → container only). Follow-ups: forward cloud still not emitted (needs `ichimoku(append=False)` span frame); Chikou displaced 25 not 26 (one-line `shift(-1)`); daily pivot stale when market closed. |
 | I | M-13, M-14, M-15, M-18, M-23 (`fundamentals.py`, `metrics.py`, `snowflake_service.py`, `routers/ratios.py`) | had not edited files yet at checkpoint |
