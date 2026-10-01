@@ -27,7 +27,10 @@ M-18 / M-17 / M-22 contract, shared by backend and frontend:
 | F | M-09, M-11, M-10 options, `short_risk_free_rate` | in progress (helper already on disk, uncommitted). **M-10 → ask the owner** with F's options. |
 | H | M-19 (+ P3-16 Bollinger ddof, P3-17 Ichimoku shift 26) | ✅ done, committed in the checkpoint. AAPL monthly pivot now from the last *completed* period (`_last_completed`, injectable `_today()`); Bollinger ddof=0 (upper 346.39 → 346.01); Senkou A/B displaced 26 (`_displace_senkou`). Tests `tests/test_technicals_m19.py` (2 need pandas_ta → container only). Follow-ups: forward cloud still not emitted (needs `ichimoku(append=False)` span frame); Chikou displaced 25 not 26 (one-line `shift(-1)`); daily pivot stale when market closed. |
 | I | M-13, M-14, M-15, M-18, M-23 (`fundamentals.py`, `metrics.py`, `snowflake_service.py`, `routers/ratios.py`) | had not edited files yet at checkpoint |
-| J | M-16, M-17, M-21, M-22, UI parts of M-14/M-15/M-23/M-18, P3-27 | in progress (uncommitted) |
+| J | M-16, M-17, M-21, M-22, UI parts of M-14/M-15/M-23/M-18, P3-27 | ✅ done, committed `09213a3` (tsc + eslint clean; no live UI check yet). DcfPanel seeds from `/valuation/full` DCF `detail.inputs` (AAPL grid $169.17 = panel default after fix, was $174.83). Caveats: Yahoo beta labelled "5y mo." by documentation; analyst estimate currency = price currency. Needs backend keys `unavailable["efficiency.dso"]`, `unavailable["profitability.fcfMargin"]` for banks (sent to I). |
+
+After the rebuild, check in the browser: grid DCF == panel default (Valuation), one risk row per
+ticker (Overview), beta basis label (Ratios).
 
 Orchestrator's own uncommitted change: `backend/backend/routers/market.py` (`/market/risk` live rf,
 `riskFree`/`riskFreeSource`, provenance text says simple returns). Needs a router test once I's
