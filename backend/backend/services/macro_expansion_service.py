@@ -9,6 +9,7 @@ import pandas as pd
 
 from ..cache import async_cached
 from ..config import FRED_API_KEY
+from ..sources._annual import yoy_pct
 from .ratelimit import fred_limiter
 
 log = logging.getLogger(__name__)
@@ -118,15 +119,10 @@ async def fetch_fred_series(
             if not series:
                 continue
             df = pd.DataFrame(series).set_index("date")
-            df.index = pd.to_datetime(df.index)
-            df = df.sort_index()
-            # One year of observations at the series' own frequency.
-            step = df.index.to_series().diff().dt.days.median() if len(df) > 1 else 365
-            periods = max(1, int(round(365.25 / step))) if step and step > 0 else 1
-            df["value"] = df["value"].pct_change(periods) * 100
+            # Lag matched by date, not row count (missing months exist).
             raw[sid] = [
                 {"date": str(d.date()), "value": round(float(v), 4)}
-                for d, v in df["value"].dropna().items()
+                for d, v in yoy_pct(df["value"]).items()
             ]
         return raw
     except Exception as exc:

@@ -16,6 +16,11 @@ def _source_order(indicator: str, countries: tuple[str, ...]) -> list:
     """Return ranked list of source modules (highest priority first)."""
     if indicator == "exchange_rates":
         return [source_frankfurter]
+    if indicator == "debt_gdp":
+        # General-government debt (IMF WEO) for every country first: the World
+        # Bank and FRED series are central-government only, and switching
+        # definitions mid-series created level breaks (e.g. Korea 47.8 → 52.3).
+        return [source_imf, source_worldbank, source_dbnomics]
 
     order: list = []
     has_us = "US" in countries

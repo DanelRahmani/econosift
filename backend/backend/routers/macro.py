@@ -19,6 +19,7 @@ from ..services import macro_service
 from ..services import regime_service
 from ..services import yfinance_service as yfs
 from ..sources import source_frankfurter, source_datareader, source_imf
+from ..sources._annual import yoy_pct
 
 log = logging.getLogger(__name__)
 
@@ -324,19 +325,16 @@ def _yoy(series: list[dict]) -> list[dict]:
 
     The lag is one year of observations for the series' own frequency
     (12 monthly, 4 quarterly, 52 weekly). A fixed ``pct_change(12)`` applied
-    to quarterly GDP produced a 3-year change labelled YoY (audit D-09).
+    to quarterly GDP produced a 3-year change labelled YoY (audit D-09), and
+    any row-count lag misreads a series with a missing observation; the lag
+    is matched by date (``yoy_pct``).
     """
     if not series:
         return []
     df = pd.DataFrame(series).set_index("date")
-    df.index = pd.to_datetime(df.index)
-    df = df.sort_index()
-    step = df.index.to_series().diff().dt.days.median() if len(df) > 1 else 365
-    periods = max(1, int(round(365.25 / step))) if step and step > 0 else 1
-    df["yoy"] = df["value"].pct_change(periods) * 100
     return [
         {"date": str(d.date()), "value": round(float(v), 4)}
-        for d, v in df["yoy"].dropna().items()
+        for d, v in yoy_pct(df["value"]).items()
     ]
 
 

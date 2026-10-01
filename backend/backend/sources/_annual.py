@@ -13,6 +13,7 @@ YoY conversions need the year before ``start``; callers fetch from
 """
 from __future__ import annotations
 
+import numpy as np
 import pandas as pd
 
 
@@ -33,6 +34,29 @@ def complete_years(s: pd.Series) -> set[int]:
     last_per_year = pd.Series(idx, index=idx.year).groupby(level=0).max()
     return {int(y) for y, last in last_per_year.items()
             if last >= pd.Timestamp(int(y), 12, 31) - tolerance}
+
+
+def yoy_pct(s: pd.Series) -> pd.Series:
+    """Year-over-year % change by date, at the series' own frequency.
+
+    Each value is compared with the observation one year earlier (nearest
+    within half a period). A row-count lag such as ``pct_change(12)`` spans 13
+    months whenever a month is missing — FRED's CPI has no October 2025
+    print — and silently reported a 13-month change as YoY. A point whose
+    year-earlier observation is missing gets no value.
+    """
+    s = pd.to_numeric(s, errors="coerce").dropna()
+    if len(s) < 2:
+        return pd.Series(dtype=float)
+    s.index = pd.to_datetime(s.index)
+    s = s.sort_index()
+    step = float(s.index.to_series().diff().dt.days.median())
+    tolerance = pd.Timedelta(days=max(3.0, step / 2))
+    target = pd.DataFrame({"t": s.index - pd.DateOffset(years=1)})
+    base = pd.DataFrame({"t": s.index, "v": s.to_numpy()})
+    prev = pd.merge_asof(target, base, on="t", direction="nearest", tolerance=tolerance)["v"].to_numpy()
+    out = pd.Series((s.to_numpy() / prev - 1.0) * 100.0, index=s.index)
+    return out.replace([np.inf, -np.inf], np.nan).dropna()
 
 
 def to_annual(s: pd.Series, method: str, start: int, end: int) -> list[tuple[int, float]]:

@@ -118,8 +118,10 @@ def _cpi_yoy_quarterly(start_year: int) -> pd.Series:
     if s.empty:
         return pd.Series(dtype=float)
     s.index = pd.to_datetime(s.index)
-    # Monthly YoY first, then quarter-end
-    monthly_yoy = (s / s.shift(12) - 1.0) * 100.0
+    # Monthly YoY first (lag matched by date: a missing month must not turn
+    # it into a 13-month change), then quarter-end
+    from ..sources._annual import yoy_pct
+    monthly_yoy = yoy_pct(s)
     quarterly = monthly_yoy.resample("QE").last().dropna()
     return quarterly
 
