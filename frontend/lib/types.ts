@@ -248,9 +248,13 @@ export interface Fundamentals {
     fiveFactor: Record<string, number | null>;
   } | null;
   piotroski: { score: number | null; maxScore: number | null; criteria: Record<string, boolean | null> } | null;
-  beneish: { mScore: number | null; note?: string } | null;
+  beneish: { mScore: number | null; manipulationLikely?: boolean | null; note?: string } | null;
   ohlson: { oScore: number | null; probDefault: number | null } | null;
-  cashConversionCycle: { ccc: number | null; dso: number | null; dio: number | null; dpo: number | null } | null;
+  cashConversionCycle: {
+    ccc: number | null; dso: number | null; dio: number | null; dpo: number | null;
+    /** Reason per null field, e.g. banks (audit M-23). */
+    unavailable?: Partial<Record<"ccc" | "dso" | "dio" | "dpo", string>>;
+  } | null;
 }
 export interface AnalystData {
   ticker: string;
@@ -1685,6 +1689,8 @@ export interface SnowflakeResponse {
   sector: string | null;
   industry: string | null;
   sectorPeers: number;
+  /** Peer set behind the percentile ranks; `reason` is set when there is none (audit M-13). */
+  peerGroup?: { scope: string | null; n: number; reason: string | null };
   overallScore: number | null;
   verdict: string;
   scores: SnowflakeScores;

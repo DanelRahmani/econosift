@@ -98,14 +98,15 @@ function PiotroskiBadge({ score, maxScore }: { score: number | null; maxScore: n
 }
 
 /**
- * Beneish M-Score badge. Red if mScore > -1.78 (possible manipulation), green only for a
- * real score below it. A missing score (with its backend note) is a neutral n/a, never green.
+ * Beneish M-Score badge. Red when the backend flags `manipulationLikely` (M > −2.22, the
+ * 8-variable cut-off used on /corporate), green only for a real score below it. A missing
+ * score (with its backend note) is a neutral n/a, never green.
  */
-function BeneishBadge({ mScore, note }: { mScore: number | null; note?: string }) {
-  if (nil(mScore)) {
+function BeneishBadge({ mScore, manipulationLikely, note }: { mScore: number | null; manipulationLikely?: boolean | null; note?: string }) {
+  if (nil(mScore) || manipulationLikely == null) {
     return <NaReason reason={note} className="px-2 py-0.5 rounded-md text-xs font-semibold bg-surface-alt" />;
   }
-  const manipulated = (mScore as number) > -1.78;
+  const manipulated = manipulationLikely === true;
   const cls = manipulated ? "bg-danger/20 text-danger" : "bg-success/20 text-success";
   return (
     <span className={`px-2 py-0.5 rounded-md text-xs font-semibold ${cls}`}>
@@ -309,6 +310,7 @@ export function ValuationKpiPanel({ kpis, wacc, fundamentals }: Props) {
                 label="Cash Conv. Cycle"
                 value={nil(ccc) ? DASH : `${fmtNum(ccc, 1)} days`}
                 prov="fundamentals.cashConversionCycle.ccc"
+                naReason={nil(ccc) ? fundamentals.cashConversionCycle?.unavailable?.ccc : undefined}
               />
               <Row
                 label="Avg. Volume"
@@ -467,11 +469,12 @@ export function ValuationKpiPanel({ kpis, wacc, fundamentals }: Props) {
                 <div className="min-w-0">
                   <p className="text-sm text-text-secondary">Beneish M-Score</p>
                   <p className="text-xs text-text-muted mt-0.5">
-                    &gt;−1.78 = possible earnings manipulation
+                    &gt;−2.22 = possible earnings manipulation
                   </p>
                 </div>
                 <BeneishBadge
                   mScore={beneish?.mScore ?? null}
+                  manipulationLikely={beneish?.manipulationLikely}
                   note={beneish?.note}
                 />
               </div>
