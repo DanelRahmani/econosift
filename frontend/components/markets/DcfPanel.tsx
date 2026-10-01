@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import type { CountryRate, DcfResponse, DcfSensitivity } from "@/lib/types";
+import type { CountryRate, DcfResponse, DcfSensitivity, ValuationFullResponse } from "@/lib/types";
 import { Card, Skeleton } from "@/components/ui";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
@@ -61,14 +61,33 @@ function isSensitivityFull(s: DcfResponse["sensitivity"]): s is DcfSensitivity {
 }
 
 // ── Main component ─────────────────────────────────────────────────────────
+// Generic fallback, used only when the backend gives no per-ticker DCF assumptions.
+const FALLBACK_PARAMS: Params = { wacc: 0.09, fcf_growth: 0.08, terminal_growth: 0.025, stage1_years: 10 };
+
+/**
+ * Pull the assumptions the valuation engine's own DCF model used for this ticker
+ * (CAPM/WACC-derived discount rate, analyst-based FCF growth), so the panel starts
+ * on the same DCF as the model grid instead of a hard-coded 9 % / 8 %.
+ */
+function defaultsFromFull(r: ValuationFullResponse): Params {
+  const dcf = r.valuation.models.find((m) => m.model.startsWith("DCF"));
+  const inp = (dcf?.detail as { inputs?: Partial<Record<string, number>> } | undefined)?.inputs;
+  const num = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
+  return {
+    wacc: num(inp?.wacc) ? inp.wacc : num(r.valuation.wacc?.wacc) ? r.valuation.wacc.wacc : FALLBACK_PARAMS.wacc,
+    fcf_growth: num(inp?.fcfGrowth) ? inp.fcfGrowth : FALLBACK_PARAMS.fcf_growth,
+    terminal_growth: num(inp?.terminalGrowth) ? inp.terminalGrowth : FALLBACK_PARAMS.terminal_growth,
+    stage1_years: num(inp?.stage1Years) ? inp.stage1Years : FALLBACK_PARAMS.stage1_years,
+  };
+}
+
 export function DcfPanel({ tickers, sharedWacc = null }: { tickers: string[]; period?: string; sharedWacc?: number | null }) {
   const [selectedTicker, setSelectedTicker] = useState<string>(tickers[0] ?? "");
-  const [params, setParams] = useState<Params>({
-    wacc: 0.09,
-    fcf_growth: 0.08,
-    terminal_growth: 0.025,
-    stage1_years: 10,
-  });
+  const [params, setParams] = useState<Params>(FALLBACK_PARAMS);
+  // Ticker the params were last seeded for; the DCF is only fetched once seeded.
+  const [seededFor, setSeededFor] = useState<string>("");
+  const [defaults, setDefaults] = useState<Params>(FALLBACK_PARAMS);
+  const [defaultsFromBackend, setDefaultsFromBackend] = useState(false);
   const [data, setData] = useState<DcfResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
@@ -89,17 +108,47 @@ export function DcfPanel({ tickers, sharedWacc = null }: { tickers: string[]; pe
     if (name) {
       const c = countryRates.find((r) => r.name === name);
       if (c) {
-        // Typical WACC = risk-free + ERP (simplified)
+        // Cost of equity of a beta-1 stock = risk-free + ERP (not a WACC; used as the discount rate override)
         setParams((prev) => ({ ...prev, wacc: Math.round((c.riskFreeRate + c.erp) * 10000) / 10000 }));
       }
+    } else {
+      setParams((prev) => ({ ...prev, wacc: defaults.wacc }));
     }
   }
 
-  // When sharedWacc changes from parent, update our WACC
+  // Seed the sliders with the backend's own DCF assumptions whenever the ticker changes.
   useEffect(() => {
-    if (sharedWacc !== null) {
-      setParams((prev) => ({ ...prev, wacc: sharedWacc }));
-    }
+    if (!selectedTicker) return;
+    let alive = true;
+    setSelectedCountry("");
+    api
+      .valuationFull(selectedTicker)
+      .then((r) => {
+        if (!alive) return;
+        const d = defaultsFromFull(r);
+        setDefaults(d);
+        setDefaultsFromBackend(true);
+        setParams(d);
+        setSeededFor(selectedTicker);
+      })
+      .catch(() => {
+        if (!alive) return;
+        setDefaults(FALLBACK_PARAMS);
+        setDefaultsFromBackend(false);
+        setParams(FALLBACK_PARAMS);
+        setSeededFor(selectedTicker);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [selectedTicker]);
+
+  // When the shared cost-of-equity override changes in the parent, apply it; clearing it
+  // restores the ticker's own default WACC.
+  useEffect(() => {
+    if (seededFor !== selectedTicker) return;
+    setParams((prev) => ({ ...prev, wacc: sharedWacc ?? defaults.wacc }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sharedWacc]);
   useEffect(() => {
     if (tickers.length && !tickers.includes(selectedTicker)) {
@@ -109,7 +158,7 @@ export function DcfPanel({ tickers, sharedWacc = null }: { tickers: string[]; pe
 
   // Debounced fetch – 500ms after any change (mirrors ValuationTab pattern)
   useEffect(() => {
-    if (!selectedTicker) return;
+    if (!selectedTicker || seededFor !== selectedTicker) return;
     const t = setTimeout(async () => {
       setLoading(true);
       setError(false);
@@ -129,7 +178,7 @@ export function DcfPanel({ tickers, sharedWacc = null }: { tickers: string[]; pe
       }
     }, 500);
     return () => clearTimeout(t);
-  }, [selectedTicker, params]);
+  }, [selectedTicker, seededFor, params]);
 
   // ── Early states ──────────────────────────────────────────────────────────
   if (!tickers.length) {
@@ -164,13 +213,13 @@ export function DcfPanel({ tickers, sharedWacc = null }: { tickers: string[]; pe
 
         {/* Country / discount rate selector */}
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-sm text-text-secondary">Discount Rate</span>
+          <span className="text-sm text-text-secondary" title="Risk-free rate + equity risk premium, i.e. the cost of equity of a beta-1 stock. Not a WACC.">Cost of equity (β = 1)</span>
           <select
             value={selectedCountry}
             onChange={(e) => handleCountryChange(e.target.value)}
             className="rounded-md bg-surface-alt border border-border px-2 py-1 text-xs text-text-primary"
           >
-            <option value="">Custom</option>
+            <option value="">{defaultsFromBackend ? "Ticker WACC (default)" : "Custom"}</option>
             {countryRates.map((c) => (
               <option key={c.name} value={c.name}>
                 {c.name} ({(c.riskFreeRate * 100).toFixed(2)}%)

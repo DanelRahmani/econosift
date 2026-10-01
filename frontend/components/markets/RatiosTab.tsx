@@ -92,16 +92,34 @@ function riskTone(g: RiskMetricGuide, v: number | null): "good" | "normal" | "ba
   return "bad";
 }
 
+/** "1y daily vs ^AEX, n=250" from the backend's betaBasis; falls back to just the benchmark. */
+function betaBasisLabel(d: RatiosResponse): string | undefined {
+  const b = d.betaBasis;
+  if (b) {
+    return `${b.period} ${b.frequency} vs ${b.benchmark}${b.nObs != null ? `, n=${b.nObs}` : ""}`;
+  }
+  return d.benchmark ? `vs ${d.benchmark}` : undefined;
+}
+
+/** "rf 3.62%, FRED DGS3MO" when the backend reports the risk-free rate it used. */
+function riskFreeLabel(d: RatiosResponse): string | undefined {
+  if (d.riskFree == null) return undefined;
+  return `rf ${(d.riskFree * 100).toFixed(2)}%${d.riskFreeSource ? `, ${d.riskFreeSource}` : ""}`;
+}
+
 function MetricInfoRow({
   guide,
   value,
   special,
   prov,
+  basis,
 }: {
   guide: RiskMetricGuide;
   value: number | null;
   special?: React.ReactNode;
   prov?: string;
+  /** Estimation window shown next to the label, e.g. "1y daily vs ^AEX, n=250". */
+  basis?: string;
 }) {
   const [open, setOpen] = useState(false);
   const tone = riskTone(guide, value);
@@ -115,7 +133,10 @@ function MetricInfoRow({
       >
         <span className={`h-2 w-2 rounded-full shrink-0 ${tone ? TONE_DOT[tone] : "bg-text-muted/40"}`} />
         <div className="flex flex-col min-w-0 flex-1">
-          <span className="text-text-secondary text-sm">{guide.label}</span>
+          <span className="text-text-secondary text-sm">
+            {guide.label}
+            {basis && <span className="text-text-muted text-xs font-normal"> ({basis})</span>}
+          </span>
           <span className="text-text-muted text-xs leading-snug truncate">{guide.blurb}</span>
         </div>
         <span className={`font-mono shrink-0 tabular-nums text-sm ${tone ? TONE_TEXT[tone] : "text-text-primary"}`}>
@@ -368,16 +389,19 @@ export function RatiosTab({ tickers }: { tickers: string[] }) {
                 guide={RISK_METRIC_GUIDES.beta}
                 value={data.beta}
                 prov="beta"
+                basis={betaBasisLabel(data)}
               />
               <MetricInfoRow
                 guide={RISK_METRIC_GUIDES.sharpe}
                 value={data.sharpe}
                 prov="sharpe"
+                basis={riskFreeLabel(data)}
               />
               <MetricInfoRow
                 guide={RISK_METRIC_GUIDES.sortino}
                 value={data.sortino}
                 prov="sortino"
+                basis={riskFreeLabel(data)}
               />
               <div className="flex items-center py-2.5 gap-3 border-b border-border/40 last:border-b-0" data-prov="zScore" data-prov-ctx="Altman Z-Score">
                 <span className="h-2 w-2 rounded-full shrink-0">

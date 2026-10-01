@@ -13,7 +13,7 @@ import {
   ReferenceLine,
 } from "recharts";
 import type { AnalystData } from "@/lib/types";
-import { fmtNum, fmtPct, fmtPrice, currencySymbol } from "@/lib/format";
+import { fmtNum, fmtPct, fmtPctFromFraction, fmtPrice, fmtLarge, currencySymbol } from "@/lib/format";
 import { Card, chartPalette, chartTooltipStyle } from "@/components/ui";
 import { useTheme } from "@/components/ThemeProvider";
 
@@ -397,11 +397,39 @@ function EarningsSurprisesSection({
 // 4. Forward Estimates Table
 // ─────────────────────────────────────────────────────────────────────────────
 
-function renderEstimateValue(val: unknown, depth = 0): React.ReactNode {
+/** Yahoo estimate period codes -> readable labels. */
+const ESTIMATE_PERIODS: Record<string, string> = {
+  "0q": "Current quarter",
+  "+1q": "Next quarter",
+  "0y": "Current year",
+  "+1y": "Next year",
+};
+
+/** Compact currency, e.g. 113624521680 -> "$113.6B". */
+function fmtMoneyCompact(v: number, sym: string): string {
+  return `${v < 0 ? "-" : ""}${sym}${fmtLarge(Math.abs(v))}`;
+}
+
+/**
+ * Format one estimate leaf by what it is, not by how it arrived: analyst counts are
+ * integers, growth is a fraction shown as %, revenue is compact currency, EPS is
+ * currency with 2 decimals. `path` is the key path, e.g. ["revenueEstimate","0y","avg"].
+ */
+function fmtEstimateNumber(val: number, path: string[], sym: string): string {
+  const leaf = path[path.length - 1] ?? "";
+  const section = (path[0] ?? "").toLowerCase();
+  if (leaf === "numberOfAnalysts") return String(Math.round(val));
+  if (leaf === "growth") return fmtPctFromFraction(val, 1);
+  if (path.length > 1 && section.includes("revenue")) return fmtMoneyCompact(val, sym);
+  if (path.length > 1 && (section.includes("earnings") || section.includes("eps"))) return fmtPrice(val, sym);
+  return fmtNum(val);
+}
+
+function renderEstimateValue(val: unknown, sym: string, path: string[] = [], depth = 0): React.ReactNode {
   if (val === null || val === undefined) return <span className="text-text-muted">—</span>;
 
   if (typeof val === "number") {
-    return <span>{fmtNum(val)}</span>;
+    return <span>{fmtEstimateNumber(val, path, sym)}</span>;
   }
 
   if (typeof val === "string" || typeof val === "boolean") {
@@ -419,9 +447,9 @@ function renderEstimateValue(val: unknown, depth = 0): React.ReactNode {
           {entries.map(([k, v]) => (
             <tr key={k} className="border-b border-border/30">
               <td className="py-0.5 pr-3 text-text-muted capitalize">
-                {k.replace(/([A-Z])/g, " $1").trim()}
+                {ESTIMATE_PERIODS[k] ?? k.replace(/([A-Z])/g, " $1").trim()}
               </td>
-              <td className="py-0.5 text-right">{renderEstimateValue(v, depth + 1)}</td>
+              <td className="py-0.5 text-right">{renderEstimateValue(v, sym, [...path, k], depth + 1)}</td>
             </tr>
           ))}
         </tbody>
@@ -436,7 +464,7 @@ function renderEstimateValue(val: unknown, depth = 0): React.ReactNode {
   return <span>{String(val)}</span>;
 }
 
-function EstimatesSection({ estimates }: { estimates: AnalystData["estimates"] }) {
+function EstimatesSection({ estimates, sym }: { estimates: AnalystData["estimates"]; sym: string }) {
   if (
     !estimates ||
     typeof estimates !== "object" ||
@@ -468,7 +496,7 @@ function EstimatesSection({ estimates }: { estimates: AnalystData["estimates"] }
                   <td className="py-1 pr-3 text-text-muted capitalize">
                     {k.replace(/([A-Z])/g, " $1").trim()}
                   </td>
-                  <td className="text-right py-1">{renderEstimateValue(v)}</td>
+                  <td className="text-right py-1">{renderEstimateValue(v, sym, [k])}</td>
                 </tr>
               ))}
             </tbody>
@@ -480,7 +508,7 @@ function EstimatesSection({ estimates }: { estimates: AnalystData["estimates"] }
           <p className="text-xs font-semibold text-text-secondary capitalize mb-1">
             {k.replace(/([A-Z])/g, " $1").trim()}
           </p>
-          {renderEstimateValue(v)}
+          {renderEstimateValue(v, sym, [k])}
         </div>
       ))}
     </div>
@@ -609,7 +637,7 @@ export function AnalystPanel({ analyst }: { analyst: AnalystData }) {
 
       {/* Forward estimates */}
       <Card className="p-4" data-prov="analyst.estimates">
-        <EstimatesSection estimates={analyst.estimates} />
+        <EstimatesSection estimates={analyst.estimates} sym={sym} />
       </Card>
 
       {/* Growth estimates */}
