@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ThemeToggle } from "./ThemeToggle";
 import { LearningToggle } from "./LearningToggle";
+import { RefreshingBadge } from "./RefreshingBadge";
 import { useTheme } from "./ThemeProvider";
 
 const primaryTabs = [
@@ -170,6 +171,7 @@ export function Navbar() {
           </div>
         </div>
         <div className="ml-auto flex items-center gap-2">
+          <RefreshingBadge />
           <LearningToggle />
           <ThemeToggle />
         </div>

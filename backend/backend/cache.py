@@ -5,15 +5,27 @@ import asyncio
 import contextvars
 import functools
 import json
+import logging
 import threading
 import time
 import weakref
 from datetime import datetime, timezone
 from cachetools import TTLCache
 
+log = logging.getLogger(__name__)
+
 # 60-minute cache for external API responses.
 _CACHE_TTL = 60 * 60
 _CACHE_MAXSIZE = 2048
+# Stale-while-revalidate: a persisted entry past its TTL but younger than this
+# is served at once while a background call refreshes it.
+_STALE_MAX = 24 * 60 * 60
+# After a failed background refresh, keep serving the stale entry this long
+# before trying again, so a down source is not hit on every request.
+_REFRESH_RETRY = 5 * 60
+# A value computed from a stale input is rebuilt after this long, by when the
+# input's own refresh has usually landed.
+_STALE_INPUT_RETRY = 60
 
 def _utcnow() -> datetime:
     """Naive UTC now — matches CacheEntry.created_at, which is stored naive."""
@@ -79,7 +91,7 @@ _stats: dict[str, dict[str, int]] = {}
 
 
 def _record(name: str, hit: bool) -> None:
-    s = _stats.setdefault(name, {"hits": 0, "misses": 0})
+    s = _stats.setdefault(name, {"hits": 0, "misses": 0, "stale": 0})
     s["hits" if hit else "misses"] += 1
 
 
@@ -92,6 +104,7 @@ def stats() -> dict:
             "hits": s["hits"],
             "misses": s["misses"],
             "hitRate": round(s["hits"] / total, 4) if total else None,
+            "staleServed": s["stale"],
             "size": len(_caches[name]) if name in _caches else 0,
         }
     return out
@@ -113,11 +126,20 @@ def _make_key(args, kwargs) -> tuple:
 
 _fetch_times: dict[str, TTLCache] = {}
 _fetch_log: contextvars.ContextVar[list[float] | None] = contextvars.ContextVar("fetch_log", default=None)
+_stale_hook: contextvars.ContextVar = contextvars.ContextVar("stale_hook", default=None)
+# Set by _Computing to a one-element list; flipped to True when the computation
+# reads a stale value, so its result is not cached as fresh.
+_used_stale: contextvars.ContextVar[list[bool] | None] = contextvars.ContextVar("used_stale", default=None)
 
 
-def start_fetch_log() -> None:
-    """Begin collecting fetch times for the current request/context."""
+def start_fetch_log(on_stale=None) -> None:
+    """Begin collecting fetch times for the current request/context.
+
+    ``on_stale(fetched_at)`` is called whenever a stale entry is served while
+    it is refreshed in the background, so the response can say so.
+    """
     _fetch_log.set([])
+    _stale_hook.set(on_stale)
 
 
 def oldest_fetch() -> float | None:
@@ -151,15 +173,116 @@ class _Computing:
 
     def __enter__(self):
         self._inner: list[float] = []
+        self._stale = [False]
         self._token = _fetch_log.set(self._inner)
+        self._stale_token = _used_stale.set(self._stale)
         return self
 
     def __exit__(self, *exc):
         _fetch_log.reset(self._token)
+        _used_stale.reset(self._stale_token)
         return False
 
     def fetched_at(self) -> float:
         return min(self._inner, default=time.time())
+
+    @property
+    def used_stale(self) -> bool:
+        return self._stale[0]
+
+
+def _mark_used_stale() -> None:
+    flag = _used_stale.get()
+    if flag is not None:
+        flag[0] = True
+
+
+# ---------------------------------------------------------------------------
+# Stale-while-revalidate state, per (cache name, key). An entry is added when a
+# stale persisted value is first served and removed once a refresh stores a
+# fresh one. While a refresh runs (or just failed), callers get the stale
+# value without waiting for the key lock.
+# ---------------------------------------------------------------------------
+
+class _Stale:
+    __slots__ = ("value", "fetched", "refreshing", "retry_at")
+
+    def __init__(self, value, fetched: float) -> None:
+        self.value = value
+        self.fetched = fetched
+        self.refreshing = False
+        self.retry_at = 0.0
+
+
+_stale: TTLCache = TTLCache(maxsize=4 * _CACHE_MAXSIZE, ttl=_STALE_MAX)
+_stale_guard = threading.Lock()
+_refresh_tasks: set = set()     # strong refs, so pending refresh tasks aren't GC'd
+_refresh_threads: set = set()
+
+
+def _serve_stale(name: str, st: _Stale):
+    """Return a stale value, reporting its true fetch time."""
+    _record(name, True)
+    _stats[name]["stale"] += 1
+    _note_fetch(st.fetched)
+    _flag_stale(st.fetched)
+    return st.value
+
+
+def _flag_stale(fetched: float) -> None:
+    """Tell the enclosing computation and the request that stale data was used."""
+    _mark_used_stale()
+    hook = _stale_hook.get()
+    if hook is not None:
+        hook(fetched)
+
+
+def _hold_stale(ck, value, fetched: float) -> None:
+    """Keep a value computed from stale inputs as this key's stale entry, to be
+    rebuilt after ``_STALE_INPUT_RETRY``."""
+    with _stale_guard:
+        st = _stale.get(ck)
+        if st is None:
+            st = _stale[ck] = _Stale(value, fetched)
+        st.value, st.fetched = value, fetched
+        st.refreshing = False
+        st.retry_at = time.time() + _STALE_INPUT_RETRY
+
+
+def _servable_stale(ck) -> _Stale | None:
+    """The stale entry for ``ck`` if it can be served without the key lock:
+    a refresh is in flight, or the last one failed recently."""
+    st = _stale.get(ck)
+    if st is None or time.time() - st.fetched > _STALE_MAX:
+        return None
+    if st.refreshing or time.time() < st.retry_at:
+        return st
+    return None
+
+
+def _claim_refresh(ck, value, fetched: float) -> tuple[_Stale, bool]:
+    """Record a stale value for ``ck``. ``refreshing`` is set on the returned
+    entry; ``start`` is True if this caller should run the refresh."""
+    with _stale_guard:
+        st = _stale.get(ck)
+        if st is None:
+            st = _stale[ck] = _Stale(value, fetched)
+        elif fetched > st.fetched:  # keep the newer of the held and stored values
+            st.value, st.fetched = value, fetched
+        start = not st.refreshing and time.time() >= st.retry_at
+        if start:
+            st.refreshing = True
+        return st, start
+
+
+def _refresh_done(ck, ok: bool) -> None:
+    with _stale_guard:
+        st = _stale.get(ck)
+        if ok:
+            _stale.pop(ck, None)
+        elif st is not None and st.refreshing:  # failed (not just held stale)
+            st.refreshing = False
+            st.retry_at = time.time() + _REFRESH_RETRY
 
 
 def _is_empty_result(result) -> bool:
@@ -208,31 +331,73 @@ def cached(name: str | None = None, skip_if=None):
 
             # Single-flight: on a cold cache, concurrent callers would each hit
             # the upstream source (thundering herd against rate-limited APIs).
-            with _sync_locks.get((cache_name, raw_key)):
+            ck = (cache_name, raw_key)
+            st = _servable_stale(ck)
+            if st is not None:
+                return _serve_stale(cache_name, st)
+
+            with _sync_locks.get(ck):
                 if raw_key in cache:
                     _hit(cache_name, raw_key)
                     return cache[raw_key]
 
                 # Tier 2: SQLite (survives restarts)
                 str_key = _json.dumps(raw_key, default=str, sort_keys=True)
-                db_val = persistent.get(str_key)
-                if db_val is not None:
+                entry = persistent.get_entry(str_key)
+                if entry is not None and entry[2]:
+                    db_val, fetched, _ = entry
                     cache[raw_key] = db_val  # promote to memory
-                    _times(cache_name)[raw_key] = persistent.loaded_at(str_key)
+                    _times(cache_name)[raw_key] = fetched
                     _hit(cache_name, raw_key)
                     return db_val
+                held = _stale.get(ck)  # e.g. a value built from stale inputs
+                if held is not None and time.time() - held.fetched > _STALE_MAX:
+                    held = None
+                if entry is not None or held is not None:
+                    value, fetched = entry[:2] if entry is not None else (held.value, held.fetched)
+                    st, start = _claim_refresh(ck, value, fetched)
+                    if start:
+                        t = threading.Thread(target=refresh, args=(ck, str_key, args, kwargs),
+                                             daemon=True, name=f"swr-{cache_name}")
+                        _refresh_threads.add(t)
+                        t.start()
+                    return _serve_stale(cache_name, st)
 
                 _record(cache_name, False)
-                with _Computing() as computing:
-                    result = func(*args, **kwargs)
-                fetched = computing.fetched_at()
-                _note_fetch(fetched)
-                if is_empty(result):
-                    return result  # don't cache empty/failed results
-                cache[raw_key] = result
-                _times(cache_name)[raw_key] = fetched
-                persistent.set(str_key, result, fetched)  # persist to DB
-                return result
+                return compute(ck, str_key, args, kwargs)[0]
+
+        def compute(ck, str_key, args, kwargs):
+            """Call ``func`` and cache a non-empty result; returns ``(result,
+            cached_fresh)``. Caller holds the key lock."""
+            with _Computing() as computing:
+                result = func(*args, **kwargs)
+            fetched = computing.fetched_at()
+            _note_fetch(fetched)
+            if is_empty(result):
+                return result, False  # don't cache empty/failed results
+            if computing.used_stale:
+                # Built from inputs that are being refreshed: as stale as they
+                # are, so hold it as stale rather than fresh for a full TTL.
+                _hold_stale(ck, result, fetched)
+                _flag_stale(fetched)
+                return result, False
+            _get_cache(cache_name)[ck[1]] = result
+            _times(cache_name)[ck[1]] = fetched
+            persistent.set(str_key, result, fetched)  # persist to DB
+            return result, True
+
+        def refresh(ck, str_key, args, kwargs):
+            # A new thread starts with an empty context, so nothing it reads
+            # reports into the request that served the stale value.
+            ok = False
+            try:
+                with _sync_locks.get(ck):
+                    ok = compute(ck, str_key, args, kwargs)[1]
+            except Exception:
+                log.warning("background refresh of %s failed", cache_name, exc_info=True)
+            finally:
+                _refresh_done(ck, ok)
+                _refresh_threads.discard(threading.current_thread())
 
         return wrapper
 
@@ -264,7 +429,12 @@ def async_cached(name: str | None = None, skip_if=None):
                 _hit(cache_name, raw_key)
                 return cache[raw_key]
 
-            async with _locks.get((cache_name, raw_key)):
+            ck = (cache_name, raw_key)
+            st = _servable_stale(ck)
+            if st is not None:
+                return _serve_stale(cache_name, st)
+
+            async with _locks.get(ck):
                 if raw_key in cache:
                     _hit(cache_name, raw_key)
                     return cache[raw_key]
@@ -273,24 +443,60 @@ def async_cached(name: str | None = None, skip_if=None):
                 # the warm-up jobs hold SQLite's write lock a DB call can wait
                 # for seconds, and on the event loop that froze every request.
                 str_key = _json.dumps(raw_key, default=str, sort_keys=True)
-                db_val = await asyncio.to_thread(persistent.get, str_key)
-                if db_val is not None:
+                entry = await asyncio.to_thread(persistent.get_entry, str_key)
+                if entry is not None and entry[2]:
+                    db_val, fetched, _ = entry
                     cache[raw_key] = db_val  # promote to memory
-                    _times(cache_name)[raw_key] = persistent.loaded_at(str_key)
+                    _times(cache_name)[raw_key] = fetched
                     _hit(cache_name, raw_key)
                     return db_val
+                held = _stale.get(ck)  # e.g. a value built from stale inputs
+                if held is not None and time.time() - held.fetched > _STALE_MAX:
+                    held = None
+                if entry is not None or held is not None:
+                    value, fetched = entry[:2] if entry is not None else (held.value, held.fetched)
+                    st, start = _claim_refresh(ck, value, fetched)
+                    if start:
+                        # A fresh context: the refresh outlives this request and
+                        # must not report into its fetch log or headers.
+                        task = asyncio.get_running_loop().create_task(
+                            refresh(ck, str_key, args, kwargs), context=contextvars.Context())
+                        _refresh_tasks.add(task)
+                        task.add_done_callback(_refresh_tasks.discard)
+                    return _serve_stale(cache_name, st)
 
                 _record(cache_name, False)
-                with _Computing() as computing:
-                    result = await func(*args, **kwargs)
-                fetched = computing.fetched_at()
-                _note_fetch(fetched)
-                if is_empty(result):
-                    return result  # don't cache empty/failed results
-                cache[raw_key] = result
-                _times(cache_name)[raw_key] = fetched
-                await asyncio.to_thread(persistent.set, str_key, result, fetched)  # persist to DB
-                return result
+                return (await compute(ck, str_key, args, kwargs))[0]
+
+        async def compute(ck, str_key, args, kwargs):
+            """Call ``func`` and cache a non-empty result; returns ``(result,
+            cached_fresh)``. Caller holds the key lock."""
+            with _Computing() as computing:
+                result = await func(*args, **kwargs)
+            fetched = computing.fetched_at()
+            _note_fetch(fetched)
+            if is_empty(result):
+                return result, False  # don't cache empty/failed results
+            if computing.used_stale:
+                # Built from inputs that are being refreshed: as stale as they
+                # are, so hold it as stale rather than fresh for a full TTL.
+                _hold_stale(ck, result, fetched)
+                _flag_stale(fetched)
+                return result, False
+            _get_cache(cache_name)[ck[1]] = result
+            _times(cache_name)[ck[1]] = fetched
+            await asyncio.to_thread(persistent.set, str_key, result, fetched)  # persist to DB
+            return result, True
+
+        async def refresh(ck, str_key, args, kwargs):
+            ok = False
+            try:
+                async with _locks.get(ck):
+                    ok = (await compute(ck, str_key, args, kwargs))[1]
+            except Exception:
+                log.warning("background refresh of %s failed", cache_name, exc_info=True)
+            finally:
+                _refresh_done(ck, ok)
 
         return wrapper
 
@@ -303,21 +509,20 @@ class HybridCache:
     Falls back gracefully if DB is unavailable.
     """
 
-    def __init__(self, name: str, ttl_sec: int = 3600, maxsize: int = 2048):
+    def __init__(self, name: str, ttl_sec: int = 3600, maxsize: int = 2048,
+                 stale_sec: int = _STALE_MAX):
         self._memory = TTLCache(maxsize=maxsize, ttl=ttl_sec)
         self._name = name
         self._ttl_sec = ttl_sec
+        self._stale_sec = max(stale_sec, ttl_sec)
         self._hit_miss = {"hits_mem": 0, "hits_db": 0, "misses": 0}
         # key -> epoch seconds the value held for that key was fetched
         self._fetched = TTLCache(maxsize=maxsize, ttl=ttl_sec)
         _hybrid_caches.append(self)
 
-    def loaded_at(self, key: str) -> float | None:
-        """When the value held for ``key`` was fetched, if known."""
-        return self._fetched.get(key)
-
-    def _get_from_db(self, key: str):
-        """Return deserialized value from SQLite, or None on miss/failure."""
+    def _read_db(self, key: str) -> tuple | None:
+        """``(value, fetched_at)`` from SQLite for a row younger than the stale
+        window, or None on miss/failure. ``fetched_at`` is epoch seconds."""
         try:
             from backend.database import SessionLocal
             from backend.db_models import CacheEntry
@@ -326,23 +531,29 @@ class HybridCache:
                 row = db.get(CacheEntry, (self._name, key))
                 if row is None:
                     return None
-                # Enforce TTL on the persistent tier too. Without this, a stale
-                # (or empty/poisoned) row is served forever, since the in-memory
-                # TTLCache expiry never applied to the DB. Expired rows are
-                # deleted so the next call re-fetches fresh data.
                 created = getattr(row, "created_at", None)
-                if created is not None:
-                    age = (_utcnow() - created).total_seconds()
-                    if age > self._ttl_sec:
-                        db.delete(row)
-                        db.commit()
-                        return None
-                    self._fetched[key] = created.replace(tzinfo=timezone.utc).timestamp()
-                return json.loads(row.value_json)
+                if created is None:
+                    return json.loads(row.value_json), time.time()
+                # Rows past the stale window are deleted, not served: without an
+                # age limit on the persistent tier a row would be served forever.
+                if (_utcnow() - created).total_seconds() > self._stale_sec:
+                    db.delete(row)
+                    db.commit()
+                    return None
+                return json.loads(row.value_json), created.replace(tzinfo=timezone.utc).timestamp()
             finally:
                 db.close()
         except Exception:
             return None  # DB unavailable — degrade gracefully
+
+    def _get_from_db(self, key: str):
+        """Return the deserialized value from SQLite if it is within its TTL,
+        or None on miss/failure. Stale rows are kept for :meth:`get_entry`."""
+        entry = self._read_db(key)
+        if entry is None or time.time() - entry[1] > self._ttl_sec:
+            return None
+        self._fetched[key] = entry[1]
+        return entry[0]
 
     def _set_in_db(self, key: str, value, fetched_at: float | None = None) -> None:
         """Persist value to SQLite; non-fatal on failure.
@@ -419,25 +630,23 @@ class HybridCache:
             return  # non-serializable — memory-only is fine
         self._set_in_db(key, value, fetched_at)
 
-    def get_stale_while_revalidate(self, key: str, max_age_sec: int = 300):
-        """
-        Return cached value immediately (even if stale by age).
-        Expects data stored via set_with_timestamp so the envelope
-        ``{"_ts": float, "_data": ...}`` is present.
-        Returns the ``_data`` portion only.
-        """
-        raw = self.get(key)
-        if raw is None:
+    def get_entry(self, key: str) -> tuple | None:
+        """``(value, fetched_at, fresh)``, including a stale row younger than
+        the stale window (``fresh`` False), or None. Memory holds fresh values only."""
+        if key in self._memory:
+            self._hit_miss["hits_mem"] += 1
+            return self._memory[key], self._fetched.get(key) or time.time(), True
+        entry = self._read_db(key)
+        if entry is None:
+            self._hit_miss["misses"] += 1
             return None
-
-        if isinstance(raw, dict) and "_ts" in raw and "_data" in raw:
-            return raw["_data"]
-
-        return raw
-
-    def set_with_timestamp(self, key: str, value) -> None:
-        """Store value wrapped with current timestamp for SWR staleness checks."""
-        self.set(key, {"_ts": time.time(), "_data": value})
+        value, fetched = entry
+        fresh = time.time() - fetched <= self._ttl_sec
+        if fresh:
+            self._memory[key] = value
+            self._fetched[key] = fetched
+        self._hit_miss["hits_db"] += 1
+        return value, fetched, fresh
 
     def invalidate(self, key: str) -> None:
         """Remove from both layers."""
@@ -475,6 +684,10 @@ def clear_all(name: str | None = None) -> dict:
     for tname, t in list(_fetch_times.items()):
         if name is None or tname == name:
             t.clear()
+    with _stale_guard:
+        for ck in list(_stale.keys()):
+            if name is None or ck[0] == name:
+                _stale.pop(ck, None)
 
     entries = 0
     result: dict = {}

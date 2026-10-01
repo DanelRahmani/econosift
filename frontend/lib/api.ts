@@ -50,6 +50,8 @@ import type {
   CrossAssetCorrelation, FxMacroLinkResponse, MultiCountryPortfolio, MultiCountryHoldingInput,
 } from "./types";
 
+import { noteResponse, STALE_HEADER } from "./staleData";
+
 // Relative by default (Docker/web hit /api via nginx); the Tauri desktop build
 // sets NEXT_PUBLIC_API_URL=http://localhost:8000 in .env.production.
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
@@ -62,7 +64,9 @@ async function get<T>(path: string): Promise<T> {
     const detail = await res.json().then((b) => (typeof b?.detail === "string" ? b.detail : null)).catch(() => null);
     throw new Error(detail ?? `API ${path} failed: ${res.status}`);
   }
-  return res.json() as Promise<T>;
+  const data = await res.json();
+  noteResponse(path, res.headers.get(STALE_HEADER), data);
+  return data as T;
 }
 
 async function post<T>(path: string, body: unknown): Promise<T> {

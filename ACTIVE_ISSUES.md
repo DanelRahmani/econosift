@@ -19,6 +19,7 @@
 |----|-------|--------|---------|
 | P1-13 | **SEC EDGAR identity not configured** | Audit L-03 | Insider aggregate, Form 4 and 13F return an explicit "identity not set" error until `EDGAR_IDENTITY` (SEC's required "Name email" User-Agent) is set in `.env`. Needs the owner's choice of name/contact. |
 | P1-15 | **Central-bank meetings data ends 2026-12-31** | Audit (calendar) | `cb_meetings.json` lists 2026 meetings only (52 rows, no source). Central-bank events disappear from the calendar in January 2027 unless the file is extended or replaced by a sourced feed. |
+| P1-16 | **Cache writes are dropped while jobs hold SQLite's write lock** | Phase 52 | During startup/scheduled jobs a long write transaction holds the SQLite lock, so `CacheEntry` writes (and Admin "Clear cache") fail with `database is locked` and are swallowed. Memory still serves the value, but refreshed entries are not persisted and a cache clear can silently not happen (`clear_all` does report the error). Shorten job transactions (commit per batch) or give SQLite a busy timeout. |
 
 ---
 
@@ -42,6 +43,7 @@
 | P2-33 | **Cached responses from before an upgrade lack provenance** | Phase 49 | Entries cached before Phase 49 carry no map until they expire (≤60 min). Use Admin → "Clear cache & re-warm" after upgrading. |
 | P2-34 | **Low-severity audit findings** | Audit C-34…C-40, D-30, D-40 | IV30 interpolated in vol not total variance; risk Calmar uses log-mean×252; Garman-Klass ignores overnight gaps; DDM grows the forward dividend twice; options Monte Carlo unseeded; foreign real yields use a year-old annual CPI; unknown quote currency defaults to USD; undefined `--color-*` CSS variables / `text-muted` class in ~20 files; banking NPL >5% and >10% add the same single flag, `capitalAdequacy` is capital-to-assets and `domesticCreditGrowth` is a level; currency-crisis reserves change includes valuation effects; credit-pulse funding spread splices TEDRATE with SOFR−DTB3; an ongoing recession's period ends "today"; the `TOTCI` fallback in financial conditions is never fetched; Technicals hard-codes `$`; short-interest average can print NaN%; sector-rotation confidence is always 100%; CAPM tile falls back from annualised to daily alpha; several components are not mounted (PositioningTab, FundingLiquidityTab, RankingsTab, RiskMetricsTable, PortfolioTab, ScreenerTab, FxRatesPanel). |
 | P2-35 | **Breadth uses today's index members (survivorship)** | Audit C-23 | Breadth and Fear & Greed count today's S&P 500 constituents over the 2-year window; point-in-time membership exists for backtests but is not applied here. |
+| P2-36 | **Running pytest inside the backend container wipes the live cache** | Phase 52 | `tests/conftest.py` calls `cache.clear_all()` before every test against whatever `DATABASE_URL` points at — in the container that is the live `./data` DB. Run container tests with `-e DATABASE_URL=sqlite:////tmp/pytest.db` until conftest pins a test DB itself. |
 
 ---
 
