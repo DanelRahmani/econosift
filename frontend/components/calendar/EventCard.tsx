@@ -229,7 +229,7 @@ export function EventCard({ event }: { event: CalendarEvent }) {
       {/* Dividend detail */}
       {event.category === "dividend" && event.amount !== null && (
         <div className="text-text-muted text-[10px]">
-          Amt: ${fmtNum(event.amount, 4)}
+          Annual rate: ${fmtNum(event.amount, 4)}/sh
         </div>
       )}
 

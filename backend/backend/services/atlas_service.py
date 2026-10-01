@@ -449,8 +449,10 @@ def _timeline_provenance(indicator: str, meta: dict, policy: str, wb_data: dict,
 
 
 @async_cached("atlas_timeline", skip_if=_timeline_all_null)
-async def get_timeline(indicator: str, start: int = 2000, end: int = 2024) -> dict:
+async def get_timeline(indicator: str, start: int = 2000, end: int | None = None) -> dict:
     """Return full timeline for all countries for the given indicator."""
+    if end is None:
+        end = date.today().year - 1  # last complete year
     if indicator not in _INDICATOR_IDS:
         raise ValueError(f"Unknown indicator: {indicator!r}")
 
@@ -463,14 +465,18 @@ async def get_timeline(indicator: str, start: int = 2000, end: int = 2024) -> di
         sc_data = await get_supply_chain_data()
         # Build timeline format from supply chain data
         countries_out: list[dict] = []
-        sc_by_iso2 = {c["iso2"]: c for c in sc_data["countries"]}
+        # Supply-chain rows are keyed by ISO2; the universe's "id" is the
+        # numeric map id, so the old lookup matched no country at all.
+        from ..config import iso2_to_iso3
+        sc_by_iso3 = {iso2_to_iso3(c["iso2"]): c for c in sc_data["countries"]}
         for country in universe:
-            iso2 = country["id"]
-            sc = sc_by_iso2.get(iso2, {})
+            sc = sc_by_iso3.get(country["iso3"], {})
+            # Only the latest composite exists: place it on its data year.
+            sc_years = [y for y in (sc.get("periods") or {}).values() if y]
+            sc_year = max(sc_years) if sc_years else None
             values: dict[str, float | None] = {}
             for y in range(start, end + 1):
-                # Supply chain data only has latest, use for most recent year
-                values[str(y)] = sc.get("compositeScore") if y == end else None
+                values[str(y)] = sc.get("compositeScore") if y == sc_year else None
             countries_out.append({
                 "iso3": country["iso3"],
                 "id": country["id"],
@@ -487,8 +493,8 @@ async def get_timeline(indicator: str, start: int = 2000, end: int = 2024) -> di
             "end": end,
             "countries": countries_out,
         }, {"*": pv.derived(
-            "Supply-chain vulnerability composite (food + fuel import dependency) from the supply-chain "
-            "service, placed on the end year only; earlier years are empty.",
+            "Supply-chain vulnerability composite (mean of food and fuel import shares) from the supply-chain "
+            "service, placed on its latest data year only; other years are empty.",
             [pv.ref("worldbank", _WB_CODES["food_imports"], "Food imports (% of merchandise imports)",
                     units="%", frequency="annual"),
              pv.ref("worldbank", _WB_CODES["fuel_imports"], "Fuel imports (% of merchandise imports)",

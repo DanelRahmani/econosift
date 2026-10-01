@@ -464,7 +464,7 @@ export const api = {
   atlasRegions: (): Promise<{ regions: AtlasRegion[] }> =>
     get("/atlas/regions"),
 
-  atlasTimeline: (indicator: string, start = 2000, end = 2024): Promise<AtlasTimelineResponse> =>
+  atlasTimeline: (indicator: string, start = 2000, end = new Date().getFullYear() - 1): Promise<AtlasTimelineResponse> =>
     get(`/atlas/timeline?indicator=${encodeURIComponent(indicator)}&start=${start}&end=${end}`),
 
   atlasSnapshot: (indicator: string, year: number): Promise<AtlasSnapshotResponse> =>

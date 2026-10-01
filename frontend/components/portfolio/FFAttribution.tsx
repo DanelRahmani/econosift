@@ -100,12 +100,12 @@ export function FFAttribution({ holdings, period }: Props) {
               </thead>
               <tbody>
                 {(data.factors ?? []).map((row) => (
-                  <tr key={row.factor} data-prov-ctx={row.factor} className="border-b border-border/50">
-                    <td className="py-2 pr-4 font-medium text-text-primary">{row.factor}</td>
-                    <td data-prov={`factors.${row.factor}.loading`} className={`py-2 pr-4 text-right ${row.loading !== null && row.loading >= 0 ? "text-green-500" : "text-red-500"}`}>
+                  <tr key={row.name} data-prov-ctx={row.name} className="border-b border-border/50">
+                    <td className="py-2 pr-4 font-medium text-text-primary">{row.name}</td>
+                    <td data-prov={`factors.${row.name}.loading`} className={`py-2 pr-4 text-right ${row.loading !== null && row.loading >= 0 ? "text-green-500" : "text-red-500"}`}>
                       {row.loading !== null ? row.loading.toFixed(4) : "—"}
                     </td>
-                    <td data-prov={`factors.${row.factor}.tStat`} className={`py-2 text-right ${row.tStat !== null && Math.abs(row.tStat) >= 2 ? "text-accent font-medium" : "text-text-secondary"}`}>
+                    <td data-prov={`factors.${row.name}.tStat`} className={`py-2 text-right ${row.tStat !== null && Math.abs(row.tStat) >= 2 ? "text-accent font-medium" : "text-text-secondary"}`}>
                       {row.tStat !== null ? row.tStat.toFixed(2) : "—"}
                     </td>
                   </tr>

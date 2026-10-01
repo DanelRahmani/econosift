@@ -204,3 +204,19 @@ async def test_failed_envelope_is_not_cached():
         second = await cot_service.get_cot_data()
     assert second["error"] is None
     assert any(c["history"] for c in second["contracts"])
+
+
+def test_commercial_net_is_read_when_present_and_missing_otherwise():
+    rows = _socrata_records("088691")
+    for r in rows:
+        r["comm_positions_long_all"] = "300"
+        r["comm_positions_short_all"] = "900"
+    with_comm = cot_service._parse_cot(pd.DataFrame(rows))
+    gold = next(c for c in with_comm if c["code"].startswith("088691"))
+    assert gold["net_commercial"] == -600
+    without = cot_service._parse_cot(pd.DataFrame(_socrata_records("088691")))
+    gold = next(c for c in without if c["code"].startswith("088691"))
+    assert gold["net_commercial"] is None
+    # A contract absent from the report is unknown, not zero.
+    absent = next(c for c in without if not c["code"].startswith("088691"))
+    assert absent["net_speculator"] is None and absent["open_interest"] is None

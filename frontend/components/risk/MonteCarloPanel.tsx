@@ -50,7 +50,7 @@ export function MonteCarloPanel({ ticker, theme }: Props) {
       </div>
 
       <p className="text-xs text-text-muted">
-        GBM simulation of {ticker}&apos;s 1-day P&L distribution. Parameterised from 2 years of
+        GBM simulation of {ticker}&apos;s {horizon}-day P&L distribution. Parameterised from 2 years of
         historical returns. Each run draws N random paths.
       </p>
 

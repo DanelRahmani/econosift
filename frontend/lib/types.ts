@@ -902,8 +902,8 @@ export interface InflationData {
     m2Yoy: MacroTimeSeries[];
   };
   quantityTheory: {
-    nominalGdp: MacroTimeSeries[];
-    m2: MacroTimeSeries[];
+    nominalGdpYoY: MacroTimeSeries[];
+    m2YoY: MacroTimeSeries[];
   };
 }
 
@@ -1808,7 +1808,8 @@ export interface KellyRow {
 export type KellyData = KellyRow[];
 
 export interface FFFactorRow {
-  factor: string;
+  /** Factor name as the backend emits it (e.g. "MktRF", "SMB", "HML"). */
+  name: string;
   loading: number | null;
   tStat: number | null;
 }
@@ -2265,6 +2266,8 @@ export interface DividendAnalysisResponse {
   sustainabilityLabel: "Strong" | "Adequate" | "Weak";
   ddmFairValue: number | null;
   ddmGrowthRate: number | null;
+  /** Discount rate used by the DDM, % (US 10Y Treasury + 5% equity risk premium). */
+  ddmDiscountRate?: number | null;
   ddmUpsidePct: number | null;
   annualDividends: Record<string, number>;
   asOf: string | null;

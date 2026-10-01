@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import { asOf } from "@/lib/series";
 import type { EmploymentData } from "@/lib/types";
 import { Card } from "@/components/ui";
 import { useSourceScope } from "@/components/provenance/SourceScope";
@@ -125,16 +126,19 @@ export function GrowthEmployment() {
     NFP: pt.value,
   }));
 
-  const joltsData = (history.joltsOpenings ?? []).map((pt, i) => ({
+  const quitsAt = asOf(history.joltsQuits);
+  const joltsData = (history.joltsOpenings ?? []).map((pt) => ({
     date: pt.date.slice(0, 7),
     "Job Openings (M)": pt.value != null ? pt.value / 1000 : null,
-    "Quit Rate %": history.joltsQuits?.[i]?.value ?? null,
+    "Quit Rate %": quitsAt(pt.date),
   }));
 
-  const ipData = (history.indProd ?? []).map((pt, i) => ({
+  // INDPRO is an index level (2017 = 100), not a growth rate.
+  const capUtilAt = asOf(history.capUtil);
+  const ipData = (history.indProd ?? []).map((pt) => ({
     date: pt.date.slice(0, 7),
-    "Industrial Production (YoY %)": pt.value,
-    "Capacity Utilization %": history.capUtil?.[i]?.value ?? null,
+    "Industrial Production (index, 2017=100)": pt.value,
+    "Capacity Utilization %": capUtilAt(pt.date),
   }));
 
   return (
@@ -283,18 +287,17 @@ export function GrowthEmployment() {
       {ipData.length > 0 && (
         <Card className="p-4" data-prov="history.indProd" data-prov-ctx="Industrial production & capacity utilization">
           <h3 className="font-semibold mb-3">
-            Industrial Production (YoY %) & Capacity Utilization
+            Industrial Production (index) & Capacity Utilization
           </h3>
           <ResponsiveContainer width="100%" height={220}>
             <LineChart data={ipData}>
               <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
               <XAxis dataKey="date" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
-              <YAxis yAxisId="left" tick={{ fontSize: 11 }} tickFormatter={(v) => `${v}%`} />
-              <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} tickFormatter={(v) => `${v}%`} />
+              <YAxis yAxisId="left" tick={{ fontSize: 11 }} domain={["auto", "auto"]} />
+              <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} tickFormatter={(v) => `${v}%`} domain={["auto", "auto"]} />
               <Tooltip />
-              <Legend formatter={legendProv({ "Industrial Production (YoY %)": "history.indProd", "Capacity Utilization %": "history.capUtil" })} />
-              <ReferenceLine yAxisId="left" y={0} stroke="rgba(255,255,255,0.2)" />
-              <Line yAxisId="left" type="monotone" dataKey="Industrial Production (YoY %)" stroke="#10b981" dot={false} strokeWidth={1.5} />
+              <Legend formatter={legendProv({ "Industrial Production (index, 2017=100)": "history.indProd", "Capacity Utilization %": "history.capUtil" })} />
+              <Line yAxisId="left" type="monotone" dataKey="Industrial Production (index, 2017=100)" stroke="#10b981" dot={false} strokeWidth={1.5} />
               <Line yAxisId="right" type="monotone" dataKey="Capacity Utilization %" stroke="#8b5cf6" dot={false} strokeWidth={1.5} />
             </LineChart>
           </ResponsiveContainer>

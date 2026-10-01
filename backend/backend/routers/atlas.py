@@ -1,6 +1,8 @@
 """Global Macro Atlas router — Phase 13."""
 from __future__ import annotations
 
+from datetime import date
+
 from fastapi import APIRouter, HTTPException, Query
 
 from ..services import atlas_service
@@ -28,7 +30,7 @@ async def get_regions():
 async def get_timeline(
     indicator: str = Query(..., description="Indicator id, e.g. gdp_growth"),
     start: int = Query(2000, description="Start year"),
-    end: int = Query(2024, description="End year"),
+    end: int = Query(default_factory=lambda: date.today().year - 1, description="End year (default: last complete year)"),
 ):
     try:
         return await atlas_service.get_timeline(indicator, start, end)

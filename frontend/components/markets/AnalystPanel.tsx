@@ -123,7 +123,8 @@ function PriceTargetSection({
               upsidePositive ? "text-green-500" : "text-red-500"
             }`}
           >
-            {upsidePct !== null ? `${upsidePct >= 0 ? "+" : ""}${fmtNum(upsidePct)}%` : "—"}
+            {/* upsidePct is a fraction (0.12 = +12%) */}
+            {upsidePct !== null ? `${upsidePct >= 0 ? "+" : ""}${fmtNum(upsidePct * 100)}%` : "—"}
           </p>
         </div>
         {price !== null && (

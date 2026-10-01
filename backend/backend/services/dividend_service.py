@@ -172,6 +172,7 @@ def get_dividend_analysis(ticker: str) -> dict:
         # DDM: Gordon Growth Model
         ddm_value = None
         ddm_growth = None
+        discount = None
         from .discount_rates import risk_free_rate
         risk_free = risk_free_rate()
         if ttm_div and cagr_5y is not None:
@@ -200,6 +201,7 @@ def get_dividend_analysis(ticker: str) -> dict:
             "sustainabilityLabel": sus_label,
             "ddmFairValue": ddm_value,
             "ddmGrowthRate": round(ddm_growth * 100, 2) if ddm_growth is not None else None,
+            "ddmDiscountRate": round(discount * 100, 2) if discount is not None else None,
             "ddmUpsidePct": round((ddm_value / price - 1) * 100, 1) if ddm_value and price else None,
             "annualDividends": {str(y): round(v, 4) for y, v in sorted(annual_divs.items())},
             "asOf": last_div_date.strftime("%Y-%m-%d") if last_div_date is not None else None,
@@ -254,6 +256,8 @@ def _provenance(ticker: str, last_div: str | None) -> dict:
                                  title="Sustainability label"),
         "ddmGrowthRate": d("5-year dividend growth, capped at risk-free rate + 2% and floored at 1%", ["cagr5y", rf],
                            title="DDM growth rate"),
+        "ddmDiscountRate": d("US 10-year Treasury yield + 5% (a hard-coded equity risk premium)", [rf],
+                             title="DDM discount rate"),
         "ddmFairValue": d("TTM dividend × (1 + g) / (r − g), g = the DDM growth rate, r = US 10-year Treasury "
                           "yield + 5% (a hard-coded equity risk premium)", ["ttmDividend", "ddmGrowthRate", rf],
                           title="Dividend discount model value"),

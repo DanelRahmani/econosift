@@ -182,7 +182,7 @@ function DividendsPageInner() {
             <Card className="p-4" data-prov="ddmFairValue">
               <h3 className="font-semibold mb-1">Gordon Growth DDM Fair Value</h3>
               <p className="text-xs text-text-secondary mb-3">
-                Assumed discount rate: 9.5% · Growth rate: {data.ddmGrowthRate}% (capped 5Y CAGR, min 1%)
+                Discount rate: {data.ddmDiscountRate != null ? `${data.ddmDiscountRate}%` : "—"} (US 10Y Treasury + 5% equity risk premium) · Growth rate: {data.ddmGrowthRate}% (5Y CAGR, capped at risk-free + 2%, min 1%)
               </p>
               <div className="grid grid-cols-2 gap-4">
                 <div data-prov="price">

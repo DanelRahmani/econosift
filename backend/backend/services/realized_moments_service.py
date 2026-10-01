@@ -137,7 +137,7 @@ def get_moments(ticker: str, period: str = "3y") -> dict:
     return pv.attach({
         "ticker": ticker,
         "period": period,
-        "asOf":   date.today().isoformat(),
+        "asOf":   pv.last_date(df),  # last price session, not today
         "series": series,
         "latest": latest,
     }, {
@@ -283,15 +283,16 @@ def get_crosssection(universe: str = "dow", window: int = 21) -> dict:
     ]
 
     name = {"sp500": "S&P 500", "ndx": "Nasdaq-100", "dow": "Dow Jones Industrial Average"}.get(universe, universe)
+    last_session = max((str(o.index[-1])[:10] for o in ohlc.values()), default=None)
     inputs = [
         pv.ref("yahoo", None, f"Daily adjusted close of each {name} member", units="price (split/dividend adjusted)",
-               frequency="daily", observed=max((str(o.index[-1])[:10] for o in ohlc.values()), default=None)),
+               frequency="daily", observed=last_session),
         pv.ref("wikipedia", None, f"Current {name} constituents"),
     ]
     return pv.attach({
         "universe": universe,
         "window":   window,
-        "asOf":     date.today().isoformat(),
+        "asOf":     last_session,  # last price session, not today
         "deciles":  deciles,
         "names":    names,
         "missing":  missing,

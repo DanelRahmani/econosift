@@ -179,16 +179,14 @@ async def get_fx_macro_link() -> dict:
         roll_corr = rets[fx].rolling(60).corr(rets[comm]).dropna()
         current_corr = float(roll_corr.iloc[-1]) if len(roll_corr) > 0 else None
 
-        # Cross-correlation: does comm lead FX?
+        # Cross-correlation: does comm lead FX? corr(FX_t, comm_{t-lag}), so a
+        # positive lag means the commodity moves first. (Correlating two
+        # .iloc slices realigned them by date, undoing the shift: every "lag"
+        # compared the same days.)
         max_lag = 21
         cross_corrs = []
         for lag in range(-max_lag, max_lag + 1):
-            if lag < 0:
-                c = rets[fx].iloc[-lag:].corr(rets[comm].iloc[:lag]) if lag != 0 else None
-            elif lag > 0:
-                c = rets[fx].iloc[:-lag].corr(rets[comm].iloc[lag:]) if lag != 0 else None
-            else:
-                c = rets[fx].corr(rets[comm])
+            c = rets[fx].corr(rets[comm].shift(lag))
             if c is not None and not np.isnan(c):
                 cross_corrs.append({"lag": lag, "correlation": round(float(c), 4)})
 
@@ -242,8 +240,8 @@ async def get_fx_macro_link() -> dict:
             "latest value of the rolling 60-session correlation of daily returns", inputs,
             title="Current correlation", observed=obs)
         prov[f"{key}.bestLag"] = pv.derived(
-            "lag (−21 to +21 sessions) with the largest absolute cross-correlation between the FX and commodity "
-            "returns; negative lags pair earlier commodity returns with later FX returns", inputs,
+            "lag (−21 to +21 sessions) with the largest absolute corr(FX return at t, commodity return at "
+            "t − lag); positive = the commodity moves first, negative = FX moves first", inputs,
             title="Best lead/lag", observed=obs)
         prov[f"{key}.bestLagCorrelation"] = pv.derived("cross-correlation at bestLag", [f"{key}.bestLag"],
                                                        title="Correlation at best lag", observed=obs)

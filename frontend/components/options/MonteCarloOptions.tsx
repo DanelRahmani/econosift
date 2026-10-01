@@ -177,8 +177,8 @@ export function MonteCarloOptions({ ticker, expiry, theme }: Props) {
               { label: "MC Price", value: result.price !== null ? fmtPrice(result.price) : "—", prov: "*" },
               { label: "BS Price", value: result.bsPrice !== null ? fmtPrice(result.bsPrice) : "—", prov: "bsPrice" },
               { label: "Std Dev", value: result.std !== null ? fmtPrice(result.std) : "—", prov: "std" },
-              { label: "VaR 95%", value: result.var95 !== null ? fmtPrice(result.var95) : "—", prov: "var95" },
-              { label: "VaR 99%", value: result.var99 !== null ? fmtPrice(result.var99) : "—", prov: "var99" },
+              { label: "5th pct payoff", value: result.var95 !== null ? fmtPrice(result.var95) : "—", prov: "var95" },
+              { label: "1st pct payoff", value: result.var99 !== null ? fmtPrice(result.var99) : "—", prov: "var99" },
             ].map((kpi) => (
               <Card key={kpi.label} className="p-3" data-prov={kpi.prov}>
                 <div className="text-[10px] text-text-muted mb-1">{kpi.label}</div>
@@ -191,7 +191,7 @@ export function MonteCarloOptions({ ticker, expiry, theme }: Props) {
           {result.distribution?.length > 0 && (
             <Card className="p-4" data-prov="distribution">
               <h4 className="text-sm font-semibold mb-3 text-text-primary">
-                Terminal Price Distribution
+                Discounted Payoff Distribution (non-zero payoffs)
               </h4>
               <ResponsiveContainer width="100%" height={200}>
                 <BarChart

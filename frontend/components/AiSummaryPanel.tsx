@@ -257,6 +257,11 @@ export function AiSummaryPanel({ summaryType, title, options, searchPlaceholder,
           <div className="text-sm text-text-secondary whitespace-pre-line leading-relaxed">
             {result.summary_text}
           </div>
+          {/* No EconoSift data is sent with the prompt (see backend ai_service). */}
+          <p className="text-xs text-warning">
+            Written by Google Gemini from its own knowledge — none of the data on this page is sent to it.
+            Figures may be out of date or wrong; check them against the panels above.
+          </p>
           {/* Regenerate button */}
           <button
             onClick={() => handleGenerate(true)}

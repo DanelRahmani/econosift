@@ -16,9 +16,11 @@ import { provOf } from "@/lib/provenance";
 import type { AtlasIndicator, AtlasRegion, AtlasTimelineResponse } from "@/lib/types";
 
 const DEFAULT_INDICATOR = "gdp_growth";
-const DEFAULT_YEAR = 2024;
 const YEAR_MIN = 2000;
-const YEAR_MAX = 2024;
+// Last complete year (the current year is never published yet); the default
+// view is the year before, which most World Bank series already cover.
+const YEAR_MAX = new Date().getFullYear() - 1;
+const DEFAULT_YEAR = YEAR_MAX - 1;
 
 export default function AtlasPage() {
   const [indicators, setIndicators] = useState<AtlasIndicator[]>([]);
@@ -104,7 +106,7 @@ export default function AtlasPage() {
         <div>
           <h1 className="text-2xl font-display font-bold text-text-primary">Global Macro Atlas</h1>
           <p className="text-sm text-text-secondary mt-1">
-            Choropleth world map of macro indicators across 200+ countries, 2000–2024.
+            Choropleth world map of macro indicators across 200+ countries, {YEAR_MIN}–{YEAR_MAX}.
           </p>
         </div>
         <RegionFilter regions={regions} active={region} onSelect={setRegion} />

@@ -109,7 +109,8 @@ def _response(summary_type: str, context_key: str, model: str, text: str, cached
         "context_key": context_key,
         "summary_text": text,
         "model_used": model,
-        "created_at": _utcnow().isoformat(),
+        # When the text was generated: a cached summary keeps its original time.
+        "created_at": (generated_at or _utcnow()).isoformat(),
         "cached": cached,
     }
     if text.startswith("Error:"):
@@ -164,15 +165,17 @@ async def ai_macro(body: MacroRequest):
 
 @router.post("/dashboard")
 async def ai_dashboard(body: DashboardRequest):
+    # One briefing per UTC day: a constant key served the first briefing forever.
+    key = f"daily:{_utcnow().date().isoformat()}"
     if not body.force_regenerate:
-        cached = await asyncio.to_thread(_cached_lookup, "dashboard", "daily")
+        cached = await asyncio.to_thread(_cached_lookup, "dashboard", key)
         if cached and cached.summary_text and not cached.summary_text.startswith("Error:"):
-            return _response("dashboard", "daily", cached.model_used, cached.summary_text, True, cached.created_at)
+            return _response("dashboard", key, cached.model_used, cached.summary_text, True, cached.created_at)
 
     prompt = ai_service.build_dashboard_prompt()
     result = await ai_service.generate_summary(prompt, body.model)
-    await asyncio.to_thread(_save, "dashboard", "daily", body.model, prompt, result)
-    return _response("dashboard", "daily", body.model, result, False)
+    await asyncio.to_thread(_save, "dashboard", key, body.model, prompt, result)
+    return _response("dashboard", key, body.model, result, False)
 
 
 @router.get("/history/{summary_type}/{context_key}")

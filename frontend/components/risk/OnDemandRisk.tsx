@@ -142,7 +142,7 @@ export function OnDemandRisk({ ticker, tickers, theme }: Props) {
               { label: "α (alpha)", value: fmtNum(garch.alpha) },
               { label: "β (beta)", value: fmtNum(garch.beta) },
               { label: "Persistence α+β", value: fmtNum((garch.alpha ?? 0) + (garch.beta ?? 0)) },
-              { label: "1D Forecast Vol", value: garch.annForecastVol !== null ? fmtPct(garch.annForecastVol * 100) : "—", prov: "annForecastVol" },
+              { label: "Next-day Vol (annualised)", value: garch.annForecastVol !== null ? fmtPct(garch.annForecastVol * 100) : "—", prov: "annForecastVol" },
             ].map(({ label, value, prov }) => (
               <div key={label} data-prov={prov}>
                 <div className="text-xs text-text-muted">{label}</div>

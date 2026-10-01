@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import { asOf } from "@/lib/series";
 import type { FinancialConditionsData, CreditGapsData } from "@/lib/types";
 import { Card } from "@/components/ui";
 import { useSourceScope } from "@/components/provenance/SourceScope";
@@ -100,10 +101,11 @@ export function FinancialConditions() {
 
   const { kpis, history } = data;
 
-  const stressData = (history.nfci ?? []).map((pt, i) => ({
+  const stlfsiAt = asOf(history.stlfsi);
+  const stressData = (history.nfci ?? []).map((pt) => ({
     date: pt.date.slice(0, 7),
     NFCI: pt.value,
-    STLFSI: history.stlfsi?.[i]?.value ?? null,
+    STLFSI: stlfsiAt(pt.date),
   }));
 
   // Backend now returns $T for Fed BS

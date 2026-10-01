@@ -56,7 +56,7 @@ export function FxCarryTab() {
   const headers: { key: SortKey; label: string }[] = [
     { key: "foreignRate", label: "Policy Rate" },
     { key: "carry", label: "Carry" },
-    { key: "fxVol", label: "30d FX Vol" },
+    { key: "fxVol", label: "FX Vol (ann., full period)" },
     { key: "volAdjCarry", label: "Vol-Adj Carry" },
   ];
 

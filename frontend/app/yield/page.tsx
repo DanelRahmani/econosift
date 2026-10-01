@@ -2,6 +2,7 @@
 import { useState, useEffect, Suspense } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { asOf } from "@/lib/series";
 import { useUrlState } from "@/lib/useUrlState";
 import type { RatesData, GlobalYieldCountry } from "@/lib/types";
 import { MultiCountryYieldChart } from "@/components/yield/MultiCountryYieldChart";
@@ -59,23 +60,30 @@ function USRatesDetailTab() {
   const hist10y = data.history["DGS10"] ?? [];
   const hist2y = data.history["DGS2"] ?? [];
   const hist3m = data.history["DGS3MO"] ?? [];
-  const histData = hist10y.map((pt, i) => ({ date: pt.date.slice(0, 7), "10Y": pt.value, "2Y": hist2y[i]?.value ?? null, "3M": hist3m[i]?.value ?? null }));
+  // Pair series by date, not array position (lengths and start dates differ).
+  const at2y = asOf(hist2y);
+  const at3m = asOf(hist3m);
+  const histData = hist10y.map((pt) => ({ date: pt.date.slice(0, 7), "10Y": pt.value, "2Y": at2y(pt.date), "3M": at3m(pt.date) }));
 
   const histBe5 = data.history["T5YIE"] ?? [];
   const histBe10 = data.history["T10YIE"] ?? [];
-  const breakevenData = histBe5.map((pt, i) => ({ date: pt.date.slice(0, 7), "5Y BE": pt.value, "10Y BE": histBe10[i]?.value ?? null }));
+  const atBe10 = asOf(histBe10);
+  const breakevenData = histBe5.map((pt) => ({ date: pt.date.slice(0, 7), "5Y BE": pt.value, "10Y BE": atBe10(pt.date) }));
 
   const histHY = data.history["BAMLH0A0HYM2"] ?? [];
   const histIG = data.history["BAMLC0A0CM"] ?? [];
-  const spreadHistoryData = histHY.map((pt, i) => ({ date: pt.date.slice(0, 7), "HY OAS": pt.value, "IG OAS": histIG[i]?.value ?? null }));
+  const atIG = asOf(histIG);
+  const spreadHistoryData = histHY.map((pt) => ({ date: pt.date.slice(0, 7), "HY OAS": pt.value, "IG OAS": atIG(pt.date) }));
 
   const taylorImplied = data.taylor_rule?.implied ?? [];
   const taylorActual = data.taylor_rule?.actual ?? [];
-  const taylorData = taylorImplied.map((pt, i) => ({ date: pt.date.slice(0, 7), "Taylor Rule": pt.value, Actual: taylorActual[i]?.value ?? null }));
+  const atActual = asOf(taylorActual);
+  const taylorData = taylorImplied.map((pt) => ({ date: pt.date.slice(0, 7), "Taylor Rule": pt.value, Actual: atActual(pt.date) }));
 
   const acmExp = data.acm?.expectations ?? [];
   const acmTP = data.acm?.term_premium ?? [];
-  const acmData = acmExp.map((pt, i) => ({ date: pt.date.slice(0, 7), Expectations: pt.value, "Term Premium": acmTP[i]?.value ?? null }));
+  const atTP = asOf(acmTP);
+  const acmData = acmExp.map((pt) => ({ date: pt.date.slice(0, 7), Expectations: pt.value, "Term Premium": atTP(pt.date) }));
 
   return (
     <div className="space-y-6" {...scope}>

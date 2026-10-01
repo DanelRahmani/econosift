@@ -218,7 +218,7 @@ def get_momentum(universe: str = _DEFAULT_UNIVERSE, signal: str = _DEFAULT_SIGNA
     return pv.attach({
         "universe": universe,
         "signal":   signal,
-        "asOf":     date.today().isoformat(),
+        "asOf":     pv.last_date(frame),  # last price session, not today
         "deciles":  deciles,
         "top":      top,
         "bottom":   bottom,

@@ -108,7 +108,7 @@ export default function TradePage() {
           </p>
           <ResponsiveContainer width="100%" height={400}>
             <BarChart
-              data={countries.map((c) => ({ name: c.name, value: c.kpis.exportsGdp ?? 0 }))}
+              data={countries.filter((c) => c.kpis.exportsGdp != null).map((c) => ({ name: c.name, value: c.kpis.exportsGdp }))}
               layout="vertical" margin={{ left: 80, right: 40 }}
             >
               <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
@@ -135,7 +135,7 @@ export default function TradePage() {
           </p>
           <ResponsiveContainer width="100%" height={400}>
             <BarChart
-              data={countries.map((c) => ({ name: c.name, value: c.kpis.importsGdp ?? 0 }))}
+              data={countries.filter((c) => c.kpis.importsGdp != null).map((c) => ({ name: c.name, value: c.kpis.importsGdp }))}
               layout="vertical" margin={{ left: 80, right: 40 }}
             >
               <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
@@ -162,9 +162,9 @@ export default function TradePage() {
           </p>
           <ResponsiveContainer width="100%" height={400}>
             <BarChart
-              data={countries.map((c) => ({
+              data={countries.filter((c) => c.kpis.tradeBalance != null).map((c) => ({
                 name: c.name,
-                value: c.kpis.tradeBalance ?? 0,
+                value: c.kpis.tradeBalance,
                 isSurplus: (c.kpis.tradeBalance ?? 0) >= 0,
               }))}
               layout="vertical" margin={{ left: 80, right: 40 }}
@@ -175,7 +175,7 @@ export default function TradePage() {
               <Tooltip formatter={(v: number) => [`${v > 0 ? "+" : ""}${v?.toFixed(1)}%`, "Trade Balance"]} />
               <ReferenceLine x={0} stroke="rgba(255,255,255,0.3)" />
               <Bar dataKey="value" radius={[0, 4, 4, 0]}>
-                {countries.map((c) => {
+                {countries.filter((c) => c.kpis.tradeBalance != null).map((c) => {
                   const isSurplus = (c.kpis.tradeBalance ?? 0) >= 0;
                   return <Cell key={c.iso2} fill={isSurplus ? "#10b981" : "#ef4444"} fillOpacity={0.8} />;
                 })}
@@ -195,7 +195,8 @@ export default function TradePage() {
           <ResponsiveContainer width="100%" height={400}>
             <BarChart
               data={countries
-                .map((c) => ({ name: c.name, value: c.kpis.tradeOpenness ?? 0 }))
+                .filter((c) => c.kpis.tradeOpenness != null)
+                .map((c) => ({ name: c.name, value: c.kpis.tradeOpenness as number }))
                 .sort((a, b) => b.value - a.value)}
               layout="vertical" margin={{ left: 80, right: 40 }}
             >
@@ -228,13 +229,13 @@ export default function TradePage() {
                 {countries.map((c) => (
                   <tr key={c.iso2} className="border-b border-border/50 hover:bg-surface-alt/50" data-prov-ctx={c.name}>
                     <td className="py-2 px-3 font-medium">{c.name}</td>
-                    <td className="py-2 px-3 text-right" data-prov="kpis.exportsGdp">{c.kpis.exportsGdp?.toFixed(1) ?? "—"}%</td>
-                    <td className="py-2 px-3 text-right" data-prov="kpis.importsGdp">{c.kpis.importsGdp?.toFixed(1) ?? "—"}%</td>
+                    <td className="py-2 px-3 text-right" data-prov="kpis.exportsGdp">{c.kpis.exportsGdp != null ? `${c.kpis.exportsGdp.toFixed(1)}%` : "—"}</td>
+                    <td className="py-2 px-3 text-right" data-prov="kpis.importsGdp">{c.kpis.importsGdp != null ? `${c.kpis.importsGdp.toFixed(1)}%` : "—"}</td>
                     <td data-prov="kpis.tradeBalance" className={`py-2 px-3 text-right ${(c.kpis.tradeBalance ?? 0) >= 0 ? "text-success" : "text-danger"}`}>
-                      {(c.kpis.tradeBalance != null ? `${c.kpis.tradeBalance > 0 ? "+" : ""}${c.kpis.tradeBalance.toFixed(1)}` : "—")}%
+                      {c.kpis.tradeBalance != null ? `${c.kpis.tradeBalance > 0 ? "+" : ""}${c.kpis.tradeBalance.toFixed(1)}%` : "—"}
                     </td>
                     <td className="py-2 px-3 text-right text-text-secondary" data-prov="kpis.tradeOpenness">
-                      {c.kpis.tradeOpenness?.toFixed(1) ?? "—"}%
+                      {c.kpis.tradeOpenness != null ? `${c.kpis.tradeOpenness.toFixed(1)}%` : "—"}
                     </td>
                   </tr>
                 ))}
