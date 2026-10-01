@@ -425,3 +425,105 @@ def test_clear_all_flushes_memory_tiers():
 
     assert len(c) == 0
     assert len(hc._memory) == 0
+
+
+# ---------------------------------------------------------------------------
+# Single-flight is per key (P1-14): one slow upstream call must not hold up
+# unrelated calls to the same cached function.
+# ---------------------------------------------------------------------------
+
+def test_sync_cached_different_keys_run_concurrently():
+    import threading
+    from backend import cache as cache_mod
+
+    barrier = threading.Barrier(2, timeout=5)
+
+    @cache_mod.cached("test_sync_per_key")
+    def fn(x):
+        barrier.wait()  # raises BrokenBarrierError if the calls are serialised
+        return {"x": x}
+
+    results = {}
+
+    def run(x):
+        results[x] = fn(x)
+
+    with patch.object(cache_mod.HybridCache, "_set_in_db"), \
+         patch.object(cache_mod.HybridCache, "_get_from_db", return_value=None):
+        threads = [threading.Thread(target=run, args=(i,)) for i in (1, 2)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join(10)
+
+    assert results == {1: {"x": 1}, 2: {"x": 2}}
+
+
+def test_sync_cached_same_key_computes_once():
+    import threading
+    from backend import cache as cache_mod
+
+    calls = {"n": 0}
+    started = threading.Event()
+
+    @cache_mod.cached("test_sync_single_flight")
+    def fn(x):
+        calls["n"] += 1
+        started.set()
+        time.sleep(0.2)
+        return {"x": x}
+
+    with patch.object(cache_mod.HybridCache, "_set_in_db"), \
+         patch.object(cache_mod.HybridCache, "_get_from_db", return_value=None):
+        t = threading.Thread(target=fn, args=(1,))
+        t.start()
+        started.wait(5)
+        assert fn(1) == {"x": 1}  # waits for the in-flight call, then hits
+        t.join(5)
+
+    assert calls["n"] == 1
+
+
+def test_async_cached_different_keys_run_concurrently():
+    import asyncio
+    from backend import cache as cache_mod
+
+    @cache_mod.async_cached("test_async_per_key")
+    async def fn(x):
+        await asyncio.sleep(0.3)
+        return {"x": x}
+
+    async def main():
+        t = time.perf_counter()
+        out = await asyncio.gather(*(fn(i) for i in range(5)))
+        return out, time.perf_counter() - t
+
+    with patch.object(cache_mod.HybridCache, "_set_in_db"), \
+         patch.object(cache_mod.HybridCache, "_get_from_db", return_value=None):
+        out, elapsed = asyncio.run(main())
+
+    assert out == [{"x": i} for i in range(5)]
+    assert elapsed < 1.0  # serialised would take 1.5 s
+
+
+def test_async_cached_same_key_computes_once():
+    import asyncio
+    from backend import cache as cache_mod
+
+    calls = {"n": 0}
+
+    @cache_mod.async_cached("test_async_single_flight")
+    async def fn(x):
+        calls["n"] += 1
+        await asyncio.sleep(0.1)
+        return {"x": x}
+
+    async def main():
+        return await asyncio.gather(*(fn(1) for _ in range(5)))
+
+    with patch.object(cache_mod.HybridCache, "_set_in_db"), \
+         patch.object(cache_mod.HybridCache, "_get_from_db", return_value=None):
+        out = asyncio.run(main())
+
+    assert out == [{"x": 1}] * 5
+    assert calls["n"] == 1

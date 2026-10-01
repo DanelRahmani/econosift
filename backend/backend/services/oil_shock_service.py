@@ -19,6 +19,8 @@ Kilian's SVAR.
 """
 from __future__ import annotations
 
+import asyncio
+
 import logging
 
 import numpy as np
@@ -203,12 +205,12 @@ async def get_oil_shocks() -> dict:
         return {"available": False, "reason": "FRED API key required"}
 
     data = await mes.fetch_fred_series(_SERIES, start=_START)
-    result = _decompose(
+    result = await asyncio.to_thread(lambda: _decompose(  # pandas work: off the loop
         _to_monthly(data.get("DCOILWTICO", [])),
         _to_monthly(data.get("CPIAUCSL", [])),
         _to_monthly(data.get("IGREA", [])),
         _to_monthly(data.get("PCOPPUSDM", [])),
-    )
+    ))
     result["method"] = (
         "Reduced-form OLS of real WTI monthly log returns on the change in "
         "Kilian's Index of Global Real Economic Activity and real copper "

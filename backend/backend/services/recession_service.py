@@ -8,6 +8,8 @@ real-time Sahm rule indicator (SAHMREALTIME) for context.
 """
 from __future__ import annotations
 
+import asyncio
+
 import logging
 
 import numpy as np
@@ -286,5 +288,6 @@ async def get_recession_probability() -> dict:
         return {"error": "FRED API key required"}
 
     data = await mes.fetch_fred_series(_SERIES, start=_START)
-    result = _compute_recession(data)
+    # The walk-forward probit refits every month: seconds of CPU, kept off the loop.
+    result = await asyncio.to_thread(_compute_recession, data)
     return pv.attach(result, _provenance(data, result)) if result else result

@@ -1,5 +1,9 @@
 # Changelog — EconoSift
 
+## Phase 51+ — Responsiveness and first-run setup (2026-10)
+
+- **Phase 51 — cold-start latency (P1-14).** Measured on a cold backend with the startup jobs running and 6 concurrent requests, like a browser: the 45-endpoint burst took 940 s (one endpoint never answered in 10 min); now 247 s, worst endpoint 128 s (under nginx's 180 s), zero event-loop stalls. Causes fixed: the cache's single-flight lock was per function, so every cold FRED / World Bank / yfinance fetch app-wide queued behind one another (now per key); SQLite cache reads/writes ran on the event loop and froze the server for up to 229 s while warm-up jobs held the write lock; BIS bulk downloads/parses and the recession probit, curve-noise and oil-shock fits ran on the loop; `/valuation/full` fetched in series. FRED's limiter only spaced requests (peaked at 159/min against FRED's 120/min cap, 28 failures cached as silent gaps): it now holds a 110/minute window and retries a rate-limited series once. Remaining floor: ~200 FRED calls at 120/min on a truly cold start.
+
 ## Phase 45–50 — Data & calculation audit, and right-click → Source (2026-10-01)
 
 Full audit of how data is pulled and computed, with the findings fixed and recorded in [`docs/audit/2026-10-econosift-data-audit.md`](./docs/audit/2026-10-econosift-data-audit.md); open and low-severity items are in `ACTIVE_ISSUES.md`.

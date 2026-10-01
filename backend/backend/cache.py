@@ -7,6 +7,7 @@ import functools
 import json
 import threading
 import time
+import weakref
 from datetime import datetime, timezone
 from cachetools import TTLCache
 
@@ -20,8 +21,48 @@ def _utcnow() -> datetime:
 
 
 _caches: dict[str, TTLCache] = {}
-_locks: dict[str, asyncio.Lock] = {}
-_sync_locks: dict[str, threading.Lock] = {}
+
+
+class _ThreadLock:
+    """threading.Lock that can be weakly referenced (the C lock cannot)."""
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+
+    def __enter__(self) -> "_ThreadLock":
+        self._lock.acquire()
+        return self
+
+    def __exit__(self, *exc) -> None:
+        self._lock.release()
+
+
+class _KeyLocks:
+    """Single-flight locks per (cache name, key).
+
+    A lock per *function* would make every cold call to that function wait for
+    whichever call is in flight, whatever its arguments — on a cold start that
+    queued all FRED and World Bank fetches app-wide behind one another. A lock
+    lives only while someone holds it, so the registry does not grow.
+    """
+
+    def __init__(self, factory) -> None:
+        self._factory = factory
+        self._locks: weakref.WeakValueDictionary = weakref.WeakValueDictionary()
+        self._guard = threading.Lock()
+
+    def get(self, key):
+        with self._guard:
+            lock = self._locks.get(key)
+            if lock is None:
+                lock = self._factory()
+                self._locks[key] = lock
+            return lock
+
+
+_locks = _KeyLocks(asyncio.Lock)
+_sync_locks = _KeyLocks(_ThreadLock)
+
 # Registry of live HybridCache instances so clear_all() can flush their
 # private in-memory tier (the decorators keep two memory layers + the DB).
 _hybrid_caches: list["HybridCache"] = []
@@ -154,7 +195,6 @@ def cached(name: str | None = None, skip_if=None):
     def decorator(func):
         cache_name = name or func.__qualname__
         _get_cache(cache_name)  # ensure the in-memory cache exists
-        lock = _sync_locks.setdefault(cache_name, threading.Lock())
         persistent = HybridCache(cache_name, ttl_sec=_CACHE_TTL, maxsize=_CACHE_MAXSIZE)
         is_empty = skip_if or _is_empty_result
 
@@ -168,7 +208,7 @@ def cached(name: str | None = None, skip_if=None):
 
             # Single-flight: on a cold cache, concurrent callers would each hit
             # the upstream source (thundering herd against rate-limited APIs).
-            with lock:
+            with _sync_locks.get((cache_name, raw_key)):
                 if raw_key in cache:
                     _hit(cache_name, raw_key)
                     return cache[raw_key]
@@ -213,7 +253,6 @@ def async_cached(name: str | None = None, skip_if=None):
     def decorator(func):
         cache_name = name or func.__qualname__
         _get_cache(cache_name)  # ensure the in-memory cache exists
-        lock = _locks.setdefault(cache_name, asyncio.Lock())
         persistent = HybridCache(cache_name, ttl_sec=_CACHE_TTL, maxsize=_CACHE_MAXSIZE)
         is_empty = skip_if or _is_empty_result
 
@@ -225,14 +264,16 @@ def async_cached(name: str | None = None, skip_if=None):
                 _hit(cache_name, raw_key)
                 return cache[raw_key]
 
-            async with lock:
+            async with _locks.get((cache_name, raw_key)):
                 if raw_key in cache:
                     _hit(cache_name, raw_key)
                     return cache[raw_key]
 
-                # Tier 2: SQLite (survives restarts)
+                # Tier 2: SQLite (survives restarts). In a worker thread: while
+                # the warm-up jobs hold SQLite's write lock a DB call can wait
+                # for seconds, and on the event loop that froze every request.
                 str_key = _json.dumps(raw_key, default=str, sort_keys=True)
-                db_val = persistent.get(str_key)
+                db_val = await asyncio.to_thread(persistent.get, str_key)
                 if db_val is not None:
                     cache[raw_key] = db_val  # promote to memory
                     _times(cache_name)[raw_key] = persistent.loaded_at(str_key)
@@ -248,7 +289,7 @@ def async_cached(name: str | None = None, skip_if=None):
                     return result  # don't cache empty/failed results
                 cache[raw_key] = result
                 _times(cache_name)[raw_key] = fetched
-                persistent.set(str_key, result, fetched)  # persist to DB
+                await asyncio.to_thread(persistent.set, str_key, result, fetched)  # persist to DB
                 return result
 
         return wrapper

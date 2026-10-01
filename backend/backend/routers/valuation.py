@@ -240,11 +240,17 @@ async def full(ticker: str):
     analyst data (price targets, consensus, surprises, estimates).
     """
     sym = ticker.strip().upper()
-    bundle = await asyncio.to_thread(yfs.get_info, sym)
-    beta = await asyncio.to_thread(_beta_for, sym)
-    valuation = await asyncio.to_thread(valuation_models, bundle, beta)
-    fundamentals = await asyncio.to_thread(extended_fundamentals, bundle)
-    analyst = await asyncio.to_thread(analyst_data, sym)
+    # The three upstream fetches are independent; run them together rather
+    # than paying their cold latencies one after another.
+    bundle, beta, analyst = await asyncio.gather(
+        asyncio.to_thread(yfs.get_info, sym),
+        asyncio.to_thread(_beta_for, sym),
+        asyncio.to_thread(analyst_data, sym),
+    )
+    valuation, fundamentals = await asyncio.gather(
+        asyncio.to_thread(valuation_models, bundle, beta),
+        asyncio.to_thread(extended_fundamentals, bundle),
+    )
     kpis = _kpis(bundle.get("info", {}) or {})
     # Fix 7: Inject computed beta when yfinance info.beta is null
     beta_injected = kpis.get("beta") is None and beta is not None

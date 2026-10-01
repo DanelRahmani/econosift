@@ -8,6 +8,7 @@ per 1 USD" and are converted to standard FX conventions:
 """
 from __future__ import annotations
 
+import asyncio
 import io
 import logging
 import zipfile
@@ -49,7 +50,11 @@ BIS_AREA_MAP = {
 # ---------------------------------------------------------------------------
 
 def _fetch_bis_zip(dataset_key: str) -> pd.DataFrame | None:
-    """Download a BIS flat CSV ZIP and return as DataFrame.  Returns None on failure."""
+    """Download a BIS flat CSV ZIP and return as DataFrame.  Returns None on failure.
+
+    Blocking for seconds (multi-MB download + parse): async callers must run it
+    via ``asyncio.to_thread`` or every other request stalls meanwhile.
+    """
     url = BIS_ZIPS.get(dataset_key)
     if not url:
         return None
@@ -171,11 +176,15 @@ async def get_cpi(iso2: str = "US", freq: str = "A") -> list[dict]:
 
     Returns list of {date, value} dicts where value is YoY % change.
     """
-    return cpi_yoy(iso2, freq)
+    return await asyncio.to_thread(cpi_yoy, iso2, freq)
 
 
 @async_cached("bis_policy")
 async def get_policy_rate(iso2: str = "US") -> list[dict]:
+    return await asyncio.to_thread(_get_policy_rate_sync, iso2)
+
+
+def _get_policy_rate_sync(iso2: str = "US") -> list[dict]:
     """Get central bank policy rate history for a country (monthly).
 
     Returns list of {date, value} dicts where value is % per year.
@@ -197,6 +206,10 @@ async def get_policy_rate(iso2: str = "US") -> list[dict]:
 
 @async_cached("bis_fx")
 async def get_fx_rate(iso2: str, freq: str = "A") -> list[dict]:
+    return await asyncio.to_thread(_get_fx_rate_sync, iso2, freq)
+
+
+def _get_fx_rate_sync(iso2: str, freq: str = "A") -> list[dict]:
     """Get exchange rate vs USD for a currency (annual end-of-period).
 
     Returns list of {date, value} dicts in standard FX convention.
@@ -222,6 +235,10 @@ async def get_fx_rate(iso2: str, freq: str = "A") -> list[dict]:
 
 @async_cached("bis_credit_gap")
 async def get_credit_gap(iso2: str = "US") -> list[dict]:
+    return await asyncio.to_thread(_get_credit_gap_sync, iso2)
+
+
+def _get_credit_gap_sync(iso2: str = "US") -> list[dict]:
     """Get credit-to-GDP gap for a country (quarterly).
 
     Returns list of {date, value} dicts where value is % of GDP.
@@ -248,6 +265,10 @@ async def get_credit_gap(iso2: str = "US") -> list[dict]:
 
 @async_cached("bis_property")
 async def get_property_prices(iso2: str = "US", real: bool = True) -> list[dict]:
+    return await asyncio.to_thread(_get_property_prices_sync, iso2, real)
+
+
+def _get_property_prices_sync(iso2: str = "US", real: bool = True) -> list[dict]:
     """Get residential property price index for a country (quarterly, 2010=100).
 
     Returns list of {date, value} dicts.  Set real=False for nominal prices.
@@ -282,6 +303,10 @@ async def get_property_prices(iso2: str = "US", real: bool = True) -> list[dict]
 
 @async_cached("bis_property_bulk")
 async def get_property_prices_bulk(iso2_tuple: tuple[str, ...], real: bool = True) -> dict[str, list[dict]]:
+    return await asyncio.to_thread(_get_property_prices_bulk_sync, iso2_tuple, real)
+
+
+def _get_property_prices_bulk_sync(iso2_tuple: tuple[str, ...], real: bool = True) -> dict[str, list[dict]]:
     """Get residential property prices for multiple countries in one call.
 
     Returns {iso2: [{date, value}, ...]}.
@@ -319,6 +344,10 @@ async def get_property_prices_bulk(iso2_tuple: tuple[str, ...], real: bool = Tru
 
 @async_cached("bis_credit_gap_bulk")
 async def get_credit_gaps_bulk(iso2_tuple: tuple[str, ...]) -> dict[str, list[dict]]:
+    return await asyncio.to_thread(_get_credit_gaps_bulk_sync, iso2_tuple)
+
+
+def _get_credit_gaps_bulk_sync(iso2_tuple: tuple[str, ...]) -> dict[str, list[dict]]:
     """Get credit-to-GDP gaps for multiple countries in one call.
 
     Returns {iso2: [{date, value}, ...]} where value is gap in % of GDP.
@@ -458,7 +487,7 @@ async def get_effective_fx_bulk(iso2_tuple: tuple[str, ...]) -> dict[str, list[d
         df = await _asyncio.to_thread(_fetch_bis_zip, "fx_effective")
         if df is None or df.empty:
             return {}
-        return _parse_eer(df, list(iso2_tuple))
+        return await _asyncio.to_thread(_parse_eer, df, list(iso2_tuple))
     except Exception as exc:
         logger.warning("BIS effective FX bulk query failed: %s", exc)
         return {}

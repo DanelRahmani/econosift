@@ -19,6 +19,8 @@ published HPW series.
 """
 from __future__ import annotations
 
+import asyncio
+
 import logging
 
 import numpy as np
@@ -142,7 +144,7 @@ async def get_treasury_noise() -> dict:
         return {"error": "no Treasury curve data available", "history": []}
 
     curve = pd.DataFrame(cols).sort_index()
-    history = _compute_noise(curve)
+    history = await asyncio.to_thread(_compute_noise, curve)  # daily curve fits: CPU-bound
     if not history:
         return {"error": "insufficient tenor coverage to fit a curve", "history": []}
 
