@@ -4,6 +4,8 @@ import { api } from "@/lib/api";
 import type { LeadingData, MacroTimeSeries } from "@/lib/types";
 import { Card } from "@/components/ui";
 import { RecessionProbability } from "@/components/macro/RecessionProbability";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 import {
   LineChart,
   Line,
@@ -27,15 +29,17 @@ function KpiCard({
   unit = "",
   color,
   sub,
+  prov,
 }: {
   label: string;
   value: number | null;
   unit?: string;
   color?: string;
   sub?: string;
+  prov?: string;
 }) {
   return (
-    <Card className="p-4">
+    <Card className="p-4" data-prov={prov} data-prov-ctx={label}>
       <div className="text-xs text-text-secondary">{label}</div>
       <div className={`text-2xl font-bold mt-1 ${color ?? ""}`}>
         {value != null ? `${value.toFixed(2)}${unit}` : "—"}
@@ -50,6 +54,7 @@ export function LeadingIndicators() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [baseYear, setBaseYear] = useState(2020);
+  const scope = useSourceScope(provOf(data));
 
   useEffect(() => {
     setLoading(true);
@@ -143,7 +148,7 @@ export function LeadingIndicators() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" {...scope}>
       {/* Recession Probability Model */}
       <RecessionProbability />
 
@@ -172,6 +177,7 @@ export function LeadingIndicators() {
         />
         <KpiCard
           label="CFNAI"
+          prov="kpis.cfnai"
           value={kpis.cfnai}
           sub="Chicago Fed National Activity Index"
           color={
@@ -190,6 +196,7 @@ export function LeadingIndicators() {
         />
         <KpiCard
           label="GSCPI"
+          prov="kpis.gscpi"
           value={kpis.gscpi}
           sub="Global Supply Chain Pressure Index"
         />
@@ -219,7 +226,7 @@ export function LeadingIndicators() {
 
       {/* CFNAI */}
       {cfnaiData.length > 0 && (
-        <Card className="p-4">
+        <Card className="p-4" data-prov="history.cfnai" data-prov-ctx="CFNAI">
           <h3 className="font-semibold mb-1">CFNAI — Chicago Fed National Activity Index</h3>
           <p className="text-xs text-text-secondary mb-3">
             0 = trend growth. Below −0.70 (3-month avg) = recession signal.
@@ -262,7 +269,7 @@ export function LeadingIndicators() {
 
       {/* GSCPI */}
       {gscpiData.length > 0 ? (
-        <Card className="p-4">
+        <Card className="p-4" data-prov="history.gscpi" data-prov-ctx="Global Supply Chain Pressure Index">
           <h3 className="font-semibold mb-1">
             Global Supply Chain Pressure Index (GSCPI)
           </h3>
@@ -300,7 +307,7 @@ export function LeadingIndicators() {
           <Card className="p-4">
             <h4 className="text-sm font-semibold mb-1">IS Curve</h4>
             <p className="text-xs text-text-secondary mb-3">
-              Fed Funds Rate vs GDP (index, {baseYear ?? "?"} = 100)
+              <span data-prov="islmpc.fedFunds" data-prov-ctx="Fed funds rate (indexed)">Fed Funds Rate</span> vs <span data-prov="islmpc.gdp" data-prov-ctx="GDP (indexed)">GDP</span> (index, {baseYear ?? "?"} = 100)
             </p>
             {isData.length > 0 ? (
               <ResponsiveContainer width="100%" height={200}>
@@ -324,7 +331,7 @@ export function LeadingIndicators() {
           <Card className="p-4">
             <h4 className="text-sm font-semibold mb-1">LM Curve</h4>
             <p className="text-xs text-text-secondary mb-3">
-              M2 vs GDP (index, {baseYear ?? "?"} = 100)
+              <span data-prov="islmpc.m2" data-prov-ctx="M2 (indexed)">M2</span> vs <span data-prov="islmpc.gdp" data-prov-ctx="GDP (indexed)">GDP</span> (index, {baseYear ?? "?"} = 100)
             </p>
             {lmData.length > 0 ? (
               <ResponsiveContainer width="100%" height={200}>
@@ -348,7 +355,7 @@ export function LeadingIndicators() {
           <Card className="p-4">
             <h4 className="text-sm font-semibold mb-1">Phillips Curve</h4>
             <p className="text-xs text-text-secondary mb-3">
-              Unemployment vs CPI (index, {baseYear ?? "?"} = 100)
+              <span data-prov="islmpc.unrate" data-prov-ctx="Unemployment (indexed)">Unemployment</span> vs <span data-prov="islmpc.cpi" data-prov-ctx="CPI (indexed)">CPI</span> (index, {baseYear ?? "?"} = 100)
             </p>
             {phillipsPath.length > 0 ? (
               <ResponsiveContainer width="100%" height={200}>

@@ -4,19 +4,22 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
 import type { PortfolioAnalysis } from "@/lib/types";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 
 interface Props {
   data: PortfolioAnalysis;
 }
 
 export function DrawdownChart({ data }: Props) {
+  const scope = useSourceScope(provOf(data));
   const step = Math.max(1, Math.floor(data.drawdownSeries.length / 200));
   const pts = data.drawdownSeries
     .filter((_, i) => i % step === 0 || i === data.drawdownSeries.length - 1)
     .map((p) => ({ date: p.date, drawdown: p.value * 100 }));
 
   return (
-    <div className="rounded-xl border border-border bg-surface p-4">
+    <div className="rounded-xl border border-border bg-surface p-4" data-prov="drawdownSeries" {...scope}>
       <h3 className="font-semibold text-sm mb-3">Drawdown</h3>
       <ResponsiveContainer width="100%" height={200}>
         <AreaChart data={pts} margin={{ top: 4, right: 16, bottom: 0, left: 0 }}>

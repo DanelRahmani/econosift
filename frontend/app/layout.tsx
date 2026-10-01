@@ -6,6 +6,7 @@ import { Footer } from "@/components/Footer";
 import { ThemeProvider, themeInitScript } from "@/components/ThemeProvider";
 import { Providers } from "@/components/providers";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { SourceMenu } from "@/components/provenance/SourceMenu";
 
 export const metadata: Metadata = {
   title: "EconoSift",
@@ -28,6 +29,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </main>
             <Footer />
             <MobileNav />
+            <SourceMenu />
           </ThemeProvider>
         </Providers>
       </body>

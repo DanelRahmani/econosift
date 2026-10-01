@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import type { RatiosResponse, RatioGroup } from "@/lib/types";
 import { Card, Skeleton, ZScoreBadge } from "@/components/ui";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 import { fmtNum, fmtPctFlex } from "@/lib/format";
 import {
   RATIO_GUIDE, ratioTone, ratioRanges, TONE_TEXT, TONE_DOT,
@@ -93,17 +95,19 @@ function MetricInfoRow({
   guide,
   value,
   special,
+  prov,
 }: {
   guide: RiskMetricGuide;
   value: number | null;
   special?: React.ReactNode;
+  prov?: string;
 }) {
   const [open, setOpen] = useState(false);
   const tone = riskTone(guide, value);
   const formatted = value !== null && !Number.isNaN(value) ? fmtNum(value) : "—";
 
   return (
-    <div className="border-b border-border/40 last:border-b-0">
+    <div className="border-b border-border/40 last:border-b-0" data-prov={prov} data-prov-ctx={guide.label}>
       <button
         onClick={() => setOpen((o) => !o)}
         className="w-full flex items-center gap-3 py-2.5 text-left hover:bg-surface-alt/50 transition-colors"
@@ -154,7 +158,7 @@ function MetricInfoRow({
 // Ratio row (unchanged logic, minor UI polish)
 // ──────────────────────────────────────────────────────────────────────────
 
-function RatioRow({ k, v }: { k: string; v: number | null }) {
+function RatioRow({ k, v, prov }: { k: string; v: number | null; prov: string }) {
   const [open, setOpen] = useState(false);
   const tone = ratioTone(k, v);
   const ranges = ratioRanges(k);
@@ -163,7 +167,7 @@ function RatioRow({ k, v }: { k: string; v: number | null }) {
   const hasGuide = Boolean(ranges && guide);
 
   return (
-    <div className="border-b border-border/40">
+    <div className="border-b border-border/40" data-prov={prov} data-prov-ctx={LABELS[k] ?? k}>
       <button
         onClick={() => hasGuide && setOpen((o) => !o)}
         className={`w-full flex items-center gap-3 py-2.5 text-left ${hasGuide ? "hover:bg-surface-alt/50 transition-colors" : "cursor-default"}`}
@@ -215,7 +219,7 @@ function RangePill({ tone, label, value }: { tone: "good" | "normal" | "bad"; la
   );
 }
 
-function Group({ title, group }: { title: string; group: RatioGroup }) {
+function Group({ title, group, groupKey }: { title: string; group: RatioGroup; groupKey: string }) {
   const [open, setOpen] = useState(true);
   return (
     <Card className="p-0 overflow-hidden">
@@ -230,7 +234,7 @@ function Group({ title, group }: { title: string; group: RatioGroup }) {
       {open && (
         <div className="px-6 pb-4 grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-0 text-sm">
           {Object.entries(group).map(([k, v]) => (
-            <RatioRow key={k} k={k} v={v} />
+            <RatioRow key={k} k={k} v={v} prov={`${groupKey}.${k}`} />
           ))}
         </div>
       )}
@@ -290,6 +294,7 @@ export function RatiosTab({ tickers }: { tickers: string[] }) {
   const [selectedTicker, setSelectedTicker] = useState(tickers[0] ?? "");
   const [data, setData] = useState<RatiosResponse | null>(null);
   const [loading, setLoading] = useState(false);
+  const scope = useSourceScope(provOf(data));
 
   useEffect(() => {
     if (!tickers.includes(selectedTicker) && tickers.length > 0) {
@@ -311,7 +316,7 @@ export function RatiosTab({ tickers }: { tickers: string[] }) {
   }, [selectedTicker]);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" {...scope} data-prov-ctx={selectedTicker}>
       {/* Header row: ticker switcher + Export PDF */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         {tickers.length > 1 && (
@@ -359,16 +364,19 @@ export function RatiosTab({ tickers }: { tickers: string[] }) {
               <MetricInfoRow
                 guide={RISK_METRIC_GUIDES.beta}
                 value={data.beta}
+                prov="beta"
               />
               <MetricInfoRow
                 guide={RISK_METRIC_GUIDES.sharpe}
                 value={data.sharpe}
+                prov="sharpe"
               />
               <MetricInfoRow
                 guide={RISK_METRIC_GUIDES.sortino}
                 value={data.sortino}
+                prov="sortino"
               />
-              <div className="flex items-center py-2.5 gap-3 border-b border-border/40 last:border-b-0">
+              <div className="flex items-center py-2.5 gap-3 border-b border-border/40 last:border-b-0" data-prov="zScore" data-prov-ctx="Altman Z-Score">
                 <span className="h-2 w-2 rounded-full shrink-0">
                   {data.zScore === null
                     ? <span className="block h-2 w-2 rounded-full bg-text-muted/40" />
@@ -427,11 +435,11 @@ export function RatiosTab({ tickers }: { tickers: string[] }) {
           </Card>
 
           {/* Ratio groups */}
-          <Group title="Liquidity" group={data.liquidity} />
-          <Group title="Leverage" group={data.leverage} />
-          <Group title="Efficiency" group={data.efficiency} />
-          <Group title="Profitability" group={data.profitability} />
-          <Group title="Valuation Multiples" group={data.valuation} />
+          <Group title="Liquidity" group={data.liquidity} groupKey="liquidity" />
+          <Group title="Leverage" group={data.leverage} groupKey="leverage" />
+          <Group title="Efficiency" group={data.efficiency} groupKey="efficiency" />
+          <Group title="Profitability" group={data.profitability} groupKey="profitability" />
+          <Group title="Valuation Multiples" group={data.valuation} groupKey="valuation" />
         </>
       )}
     </div>

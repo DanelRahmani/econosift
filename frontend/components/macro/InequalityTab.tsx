@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import type { InequalityData } from "@/lib/types";
 import { Card } from "@/components/ui";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 import { shortCountryName } from "@/lib/format";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -18,11 +20,11 @@ function signalColor(s: string): string {
   return "text-text-muted";
 }
 
-function KpiCard({ label, value, unit = "", sub, sig }: {
-  label: string; value: number | null; unit?: string; sub?: string; sig?: string;
+function KpiCard({ label, value, unit = "", sub, sig, prov }: {
+  label: string; value: number | null; unit?: string; sub?: string; sig?: string; prov?: string;
 }) {
   return (
-    <Card className="p-4">
+    <Card className="p-4" data-prov={prov} data-prov-ctx={label}>
       <div className="text-xs text-text-secondary">{label}</div>
       <div className={`text-2xl font-bold mt-1 ${sig && value != null ? signalColor(sig) : ""}`}>
         {value != null ? `${value.toFixed(1)}${unit}` : "—"}
@@ -36,6 +38,7 @@ export function InequalityTab() {
   const [data, setData] = useState<InequalityData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const scope = useSourceScope(provOf(data));
 
   useEffect(() => {
     api.macroInequality().then(setData).catch(() => setError(true)).finally(() => setLoading(false));
@@ -56,21 +59,21 @@ export function InequalityTab() {
   const { summary, countries } = data;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" {...scope}>
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-        <KpiCard label="Avg Gini" value={summary.avgGini}
+        <KpiCard prov="summary" label="Avg Gini" value={summary.avgGini}
           sig={summary.avgGini != null && summary.avgGini < 30 ? "green" : summary.avgGini != null && summary.avgGini < 45 ? "yellow" : "red"}
           sub={`${summary.totalCountries} countries`} />
-        <KpiCard label="Avg Poverty ($3.00/day)" value={summary.avgPoverty215} unit="%"
+        <KpiCard prov="summary" label="Avg Poverty ($3.00/day)" value={summary.avgPoverty215} unit="%"
           sig={summary.avgPoverty215 != null && summary.avgPoverty215 < 5 ? "green" : "yellow"} />
-        <KpiCard label="High Inequality" value={summary.highGiniCount} unit=""
+        <KpiCard prov="summary" label="High Inequality" value={summary.highGiniCount} unit=""
           sig={summary.highGiniCount > 3 ? "red" : "yellow"} sub="Gini >45" />
         <KpiCard label="Source" value={null} unit="" sub={data.source} />
       </div>
 
       {/* Gini Coefficient */}
       {countries.length > 0 && (
-        <Card className="p-4">
+        <Card className="p-4" data-prov="kpis.gini" data-prov-ctx="Gini coefficient">
           <h3 className="font-semibold mb-1">Gini Coefficient (0=perfect equality, 100=perfect inequality)</h3>
           <p className="text-xs text-text-secondary mb-3">
             Green &lt;30 · Yellow 30–45 · Red &gt;45
@@ -101,7 +104,7 @@ export function InequalityTab() {
 
       {/* Income Share of Top 10% */}
       {countries.length > 0 && (
-        <Card className="p-4">
+        <Card className="p-4" data-prov="kpis.incomeTop10" data-prov-ctx="Income share of top 10%">
           <h3 className="font-semibold mb-1">Income Share Held by Top 10% (%)</h3>
           <p className="text-xs text-text-secondary mb-3">
             Green &lt;25% · Yellow 25–35% · Red &gt;35%
@@ -132,7 +135,7 @@ export function InequalityTab() {
 
       {/* Poverty Headcount Ratios */}
       {countries.filter(c => c.kpis.poverty215 != null).length > 0 && (
-        <Card className="p-4">
+        <Card className="p-4" data-prov="kpis.poverty215" data-prov-ctx="Poverty headcount">
           <h3 className="font-semibold mb-1">Poverty Headcount — $3.00/day (intl. poverty line, 2021 PPP, %)</h3>
           <p className="text-xs text-text-secondary mb-3">
             Green &lt;5% · Yellow 5–20% · Red &gt;20%

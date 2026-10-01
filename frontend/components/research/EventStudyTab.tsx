@@ -7,6 +7,8 @@ import {
 import { Card } from "@/components/ui";
 import { api } from "@/lib/api";
 import type { EventStudyData } from "@/lib/types";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 
 const WINDOWS = [3, 5, 10] as const;
 type WindowSize = (typeof WINDOWS)[number];
@@ -28,9 +30,9 @@ function pct(v: number | null | undefined, dp = 2): string {
   return v === null || v === undefined ? "—" : `${(v * 100).toFixed(dp)}%`;
 }
 
-function Kpi({ label, value, color }: { label: string; value: string; color?: string }) {
+function Kpi({ label, value, color, prov }: { label: string; value: string; color?: string; prov?: string }) {
   return (
-    <Card className="p-4">
+    <Card className="p-4" data-prov={prov}>
       <div className="text-xs text-text-muted">{label}</div>
       <div className={`text-2xl font-bold mt-1 ${color ?? ""}`}>{value}</div>
     </Card>
@@ -43,6 +45,7 @@ export function EventStudyTab() {
   const [windowSize, setWindowSize] = useState<WindowSize>(5);
   const [data, setData] = useState<EventStudyData | null>(null);
   const [loading, setLoading] = useState(false);
+  const scope = useSourceScope(provOf(data));
 
   const run = () => {
     const t = ticker.trim().toUpperCase();
@@ -59,7 +62,7 @@ export function EventStudyTab() {
   const eventRows = [...(data?.events ?? [])].reverse();
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" {...scope}>
       <Card>
         <div className="flex flex-wrap items-end gap-4">
           <div>
@@ -119,16 +122,17 @@ export function EventStudyTab() {
         <>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <Kpi
+              prov="kpis"
               label="Mean CAR"
               value={pct(kpis?.meanCar)}
               color={kpis?.meanCar != null ? (kpis.meanCar >= 0 ? "text-success" : "text-danger") : undefined}
             />
-            <Kpi label="Hit Rate" value={kpis?.hitRate != null ? `${kpis.hitRate.toFixed(1)}%` : "—"} />
-            <Kpi label="t-Stat" value={kpis?.tStat != null ? kpis.tStat.toFixed(2) : "—"} />
-            <Kpi label="N Events" value={String(data.nEvents ?? 0)} />
+            <Kpi prov="kpis" label="Hit Rate" value={kpis?.hitRate != null ? `${kpis.hitRate.toFixed(1)}%` : "—"} />
+            <Kpi prov="kpis" label="t-Stat" value={kpis?.tStat != null ? kpis.tStat.toFixed(2) : "—"} />
+            <Kpi prov="events" label="N Events" value={String(data.nEvents ?? 0)} />
           </div>
 
-          <Card>
+          <Card data-prov="carPath">
             <h3 className="text-sm font-semibold text-text-secondary mb-3">Average Cumulative Abnormal Return</h3>
             {carPathRows.length === 0 ? (
               <p className="text-sm text-text-muted">No data.</p>
@@ -147,7 +151,7 @@ export function EventStudyTab() {
             )}
           </Card>
 
-          <Card>
+          <Card data-prov="events">
             <h3 className="text-sm font-semibold text-text-secondary mb-3">Individual Events</h3>
             {eventRows.length === 0 ? (
               <p className="text-sm text-text-muted">No events.</p>

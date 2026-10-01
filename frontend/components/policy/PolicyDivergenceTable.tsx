@@ -31,16 +31,16 @@ export function PolicyDivergenceTable({ entries }: Props) {
         </thead>
         <tbody>
           {entries.map((e) => (
-            <tr key={e.cb} className="border-b border-border/50 hover:bg-surface/50">
+            <tr key={e.cb} className="border-b border-border/50 hover:bg-surface/50" data-prov={`divergence.${e.cb}`} data-prov-ctx={e.cb}>
               <td className="py-2 pr-4 font-medium">{e.cb}</td>
               <td className="py-2 pr-4 text-right">{fmt(e.current_rate)}</td>
-              <td className={`py-2 pr-4 text-right ${(e.change_3m ?? 0) >= 0 ? "text-red-400" : "text-green-400"}`}>
+              <td data-prov={`divergence.${e.cb}.change_3m`} className={`py-2 pr-4 text-right ${(e.change_3m ?? 0) >= 0 ? "text-red-400" : "text-green-400"}`}>
                 {fmtChange(e.change_3m)}
               </td>
-              <td className={`py-2 pr-4 text-right ${(e.change_12m ?? 0) >= 0 ? "text-red-400" : "text-green-400"}`}>
+              <td data-prov={`divergence.${e.cb}.change_12m`} className={`py-2 pr-4 text-right ${(e.change_12m ?? 0) >= 0 ? "text-red-400" : "text-green-400"}`}>
                 {fmtChange(e.change_12m)}
               </td>
-              <td className="py-2">
+              <td className="py-2" data-prov={`divergence.${e.cb}.stance`}>
                 <span className={`px-2 py-0.5 rounded-full text-xs ${STANCE_COLORS[e.stance] ?? STANCE_COLORS.unknown}`}>
                   {e.stance.replace("_", " ")}
                 </span>

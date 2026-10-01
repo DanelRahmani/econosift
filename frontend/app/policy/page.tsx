@@ -7,11 +7,13 @@ import { PolicyDivergenceTable } from "@/components/policy/PolicyDivergenceTable
 import { SovereignSpreadTable } from "@/components/sovereign/SovereignSpreadTable";
 import { CentralBanksTab } from "@/components/macro/CentralBanksTab";
 import { TabButton } from "@/components/ui";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 
 // ─── Shared KPI card ────────────────────────────────────────────────
-function KpiCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
+function KpiCard({ label, value, sub, prov }: { label: string; value: string; sub?: string; prov?: string }) {
   return (
-    <div className="bg-surface rounded-lg p-4 border border-border">
+    <div className="bg-surface rounded-lg p-4 border border-border" data-prov={prov}>
       <div className="text-xs text-muted mb-1">{label}</div>
       <div className="text-xl font-semibold">{value}</div>
       {sub && <div className="text-xs text-muted mt-1">{sub}</div>}
@@ -39,6 +41,7 @@ function PolicyTrackerTab() {
     queryKey: ["policyTracker"],
     queryFn: api.policyTracker,
   });
+  const scope = useSourceScope(provOf(data));
 
   if (isLoading) return <div className="p-8 text-muted">Loading policy data…</div>;
   if (error || !data) return <div className="p-8 text-red-400">Failed to load policy data.</div>;
@@ -52,24 +55,28 @@ function PolicyTrackerTab() {
     .sort(([, a], [, b]) => Math.abs(b!) - Math.abs(a!))[0];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" {...scope}>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <KpiCard
+          prov="divergence.Fed"
           label="Fed Funds Rate"
           value={fed?.current_rate != null ? `${fed.current_rate.toFixed(2)}%` : "N/A"}
           sub={fed ? `${fed.stance.replace("_", " ")} (12M: ${(fed.change_12m ?? 0).toFixed(2)}%)` : undefined}
         />
         <KpiCard
+          prov={tightening ? `divergence.${tightening.cb}` : undefined}
           label="Most Tightening"
           value={tightening?.cb ?? "None"}
           sub={tightening ? `+${(tightening.change_12m ?? 0).toFixed(2)}% (12M)` : undefined}
         />
         <KpiCard
+          prov={easing ? `divergence.${easing.cb}` : undefined}
           label="Most Easing"
           value={easing?.cb ?? "None"}
           sub={easing ? `${(easing.change_12m ?? 0).toFixed(2)}% (12M)` : undefined}
         />
         <KpiCard
+          prov={maxCarryEntry ? `carry_differentials.${maxCarryEntry[0]}` : undefined}
           label="Max Carry Differential"
           value={maxCarryEntry ? maxCarryEntry[0] : "N/A"}
           sub={maxCarryEntry && maxCarryEntry[1] != null ? `${maxCarryEntry[1].toFixed(2)}%` : undefined}
@@ -85,7 +92,7 @@ function PolicyTrackerTab() {
         <h2 className="text-sm font-medium mb-3 text-muted">G10 Carry Differentials vs USD</h2>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
           {Object.entries(carry_differentials).map(([pair, val]) => (
-            <div key={pair} className="flex justify-between px-3 py-2 rounded bg-background border border-border/50">
+            <div key={pair} className="flex justify-between px-3 py-2 rounded bg-background border border-border/50" data-prov={`carry_differentials.${pair}`} data-prov-ctx={pair}>
               <span className="text-sm">{pair}</span>
               <span className={`text-sm font-medium ${(val ?? 0) > 0 ? "text-red-400" : "text-green-400"}`}>
                 {val != null ? `${val > 0 ? "+" : ""}${val.toFixed(2)}%` : "N/A"}
@@ -104,6 +111,7 @@ function DefaultRiskTab() {
     queryKey: ["sovereignDefault"],
     queryFn: api.sovereignDefaultProb,
   });
+  const scope = useSourceScope(provOf(data));
 
   if (isLoading) return <div className="p-8 text-muted">Computing default probabilities…</div>;
   if (error || !data) return <div className="p-8 text-red-400">Failed to load default model.</div>;
@@ -115,24 +123,28 @@ function DefaultRiskTab() {
   const greenCount = countries.filter((c) => c.signal === "green").length;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" {...scope}>
       {/* Summary KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <KpiCard
+          prov="countries"
           label="Countries Analyzed"
           value={String(countries.length)}
         />
         <KpiCard
+          prov="countries"
           label="High Risk (Red)"
           value={String(redCount)}
           sub=">20% probability"
         />
         <KpiCard
+          prov="countries"
           label="Medium Risk (Yellow)"
           value={String(yellowCount)}
           sub="5–20% probability"
         />
         <KpiCard
+          prov="countries"
           label="Low Risk (Green)"
           value={String(greenCount)}
           sub="<5% probability"
@@ -141,7 +153,7 @@ function DefaultRiskTab() {
 
       {/* Model Summary */}
       {model && (
-        <div className="bg-surface rounded-lg p-4 border border-border">
+        <div className="bg-surface rounded-lg p-4 border border-border" data-prov="model">
           <h2 className="text-sm font-medium mb-3 text-muted">Model Summary</h2>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
             <div>
@@ -211,7 +223,7 @@ function DefaultRiskTab() {
             </thead>
             <tbody>
               {countries.map((c) => (
-                <tr key={c.iso3} className="border-b border-border/30 hover:bg-surface-alt/50">
+                <tr key={c.iso3} className="border-b border-border/30 hover:bg-surface-alt/50" data-prov="countries" data-prov-ctx={c.name}>
                   <td className="py-1.5">
                     <span className="font-mono text-xs text-text-muted mr-2">{c.iso3}</span>
                     {c.name}
@@ -241,6 +253,7 @@ function SovereignRiskTab() {
     queryKey: ["sovereignRisk"],
     queryFn: api.sovereignRisk,
   });
+  const scope = useSourceScope(provOf(data));
 
   if (isLoading) return <div className="p-8 text-muted">Loading sovereign risk data…</div>;
   if (error || !data) return <div className="p-8 text-red-400">Failed to load sovereign data.</div>;
@@ -253,20 +266,22 @@ function SovereignRiskTab() {
     countries.reduce((s, c) => s + (c.spread_vs_us ?? 0), 0) / (countries.length || 1);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" {...scope}>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <KpiCard
+          prov={riskiest ? `countries.${riskiest.iso3}` : undefined}
           label="Highest Risk"
           value={riskiest?.name ?? "N/A"}
           sub={riskiest ? `Score: ${riskiest.composite_score.toFixed(1)}` : undefined}
         />
         <KpiCard
+          prov={safest ? `countries.${safest.iso3}` : undefined}
           label="Lowest Risk"
           value={safest?.name ?? "N/A"}
           sub={safest ? `Score: ${safest.composite_score.toFixed(1)}` : undefined}
         />
-        <KpiCard label="Avg Spread vs US" value={`${avgSpread.toFixed(2)}%`} />
-        <KpiCard label="Red-Signal Countries" value={String(redCount)} />
+        <KpiCard prov="countries" label="Avg Spread vs US" value={`${avgSpread.toFixed(2)}%`} />
+        <KpiCard prov="countries" label="Red-Signal Countries" value={String(redCount)} />
       </div>
 
       <div className="grid md:grid-cols-2 gap-4">

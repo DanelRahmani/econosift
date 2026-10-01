@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import type { CountryRate } from "@/lib/types";
 import { Card } from "@/components/ui";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf, type Provenance } from "@/lib/provenance";
 import { ValuationEngine } from "@/components/markets/ValuationEngine";
 import { DcfPanel } from "@/components/markets/DcfPanel";
 
@@ -24,10 +26,12 @@ export function ValuationTab({
   const [selectedCountry, setSelectedCountry] = useState("");
   const [customWacc, setCustomWacc] = useState<number | null>(null);
   const [showInfo, setShowInfo] = useState(false);
+  const [ratesProv, setRatesProv] = useState<Provenance | undefined>(undefined);
+  const ratesScope = useSourceScope(ratesProv);
 
   useEffect(() => {
     api.riskFreeRates().then((r) => {
-      if (r.rates?.length) setCountryRates(r.rates);
+      if (r.rates?.length) { setCountryRates(r.rates); setRatesProv(provOf(r)); }
     }).catch(() => {});
   }, []);
 
@@ -57,7 +61,7 @@ export function ValuationTab({
   return (
     <div className="space-y-8">
       {/* Global Discount Rate Selector */}
-      <Card className="p-4">
+      <Card className="p-4" {...ratesScope}>
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-sm font-semibold text-text-secondary">Discount Rate &amp; Currency</h3>
           <button
@@ -96,15 +100,15 @@ export function ValuationTab({
             </select>
           </div>
           {selected && (
-            <div className="flex items-center gap-4 text-xs text-text-secondary">
-              <span>
+            <div className="flex items-center gap-4 text-xs text-text-secondary" data-prov-ctx={selected.name}>
+              <span data-prov={`rates.${selected.name}`}>
                 Risk-free: <span className="font-mono text-text-primary">{(selected.riskFreeRate * 100).toFixed(2)}%</span>
                 {selected.tenor && <span className="text-text-muted"> ({selected.tenor}{selected.asOf ? `, ${selected.asOf.slice(0, 7)}` : ""})</span>}
                 {(selected.basis === "fallback" || selected.stale) && (
                   <span className="ml-1 text-warning">{selected.basis === "fallback" ? "estimate, no live data" : "stale"}</span>
                 )}
               </span>
-              <span>ERP: <span className="font-mono text-text-primary">{(selected.erp * 100).toFixed(2)}%</span></span>
+              <span data-prov={`rates.${selected.name}.erp`}>ERP: <span className="font-mono text-text-primary">{(selected.erp * 100).toFixed(2)}%</span></span>
               <span>WACC: <span className="font-mono text-accent font-semibold">{customWacc ? `${(customWacc * 100).toFixed(2)}%` : "—"}</span></span>
             </div>
           )}

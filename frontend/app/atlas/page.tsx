@@ -11,6 +11,8 @@ import { ColorLegend } from "@/components/atlas/ColorLegend";
 import { AtlasKPIs } from "@/components/atlas/AtlasKPIs";
 import { RankingTable } from "@/components/atlas/RankingTable";
 import { buildAtlasScale } from "@/lib/atlasScale";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 import type { AtlasIndicator, AtlasRegion, AtlasTimelineResponse } from "@/lib/types";
 
 const DEFAULT_INDICATOR = "gdp_growth";
@@ -30,6 +32,7 @@ export default function AtlasPage() {
   const [year, setYear] = useState(DEFAULT_YEAR);
   const [region, setRegion] = useState("World");
   const [playing, setPlaying] = useState(false);
+  const scope = useSourceScope(provOf(timeline));
 
   // Fetch indicators + regions once on mount
   useEffect(() => {
@@ -96,7 +99,7 @@ export default function AtlasPage() {
   const isLoading = loadingMeta || loadingTimeline;
 
   return (
-    <main className="max-w-7xl mx-auto px-4 py-6 space-y-6">
+    <main className="max-w-7xl mx-auto px-4 py-6 space-y-6" {...scope}>
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-display font-bold text-text-primary">Global Macro Atlas</h1>
@@ -163,6 +166,8 @@ export default function AtlasPage() {
               region={region}
               members={members}
               iso3ById={iso3ById}
+              prov={provOf(timeline)}
+              indicatorLabel={timeline.label}
             />
           </div>
         )}

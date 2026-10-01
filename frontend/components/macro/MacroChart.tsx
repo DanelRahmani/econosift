@@ -7,9 +7,13 @@ import type { MacroResponse, MacroSeries } from "@/lib/types";
 import { CHART_COLORS } from "@/lib/format";
 import { chartTooltipStyle, chartPalette } from "@/components/ui";
 import { useTheme } from "@/components/ThemeProvider";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf, type Provenance } from "@/lib/provenance";
 
-export function MacroChart({ data, forecast: forecastProp = [] }: { data: MacroResponse; forecast?: MacroSeries[] }) {
+export function MacroChart({ data, forecast: forecastProp = [], forecastProv }: { data: MacroResponse; forecast?: MacroSeries[]; forecastProv?: Provenance }) {
   const { theme } = useTheme();
+  const scope = useSourceScope(provOf(data));
+  const forecastScope = useSourceScope(forecastProv);
   const pal = chartPalette(theme);
   // Projection points inside the main series (e.g. IMF WEO filling the current
   // year) are drawn on the dashed forecast line, never as solid actuals.
@@ -59,7 +63,7 @@ export function MacroChart({ data, forecast: forecastProp = [] }: { data: MacroR
   });
 
   return (
-    <div>
+    <div {...scope}>
       <div className="h-96 w-full">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={rows}>
@@ -115,7 +119,7 @@ export function MacroChart({ data, forecast: forecastProp = [] }: { data: MacroR
       </div>
       <div className="mt-2 text-xs text-text-muted">
         Sources: {Array.from(new Set(series.map((s) => s.source_label))).join(", ")}
-        {forecast.length > 0 && " · IMF WEO projections (dashed)"}
+        {forecast.length > 0 && <span {...forecastScope}> · IMF WEO projections (dashed)</span>}
       </div>
     </div>
   );

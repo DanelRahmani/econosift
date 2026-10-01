@@ -5,6 +5,8 @@ import { api } from "@/lib/api";
 import type { CalendarEvent, CalendarResponse } from "@/lib/types";
 import { Card, Skeleton, PageSkeleton } from "@/components/ui";
 import { useUrlState } from "@/lib/useUrlState";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 import { CalendarGrid } from "@/components/calendar/CalendarGrid";
 import {
   CalendarFilters,
@@ -133,6 +135,7 @@ function CalendarPageInner() {
   const [data, setData] = useState<CalendarResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const scope = useSourceScope(provOf(data));
 
   // ── Filter state (in-memory, no refetch) ──
   const [filters, setFilters] = useState<CalendarFilterState>(defaultFilters);
@@ -319,7 +322,7 @@ function CalendarPageInner() {
           </div>
         </Card>
       ) : (
-        <Card>
+        <Card {...scope}>
           <CalendarGrid events={visibleEvents} monday={monday} />
         </Card>
       )}

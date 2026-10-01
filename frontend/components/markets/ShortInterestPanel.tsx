@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import type { ShortInterestData } from "@/lib/types";
 import { Card } from "@/components/ui";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Cell,
@@ -21,6 +23,7 @@ export function ShortInterestPanel() {
   const [data, setData] = useState<ShortInterestData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const scope = useSourceScope(provOf(data));
 
   useEffect(() => {
     api.marketShortInterest("sp500")
@@ -44,7 +47,7 @@ export function ShortInterestPanel() {
   const { mostShorted, squeezeCandidates, sectorSummary, items } = data;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" {...scope}>
       {/* KPI Row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <Card className="p-4">
@@ -52,7 +55,7 @@ export function ShortInterestPanel() {
           <div className="text-2xl font-bold mt-1">{items.length}</div>
           <div className="text-xs text-text-secondary mt-0.5">{data.source}</div>
         </Card>
-        <Card className="p-4">
+        <Card className="p-4" data-prov={mostShorted[0] ? `mostShorted.${mostShorted[0].ticker}` : undefined} data-prov-ctx={mostShorted[0]?.ticker}>
           <div className="text-xs text-text-secondary">Most Shorted</div>
           <div className="text-2xl font-bold mt-1 text-danger">
             {mostShorted[0]?.ticker ?? "—"}
@@ -99,7 +102,7 @@ export function ShortInterestPanel() {
             </thead>
             <tbody>
               {mostShorted.map((item) => (
-                <tr key={item.ticker} className="border-b border-border/50">
+                <tr key={item.ticker} className="border-b border-border/50" data-prov={`mostShorted.${item.ticker}`} data-prov-ctx={item.ticker}>
                   <td className="py-2 font-mono font-semibold">{item.ticker}</td>
                   <td className={`py-2 text-right font-mono ${(item.shortFloat ?? 0) > 25 ? "text-danger" : (item.shortFloat ?? 0) > 15 ? "text-warning" : ""}`}>
                     {item.shortFloat != null ? `${item.shortFloat.toFixed(1)}%` : "—"}
@@ -107,10 +110,10 @@ export function ShortInterestPanel() {
                   <td className="py-2 text-right font-mono text-text-secondary">
                     {item.daysToCover != null ? item.daysToCover.toFixed(1) : "—"}
                   </td>
-                  <td className="py-2 text-right font-mono" style={{ color: squeezeColor(item.squeezeScore) }}>
+                  <td className="py-2 text-right font-mono" style={{ color: squeezeColor(item.squeezeScore) }} data-prov={`mostShorted.${item.ticker}.squeezeScore`}>
                     {item.squeezeScore != null ? item.squeezeScore.toFixed(1) : "—"}
                   </td>
-                  <td className="py-2 text-right text-text-secondary">{item.sector}</td>
+                  <td className="py-2 text-right text-text-secondary" data-prov={`mostShorted.${item.ticker}.sector`}>{item.sector}</td>
                 </tr>
               ))}
             </tbody>
@@ -127,7 +130,7 @@ export function ShortInterestPanel() {
           </p>
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
             {squeezeCandidates.map((item) => (
-              <div key={item.ticker} className="text-sm">
+              <div key={item.ticker} className="text-sm" data-prov={`squeezeCandidates.${item.ticker}`} data-prov-ctx={item.ticker}>
                 <span className="font-mono font-semibold">{item.ticker}</span>
                 <span className="text-text-secondary text-xs ml-1">
                   SI: {item.shortFloat?.toFixed(0)}% · DTC: {item.daysToCover?.toFixed(0)}d
@@ -140,7 +143,7 @@ export function ShortInterestPanel() {
 
       {/* Sector Short Interest Bar Chart */}
       {sectorSummary.length > 0 && (
-        <Card className="p-4">
+        <Card className="p-4" data-prov="sectorSummary">
           <h3 className="font-semibold mb-1">Sector Average Short Interest</h3>
           <p className="text-xs text-text-secondary mb-3">
             Average % of float sold short by sector.

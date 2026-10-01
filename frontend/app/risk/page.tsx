@@ -6,6 +6,8 @@ import { useTheme } from "@/components/ThemeProvider";
 import { Skeleton, TabButton } from "@/components/ui";
 import { SearchBar } from "@/components/SearchBar";
 import { useUrlState } from "@/lib/useUrlState";
+import { SourceScope } from "@/components/provenance/SourceScope";
+import { provOf, type Provenance } from "@/lib/provenance";
 import { RiskKPIRow } from "@/components/risk/RiskKPIRow";
 import { RollingMetricsChart } from "@/components/risk/RollingMetricsChart";
 import { ExtendedRiskTable } from "@/components/risk/ExtendedRiskTable";
@@ -61,6 +63,10 @@ function RiskPageInner() {
   const [extendedData, setExtendedData] = useState<ExtendedRiskTicker[]>([]);
   const [rollingData, setRollingData] = useState<RollingTickerMetrics[]>([]);
   const [corrData, setCorrData] = useState<CorrelationResponse | null>(null);
+  // `provenance` maps of the responses whose arrays are unwrapped into the state above
+  const [baseProv, setBaseProv] = useState<Provenance | undefined>();
+  const [rollingProv, setRollingProv] = useState<Provenance | undefined>();
+  const [extendedProv, setExtendedProv] = useState<Provenance | undefined>();
 
   const [baseLoading, setBaseLoading] = useState(false);
   const [rollingLoading, setRollingLoading] = useState(false);
@@ -74,8 +80,10 @@ function RiskPageInner() {
     try {
       const res = await api.risk(tickersStr, "1y", 0.04, benchmark || undefined);
       setBaseMetrics(res.metrics);
+      setBaseProv(provOf(res));
     } catch {
       setBaseMetrics([]);
+      setBaseProv(undefined);
     } finally {
       setBaseLoading(false);
     }
@@ -88,8 +96,10 @@ function RiskPageInner() {
     try {
       const res: RollingMetricsResponse = await api.riskRolling(tickersStr, period, window, benchmark || undefined);
       setRollingData(res.tickers ?? []);
+      setRollingProv(provOf(res));
     } catch {
       setRollingData([]);
+      setRollingProv(undefined);
     } finally {
       setRollingLoading(false);
     }
@@ -102,8 +112,10 @@ function RiskPageInner() {
     try {
       const res: ExtendedRiskResponse = await api.riskExtended(tickersStr, period, benchmark || undefined);
       setExtendedData(res.tickers ?? []);
+      setExtendedProv(provOf(res));
     } catch {
       setExtendedData([]);
+      setExtendedProv(undefined);
     } finally {
       setExtendedLoading(false);
     }
@@ -225,7 +237,14 @@ function RiskPageInner() {
       {baseLoading ? (
         <Skeleton className="h-28 w-full rounded-xl" />
       ) : (
-        <RiskKPIRow base={firstBase} extended={firstExtended} ticker={primaryTicker} period={period} />
+        <RiskKPIRow
+          base={firstBase}
+          extended={firstExtended}
+          ticker={primaryTicker}
+          period={period}
+          baseProv={baseProv}
+          extendedProv={extendedProv}
+        />
       )}
 
       {/* Tabs */}
@@ -257,7 +276,9 @@ function RiskPageInner() {
                 </button>
               ))}
             </div>
-            <RollingMetricsChart data={rollingData} theme={theme} loading={rollingLoading} />
+            <SourceScope prov={rollingProv}>
+              <RollingMetricsChart data={rollingData} theme={theme} loading={rollingLoading} />
+            </SourceScope>
           </div>
         )}
 
@@ -265,7 +286,9 @@ function RiskPageInner() {
           extendedLoading ? (
             <Skeleton className="h-64 w-full rounded-xl" />
           ) : (
-            <ExtendedRiskTable tickers={extendedData} />
+            <SourceScope prov={extendedProv}>
+              <ExtendedRiskTable tickers={extendedData} />
+            </SourceScope>
           )
         )}
 

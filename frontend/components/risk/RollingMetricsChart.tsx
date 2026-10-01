@@ -120,6 +120,8 @@ export function RollingMetricsChart({ data, theme, loading }: Props) {
   }
 
   const tickers = data.map((d) => d.ticker);
+  // One ticker: its own metric key. Several: the chart mixes sources, so leave it to the response default.
+  const metricKey = (m: string) => (tickers.length === 1 ? `tickers.${tickers[0]}.${m}` : undefined);
 
   return (
     <Card className="p-4 space-y-4">
@@ -170,7 +172,7 @@ export function RollingMetricsChart({ data, theme, loading }: Props) {
 
       {/* Charts */}
       {view === "overlay" ? (
-        <div>
+        <div data-prov={metricKey(metric)}>
           <p className="text-xs text-text-muted mb-2">
             {METRICS.find((m) => m.key === metric)?.label} · {window}D rolling window
           </p>
@@ -179,7 +181,7 @@ export function RollingMetricsChart({ data, theme, loading }: Props) {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {METRICS.map((m) => (
-            <div key={m.key}>
+            <div key={m.key} data-prov={metricKey(m.key)}>
               <p className="text-xs text-text-muted mb-1">{m.label}</p>
               <SingleChart data={data} metricKey={m.key} tickers={tickers} theme={theme} height={180} />
             </div>
@@ -190,7 +192,7 @@ export function RollingMetricsChart({ data, theme, loading }: Props) {
       {/* Legend */}
       <div className="flex flex-wrap gap-3 pt-1">
         {tickers.map((t, i) => (
-          <div key={t} className="flex items-center gap-1.5">
+          <div key={t} data-prov={`prices.${t}`} className="flex items-center gap-1.5">
             <div
               className="w-3 h-0.5 rounded"
               style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }}

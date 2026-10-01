@@ -9,6 +9,8 @@ import { chartTooltipStyle, chartPalette } from "@/components/ui";
 import { fmtNum, fmtPct } from "@/lib/format";
 import { api } from "@/lib/api";
 import type { GarchResult, HurstResult, OUResponse, CointegrationResult } from "@/lib/types";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 
 interface Props {
   ticker: string;
@@ -17,17 +19,18 @@ interface Props {
 }
 
 function PanelShell({
-  title, badge, children, onCalculate, loading, tier = "yellow",
+  title, badge, children, onCalculate, loading, scope, tier = "yellow",
 }: {
   title: string;
   badge?: string;
   children: React.ReactNode;
   onCalculate: () => void;
   loading: boolean;
+  scope?: Record<string, string>;
   tier?: "yellow";
 }) {
   return (
-    <Card className="p-4 space-y-3">
+    <Card className="p-4 space-y-3" {...scope}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <h3 className="text-sm font-semibold">{title}</h3>
@@ -69,6 +72,11 @@ export function OnDemandRisk({ ticker, tickers, theme }: Props) {
   // Cointegration
   const [cointLoading, setCointLoading] = useState(false);
   const [coint, setCoint] = useState<CointegrationResult | null>(null);
+
+  const garchScope = useSourceScope(provOf(garch));
+  const hurstScope = useSourceScope(provOf(hurst));
+  const ouScope = useSourceScope(provOf(ou));
+  const cointScope = useSourceScope(provOf(coint));
 
   async function calcGarch() {
     setGarchLoading(true);
@@ -121,6 +129,7 @@ export function OnDemandRisk({ ticker, tickers, theme }: Props) {
         badge="~3s"
         onCalculate={calcGarch}
         loading={garchLoading}
+        scope={garchScope}
       >
         <p className="text-xs text-text-muted">
           Fits a GARCH(1,1) model to {ticker}&apos;s return history. Returns conditional variance
@@ -129,13 +138,13 @@ export function OnDemandRisk({ ticker, tickers, theme }: Props) {
         {garch && !garch.error && (
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 pt-1">
             {[
-              { label: "ω (omega)", value: fmtNum(garch.omega, 6) },
+              { label: "ω (omega)", value: fmtNum(garch.omega, 6), prov: "omega" },
               { label: "α (alpha)", value: fmtNum(garch.alpha) },
               { label: "β (beta)", value: fmtNum(garch.beta) },
               { label: "Persistence α+β", value: fmtNum((garch.alpha ?? 0) + (garch.beta ?? 0)) },
-              { label: "1D Forecast Vol", value: garch.annForecastVol !== null ? fmtPct(garch.annForecastVol * 100) : "—" },
-            ].map(({ label, value }) => (
-              <div key={label}>
+              { label: "1D Forecast Vol", value: garch.annForecastVol !== null ? fmtPct(garch.annForecastVol * 100) : "—", prov: "annForecastVol" },
+            ].map(({ label, value, prov }) => (
+              <div key={label} data-prov={prov}>
                 <div className="text-xs text-text-muted">{label}</div>
                 <div className="text-sm font-semibold tabular-nums">{value}</div>
               </div>
@@ -151,6 +160,7 @@ export function OnDemandRisk({ ticker, tickers, theme }: Props) {
         badge="~2s"
         onCalculate={calcHurst}
         loading={hurstLoading}
+        scope={hurstScope}
       >
         <p className="text-xs text-text-muted">
           R/S analysis on {ticker}&apos;s price series. H &lt; 0.5 = mean-reverting, H ≈ 0.5 = random walk,
@@ -158,11 +168,11 @@ export function OnDemandRisk({ ticker, tickers, theme }: Props) {
         </p>
         {hurst && (
           <div className="flex items-center gap-4 pt-1">
-            <div>
+            <div data-prov="*">
               <div className="text-xs text-text-muted">Hurst Exponent</div>
               <div className="text-2xl font-bold tabular-nums">{fmtNum(hurst.hurst)}</div>
             </div>
-            <div className="text-sm text-text-secondary">{hurst.interpretation}</div>
+            <div data-prov="interpretation" className="text-sm text-text-secondary">{hurst.interpretation}</div>
           </div>
         )}
       </PanelShell>
@@ -173,6 +183,7 @@ export function OnDemandRisk({ ticker, tickers, theme }: Props) {
         badge="~2s"
         onCalculate={calcOU}
         loading={ouLoading}
+        scope={ouScope}
       >
         <p className="text-xs text-text-muted">
           OLS-based OU process fit. Useful for mean-reversion strategy parameters.
@@ -181,15 +192,15 @@ export function OnDemandRisk({ ticker, tickers, theme }: Props) {
         {ou && (
           <div className="space-y-3 pt-1">
             {ou.results.map((r) => (
-              <div key={r.ticker} className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div key={r.ticker} data-prov-ctx={r.ticker} className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div className="col-span-full text-xs font-mono font-semibold text-accent">{r.ticker}</div>
                 {[
-                  { label: "θ (mean reversion speed)", value: fmtNum(r.theta) },
-                  { label: "μ (long-run mean)", value: fmtNum(r.mu, 4) },
-                  { label: "σ (vol)", value: fmtNum(r.sigma) },
-                  { label: "Half-life (days)", value: fmtNum(r.halfLifeDays, 1) },
-                ].map(({ label, value }) => (
-                  <div key={label}>
+                  { label: "θ (mean reversion speed)", value: fmtNum(r.theta), prov: "theta" },
+                  { label: "μ (long-run mean)", value: fmtNum(r.mu, 4), prov: "mu" },
+                  { label: "σ (vol)", value: fmtNum(r.sigma), prov: "sigma" },
+                  { label: "Half-life (days)", value: fmtNum(r.halfLifeDays, 1), prov: "halfLifeDays" },
+                ].map(({ label, value, prov }) => (
+                  <div key={label} data-prov={`results.${r.ticker}.${prov}`}>
                     <div className="text-xs text-text-muted">{label}</div>
                     <div className="text-sm font-semibold tabular-nums">{value}</div>
                   </div>
@@ -206,6 +217,7 @@ export function OnDemandRisk({ ticker, tickers, theme }: Props) {
         badge="~3s"
         onCalculate={calcCoint}
         loading={cointLoading}
+        scope={cointScope}
       >
         {!hasPair ? (
           <p className="text-xs text-warning">Add a second ticker to run cointegration analysis.</p>
@@ -219,11 +231,11 @@ export function OnDemandRisk({ ticker, tickers, theme }: Props) {
           <div className="space-y-3 pt-1">
             <div className="flex flex-wrap gap-6">
               {[
-                { label: "P-value", value: fmtNum(coint.pValue, 4) },
-                { label: "Cointegrated?", value: coint.isCointegrated ? "Yes" : "No" },
-                { label: "Hedge Ratio", value: fmtNum(coint.hedgeRatio) },
-              ].map(({ label, value }) => (
-                <div key={label}>
+                { label: "P-value", value: fmtNum(coint.pValue, 4), prov: "pValue" },
+                { label: "Cointegrated?", value: coint.isCointegrated ? "Yes" : "No", prov: "isCointegrated" },
+                { label: "Hedge Ratio", value: fmtNum(coint.hedgeRatio), prov: "hedgeRatio" },
+              ].map(({ label, value, prov }) => (
+                <div key={label} data-prov={prov}>
                   <div className="text-xs text-text-muted">{label}</div>
                   <div className={`text-sm font-semibold ${label === "Cointegrated?" && coint.isCointegrated ? "text-success" : ""}`}>
                     {value}
@@ -232,7 +244,7 @@ export function OnDemandRisk({ ticker, tickers, theme }: Props) {
               ))}
             </div>
             {coint.spread.length > 0 && (
-              <div>
+              <div data-prov="spread">
                 <p className="text-xs text-text-muted mb-1">Spread (pair)</p>
                 <ResponsiveContainer width="100%" height={120}>
                   <LineChart data={coint.spread} margin={{ top: 2, right: 8, left: -20, bottom: 0 }}>

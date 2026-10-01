@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import type { EnergyData } from "@/lib/types";
 import { Card } from "@/components/ui";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 import { shortCountryName } from "@/lib/format";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -18,11 +20,11 @@ function signalColor(s: string): string {
   return "text-text-muted";
 }
 
-function KpiCard({ label, value, unit = "%", sub, sig }: {
-  label: string; value: number | null; unit?: string; sub?: string; sig?: string;
+function KpiCard({ label, value, unit = "%", sub, sig, prov }: {
+  label: string; value: number | null; unit?: string; sub?: string; sig?: string; prov?: string;
 }) {
   return (
-    <Card className="p-4">
+    <Card className="p-4" data-prov={prov} data-prov-ctx={label}>
       <div className="text-xs text-text-secondary">{label}</div>
       <div className={`text-2xl font-bold mt-1 ${sig && value != null ? signalColor(sig) : ""}`}>
         {value != null ? `${value.toFixed(1)}${unit}` : "—"}
@@ -36,6 +38,7 @@ export function EnergyTab() {
   const [data, setData] = useState<EnergyData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const scope = useSourceScope(provOf(data));
 
   useEffect(() => {
     api.macroEnergy().then(setData).catch(() => setError(true)).finally(() => setLoading(false));
@@ -56,21 +59,21 @@ export function EnergyTab() {
   const { summary, countries } = data;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" {...scope}>
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-        <KpiCard label="Avg CO₂/capita" value={summary.avgCo2PerCapita} unit=" t"
+        <KpiCard prov="summary" label="Avg CO₂/capita" value={summary.avgCo2PerCapita} unit=" t"
           sig={summary.avgCo2PerCapita != null && summary.avgCo2PerCapita < 5 ? "green" : summary.avgCo2PerCapita != null && summary.avgCo2PerCapita < 10 ? "yellow" : "red"}
           sub={`${summary.totalCountries} countries`} />
-        <KpiCard label="Avg Renewable" value={summary.avgRenewableShare}
+        <KpiCard prov="summary" label="Avg Renewable" value={summary.avgRenewableShare}
           sig={summary.avgRenewableShare != null && summary.avgRenewableShare > 30 ? "green" : summary.avgRenewableShare != null && summary.avgRenewableShare > 15 ? "yellow" : "red"} />
-        <KpiCard label="High CO₂ (>10t)" value={summary.highCo2Count} unit=""
+        <KpiCard prov="summary" label="High CO₂ (>10t)" value={summary.highCo2Count} unit=""
           sig={summary.highCo2Count > 3 ? "red" : "yellow"} sub="Countries" />
         <KpiCard label="Source" value={null} unit="" sub={data.source} />
       </div>
 
       {/* CO2 per capita */}
       {countries.length > 0 && (
-        <Card className="p-4">
+        <Card className="p-4" data-prov="kpis.co2PerCapita" data-prov-ctx="CO2 emissions per capita">
           <h3 className="font-semibold mb-1">CO₂ Emissions per Capita (t CO₂e, excl. land use)</h3>
           <p className="text-xs text-text-secondary mb-3">
             Green &lt;5t · Yellow 5–10t · Red &gt;10t
@@ -99,7 +102,7 @@ export function EnergyTab() {
 
       {/* Renewable Energy Share */}
       {countries.length > 0 && (
-        <Card className="p-4">
+        <Card className="p-4" data-prov="kpis.renewableShare" data-prov-ctx="Renewable energy share">
           <h3 className="font-semibold mb-1">Renewable Energy Share (% of total final energy consumption)</h3>
           <p className="text-xs text-text-secondary mb-3">
             Green &gt;30% · Yellow 15–30% · Red &lt;15%
@@ -128,7 +131,7 @@ export function EnergyTab() {
 
       {/* Energy Imports */}
       {countries.length > 0 && (
-        <Card className="p-4">
+        <Card className="p-4" data-prov="kpis.energyImports" data-prov-ctx="Energy imports">
           <h3 className="font-semibold mb-1">Energy Imports (% of energy use)</h3>
           <p className="text-xs text-text-secondary mb-3">
             Green &lt;20% · Yellow 20–50% · Red &gt;50%. Negative = net exporter.
@@ -158,7 +161,7 @@ export function EnergyTab() {
 
       {/* Fossil Fuel Rents */}
       {countries.length > 0 && (
-        <Card className="p-4">
+        <Card className="p-4" data-prov="kpis.fossilRentsTotal" data-prov-ctx="Fossil fuel rents">
           <h3 className="font-semibold mb-1">Fossil Fuel Rents (% of GDP) — Oil + Gas + Coal</h3>
           <p className="text-xs text-text-secondary mb-3">
             Green &lt;2% · Yellow 2–10% · Red &gt;10%

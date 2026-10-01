@@ -2,6 +2,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import type { BacktestResponse, BacktestSignalDef } from "@/lib/types";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 import { Card, chartPalette } from "@/components/ui";
 import {
   ResponsiveContainer,
@@ -57,6 +59,7 @@ export function BacktestTab() {
   const [data, setData] = useState<BacktestResponse | null>(null);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const scope = useSourceScope(provOf(data));
 
   const pal = chartPalette("dark");
 
@@ -220,7 +223,7 @@ export function BacktestTab() {
       {data?.available && ls && (
         <>
           {/* KPI row — net figures, since gross is not what you would have earned */}
-          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3" {...scope}>
             <Kpi
               label="Long-Short CAGR (net)"
               value={pct(ls.net.cagr)}
@@ -234,7 +237,7 @@ export function BacktestTab() {
           </div>
 
           {/* Equity curves */}
-          <Card className="p-4">
+          <Card className="p-4" {...scope}>
             <h3 className="font-semibold mb-1">Growth of $1 by quantile (net of costs)</h3>
             <p className="text-xs text-text-secondary mb-3">
               Q1 is the lowest-ranked bucket, Q{data.settings?.nQuantiles} the highest.
@@ -267,7 +270,7 @@ export function BacktestTab() {
           </Card>
 
           {/* Detail table */}
-          <Card className="p-4">
+          <Card className="p-4" {...scope}>
             <h3 className="font-semibold mb-3">By quantile — gross vs net</h3>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -314,7 +317,7 @@ export function BacktestTab() {
           </Card>
 
           {/* Run provenance + caveats */}
-          <Card className="p-4">
+          <Card className="p-4" {...scope}>
             <h4 className="text-sm font-semibold mb-2">About this run</h4>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs text-text-secondary mb-3">
               <div>Window<div className="text-text-primary font-mono">{data.start} → {data.end}</div></div>

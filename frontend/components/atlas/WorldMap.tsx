@@ -10,6 +10,8 @@ import {
 import { feature } from "topojson-client";
 import type { AtlasCountry } from "@/lib/types";
 import { fmtNum } from "@/lib/format";
+import { openSourceMenu } from "@/components/provenance/SourceMenu";
+import { resolveRefs, type Provenance } from "@/lib/provenance";
 
 interface Props {
   countries: AtlasCountry[];
@@ -19,6 +21,8 @@ interface Props {
   region: string;
   members: Set<string>; // ISO3 set for region filter
   iso3ById: Map<string, string>; // numeric id -> iso3
+  prov?: Provenance; // provenance map of the timeline response
+  indicatorLabel?: string;
 }
 
 // Hardcoded zoom targets per region (center [lng, lat], zoom)
@@ -30,7 +34,7 @@ const REGION_VIEW: Record<string, { center: [number, number]; zoom: number }> = 
   EM: { center: [30, 15], zoom: 1.2 },
 };
 
-export function WorldMap({ countries, year, unit, colorFor, region, members, iso3ById }: Props) {
+export function WorldMap({ countries, year, unit, colorFor, region, members, iso3ById, prov, indicatorLabel }: Props) {
   // Use `object` as a safe escape hatch for the parsed topojson/geojson data
   const [geojson, setGeojson] = useState<object | null>(null);
   const [loadError, setLoadError] = useState(false);
@@ -151,6 +155,27 @@ export function WorldMap({ countries, year, unit, colorFor, region, members, iso
                       );
                     }}
                     onMouseLeave={() => setTooltip(null)}
+                    onContextMenu={(e: React.MouseEvent) => {
+                      if (e.shiftKey) return;
+                      // preventDefault also tells the app-wide listener this menu is handled here.
+                      e.preventDefault();
+                      let refs = resolveRefs(prov, `countries.${iso3 ?? numericId}`);
+                      // The timeline lists World Bank and IMF refs; imfYears says which one supplied this year.
+                      const imfYears = (countries.find((c) => c.iso3 === iso3) as (AtlasCountry & { imfYears?: number[] }) | undefined)?.imfYears;
+                      if (refs.length > 1) {
+                        const fromImf = !!imfYears?.includes(year);
+                        const pick = refs.filter((r) => (r.provider === "imf") === fromImf);
+                        if (pick.length) refs = pick;
+                      }
+                      openSourceMenu({
+                        x: e.clientX,
+                        y: e.clientY,
+                        refs,
+                        prov,
+                        ctx: `${countryName} · ${year}${indicatorLabel ? ` · ${indicatorLabel}` : ""}`,
+                        value: value !== null ? `${fmtNum(value)} ${unit}` : undefined,
+                      });
+                    }}
                   />
                 );
               })

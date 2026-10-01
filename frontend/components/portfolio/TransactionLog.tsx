@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
 import type { Transaction, PnLSummary } from "@/lib/types";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 
 const LS_KEY = "econosift_transactions";
 const LEGACY_LS_KEY = "axiom_transactions";
@@ -56,6 +58,7 @@ export function TransactionLog() {
   const [syncing, setSyncing] = useState(false);
   const [syncMsg, setSyncMsg] = useState<string | null>(null);
   const [importMsg, setImportMsg] = useState<string | null>(null);
+  const pnlScope = useSourceScope(provOf(pnl));
 
   useEffect(() => {
     setTransactions(loadTransactions());
@@ -282,13 +285,13 @@ export function TransactionLog() {
         </div>
         {pnl && (
           <>
-            <div className="bg-surface-alt rounded-lg p-3 min-w-[120px]">
+            <div data-prov="total_realized_pnl" className="bg-surface-alt rounded-lg p-3 min-w-[120px]" {...pnlScope}>
               <div className="text-xs text-text-muted">Realized P&L</div>
               <div className={`text-xl font-bold tabular-nums ${pnl.total_realized_pnl >= 0 ? "text-green-500" : "text-red-500"}`}>
                 ${pnl.total_realized_pnl.toFixed(2)}
               </div>
             </div>
-            <div className="bg-surface-alt rounded-lg p-3 min-w-[120px]">
+            <div data-prov="total_cost_basis" className="bg-surface-alt rounded-lg p-3 min-w-[120px]" {...pnlScope}>
               <div className="text-xs text-text-muted">Cost Basis</div>
               <div className="text-xl font-bold tabular-nums">${pnl.total_cost_basis.toFixed(2)}</div>
             </div>
@@ -430,7 +433,7 @@ export function TransactionLog() {
         <div className="text-xs text-red-500 bg-red-500/10 rounded-lg px-3 py-2">{pnlError}</div>
       )}
       {pnl && pnl.items.length > 0 && (
-        <div className="rounded-xl border border-border bg-surface p-4">
+        <div className="rounded-xl border border-border bg-surface p-4" {...pnlScope}>
           <h4 className="text-sm font-semibold mb-3">P&L Summary</h4>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -446,15 +449,15 @@ export function TransactionLog() {
               </thead>
               <tbody>
                 {pnl.items.map((item) => (
-                  <tr key={item.ticker} className="border-b border-border/50 hover:bg-surface-alt/50">
+                  <tr key={item.ticker} data-prov-ctx={item.ticker} className="border-b border-border/50 hover:bg-surface-alt/50">
                     <td className="py-2 pr-3 font-mono font-medium">{item.ticker}</td>
-                    <td className="py-2 pr-3 text-right text-text-secondary">{item.quantity.toFixed(4)}</td>
-                    <td className="py-2 pr-3 text-right text-text-secondary">${item.avg_cost.toFixed(2)}</td>
-                    <td className="py-2 pr-3 text-right text-text-secondary">${item.cost_basis.toFixed(2)}</td>
-                    <td className={`py-2 pr-3 text-right font-medium ${item.realized_pnl >= 0 ? "text-green-500" : "text-red-500"}`}>
+                    <td data-prov={`items.${item.ticker}.quantity`} className="py-2 pr-3 text-right text-text-secondary">{item.quantity.toFixed(4)}</td>
+                    <td data-prov={`items.${item.ticker}.avg_cost`} className="py-2 pr-3 text-right text-text-secondary">${item.avg_cost.toFixed(2)}</td>
+                    <td data-prov={`items.${item.ticker}.cost_basis`} className="py-2 pr-3 text-right text-text-secondary">${item.cost_basis.toFixed(2)}</td>
+                    <td data-prov={`items.${item.ticker}.realized_pnl`} className={`py-2 pr-3 text-right font-medium ${item.realized_pnl >= 0 ? "text-green-500" : "text-red-500"}`}>
                       ${item.realized_pnl.toFixed(2)}
                     </td>
-                    <td className={`py-2 text-right font-medium ${item.total_return_pct >= 0 ? "text-green-500" : "text-red-500"}`}>
+                    <td data-prov={`items.${item.ticker}.total_return_pct`} className={`py-2 text-right font-medium ${item.total_return_pct >= 0 ? "text-green-500" : "text-red-500"}`}>
                       {item.total_return_pct >= 0 ? "+" : ""}{item.total_return_pct.toFixed(2)}%
                     </td>
                   </tr>
@@ -465,11 +468,11 @@ export function TransactionLog() {
                   <td className="py-2 pr-3">Total</td>
                   <td />
                   <td />
-                  <td className="py-2 pr-3 text-right">${pnl.total_cost_basis.toFixed(2)}</td>
-                  <td className={`py-2 pr-3 text-right ${pnl.total_realized_pnl >= 0 ? "text-green-500" : "text-red-500"}`}>
+                  <td data-prov="total_cost_basis" className="py-2 pr-3 text-right">${pnl.total_cost_basis.toFixed(2)}</td>
+                  <td data-prov="total_realized_pnl" className={`py-2 pr-3 text-right ${pnl.total_realized_pnl >= 0 ? "text-green-500" : "text-red-500"}`}>
                     ${pnl.total_realized_pnl.toFixed(2)}
                   </td>
-                  <td className={`py-2 text-right ${pnl.total_return_pct >= 0 ? "text-green-500" : "text-red-500"}`}>
+                  <td data-prov="total_return_pct" className={`py-2 text-right ${pnl.total_return_pct >= 0 ? "text-green-500" : "text-red-500"}`}>
                     {pnl.total_return_pct >= 0 ? "+" : ""}{pnl.total_return_pct.toFixed(2)}%
                   </td>
                 </tr>

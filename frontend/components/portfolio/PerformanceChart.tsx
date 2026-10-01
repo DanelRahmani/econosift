@@ -5,6 +5,8 @@ import {
   Legend, ResponsiveContainer,
 } from "recharts";
 import type { PortfolioAnalysis } from "@/lib/types";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 
 interface Props {
   data: PortfolioAnalysis;
@@ -47,13 +49,14 @@ function formatPct(v: number | null) {
 }
 
 export function PerformanceChart({ data }: Props) {
+  const scope = useSourceScope(provOf(data));
   const merged = mergeByDate(data);
   // Thin to ~200 points for performance
   const step = Math.max(1, Math.floor(merged.length / 200));
   const pts = merged.filter((_, i) => i % step === 0 || i === merged.length - 1);
 
   return (
-    <div className="rounded-xl border border-border bg-surface p-4">
+    <div className="rounded-xl border border-border bg-surface p-4" {...scope}>
       <h3 className="font-semibold text-sm mb-3">Cumulative Return</h3>
       <ResponsiveContainer width="100%" height={300}>
         <LineChart data={pts} margin={{ top: 4, right: 16, bottom: 0, left: 0 }}>

@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import type { Quote } from "@/lib/types";
 import { Card, Skeleton } from "@/components/ui";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 import { fmtPct, fmtPrice, currencySymbol } from "@/lib/format";
 
 export function QuoteCards({ tickers }: { tickers: string[] }) {
@@ -29,20 +31,25 @@ export function QuoteCards({ tickers }: { tickers: string[] }) {
       {tickers.map((t) => {
         const q = quotes[t];
         if (q === undefined) return <Skeleton key={t} className="h-24" />;
-        const up = (q?.changePercent ?? 0) >= 0;
-        return (
-          <Card key={t} className="p-4">
-            <div className="text-xs text-text-muted font-mono">{t}</div>
-            <div className="text-sm text-text-secondary truncate">{q?.name ?? "—"}</div>
-            <div className="text-xl font-semibold mt-1">
-              {fmtPrice(q?.price ?? null, currencySymbol(q?.currency))}
-            </div>
-            <div className={`text-sm font-medium ${up ? "text-success" : "text-danger"}`}>
-              {q?.changePercent != null ? `${up ? "▲" : "▼"} ${fmtPct(Math.abs(q.changePercent))}` : "—"}
-            </div>
-          </Card>
-        );
+        return <QuoteCard key={t} ticker={t} q={q} />;
       })}
     </div>
+  );
+}
+
+function QuoteCard({ ticker: t, q }: { ticker: string; q: Quote | null }) {
+  const scope = useSourceScope(provOf(q));
+  const up = (q?.changePercent ?? 0) >= 0;
+  return (
+    <Card className="p-4" {...scope} data-prov-ctx={t}>
+      <div className="text-xs text-text-muted font-mono">{t}</div>
+      <div className="text-sm text-text-secondary truncate">{q?.name ?? "—"}</div>
+      <div className="text-xl font-semibold mt-1">
+        {fmtPrice(q?.price ?? null, currencySymbol(q?.currency))}
+      </div>
+      <div className={`text-sm font-medium ${up ? "text-success" : "text-danger"}`} data-prov="changePercent">
+        {q?.changePercent != null ? `${up ? "▲" : "▼"} ${fmtPct(Math.abs(q.changePercent))}` : "—"}
+      </div>
+    </Card>
   );
 }

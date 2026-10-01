@@ -116,7 +116,7 @@ function PriceTargetSection({
           <p className="text-xs text-text-muted">High</p>
           <p className="text-sm font-semibold">{fmtPrice(highPrice, sym)}</p>
         </div>
-        <div className="text-center">
+        <div className="text-center" data-prov="analyst.priceTarget.upsidePct">
           <p className="text-xs text-text-muted">Upside</p>
           <p
             className={`text-sm font-bold ${
@@ -127,7 +127,7 @@ function PriceTargetSection({
           </p>
         </div>
         {price !== null && (
-          <div className="text-center">
+          <div className="text-center" data-prov="analyst.price">
             <p className="text-xs text-text-muted">Current</p>
             <p className="text-sm font-semibold">{fmtPrice(price, sym)}</p>
           </div>
@@ -258,7 +258,7 @@ function ConsensusSection({ consensus }: { consensus: AnalystData["consensus"] }
 
       {/* Stacked bar history */}
       {hasHistory ? (
-        <div className="h-52">
+        <div className="h-52" data-prov="analyst.consensus.history">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={barData} layout="vertical" margin={{ left: 8, right: 8 }}>
               <CartesianGrid stroke={pal.grid} strokeDasharray="3 3" horizontal={false} />
@@ -373,7 +373,7 @@ function EarningsSurprisesSection({
             {recent.map((s, i) => {
               const pos = (s.surprisePct ?? 0) >= 0;
               return (
-                <tr key={i} className="border-b border-border/40 hover:bg-surface-1/50">
+                <tr key={i} className="border-b border-border/40 hover:bg-surface-1/50" data-prov-ctx={s.date}>
                   <td className="py-1 pr-3 text-text-secondary">{s.date}</td>
                   <td className="text-right py-1 pr-3">{fmtPrice(s.epsEstimate, sym)}</td>
                   <td className="text-right py-1 pr-3">{fmtPrice(s.epsActual, sym)}</td>
@@ -588,7 +588,7 @@ export function AnalystPanel({ analyst }: { analyst: AnalystData }) {
   return (
     <div className="space-y-6">
       {/* Top KPI: price target band */}
-      <Card className="p-4">
+      <Card className="p-4" data-prov="analyst.priceTarget">
         <PriceTargetSection
           priceTarget={analyst.priceTarget}
           price={analyst.price}
@@ -597,22 +597,22 @@ export function AnalystPanel({ analyst }: { analyst: AnalystData }) {
       </Card>
 
       {/* Consensus rating */}
-      <Card className="p-4">
+      <Card className="p-4" data-prov="analyst.consensus">
         <ConsensusSection consensus={analyst.consensus} />
       </Card>
 
       {/* Earnings surprises */}
-      <Card className="p-4">
+      <Card className="p-4" data-prov="analyst.earningsSurprises">
         <EarningsSurprisesSection surprises={analyst.earningsSurprises} sym={sym} />
       </Card>
 
       {/* Forward estimates */}
-      <Card className="p-4">
+      <Card className="p-4" data-prov="analyst.estimates">
         <EstimatesSection estimates={analyst.estimates} />
       </Card>
 
       {/* Growth estimates */}
-      <Card className="p-4">
+      <Card className="p-4" data-prov="analyst.growthEstimates">
         <GrowthEstimatesSection growthEstimates={analyst.growthEstimates} />
       </Card>
 

@@ -3,6 +3,9 @@ import { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import type { CreditConditionsData, ConditionSignal } from "@/lib/types";
 import { Card, ChartSkeleton, chartPalette } from "@/components/ui";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
+import { legendProv } from "./legendProv";
 import {
   ResponsiveContainer,
   LineChart,
@@ -34,15 +37,17 @@ function ConditionKpi({
   signal,
   sub,
   asOf,
+  prov,
 }: {
   label: string;
   value: string;
   signal?: ConditionSignal;
   sub: string;
   asOf?: string | null;
+  prov?: string;
 }) {
   return (
-    <Card className="p-4">
+    <Card className="p-4" data-prov={prov} data-prov-ctx={label}>
       <div className="text-xs text-text-secondary">{label}</div>
       <div className={`text-2xl font-bold mt-1 ${signalColor(signal)}`}>{value}</div>
       <div className="text-xs text-text-secondary mt-0.5">{sub}</div>
@@ -54,6 +59,7 @@ function ConditionKpi({
 export function CreditConditions() {
   const [data, setData] = useState<CreditConditionsData | null>(null);
   const [loading, setLoading] = useState(true);
+  const scope = useSourceScope(provOf(data));
   const pal = chartPalette("dark");
 
   useEffect(() => {
@@ -114,7 +120,7 @@ export function CreditConditions() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" {...scope}>
       <div>
         <h2 className="font-semibold text-lg">Credit &amp; Funding Conditions</h2>
         <p className="text-xs text-text-secondary mt-1">
@@ -128,6 +134,7 @@ export function CreditConditions() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <ConditionKpi
           label="SOFR − IORB"
+          prov="kpis.sofr_iorb"
           value={fmt(kpis.sofr_iorb, 2, " pp")}
           signal={signals?.sofr_iorb}
           sub="Above 0 = repo pricing through the Fed's floor, i.e. reserves scarce"
@@ -135,6 +142,7 @@ export function CreditConditions() {
         />
         <ConditionKpi
           label="SLOOS — C&I standards"
+          prov="kpis.sloos_ci"
           value={fmt(kpis.sloos_ci, 1, "%")}
           signal={signals?.sloos_ci}
           sub="Net % of banks tightening. >20% has accompanied contractions"
@@ -142,6 +150,7 @@ export function CreditConditions() {
         />
         <ConditionKpi
           label="Excess Bond Premium"
+          prov="kpis.ebp"
           value={fmt(kpis.ebp, 2)}
           signal={signals?.ebp}
           sub="Spread beyond default risk. Positive = impaired risk appetite"
@@ -149,6 +158,7 @@ export function CreditConditions() {
         />
         <ConditionKpi
           label="ANFCI"
+          prov="kpis.anfci"
           value={fmt(kpis.anfci, 2)}
           signal={signals?.anfci}
           sub="Conditions relative to the business cycle. >0 = tighter than warranted"
@@ -158,7 +168,7 @@ export function CreditConditions() {
 
       {/* Excess Bond Premium */}
       {ebpChart.length > 0 && (
-        <Card className="p-4">
+        <Card className="p-4" data-prov="history.ebp" data-prov-ctx="Excess bond premium & GZ credit spread">
           <h3 className="font-semibold mb-1">Excess Bond Premium &amp; GZ Credit Spread</h3>
           <p className="text-xs text-text-secondary mb-3">
             Gilchrist &amp; Zakrajšek (2012) split corporate spreads into compensation for
@@ -167,7 +177,7 @@ export function CreditConditions() {
             {kpis.gz_recession_prob != null && (
               <>
                 {" "}Their associated recession probability currently reads{" "}
-                <span className="font-semibold text-text-primary">
+                <span className="font-semibold text-text-primary" data-prov="kpis.gz_recession_prob" data-prov-ctx="GZ implied recession probability">
                   {(kpis.gz_recession_prob * 100).toFixed(1)}%
                 </span>.
               </>
@@ -179,7 +189,7 @@ export function CreditConditions() {
               <XAxis dataKey="date" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
               <YAxis tick={{ fontSize: 11 }} />
               <Tooltip formatter={(v: number) => (v != null ? v.toFixed(3) : "—")} />
-              <Legend />
+              <Legend formatter={legendProv({ "Excess Bond Premium": "history.ebp", "GZ Credit Spread": "history.gz_spread" })} />
               <ReferenceLine y={0} stroke={pal.axis} strokeDasharray="4 4" />
               <Line type="monotone" dataKey="Excess Bond Premium" stroke="#ef4444" dot={false} strokeWidth={1.6} />
               <Line type="monotone" dataKey="GZ Credit Spread" stroke="#3b82f6" dot={false} strokeWidth={1.2} />
@@ -193,7 +203,7 @@ export function CreditConditions() {
 
       {/* SLOOS */}
       {sloosChart.length > 0 && (
-        <Card className="p-4">
+        <Card className="p-4" data-prov="history.sloos_ci" data-prov-ctx="SLOOS C&I lending standards">
           <h3 className="font-semibold mb-1">Bank Lending Standards — C&amp;I Loans</h3>
           <p className="text-xs text-text-secondary mb-3">
             Net percentage of senior loan officers reporting tighter standards. Lown &amp;
@@ -221,7 +231,7 @@ export function CreditConditions() {
 
       {/* SOFR - IORB */}
       {sofrChart.length > 0 && (
-        <Card className="p-4">
+        <Card className="p-4" data-prov="history.sofr_iorb" data-prov-ctx="SOFR minus IORB">
           <h3 className="font-semibold mb-1">Reserve Scarcity — SOFR minus IORB</h3>
           <p className="text-xs text-text-secondary mb-3">
             Secured overnight repo against the rate the Fed pays on reserves. A persistently
@@ -245,7 +255,7 @@ export function CreditConditions() {
 
       {/* NFCI vs ANFCI */}
       {nfciChart.length > 0 && (
-        <Card className="p-4">
+        <Card className="p-4" data-prov="history.nfci" data-prov-ctx="NFCI vs ANFCI">
           <h3 className="font-semibold mb-1">NFCI vs ANFCI</h3>
           <p className="text-xs text-text-secondary mb-3">
             Chicago Fed composite financial conditions, weekly. ANFCI is orthogonalised to
@@ -259,7 +269,7 @@ export function CreditConditions() {
               <XAxis dataKey="date" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
               <YAxis tick={{ fontSize: 11 }} />
               <Tooltip formatter={(v: number) => (v != null ? v.toFixed(3) : "—")} />
-              <Legend />
+              <Legend formatter={legendProv({ NFCI: "history.nfci", ANFCI: "history.anfci" })} />
               <ReferenceLine y={0} stroke={pal.axis} strokeDasharray="4 4" />
               <Line type="monotone" dataKey="NFCI" stroke="#3b82f6" dot={false} strokeWidth={1.3} />
               <Line type="monotone" dataKey="ANFCI" stroke="#8b5cf6" dot={false} strokeWidth={1.6} />
@@ -282,37 +292,37 @@ export function CreditConditions() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              <tr>
+              <tr data-prov="kpis.sofr_iorb" data-prov-ctx="SOFR − IORB">
                 <td className="py-2 pr-4">SOFR − IORB</td>
                 <td className="py-2 pr-4 font-mono">{fmt(kpis.sofr_iorb, 3, " pp")}</td>
                 <td className="py-2 pr-4 text-text-secondary">Daily</td>
                 <td className="py-2 pr-4 text-text-secondary">Mechanical — repo above the administered floor is definitionally reserve scarcity</td>
               </tr>
-              <tr>
+              <tr data-prov="kpis.sloos_ci" data-prov-ctx="SLOOS net tightening (C&I)">
                 <td className="py-2 pr-4">SLOOS net tightening (C&amp;I)</td>
                 <td className="py-2 pr-4 font-mono">{fmt(kpis.sloos_ci, 1, "%")}</td>
                 <td className="py-2 pr-4 text-text-secondary">Quarterly</td>
                 <td className="py-2 pr-4 text-text-secondary">Lown &amp; Morgan (2006, JMCB); Bassett et al. (2014, JME)</td>
               </tr>
-              <tr>
+              <tr data-prov="kpis.ebp" data-prov-ctx="Excess bond premium">
                 <td className="py-2 pr-4">Excess Bond Premium</td>
                 <td className="py-2 pr-4 font-mono">{fmt(kpis.ebp, 3)}</td>
                 <td className="py-2 pr-4 text-text-secondary">Monthly</td>
                 <td className="py-2 pr-4 text-text-secondary">Gilchrist &amp; Zakrajšek (2012, AER)</td>
               </tr>
-              <tr>
+              <tr data-prov="kpis.gz_spread" data-prov-ctx="GZ credit spread">
                 <td className="py-2 pr-4">GZ credit spread</td>
                 <td className="py-2 pr-4 font-mono">{fmt(kpis.gz_spread, 3)}</td>
                 <td className="py-2 pr-4 text-text-secondary">Monthly</td>
                 <td className="py-2 pr-4 text-text-secondary">Gilchrist &amp; Zakrajšek (2012, AER)</td>
               </tr>
-              <tr>
+              <tr data-prov="kpis.nfci" data-prov-ctx="NFCI">
                 <td className="py-2 pr-4">NFCI</td>
                 <td className="py-2 pr-4 font-mono">{fmt(kpis.nfci, 3)}</td>
                 <td className="py-2 pr-4 text-text-secondary">Weekly</td>
                 <td className="py-2 pr-4 text-text-secondary">Chicago Fed composite of 105 financial indicators</td>
               </tr>
-              <tr>
+              <tr data-prov="kpis.anfci" data-prov-ctx="ANFCI">
                 <td className="py-2 pr-4">ANFCI</td>
                 <td className="py-2 pr-4 font-mono">{fmt(kpis.anfci, 3)}</td>
                 <td className="py-2 pr-4 text-text-secondary">Weekly</td>

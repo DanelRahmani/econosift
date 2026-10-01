@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import type { RelStrengthResponse } from "@/lib/types";
 import { Card, Skeleton } from "@/components/ui";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 import { fmtPct } from "@/lib/format";
 
 function Cell({ value }: { value: number | null }) {
@@ -18,6 +20,7 @@ function Cell({ value }: { value: number | null }) {
 export function RankingsTab({ tickers }: { tickers: string[] }) {
   const [data, setData] = useState<RelStrengthResponse | null>(null);
   const [loading, setLoading] = useState(false);
+  const scope = useSourceScope(provOf(data));
 
   useEffect(() => {
     if (!tickers.length) { setData(null); return; }
@@ -35,7 +38,7 @@ export function RankingsTab({ tickers }: { tickers: string[] }) {
   }
 
   return (
-    <Card>
+    <Card {...scope}>
       <h2 className="text-sm font-semibold mb-1 text-text-secondary">Relative Strength Rankings</h2>
       <p className="text-xs text-text-muted mb-4">
         Trailing returns and the spread vs. each ticker&apos;s benchmark (Rel). Ranked by 3-month return.
@@ -59,7 +62,7 @@ export function RankingsTab({ tickers }: { tickers: string[] }) {
             </thead>
             <tbody>
               {data?.rankings.map((r, i) => (
-                <tr key={r.ticker} className="border-b border-border/50">
+                <tr key={r.ticker} className="border-b border-border/50" data-prov={`rankings.${r.ticker}`} data-prov-ctx={r.ticker}>
                   <td className="py-2 px-3 text-text-muted font-mono">{i + 1}</td>
                   <td className="py-2 px-3 font-mono">{r.ticker}</td>
                   <Cell value={r.ret1m} />

@@ -3,6 +3,8 @@
 import { useState, useMemo } from "react";
 import type { AiSummaryResponse } from "@/lib/types";
 import { Card } from "@/components/ui";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 
 const AVAILABLE_MODELS = ["gemini-2.5-flash", "gemini-3-flash-preview", "gemini-3.1-flash-lite", "gemini-3.5-flash"];
 
@@ -28,6 +30,7 @@ export function AiSummaryPanel({ summaryType, title, options, searchPlaceholder,
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<AiSummaryResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const scope = useSourceScope(provOf(result));
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Set<string>>(() => {
     if (options && options.length > 0) {
@@ -238,7 +241,7 @@ export function AiSummaryPanel({ summaryType, title, options, searchPlaceholder,
 
       {/* Result */}
       {hasResult && !loading && (
-        <div className="space-y-2">
+        <div className="space-y-2" {...scope} data-prov-ctx={result.context_key}>
           {/* Date/model badge */}
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-xs text-text-muted bg-surface-alt rounded px-2 py-0.5">

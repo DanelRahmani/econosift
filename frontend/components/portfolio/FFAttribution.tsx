@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { api } from "@/lib/api";
 import type { Holding, FFData } from "@/lib/types";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 
 interface Props {
   holdings: Holding[];
@@ -14,6 +16,7 @@ export function FFAttribution({ holdings, period }: Props) {
   const [data, setData] = useState<FFData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const scope = useSourceScope(provOf(data));
 
   async function calculate() {
     setLoading(true);
@@ -34,7 +37,7 @@ export function FFAttribution({ holdings, period }: Props) {
   }
 
   return (
-    <div className="rounded-xl border border-border bg-surface p-4 space-y-3">
+    <div className="rounded-xl border border-border bg-surface p-4 space-y-3" {...scope}>
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h3 className="font-semibold text-sm">Fama-French Attribution</h3>
         <div className="flex items-center gap-2">
@@ -72,13 +75,13 @@ export function FFAttribution({ holdings, period }: Props) {
       {data && (
         <>
           <div className="flex gap-4 flex-wrap">
-            <div className="bg-surface-alt rounded-lg p-3">
+            <div data-prov="annAlpha" className="bg-surface-alt rounded-lg p-3">
               <p className="text-xs text-text-muted">Alpha (ann.)</p>
               <p className={`text-lg font-bold mt-1 ${data.annAlpha !== null && (data.annAlpha ?? 0) >= 0 ? "text-green-500" : "text-red-500"}`}>
                 {data.annAlpha !== null ? `${((data.annAlpha ?? 0) * 100).toFixed(2)}%` : "—"}
               </p>
             </div>
-            <div className="bg-surface-alt rounded-lg p-3">
+            <div data-prov="rSquared" className="bg-surface-alt rounded-lg p-3">
               <p className="text-xs text-text-muted">R²</p>
               <p className="text-lg font-bold mt-1 text-text-primary">
                 {data.rSquared !== null ? data.rSquared.toFixed(3) : "—"}
@@ -97,12 +100,12 @@ export function FFAttribution({ holdings, period }: Props) {
               </thead>
               <tbody>
                 {(data.factors ?? []).map((row) => (
-                  <tr key={row.factor} className="border-b border-border/50">
+                  <tr key={row.factor} data-prov-ctx={row.factor} className="border-b border-border/50">
                     <td className="py-2 pr-4 font-medium text-text-primary">{row.factor}</td>
-                    <td className={`py-2 pr-4 text-right ${row.loading !== null && row.loading >= 0 ? "text-green-500" : "text-red-500"}`}>
+                    <td data-prov={`factors.${row.factor}.loading`} className={`py-2 pr-4 text-right ${row.loading !== null && row.loading >= 0 ? "text-green-500" : "text-red-500"}`}>
                       {row.loading !== null ? row.loading.toFixed(4) : "—"}
                     </td>
-                    <td className={`py-2 text-right ${row.tStat !== null && Math.abs(row.tStat) >= 2 ? "text-accent font-medium" : "text-text-secondary"}`}>
+                    <td data-prov={`factors.${row.factor}.tStat`} className={`py-2 text-right ${row.tStat !== null && Math.abs(row.tStat) >= 2 ? "text-accent font-medium" : "text-text-secondary"}`}>
                       {row.tStat !== null ? row.tStat.toFixed(2) : "—"}
                     </td>
                   </tr>

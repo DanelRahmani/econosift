@@ -17,6 +17,8 @@ import { api } from "@/lib/api";
 import type { RegimeResponse, RegimePoint, RegimeQuadrant } from "@/lib/types";
 import { Card, Skeleton, chartPalette, chartTooltipStyle } from "@/components/ui";
 import { useTheme } from "@/components/ThemeProvider";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 import { fmtPct } from "@/lib/format";
 
 // ─── colour maps ────────────────────────────────────────────────────────────
@@ -95,6 +97,7 @@ export function RegimeClock({
   const [data, setData] = useState<RegimeResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const scope = useSourceScope(provOf(data));
 
   // scrubber index — defaults to last point
   const [scrubIdx, setScrubIdx] = useState(0);
@@ -236,27 +239,27 @@ export function RegimeClock({
   const badgeCls = quadrant ? QUADRANT_BADGE[quadrant] : "bg-text-muted/20 text-text-secondary";
 
   return (
-    <Card>
+    <Card {...scope}>
       <div className="p-4 space-y-4">
         {/* header */}
         <div className="flex items-center justify-between flex-wrap gap-2">
           <h3 className="text-sm font-semibold text-text-primary">
             Regime Clock — {countryName}
           </h3>
-          <span className={`px-2 py-0.5 rounded-md text-xs font-semibold ${badgeCls}`}>
+          <span className={`px-2 py-0.5 rounded-md text-xs font-semibold ${badgeCls}`} data-prov="series.quadrant" data-prov-ctx={`${countryName} regime quadrant`}>
             {quadrant ?? "—"}
           </span>
         </div>
 
         {/* KPI row */}
         <div className="flex flex-wrap gap-6">
-          <div>
+          <div data-prov="series.gdpGrowth" data-prov-ctx={`${countryName} real GDP YoY`}>
             <p className="text-xs text-text-muted uppercase tracking-wide">Real GDP YoY</p>
             <p className="text-lg font-bold text-text-primary">
               {fmtPct(kpiPoint?.gdpGrowth ?? null)}
             </p>
           </div>
-          <div>
+          <div data-prov="series.cpiInflation" data-prov-ctx={`${countryName} CPI inflation YoY`}>
             <p className="text-xs text-text-muted uppercase tracking-wide">CPI Inflation YoY</p>
             <p className="text-lg font-bold text-text-primary">
               {fmtPct(kpiPoint?.cpiInflation ?? null)}

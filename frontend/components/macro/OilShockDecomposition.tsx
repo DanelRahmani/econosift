@@ -3,6 +3,8 @@ import { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import type { OilShocksData } from "@/lib/types";
 import { Card, ChartSkeleton, chartPalette } from "@/components/ui";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 import {
   ResponsiveContainer,
   ComposedChart,
@@ -20,9 +22,9 @@ function fmt(v: number | null | undefined, decimals = 1, suffix = ""): string {
   return v != null ? `${v.toFixed(decimals)}${suffix}` : "—";
 }
 
-function Kpi({ label, value, color, sub }: { label: string; value: string; color?: string; sub: string }) {
+function Kpi({ label, value, color, sub, prov }: { label: string; value: string; color?: string; sub: string; prov?: string }) {
   return (
-    <Card className="p-4">
+    <Card className="p-4" data-prov={prov} data-prov-ctx={label}>
       <div className="text-xs text-text-secondary">{label}</div>
       <div className={`text-2xl font-bold mt-1 ${color ?? ""}`}>{value}</div>
       <div className="text-xs text-text-secondary mt-0.5">{sub}</div>
@@ -34,6 +36,7 @@ export function OilShockDecomposition() {
   const [data, setData] = useState<OilShocksData | null>(null);
   const [loading, setLoading] = useState(true);
   const [months, setMonths] = useState(60);
+  const scope = useSourceScope(provOf(data));
   const pal = chartPalette("dark");
 
   useEffect(() => {
@@ -74,7 +77,7 @@ export function OilShockDecomposition() {
   const dominantColor = latest.interpretation === "expansionary" ? "text-success" : "text-danger";
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" {...scope}>
       <div className="border-t border-border pt-6 mt-2">
         <h2 className="font-semibold text-lg">Oil Shock Decomposition</h2>
         <p className="text-xs text-text-secondary mt-1">
@@ -88,22 +91,26 @@ export function OilShockDecomposition() {
       {/* KPI row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <Kpi
+          prov="latest"
           label={`Real oil return (${latest.date.slice(0, 7)})`}
           value={fmt(latest.total, 1, "%")}
           color={latest.total >= 0 ? "text-success" : "text-danger"}
           sub="Monthly log return, CPI-deflated"
         />
         <Kpi
+          prov="latest"
           label="Demand component"
           value={fmt(latest.demand, 1, "%")}
           sub="Explained by global activity + copper"
         />
         <Kpi
+          prov="latest"
           label="Oil-specific component"
           value={fmt(latest.supply, 1, "%")}
           sub="Supply / precautionary residual"
         />
         <Kpi
+          prov="latest"
           label="Read-through"
           value={latest.interpretation === "expansionary" ? "Expansionary" : "Contractionary"}
           color={dominantColor}
@@ -112,7 +119,7 @@ export function OilShockDecomposition() {
       </div>
 
       {/* Decomposition chart */}
-      <Card className="p-4">
+      <Card className="p-4" data-prov="history" data-prov-ctx="Monthly return attribution">
         <div className="flex items-center justify-between mb-1">
           <h3 className="font-semibold">Monthly Return Attribution</h3>
           <div className="flex gap-1">
@@ -153,7 +160,7 @@ export function OilShockDecomposition() {
 
       {/* Extended detail */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Card className="p-4">
+        <Card className="p-4" data-prov="trailing12m" data-prov-ctx="Trailing 12-month attribution">
           <h3 className="font-semibold mb-3">Trailing 12 Months</h3>
           <table className="w-full text-sm">
             <tbody className="divide-y divide-border">
@@ -177,7 +184,7 @@ export function OilShockDecomposition() {
           </table>
         </Card>
 
-        <Card className="p-4">
+        <Card className="p-4" data-prov="regression" data-prov-ctx="Regression diagnostics">
           <h3 className="font-semibold mb-3">Model Fit</h3>
           <table className="w-full text-sm">
             <tbody className="divide-y divide-border">

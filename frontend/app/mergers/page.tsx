@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import type { MAData } from "@/lib/types";
 import { Card } from "@/components/ui";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Cell,
@@ -14,6 +16,7 @@ export default function MergersPage() {
   const [data, setData] = useState<MAData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const scope = useSourceScope(provOf(data));
 
   useEffect(() => {
     api.mergers().then(setData).catch(() => setError(true)).finally(() => setLoading(false));
@@ -47,24 +50,24 @@ export default function MergersPage() {
   const sectorsWithDeals = sectorHeatmap.length;
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6 p-6">
+    <div className="max-w-6xl mx-auto space-y-6 p-6" {...scope}>
       <h1 className="text-2xl font-bold">M&A Tracker</h1>
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <Card className="p-4">
+        <Card className="p-4" data-prov="deals">
           <div className="text-xs text-text-secondary">Announced Deals</div>
           <div className="text-2xl font-bold mt-1">{totalDeals}</div>
           <div className="text-xs text-text-secondary mt-0.5">Last 90 days</div>
         </Card>
-        <Card className="p-4">
+        <Card className="p-4" data-prov="deals">
           <div className="text-xs text-text-secondary">Total Deal Value</div>
           <div className="text-2xl font-bold mt-1">
             {totalValue > 0 ? `$${(totalValue / 1000).toFixed(1)}B` : "—"}
           </div>
           <div className="text-xs text-text-secondary mt-0.5">Estimated</div>
         </Card>
-        <Card className="p-4">
+        <Card className="p-4" data-prov="sectorHeatmap">
           <div className="text-xs text-text-secondary">Active Sectors</div>
           <div className="text-2xl font-bold mt-1">{sectorsWithDeals}</div>
         </Card>
@@ -76,7 +79,7 @@ export default function MergersPage() {
 
       {/* Deal Table */}
       {deals.length > 0 && (
-        <Card className="p-4 overflow-x-auto">
+        <Card className="p-4 overflow-x-auto" data-prov="deals">
           <h3 className="font-semibold mb-3">Recent M&A Deals</h3>
           <table className="w-full text-sm">
             <thead>
@@ -89,7 +92,7 @@ export default function MergersPage() {
             </thead>
             <tbody>
               {deals.slice(0, 20).map((d, i) => (
-                <tr key={i} className="border-b border-border/50">
+                <tr key={i} className="border-b border-border/50" data-prov-ctx={d.headline}>
                   <td className="py-2 text-text-secondary font-mono text-xs">{d.date}</td>
                   <td className="py-2 max-w-md truncate">
                     {d.url ? (
@@ -112,7 +115,7 @@ export default function MergersPage() {
 
       {/* Monthly Volume Chart */}
       {monthlyVolume.length > 0 && (
-        <Card className="p-4">
+        <Card className="p-4" data-prov="monthlyVolume">
           <h3 className="font-semibold mb-1">Monthly Deal Volume</h3>
           <ResponsiveContainer width="100%" height={250}>
             <BarChart data={monthlyVolume} margin={{ left: 10, right: 30 }}>
@@ -128,7 +131,7 @@ export default function MergersPage() {
 
       {/* Sector Heatmap */}
       {sectorHeatmap.length > 0 && (
-        <Card className="p-4">
+        <Card className="p-4" data-prov="sectorHeatmap">
           <h3 className="font-semibold mb-1">M&A Activity by Sector</h3>
           <p className="text-xs text-text-secondary mb-3">Deal count by sector (last 90 days).</p>
           <ResponsiveContainer width="100%" height={300}>

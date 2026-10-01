@@ -13,6 +13,8 @@ import {
 import { Card, Skeleton, chartPalette, chartTooltipStyle } from "@/components/ui";
 import { fmtPrice } from "@/lib/format";
 import type { OIProfile } from "@/lib/types";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 
 interface Props {
   data: OIProfile | null;
@@ -61,6 +63,7 @@ function CustomTooltip({ active, payload, label }: CustomTooltipProps) {
 export function OIProfileChart({ data, loading, theme }: Props) {
   const p = chartPalette(theme as "light" | "dark");
   const tt = chartTooltipStyle(theme as "light" | "dark");
+  const scope = useSourceScope(provOf(data));
 
   if (loading) {
     return <Skeleton className="h-80 w-full rounded-xl" />;
@@ -83,7 +86,7 @@ export function OIProfileChart({ data, loading, theme }: Props) {
   }));
 
   return (
-    <Card className="p-4">
+    <Card className="p-4" {...scope}>
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-sm font-semibold text-text-primary">Open Interest Profile</h3>
         <div className="flex items-center gap-4 text-[10px] text-text-muted">

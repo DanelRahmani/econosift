@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import type { CommoditiesData, CommodityRow } from "@/lib/types";
 import { Card } from "@/components/ui";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 import { OilShockDecomposition } from "./OilShockDecomposition";
 import {
   LineChart,
@@ -24,22 +26,26 @@ function KpiCard({
   value,
   change,
   unit = "",
+  prov,
+  changeProv,
 }: {
   label: string;
   value: number | null;
   change?: number | null;
   unit?: string;
+  prov?: string;
+  changeProv?: string;
 }) {
   const changeColor =
     change != null && change >= 0 ? "text-success" : "text-danger";
   return (
-    <Card className="p-4">
+    <Card className="p-4" data-prov={prov} data-prov-ctx={label}>
       <div className="text-xs text-text-secondary">{label}</div>
       <div className="text-xl font-bold mt-1">
         {value != null ? `${unit}${value.toFixed(2)}` : "—"}
       </div>
       {change != null && (
-        <div className={`text-xs mt-0.5 ${changeColor}`}>
+        <div className={`text-xs mt-0.5 ${changeColor}`} data-prov={changeProv} data-prov-ctx={`${label} · 1-day change`}>
           {change >= 0 ? "+" : ""}
           {change.toFixed(2)}% today
         </div>
@@ -63,6 +69,7 @@ export function CommoditiesTab() {
   const [data, setData] = useState<CommoditiesData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const scope = useSourceScope(provOf(data));
 
   useEffect(() => {
     api
@@ -101,14 +108,14 @@ export function CommoditiesTab() {
   }));
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" {...scope}>
       {/* KPI Row */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-        <KpiCard label="WTI Crude ($/bbl)" value={kpis.wti} change={kpis.wtiChange1d} unit="$" />
-        <KpiCard label="Gold ($/oz)" value={kpis.gold} change={kpis.goldChange1d} unit="$" />
-        <KpiCard label="Natural Gas ($/MMBtu)" value={kpis.natGas} unit="$" />
-        <KpiCard label="Copper ($/lb)" value={kpis.copper} unit="$" />
-        <KpiCard label="Wheat (¢/bu)" value={kpis.wheat} />
+        <KpiCard label="WTI Crude ($/bbl)" value={kpis.wti} change={kpis.wtiChange1d} unit="$" prov="kpis.wti" changeProv="kpis.wtiChange1d" />
+        <KpiCard label="Gold ($/oz)" value={kpis.gold} change={kpis.goldChange1d} unit="$" prov="kpis.gold" changeProv="kpis.goldChange1d" />
+        <KpiCard label="Natural Gas ($/MMBtu)" value={kpis.natGas} unit="$" prov="kpis.natGas" />
+        <KpiCard label="Copper ($/lb)" value={kpis.copper} unit="$" prov="kpis.copper" />
+        <KpiCard label="Wheat (¢/bu)" value={kpis.wheat} prov="kpis.wheat" />
       </div>
 
       {/* Commodities Table */}
@@ -132,6 +139,8 @@ export function CommoditiesTab() {
                   <tr
                     key={row.ticker}
                     className="border-b border-border/40 hover:bg-surface-alt/30 transition-colors"
+                    data-prov={`table.${row.ticker}`}
+                    data-prov-ctx={row.name}
                   >
                     <td className="py-2 pr-4">
                       <div className="font-medium">{row.name}</div>
@@ -143,10 +152,10 @@ export function CommoditiesTab() {
                       {row.price != null ? row.price.toFixed(2) : "—"}
                       {row.unit && <div className="text-[10px] text-text-muted">{row.unit}</div>}
                     </td>
-                    <td className="py-2 pr-4 text-right">{pct(row.change1d)}</td>
-                    <td className="py-2 pr-4 text-right">{pct(row.change1w)}</td>
-                    <td className="py-2 pr-4 text-right">{pct(row.change1m)}</td>
-                    <td className="py-2 text-right">{pct(row.changeYtd)}</td>
+                    <td className="py-2 pr-4 text-right" data-prov={`table.${row.ticker}.change1d`}>{pct(row.change1d)}</td>
+                    <td className="py-2 pr-4 text-right" data-prov={`table.${row.ticker}.change1w`}>{pct(row.change1w)}</td>
+                    <td className="py-2 pr-4 text-right" data-prov={`table.${row.ticker}.change1m`}>{pct(row.change1m)}</td>
+                    <td className="py-2 text-right" data-prov={`table.${row.ticker}.changeYtd`}>{pct(row.changeYtd)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -162,7 +171,7 @@ export function CommoditiesTab() {
 
       {/* Gold/Oil Ratio */}
       {goldOilData.length > 0 && (
-        <Card className="p-4">
+        <Card className="p-4" data-prov="ratios.goldOilRatio" data-prov-ctx="Gold/oil ratio">
           <h3 className="font-semibold mb-1">Gold/Oil Ratio</h3>
           <p className="text-xs text-text-secondary mb-3">
             High ratio: risk-off (recession fears). Low ratio: risk-on (growth
@@ -188,7 +197,7 @@ export function CommoditiesTab() {
 
       {/* EconoSift Commodity Index */}
       {commodityIndexData.length > 0 && (
-        <Card className="p-4">
+        <Card className="p-4" data-prov="axiomIndex" data-prov-ctx="EconoSift Commodity Index">
           <h3 className="font-semibold mb-1">EconoSift Commodity Index</h3>
           <p className="text-xs text-text-secondary mb-3">
             Equal-weighted basket of major commodities, indexed to 100 at inception.

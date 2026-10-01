@@ -7,6 +7,8 @@ import {
 import { Card } from "@/components/ui";
 import { api } from "@/lib/api";
 import type { CarryTable, CarryBacktest, CarryRow } from "@/lib/types";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 
 const tooltipStyle = {
   backgroundColor: "var(--color-surface-alt)",
@@ -28,6 +30,9 @@ export function FxCarryTab() {
 
   const [backtest, setBacktest] = useState<CarryBacktest | null>(null);
   const [btLoading, setBtLoading] = useState(false);
+
+  const tableScope = useSourceScope(provOf(table));
+  const backtestScope = useSourceScope(provOf(backtest));
 
   useEffect(() => {
     setLoading(true);
@@ -57,13 +62,13 @@ export function FxCarryTab() {
 
   return (
     <div className="space-y-6">
-      <Card>
+      <Card {...tableScope}>
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-sm font-semibold text-text-secondary">
             G10 Carry Table {table?.asOf && <span className="text-text-muted font-normal">· as of {table.asOf}</span>}
           </h3>
           {table?.usdRate != null && (
-            <span className="text-xs text-text-muted font-mono">USD funding: {table.usdRate.toFixed(2)}%</span>
+            <span data-prov="usdRate" className="text-xs text-text-muted font-mono">USD funding: {table.usdRate.toFixed(2)}%</span>
           )}
         </div>
         {loading ? <div className="h-64 animate-pulse bg-surface-alt rounded-lg" />
@@ -91,14 +96,14 @@ export function FxCarryTab() {
               </thead>
               <tbody>
                 {rows.map((r) => (
-                  <tr key={r.ccy} className="border-b border-border/50 hover:bg-surface-alt/50">
+                  <tr key={r.ccy} data-prov-ctx={r.pair} className="border-b border-border/50 hover:bg-surface-alt/50">
                     <td className="py-2 pr-3 font-mono font-semibold">{r.pair}</td>
-                    <td className="text-right py-2 px-3 font-mono text-text-secondary">{num(r.spot, 4)}</td>
-                    <td className="text-right py-2 px-3 font-mono">{num(r.foreignRate, 2, "%")}</td>
-                    <td className={`text-right py-2 px-3 font-mono font-semibold ${carryColor(r)}`}>{num(r.carry, 2, "%")}</td>
-                    <td className="text-right py-2 px-3 font-mono text-text-secondary">{num(r.fxVol, 1, "%")}</td>
-                    <td className="text-right py-2 px-3 font-mono">{num(r.volAdjCarry, 3)}</td>
-                    <td className="text-right py-2 pl-3 font-mono text-text-muted text-xs">{r.rateSource}</td>
+                    <td data-prov={`rows.${r.ccy}.spot`} className="text-right py-2 px-3 font-mono text-text-secondary">{num(r.spot, 4)}</td>
+                    <td data-prov={`rows.${r.ccy}.foreignRate`} className="text-right py-2 px-3 font-mono">{num(r.foreignRate, 2, "%")}</td>
+                    <td data-prov={`rows.${r.ccy}.carry`} className={`text-right py-2 px-3 font-mono font-semibold ${carryColor(r)}`}>{num(r.carry, 2, "%")}</td>
+                    <td data-prov={`rows.${r.ccy}.fxVol`} className="text-right py-2 px-3 font-mono text-text-secondary">{num(r.fxVol, 1, "%")}</td>
+                    <td data-prov={`rows.${r.ccy}.volAdjCarry`} className="text-right py-2 px-3 font-mono">{num(r.volAdjCarry, 3)}</td>
+                    <td data-prov={`rows.${r.ccy}.foreignRate`} className="text-right py-2 pl-3 font-mono text-text-muted text-xs">{r.rateSource}</td>
                   </tr>
                 ))}
               </tbody>
@@ -110,7 +115,7 @@ export function FxCarryTab() {
         </p>
       </Card>
 
-      <Card>
+      <Card {...backtestScope}>
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-sm font-semibold text-text-secondary">
             Carry Basket Backtest <span className="text-text-muted">(long top-3 / short bottom-3, vs DXY)</span>
@@ -126,7 +131,7 @@ export function FxCarryTab() {
         {btLoading && <div className="h-72 animate-pulse bg-surface-alt rounded-lg" />}
         {backtest && backtest.series.length > 0 && (
           <>
-            <div className="flex flex-wrap gap-4 mb-3 text-xs">
+            <div data-prov="legs" className="flex flex-wrap gap-4 mb-3 text-xs">
               <span><span className="text-success font-semibold">Long:</span> {backtest.legs.long.join(", ")}</span>
               <span><span className="text-danger font-semibold">Short:</span> {backtest.legs.short.join(", ")}</span>
             </div>
@@ -148,7 +153,7 @@ export function FxCarryTab() {
                 ["Sharpe", backtest.metrics.sharpe],
                 ["Max DD", backtest.metrics.maxDrawdown],
               ] as const).map(([label, v]) => (
-                <div key={label} className="rounded-lg border border-border p-2.5">
+                <div key={label} data-prov="metrics" className="rounded-lg border border-border p-2.5">
                   <div className="text-xs text-text-muted">{label}</div>
                   <div className="text-sm font-mono text-accent">
                     {v === null || v === undefined ? "—" : label === "Sharpe" ? v.toFixed(2) : `${v.toFixed(2)}%`}

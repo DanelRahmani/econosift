@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import type { BankingStabilityData } from "@/lib/types";
 import { Card } from "@/components/ui";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 import { shortCountryName } from "@/lib/format";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -22,6 +24,7 @@ export function BankingStabilityPanel() {
   const [data, setData] = useState<BankingStabilityData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const scope = useSourceScope(provOf(data));
 
   useEffect(() => {
     api.stabilityBanking().then(setData).catch(() => setError(true)).finally(() => setLoading(false));
@@ -33,21 +36,21 @@ export function BankingStabilityPanel() {
   const { summary, countries, source } = data;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" {...scope}>
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <Card className="p-4">
+        <Card className="p-4" data-prov="summary">
           <div className="text-xs text-text-secondary">Red Alerts</div>
           <div className="text-2xl font-bold text-danger">{summary.redCount}</div>
         </Card>
-        <Card className="p-4">
+        <Card className="p-4" data-prov="summary">
           <div className="text-xs text-text-secondary">Yellow Warnings</div>
           <div className="text-2xl font-bold text-warning">{summary.yellowCount}</div>
         </Card>
-        <Card className="p-4">
+        <Card className="p-4" data-prov="summary">
           <div className="text-xs text-text-secondary">Green / Stable</div>
           <div className="text-2xl font-bold text-success">{summary.greenCount}</div>
         </Card>
-        <Card className="p-4">
+        <Card className="p-4" data-prov="summary">
           <div className="text-xs text-text-secondary">Countries</div>
           <div className="text-2xl font-bold">{summary.totalCountries}</div>
         </Card>
@@ -59,7 +62,7 @@ export function BankingStabilityPanel() {
 
       {/* NPL Ratio Bar Chart */}
       {countries.length > 0 && (
-        <Card className="p-4">
+        <Card className="p-4" data-prov={`countries.${countries[0].iso2}.kpis.nplRatio`} data-prov-ctx="Bank NPL ratio, all countries (source shown for the first country; period varies)">
           <h3 className="font-semibold mb-1">Bank Non-Performing Loans (% of total)</h3>
           <p className="text-xs text-text-secondary mb-3">
             Green &lt;5% · Yellow 5–10% · Red &gt;10%
@@ -91,7 +94,7 @@ export function BankingStabilityPanel() {
       {/* Capital Adequacy + Z-Score Grid */}
       <div className="grid md:grid-cols-2 gap-4">
         {countries.length > 0 && (
-          <Card className="p-4">
+          <Card className="p-4" data-prov={`countries.${countries[0].iso2}.kpis.capitalAdequacy`} data-prov-ctx="Bank capital to assets, all countries (source shown for the first country; period varies)">
             <h3 className="font-semibold mb-1">Bank Capital to Assets Ratio (%)</h3>
             <p className="text-xs text-text-secondary mb-3">Green &gt;8% · Yellow 6–8% · Red &lt;6%</p>
             <ResponsiveContainer width="100%" height={Math.max(280, countries.length * 22)}>
@@ -114,7 +117,7 @@ export function BankingStabilityPanel() {
         )}
 
         {countries.length > 0 && (
-          <Card className="p-4">
+          <Card className="p-4" data-prov={`countries.${countries[0].iso2}.kpis.bankZscore`} data-prov-ctx="Bank Z-score, all countries (source shown for the first country; period varies)">
             <h3 className="font-semibold mb-1">Bank Z-Score (higher = more stable)</h3>
             <p className="text-xs text-text-secondary mb-3">
               Green &gt;20 · Yellow 10–20 · Red &lt;10
@@ -151,7 +154,7 @@ export function BankingStabilityPanel() {
             {countries.filter(c => c.kpis.creditGap != null && c.kpis.creditGap > 2)
               .sort((a, b) => (b.kpis.creditGap || 0) - (a.kpis.creditGap || 0))
               .map(c => (
-                <div key={c.iso2} className={c.kpis.creditGap != null && c.kpis.creditGap > 10 ? "text-danger" : "text-warning"}>
+                <div key={c.iso2} data-prov={`countries.${c.iso2}.kpis.creditGap`} data-prov-ctx={c.name} className={c.kpis.creditGap != null && c.kpis.creditGap > 10 ? "text-danger" : "text-warning"}>
                   <span className="font-medium">{c.name}</span>
                   <span className="text-xs ml-1">{c.kpis.creditGap?.toFixed(1)}pp</span>
                 </div>

@@ -7,6 +7,8 @@ import {
 } from "recharts";
 import { api } from "@/lib/api";
 import type { Holding, FrontierData } from "@/lib/types";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 
 interface Props {
   holdings: Holding[];
@@ -17,6 +19,7 @@ export function EfficientFrontier({ holdings, period }: Props) {
   const [data, setData] = useState<FrontierData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const scope = useSourceScope(provOf(data));
 
   async function run() {
     if (holdings.length > 20) {
@@ -55,7 +58,7 @@ export function EfficientFrontier({ holdings, period }: Props) {
     : [];
 
   return (
-    <div className="rounded-xl border border-border bg-surface p-4 space-y-3">
+    <div className="rounded-xl border border-border bg-surface p-4 space-y-3" {...scope}>
       <div className="flex items-center justify-between">
         <h3 className="font-semibold text-sm">Efficient Frontier</h3>
         <button
@@ -139,9 +142,9 @@ export function EfficientFrontier({ holdings, period }: Props) {
             </ScatterChart>
           </ResponsiveContainer>
           <div className="flex gap-4 text-xs text-text-muted">
-            <span className="flex items-center gap-1"><span className="w-3 h-1 bg-indigo-500 inline-block rounded" /> Frontier</span>
-            <span className="flex items-center gap-1"><span className="w-3 h-3 bg-accent rounded-full inline-block" /> Current Portfolio</span>
-            <span className="flex items-center gap-1"><span className="w-3 h-3 bg-amber-500 rounded-full inline-block" /> Max Sharpe</span>
+            <span data-prov="frontier" className="flex items-center gap-1"><span className="w-3 h-1 bg-indigo-500 inline-block rounded" /> Frontier</span>
+            <span data-prov="currentPortfolio" className="flex items-center gap-1"><span className="w-3 h-3 bg-accent rounded-full inline-block" /> Current Portfolio</span>
+            <span data-prov="maxSharpe" className="flex items-center gap-1"><span className="w-3 h-3 bg-amber-500 rounded-full inline-block" /> Max Sharpe</span>
           </div>
         </>
       )}

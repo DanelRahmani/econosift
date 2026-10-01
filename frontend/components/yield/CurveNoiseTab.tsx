@@ -3,6 +3,8 @@ import { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import type { TreasuryNoiseData } from "@/lib/types";
 import { Card, ChartSkeleton, chartPalette } from "@/components/ui";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 import {
   ResponsiveContainer,
   AreaChart,
@@ -18,9 +20,9 @@ function fmt(v: number | null | undefined, decimals = 2, suffix = ""): string {
   return v != null ? `${v.toFixed(decimals)}${suffix}` : "—";
 }
 
-function Kpi({ label, value, sub }: { label: string; value: string; sub: string }) {
+function Kpi({ label, value, sub, prov }: { label: string; value: string; sub: string; prov: string }) {
   return (
-    <Card className="p-4">
+    <Card className="p-4" data-prov={prov}>
       <div className="text-xs text-text-secondary">{label}</div>
       <div className="text-2xl font-bold mt-1">{value}</div>
       <div className="text-xs text-text-secondary mt-0.5">{sub}</div>
@@ -33,6 +35,7 @@ export function CurveNoiseTab() {
   const [loading, setLoading] = useState(true);
   const [full, setFull] = useState(false);
   const pal = chartPalette("dark");
+  const scope = useSourceScope(provOf(data));
 
   useEffect(() => {
     api
@@ -67,7 +70,7 @@ export function CurveNoiseTab() {
   const k = data.kpis;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" {...scope}>
       <div>
         <h2 className="font-semibold text-lg">Treasury Curve-Fit Noise</h2>
         <p className="text-xs text-text-secondary mt-1">
@@ -78,13 +81,13 @@ export function CurveNoiseTab() {
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <Kpi label="Current noise" value={fmt(k.latest, 2, " bps")} sub={k.asOf ? `as of ${k.asOf}` : ""} />
-        <Kpi label="20-day average" value={fmt(k.ma20, 2, " bps")} sub="Smooths daily fitting jitter" />
-        <Kpi label="Percentile" value={fmt(k.percentile, 0, "%ile")} sub="Rank within history since 2000" />
-        <Kpi label="Historical median" value={fmt(k.median, 2, " bps")} sub={`Peak ${fmt(k.max, 1, " bps")}`} />
+        <Kpi prov="kpis.latest" label="Current noise" value={fmt(k.latest, 2, " bps")} sub={k.asOf ? `as of ${k.asOf}` : ""} />
+        <Kpi prov="kpis.ma20" label="20-day average" value={fmt(k.ma20, 2, " bps")} sub="Smooths daily fitting jitter" />
+        <Kpi prov="kpis.percentile" label="Percentile" value={fmt(k.percentile, 0, "%ile")} sub="Rank within history since 2000" />
+        <Kpi prov="kpis.median" label="Historical median" value={fmt(k.median, 2, " bps")} sub={`Peak ${fmt(k.max, 1, " bps")}`} />
       </div>
 
-      <Card className="p-4">
+      <Card className="p-4" data-prov="history">
         <div className="flex items-center justify-between mb-1">
           <h3 className="font-semibold">Noise (RMSE of Nelson-Siegel fit, bps)</h3>
           <button

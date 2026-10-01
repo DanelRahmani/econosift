@@ -18,15 +18,18 @@ interface ModelCardProps {
   sym: string;
   fullWidth?: boolean;
   label?: string; // override display label
+  prov: string; // provenance key of this model in the /full response
 }
 
-function ModelCard({ model, spot, sym, fullWidth = false, label }: ModelCardProps) {
+function ModelCard({ model, spot, sym, fullWidth = false, label, prov }: ModelCardProps) {
   const displayLabel = label ?? model.model;
 
   if (model.locked) {
     return (
       <div
         className={`rounded-xl border border-border bg-surface-alt p-4 opacity-60 flex flex-col gap-1 ${fullWidth ? "col-span-full" : ""}`}
+        data-prov={prov}
+        data-prov-ctx={displayLabel}
       >
         <div className="flex items-center gap-1.5">
           {/* lock glyph */}
@@ -59,6 +62,8 @@ function ModelCard({ model, spot, sym, fullWidth = false, label }: ModelCardProp
     return (
       <div
         className={`rounded-xl border border-border bg-surface-alt p-4 flex flex-col gap-1 ${fullWidth ? "col-span-full" : ""}`}
+        data-prov={prov}
+        data-prov-ctx={displayLabel}
       >
         <p className="text-xs text-text-muted truncate">{displayLabel}</p>
         <p className="text-2xl font-mono font-semibold text-text-primary">—</p>
@@ -84,6 +89,8 @@ function ModelCard({ model, spot, sym, fullWidth = false, label }: ModelCardProp
   return (
     <div
       className={`rounded-xl border border-border bg-surface-alt p-4 flex flex-col gap-1 ${fullWidth ? "col-span-full" : ""}`}
+      data-prov={prov}
+      data-prov-ctx={displayLabel}
     >
       <p className="text-xs text-text-muted truncate">{displayLabel}</p>
       <p className="text-2xl font-mono font-semibold text-text-primary">
@@ -123,7 +130,7 @@ export function ValuationModelsGrid({ valuation }: { valuation: ValuationCore })
       {/* ── 8-model 2×4 grid ────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         {valuation.models.map((m) => (
-          <ModelCard key={m.model} model={m} spot={spot} sym={sym} />
+          <ModelCard key={m.model} model={m} spot={spot} sym={sym} prov={`valuation.models.${m.model}`} />
         ))}
       </div>
 
@@ -134,6 +141,7 @@ export function ValuationModelsGrid({ valuation }: { valuation: ValuationCore })
           spot={spot}
           sym={sym}
           label="CAPM Implied Fair Value"
+          prov="valuation.capmImplied"
         />
       </div>
 

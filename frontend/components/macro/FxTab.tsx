@@ -1,8 +1,10 @@
 "use client";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import type { FxHeatmapData, FxPppData, FxPppPair } from "@/lib/types";
+import type { FxCross, FxHeatmapData, FxPppData, FxPppPair } from "@/lib/types";
 import { Card } from "@/components/ui";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 import { FxWidget } from "./FxWidget";
 
 function cellBg(change: number | null): string {
@@ -49,6 +51,8 @@ export function FxTab() {
   const [pppLoading, setPppLoading] = useState(true);
   const [heatmapError, setHeatmapError] = useState(false);
   const [pppError, setPppError] = useState(false);
+  const heatmapScope = useSourceScope(provOf(heatmap));
+  const pppScope = useSourceScope(provOf(ppp));
 
   useEffect(() => {
     api
@@ -70,7 +74,7 @@ export function FxTab() {
       <FxWidget />
 
       {/* FX Heatmap */}
-      <Card className="p-4">
+      <Card className="p-4" {...heatmapScope}>
         <h3 className="font-semibold mb-3">
           Currency Performance Heatmap (1D % Change)
         </h3>
@@ -87,6 +91,8 @@ export function FxTab() {
                 <div
                   key={cross.pair}
                   className={`rounded p-3 text-center ${cellBg(cross.change1d)}`}
+                  data-prov={`crosses.${(cross as FxCross & { ticker?: string }).ticker}.change1d`}
+                  data-prov-ctx={cross.pair}
                 >
                   <div className="text-xs font-semibold text-text-secondary">
                     {cross.pair}
@@ -109,7 +115,7 @@ export function FxTab() {
       </Card>
 
       {/* PPP Panel */}
-      <Card className="p-4">
+      <Card className="p-4" {...pppScope}>
         <h3 className="font-semibold mb-1">
           Purchasing Power Parity (PPP) Analysis
         </h3>
@@ -142,15 +148,17 @@ export function FxTab() {
                   <tr
                     key={pair.pair}
                     className="border-b border-border/40 hover:bg-surface-alt/30 transition-colors"
+                    data-prov-ctx={pair.pair}
                   >
                     <td className="py-2 pr-4 font-semibold">{pair.pair}</td>
-                    <td className="py-2 pr-4 text-right font-mono">
+                    <td className="py-2 pr-4 text-right font-mono" data-prov={`pairs.${pair.currency}.spot`}>
                       {pair.spot?.toFixed(4) ?? "—"}
                     </td>
-                    <td className="py-2 pr-4 text-right font-mono">
+                    <td className="py-2 pr-4 text-right font-mono" data-prov={`pairs.${pair.currency}.ppp`}>
                       {pair.ppp?.toFixed(4) ?? "—"}
                     </td>
                     <td
+                      data-prov={`pairs.${pair.currency}.overvaluation`}
                       className={`py-2 pr-4 text-right font-semibold ${
                         pair.overvaluation != null && pair.overvaluation > 0
                           ? "text-danger"
@@ -161,7 +169,7 @@ export function FxTab() {
                         ? `${pair.overvaluation >= 0 ? "+" : ""}${pair.overvaluation.toFixed(1)}%`
                         : "—"}
                     </td>
-                    <td className="py-2">
+                    <td className="py-2" data-prov={`pairs.${pair.currency}.overvaluation`}>
                       {pair.currency && pair.overvaluation != null && (
                         <span className="mr-1.5 font-mono text-xs text-text-secondary">{pair.currency}</span>
                       )}

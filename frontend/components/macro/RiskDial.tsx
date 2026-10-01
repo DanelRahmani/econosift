@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import type { RiskDialData, RiskDialBacktest } from "@/lib/types";
 import { Card, ChartSkeleton } from "@/components/ui";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 
 /**
  * Composite risk dial — Phase 43 (task D3).
@@ -35,6 +37,8 @@ export function RiskDial() {
   const [data, setData] = useState<RiskDialData | null>(null);
   const [bt, setBt] = useState<RiskDialBacktest | null>(null);
   const [loading, setLoading] = useState(true);
+  const scope = useSourceScope(provOf(data));
+  const btScope = useSourceScope(provOf(bt));
 
   useEffect(() => {
     api.macroRiskDial()
@@ -64,7 +68,7 @@ export function RiskDial() {
   const fill = Math.max(0, Math.min(1, (exposure - lo) / (hi - lo)));
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" {...scope}>
       <div>
         <h2 className="font-semibold text-lg">Composite Risk Dial</h2>
         <p className="text-xs text-text-secondary mt-1">
@@ -75,12 +79,12 @@ export function RiskDial() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <Card className="p-4 lg:col-span-1">
+        <Card className="p-4 lg:col-span-1" data-prov="exposureMultiplier" data-prov-ctx="Suggested equity exposure">
           <div className="text-xs text-text-secondary">Suggested equity exposure</div>
           <div className={`text-4xl font-bold mt-1 ${regimeTone(data.regime)}`}>
             {exposure.toFixed(2)}×
           </div>
-          <div className="text-xs text-text-secondary mt-1 capitalize">
+          <div className="text-xs text-text-secondary mt-1 capitalize" data-prov="regime" data-prov-ctx="Risk regime and composite z-score">
             {data.regime} · composite z {num(data.shrunkZ)} (shrunk from {num(data.compositeZ)})
           </div>
 
@@ -114,7 +118,7 @@ export function RiskDial() {
               </thead>
               <tbody className="divide-y divide-border">
                 {(data.components ?? []).map((c) => (
-                  <tr key={c.key}>
+                  <tr key={c.key} data-prov={`components.${c.key}`} data-prov-ctx={c.label}>
                     <td className="py-1.5 pr-3">{c.label}</td>
                     <td className="py-1.5 pr-3 text-right font-mono">{num(c.z)}</td>
                     <td
@@ -139,7 +143,7 @@ export function RiskDial() {
 
       {/* The dial's own record */}
       {bt?.available && (
-        <Card className={`p-4 ${bt.beatsStatic ? "" : "border-warning/40"}`}>
+        <Card className={`p-4 ${bt.beatsStatic ? "" : "border-warning/40"}`} {...btScope}>
           <h3 className="font-semibold text-sm mb-1">
             Does this dial actually help?
           </h3>
@@ -162,14 +166,14 @@ export function RiskDial() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                <tr>
+                <tr data-prov-ctx="Dial-scaled (net)">
                   <td className="py-1.5 pr-4">Dial-scaled (net)</td>
                   <td className="py-1.5 pr-4 text-right font-mono">{pct(bt.timed?.cagr)}</td>
                   <td className="py-1.5 pr-4 text-right font-mono">{pct(bt.timed?.vol)}</td>
                   <td className="py-1.5 pr-4 text-right font-mono">{num(bt.timed?.sharpe)}</td>
                   <td className="py-1.5 text-right font-mono">{pct(bt.timed?.maxDrawdown)}</td>
                 </tr>
-                <tr>
+                <tr data-prov="static" data-prov-ctx="Buy & hold SPY">
                   <td className="py-1.5 pr-4">Buy &amp; hold SPY</td>
                   <td className="py-1.5 pr-4 text-right font-mono">{pct(bt.static?.cagr)}</td>
                   <td className="py-1.5 pr-4 text-right font-mono">{pct(bt.static?.vol)}</td>

@@ -6,6 +6,8 @@ import { api } from "@/lib/api";
 import type { FxRatesResponse, FxPair } from "@/lib/types";
 import { Card, Skeleton, chartPalette } from "@/components/ui";
 import { useTheme } from "@/components/ThemeProvider";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 import { fmtNum, fmtPct } from "@/lib/format";
 
 const BASES = ["USD", "EUR", "GBP", "JPY", "CHF", "AUD", "CAD"] as const;
@@ -58,12 +60,12 @@ function SparklineCell({ values, positive }: { values: number[]; positive: boole
 function KpiTile({ pair }: { pair: FxPair }) {
   const isPositive = pair.change1d !== null && pair.change1d >= 0;
   return (
-    <div className="flex flex-col gap-1 px-4 py-3 rounded-lg bg-surface-alt border border-border min-w-[120px]">
+    <div className="flex flex-col gap-1 px-4 py-3 rounded-lg bg-surface-alt border border-border min-w-[120px]" data-prov={`pairs.${pair.quote}`} data-prov-ctx={pair.pair}>
       <span className="text-xs text-text-muted font-medium">{pair.pair}</span>
       <span className="text-base font-semibold text-text-primary font-mono">
         {pair.rate === null ? "—" : fmtNum(pair.rate, 4)}
       </span>
-      <span className={`text-xs font-mono ${changeColor(pair.change1d)}`}>
+      <span className={`text-xs font-mono ${changeColor(pair.change1d)}`} data-prov={`pairs.${pair.quote}.change1d`}>
         {pair.change1d === null ? "—" : (isPositive ? "+" : "") + fmtPct(pair.change1d)} 1D
       </span>
     </div>
@@ -76,6 +78,7 @@ export function FxRatesPanel() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const { theme } = useTheme();
+  const scope = useSourceScope(provOf(data));
 
   useEffect(() => {
     let active = true;
@@ -120,7 +123,7 @@ export function FxRatesPanel() {
   }, [data]);
 
   return (
-    <Card>
+    <Card {...scope}>
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
         <div className="flex flex-col gap-0.5">
@@ -188,21 +191,23 @@ export function FxRatesPanel() {
                     <tr
                       key={pair.pair}
                       className="border-b border-border/50 hover:bg-surface-alt/60 transition-colors"
+                      data-prov={`pairs.${pair.quote}`}
+                      data-prov-ctx={pair.pair}
                     >
                       <td className="py-2 text-text-primary font-medium">{pair.pair}</td>
                       <td className="py-2 text-right font-mono text-text-primary">
                         {pair.rate === null ? "—" : fmtNum(pair.rate, 4)}
                       </td>
-                      <td className="py-2 text-right">
+                      <td className="py-2 text-right" data-prov={`pairs.${pair.quote}.change1d`}>
                         <ChangeCell value={pair.change1d} />
                       </td>
-                      <td className="py-2 text-right">
+                      <td className="py-2 text-right" data-prov={`pairs.${pair.quote}.change1w`}>
                         <ChangeCell value={pair.change1w} />
                       </td>
-                      <td className="py-2 text-right">
+                      <td className="py-2 text-right" data-prov={`pairs.${pair.quote}.change1m`}>
                         <ChangeCell value={pair.change1m} />
                       </td>
-                      <td className="py-2 text-right">
+                      <td className="py-2 text-right" data-prov={`pairs.${pair.quote}.change1y`}>
                         <ChangeCell value={pair.change1y} />
                       </td>
                       <td className="py-2 text-right">

@@ -4,6 +4,8 @@ import { useState } from "react";
 import { api } from "@/lib/api";
 import type { ScreenerResponse, ScreenerRow } from "@/lib/types";
 import { Card, Skeleton } from "@/components/ui";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 import { fmtNum, fmtPct, fmtPctFromFraction, exportToCsv } from "@/lib/format";
 
 // Screener fields with how to read & render them.
@@ -49,6 +51,7 @@ export function ScreenerTab() {
   const [sort, setSort] = useState("sharpe");
   const [data, setData] = useState<ScreenerResponse | null>(null);
   const [loading, setLoading] = useState(false);
+  const scope = useSourceScope(provOf(data));
 
   async function run() {
     setLoading(true);
@@ -142,7 +145,7 @@ export function ScreenerTab() {
       {loading ? (
         <Skeleton className="h-48" />
       ) : data ? (
-        <Card>
+        <Card {...scope}>
           <div className="flex items-center justify-between mb-3">
             <span className="text-sm text-text-secondary">
               {data.count} of {data.screened} match
@@ -164,10 +167,10 @@ export function ScreenerTab() {
               </thead>
               <tbody>
                 {data.results.map((r) => (
-                  <tr key={r.ticker} className="border-b border-border/50">
+                  <tr key={r.ticker} className="border-b border-border/50" data-prov-ctx={r.ticker}>
                     <td className="py-2 px-3 font-mono sticky left-0 bg-surface">{r.ticker}</td>
                     {FIELDS.map((f) => (
-                      <td key={f.key} className="py-2 px-3 text-right font-mono">{renderValue(r, f.key)}</td>
+                      <td key={f.key} className="py-2 px-3 text-right font-mono" data-prov={`results.${f.key}`}>{renderValue(r, f.key)}</td>
                     ))}
                   </tr>
                 ))}

@@ -5,6 +5,8 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { Card } from "@/components/ui";
 import { api } from "@/lib/api";
 import type { MultiCountryHoldingInput, MultiCountryPortfolio } from "@/lib/types";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 
 const CURRENCIES = ["USD", "EUR", "JPY", "GBP", "CHF", "AUD", "CAD"] as const;
 
@@ -23,6 +25,7 @@ export function MultiCountryPortfolio() {
   const [data, setData] = useState<MultiCountryPortfolio | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const scope = useSourceScope(provOf(data));
 
   const handleAnalyze = () => {
     const valid = holdings.filter((h) => h.ticker.trim() && h.weight > 0);
@@ -126,17 +129,17 @@ export function MultiCountryPortfolio() {
         <>
           {/* KPIs */}
           <div className="grid grid-cols-3 gap-3">
-            <Card>
+            <Card data-prov="metrics.annReturn" {...scope}>
               <div className="text-xs text-text-muted">Ann. Return</div>
               <div className={`text-xl font-bold tabular-nums ${data.metrics.annReturn >= 0 ? "text-green-500" : "text-red-500"}`}>
                 {data.metrics.annReturn.toFixed(2)}%
               </div>
             </Card>
-            <Card>
+            <Card data-prov="metrics.annVolatility" {...scope}>
               <div className="text-xs text-text-muted">Ann. Volatility</div>
               <div className="text-xl font-bold tabular-nums">{data.metrics.annVolatility.toFixed(2)}%</div>
             </Card>
-            <Card>
+            <Card data-prov="metrics.sharpe" {...scope}>
               <div className="text-xs text-text-muted">Sharpe Ratio</div>
               <div className={`text-xl font-bold tabular-nums ${data.metrics.sharpe >= 1 ? "text-green-500" : ""}`}>
                 {data.metrics.sharpe.toFixed(2)}
@@ -146,7 +149,7 @@ export function MultiCountryPortfolio() {
 
           {/* Cumulative chart */}
           {data.series.length > 0 && (
-            <Card>
+            <Card data-prov="series" {...scope}>
               <h3 className="text-sm font-semibold mb-3">FX-Adjusted Portfolio (USD)</h3>
               <div className="h-64">
                 <ResponsiveContainer>
@@ -163,7 +166,7 @@ export function MultiCountryPortfolio() {
           )}
 
           {/* Holdings table */}
-          <Card>
+          <Card data-prov="holdings" {...scope}>
             <h3 className="text-sm font-semibold mb-3">Holdings Breakdown</h3>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -177,7 +180,7 @@ export function MultiCountryPortfolio() {
                 </thead>
                 <tbody>
                   {data.holdings.map((h) => (
-                    <tr key={h.ticker} className="border-b border-border/50 hover:bg-surface-alt/50">
+                    <tr key={h.ticker} data-prov-ctx={h.ticker} className="border-b border-border/50 hover:bg-surface-alt/50">
                       <td className="py-2 pr-3 font-mono font-medium">{h.ticker}</td>
                       <td className="py-2 pr-3 text-right">{h.weight}%</td>
                       <td className={`py-2 pr-3 text-right font-medium ${(h.annReturn ?? 0) >= 0 ? "text-green-500" : "text-red-500"}`}>
@@ -195,7 +198,7 @@ export function MultiCountryPortfolio() {
 
           {/* Allocation */}
           <div className="grid grid-cols-2 gap-3">
-            <Card>
+            <Card data-prov="countryAllocation" {...scope}>
               <h3 className="text-sm font-semibold mb-2">Currency Allocation</h3>
               {Object.entries(data.countryAllocation).map(([ccy, w]) => (
                 <div key={ccy} className="flex justify-between text-sm py-0.5">
@@ -204,7 +207,7 @@ export function MultiCountryPortfolio() {
                 </div>
               ))}
             </Card>
-            <Card>
+            <Card data-prov="currencyExposure" {...scope}>
               <h3 className="text-sm font-semibold mb-2">Currency Exposure</h3>
               {Object.entries(data.currencyExposure).map(([ccy, w]) => (
                 <div key={ccy} className="flex justify-between text-sm py-0.5">

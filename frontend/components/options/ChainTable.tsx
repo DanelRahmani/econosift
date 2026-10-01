@@ -3,6 +3,8 @@
 import { Skeleton } from "@/components/ui";
 import { fmtNum, fmtPrice } from "@/lib/format";
 import type { OptionsChain, OptionRow } from "@/lib/types";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 
 interface Props {
   chain: OptionsChain | null;
@@ -26,6 +28,8 @@ function fmtVol(v: number | null) {
 }
 
 export function ChainTable({ chain, loading, showOTMOnly }: Props) {
+  const scope = useSourceScope(provOf(chain));
+
   if (loading) {
     return <Skeleton className="h-64 w-full rounded-xl" />;
   }
@@ -52,7 +56,7 @@ export function ChainTable({ chain, loading, showOTMOnly }: Props) {
   const spot = chain.spot;
 
   return (
-    <div className="overflow-x-auto rounded-xl border border-border">
+    <div className="overflow-x-auto rounded-xl border border-border" {...scope}>
       <table className="w-full min-w-[820px] border-collapse">
         <thead>
           <tr className="bg-surface-alt text-[10px] text-text-muted uppercase tracking-wider">
@@ -96,6 +100,7 @@ export function ChainTable({ chain, loading, showOTMOnly }: Props) {
             return (
               <tr
                 key={strike}
+                data-prov-ctx={`Strike ${fmtPrice(strike)}`}
                 className={`border-b border-border ${
                   isAtm ? "ring-1 ring-accent/40" : ""
                 }`}
@@ -103,9 +108,9 @@ export function ChainTable({ chain, loading, showOTMOnly }: Props) {
                 {/* Call side */}
                 {call ? (
                   <>
-                    <td className={`py-1.5 px-2 text-right text-xs font-mono text-text-secondary ${call.itm ? "bg-green-950/30" : ""}`}>{fmtIV(call.iv)}</td>
-                    <td className={`py-1.5 px-2 text-right text-xs font-mono text-text-secondary ${call.itm ? "bg-green-950/30" : ""}`}>{fmt(call.delta)}</td>
-                    <td className={`py-1.5 px-2 text-right text-xs font-mono text-text-secondary ${call.itm ? "bg-green-950/30" : ""}`}>{call.bsPrice !== null ? fmtPrice(call.bsPrice) : "—"}</td>
+                    <td data-prov="calls.iv" className={`py-1.5 px-2 text-right text-xs font-mono text-text-secondary ${call.itm ? "bg-green-950/30" : ""}`}>{fmtIV(call.iv)}</td>
+                    <td data-prov="calls.delta" className={`py-1.5 px-2 text-right text-xs font-mono text-text-secondary ${call.itm ? "bg-green-950/30" : ""}`}>{fmt(call.delta)}</td>
+                    <td data-prov="calls.bsPrice" className={`py-1.5 px-2 text-right text-xs font-mono text-text-secondary ${call.itm ? "bg-green-950/30" : ""}`}>{call.bsPrice !== null ? fmtPrice(call.bsPrice) : "—"}</td>
                     <td className={`py-1.5 px-2 text-right text-xs font-mono ${call.itm ? "bg-green-950/30" : ""}`}>{call.bid !== null ? fmtPrice(call.bid) : "—"}</td>
                     <td className={`py-1.5 px-2 text-right text-xs font-mono ${call.itm ? "bg-green-950/30" : ""}`}>{call.ask !== null ? fmtPrice(call.ask) : "—"}</td>
                     <td className={`py-1.5 px-2 text-right text-xs font-mono text-text-muted ${call.itm ? "bg-green-950/30" : ""}`}>{fmtVol(call.volume)}</td>
@@ -128,9 +133,9 @@ export function ChainTable({ chain, loading, showOTMOnly }: Props) {
                     <td className={`py-1.5 px-2 text-left text-xs font-mono text-text-muted ${put.itm ? "bg-red-950/30" : ""}`}>{fmtVol(put.volume)}</td>
                     <td className={`py-1.5 px-2 text-left text-xs font-mono ${put.itm ? "bg-red-950/30" : ""}`}>{put.bid !== null ? fmtPrice(put.bid) : "—"}</td>
                     <td className={`py-1.5 px-2 text-left text-xs font-mono ${put.itm ? "bg-red-950/30" : ""}`}>{put.ask !== null ? fmtPrice(put.ask) : "—"}</td>
-                    <td className={`py-1.5 px-2 text-left text-xs font-mono text-text-secondary ${put.itm ? "bg-red-950/30" : ""}`}>{put.bsPrice !== null ? fmtPrice(put.bsPrice) : "—"}</td>
-                    <td className={`py-1.5 px-2 text-left text-xs font-mono text-text-secondary ${put.itm ? "bg-red-950/30" : ""}`}>{fmt(put.delta)}</td>
-                    <td className={`py-1.5 px-2 text-left text-xs font-mono text-text-secondary ${put.itm ? "bg-red-950/30" : ""}`}>{fmtIV(put.iv)}</td>
+                    <td data-prov="puts.bsPrice" className={`py-1.5 px-2 text-left text-xs font-mono text-text-secondary ${put.itm ? "bg-red-950/30" : ""}`}>{put.bsPrice !== null ? fmtPrice(put.bsPrice) : "—"}</td>
+                    <td data-prov="puts.delta" className={`py-1.5 px-2 text-left text-xs font-mono text-text-secondary ${put.itm ? "bg-red-950/30" : ""}`}>{fmt(put.delta)}</td>
+                    <td data-prov="puts.iv" className={`py-1.5 px-2 text-left text-xs font-mono text-text-secondary ${put.itm ? "bg-red-950/30" : ""}`}>{fmtIV(put.iv)}</td>
                   </>
                 ) : (
                   <td colSpan={7} className="py-1.5 px-2 text-center text-xs text-text-muted">—</td>

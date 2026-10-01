@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import type { SectorsResponse } from "@/lib/types";
 import { Card, Skeleton } from "@/components/ui";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 import { fmtPct } from "@/lib/format";
 
 const PERIODS = ["1mo", "3mo", "6mo", "1y"];
@@ -20,6 +22,7 @@ export function SectorHeatmap() {
   const [period, setPeriod] = useState("1mo");
   const [data, setData] = useState<SectorsResponse | null>(null);
   const [loading, setLoading] = useState(false);
+  const scope = useSourceScope(provOf(data));
 
   useEffect(() => {
     let active = true;
@@ -32,7 +35,7 @@ export function SectorHeatmap() {
   }, [period]);
 
   return (
-    <Card>
+    <Card {...scope}>
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <h2 className="text-sm font-semibold text-text-secondary">S&amp;P 500 Sector Performance</h2>
         <div className="flex gap-1">
@@ -55,6 +58,8 @@ export function SectorHeatmap() {
             <div
               key={s.ticker}
               className="rounded-lg p-3 border border-border/60 flex flex-col justify-between min-h-[84px]"
+              data-prov={`sectors.${s.ticker}`}
+              data-prov-ctx={s.sector}
               style={{ backgroundColor: heatColor(s.changePercent) }}
             >
               <div className="flex items-center justify-between">

@@ -3,6 +3,8 @@ import { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import type { CrossborderData, FactbookCountry } from "@/lib/types";
 import { Card, PageSkeleton } from "@/components/ui";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 
 function fmtUsd(v: number): string {
   if (v >= 1e12) return `$${(v / 1e12).toFixed(1)}T`;
@@ -16,6 +18,7 @@ export default function CrossborderPage() {
   const [countries, setCountries] = useState<FactbookCountry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const scope = useSourceScope(provOf(data));
 
   useEffect(() => {
     Promise.all([api.crossborderClaims(), api.factbookCountries()])
@@ -99,7 +102,7 @@ export default function CrossborderPage() {
   });
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
+    <div className="max-w-7xl mx-auto px-4 py-6 space-y-6" {...scope}>
       <div>
         <h1 className="text-2xl font-bold text-text-primary">Cross-Border Finance</h1>
         <p className="text-sm text-text-secondary mt-1">
@@ -110,11 +113,11 @@ export default function CrossborderPage() {
 
       {/* Summary KPIs */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <Card className="p-4">
+        <Card className="p-4" data-prov="totalUsd">
           <div className="text-xs text-text-secondary">Global Cross-Border Claims</div>
           <div className="text-2xl font-bold mt-1">{data.totalUsd != null ? fmtUsd(data.totalUsd) : "—"}</div>
         </Card>
-        <Card className="p-4">
+        <Card className="p-4" data-prov="pairCount">
           <div className="text-xs text-text-secondary">Largest Pairs Shown</div>
           <div className="text-2xl font-bold mt-1">
             {claims.length}

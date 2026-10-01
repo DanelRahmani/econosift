@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState, Suspense } from "rea
 import { api } from "@/lib/api";
 import type { PresetDef, ScreenerCacheRow, ScreenerUniverseResponse, SnowflakeBatchResponse } from "@/lib/types";
 import { Card, Skeleton, PageSkeleton } from "@/components/ui";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 import { useUrlState } from "@/lib/useUrlState";
 import { PresetPills } from "@/components/screener/PresetPills";
 import { ResultTabs, RESULT_TABS } from "@/components/screener/ResultTabs";
@@ -64,7 +66,7 @@ function SparkCard({
 }) {
   const positive = (row.changePercent ?? 0) >= 0;
   return (
-    <div className="bg-surface border border-border rounded-lg p-3 flex flex-col gap-1.5">
+    <div className="bg-surface border border-border rounded-lg p-3 flex flex-col gap-1.5" data-prov-ctx={row.symbol}>
       <div className="flex items-center justify-between gap-1">
         <span className="font-semibold text-sm text-text-primary truncate">{row.symbol}</span>
         <span
@@ -136,6 +138,7 @@ function ScreenerPageInner() {
   const [snowflakeScores, setSnowflakeScores] = useState<SnowflakeBatchResponse>({});
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const scope = useSourceScope(provOf(data));
 
   // Load preset definitions once
   useEffect(() => {
@@ -265,7 +268,7 @@ function ScreenerPageInner() {
       </Card>
 
       {/* Results */}
-      <Card className="p-4">
+      <Card className="p-4" {...scope}>
         {/* Toolbar */}
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
           <div className="text-sm text-text-secondary">

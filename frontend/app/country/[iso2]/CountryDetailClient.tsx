@@ -5,13 +5,15 @@ import Link from "next/link";
 import { api } from "@/lib/api";
 import type { FactbookProfile, FactbookCountry } from "@/lib/types";
 import { Card, PageSkeleton } from "@/components/ui";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 
 function CollapsibleSection({ title, fields, defaultOpen = false }: {
   title: string; fields: { label: string; value: string }[]; defaultOpen?: boolean;
 }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <Card className="p-5 lg:col-span-2">
+    <Card className="p-5 lg:col-span-2" data-prov={`sections.${title}`} data-prov-ctx={title}>
       <button
         onClick={() => setOpen(!open)}
         className="w-full flex items-center justify-between text-left"
@@ -53,6 +55,7 @@ export default function CountryDetailClient({ iso2 }: { iso2: string }) {
   const [error, setError] = useState(false);
   const [search, setSearch] = useState("");
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const scope = useSourceScope(provOf(profile));
 
   useEffect(() => { api.factbookCountries().then(setCountries).catch(() => {}); }, []);
   useEffect(() => {
@@ -94,7 +97,7 @@ export default function CountryDetailClient({ iso2 }: { iso2: string }) {
   );
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-6 space-y-4">
+    <div className="max-w-5xl mx-auto px-4 py-6 space-y-4" {...scope}>
       <div className="flex items-center gap-4 flex-wrap">
         <Link href="/country" className="text-sm text-accent hover:underline shrink-0">← All Countries</Link>
         <div id="country-dropdown" className="relative flex-1 max-w-sm">

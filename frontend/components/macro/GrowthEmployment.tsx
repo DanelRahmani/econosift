@@ -3,6 +3,9 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import type { EmploymentData } from "@/lib/types";
 import { Card } from "@/components/ui";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
+import { legendProv } from "./legendProv";
 import {
   LineChart,
   Line,
@@ -27,14 +30,16 @@ function KpiCard({
   value,
   unit = "%",
   color,
+  prov,
 }: {
   label: string;
   value: number | null;
   unit?: string;
   color?: string;
+  prov?: string;
 }) {
   return (
-    <Card className="p-4">
+    <Card className="p-4" data-prov={prov} data-prov-ctx={label}>
       <div className="text-xs text-text-secondary">{label}</div>
       <div className={`text-2xl font-bold mt-1 ${color ?? ""}`}>
         {value != null ? `${value.toFixed(2)}${unit}` : "—"}
@@ -52,6 +57,7 @@ export function GrowthEmployment() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [nfpRange, setNfpRange] = useState<"5Y" | "All">("5Y");
+  const scope = useSourceScope(provOf(data));
 
   useEffect(() => {
     api
@@ -132,36 +138,40 @@ export function GrowthEmployment() {
   }));
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" {...scope}>
       {/* KPI Row */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         <KpiCard
           label="Real GDP YoY"
+          prov="kpis.gdpYoY"
           value={kpis.gdpYoY}
           color={kpis.gdpYoY != null && kpis.gdpYoY < 0 ? "text-danger" : "text-success"}
         />
         <KpiCard
           label="Unemployment Rate"
+          prov="kpis.unemploymentRate"
           value={kpis.unemploymentRate}
           color={kpis.unemploymentRate != null && kpis.unemploymentRate > 6 ? "text-danger" : "text-text-primary"}
         />
         <KpiCard
           label="NFP (thousands)"
+          prov="kpis.nfpLatest"
           value={kpis.nfpLatest}
           unit="K"
           color={kpis.nfpLatest != null && kpis.nfpLatest < 0 ? "text-danger" : "text-success"}
         />
         <KpiCard
           label="Initial Claims"
+          prov="kpis.joblessClaims"
           value={kpis.joblessClaims != null ? kpis.joblessClaims / 1_000 : null}
           unit="K"
         />
-        <KpiCard label="Labor Participation" value={kpis.laborParticipation} />
+        <KpiCard label="Labor Participation" value={kpis.laborParticipation} prov="kpis.laborParticipation" />
       </div>
 
       {/* GDP YoY + recession shading */}
       {gdpData.length > 0 && (
-        <Card className="p-4">
+        <Card className="p-4" data-prov="history.gdpYoY" data-prov-ctx="Real GDP growth (YoY %)">
           <h3 className="font-semibold mb-3">Real GDP Growth (YoY %)</h3>
           <ResponsiveContainer width="100%" height={240}>
             <LineChart data={gdpData}>
@@ -180,7 +190,7 @@ export function GrowthEmployment() {
 
       {/* Unemployment Rate + recession shading */}
       {unrateData.length > 0 && (
-        <Card className="p-4">
+        <Card className="p-4" data-prov="history.unemploymentRate" data-prov-ctx="Unemployment rate">
           <h3 className="font-semibold mb-3">Unemployment Rate (%)</h3>
           <ResponsiveContainer width="100%" height={240}>
             <LineChart data={unrateData}>
@@ -197,7 +207,7 @@ export function GrowthEmployment() {
 
       {/* Sahm Rule */}
       {sahmData.length > 0 && (
-        <Card className="p-4">
+        <Card className="p-4" data-prov="history.sahmRule" data-prov-ctx="Sahm rule recession indicator">
           <h3 className="font-semibold mb-1">Sahm Rule Recession Indicator</h3>
           <p className="text-xs text-text-secondary mb-3">
             Reading ≥ 0.50 signals early-stage recession (red zone)
@@ -222,7 +232,7 @@ export function GrowthEmployment() {
         const cutoff = nfpRange === "5Y" ? new Date(new Date().setFullYear(new Date().getFullYear() - 5)).toISOString().slice(0, 7) : null;
         const filtered = cutoff ? nfpData.filter((d: any) => d.date >= cutoff) : nfpData;
         return (
-        <Card className="p-4">
+        <Card className="p-4" data-prov="history.nfp" data-prov-ctx="Non-farm payrolls, monthly change">
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-semibold">Non-Farm Payrolls (Monthly Change, thousands)</h3>
             <div className="flex gap-1">
@@ -252,7 +262,7 @@ export function GrowthEmployment() {
 
       {/* JOLTS */}
       {joltsData.length > 0 && (
-        <Card className="p-4">
+        <Card className="p-4" data-prov="history.joltsOpenings" data-prov-ctx="JOLTS: job openings & quit rate">
           <h3 className="font-semibold mb-3">JOLTS: Job Openings & Quit Rate</h3>
           <ResponsiveContainer width="100%" height={220}>
             <LineChart data={joltsData}>
@@ -261,7 +271,7 @@ export function GrowthEmployment() {
               <YAxis yAxisId="left" tick={{ fontSize: 11 }} tickFormatter={(v) => `${v}M`} />
               <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} tickFormatter={(v) => `${v}%`} />
               <Tooltip />
-              <Legend />
+              <Legend formatter={legendProv({ "Job Openings (M)": "history.joltsOpenings", "Quit Rate %": "history.joltsQuits" })} />
               <Line yAxisId="left" type="monotone" dataKey="Job Openings (M)" stroke="#3b82f6" dot={false} strokeWidth={1.5} />
               <Line yAxisId="right" type="monotone" dataKey="Quit Rate %" stroke="#f59e0b" dot={false} strokeWidth={1.5} />
             </LineChart>
@@ -271,7 +281,7 @@ export function GrowthEmployment() {
 
       {/* Industrial Production + Capacity Utilization */}
       {ipData.length > 0 && (
-        <Card className="p-4">
+        <Card className="p-4" data-prov="history.indProd" data-prov-ctx="Industrial production & capacity utilization">
           <h3 className="font-semibold mb-3">
             Industrial Production (YoY %) & Capacity Utilization
           </h3>
@@ -282,7 +292,7 @@ export function GrowthEmployment() {
               <YAxis yAxisId="left" tick={{ fontSize: 11 }} tickFormatter={(v) => `${v}%`} />
               <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} tickFormatter={(v) => `${v}%`} />
               <Tooltip />
-              <Legend />
+              <Legend formatter={legendProv({ "Industrial Production (YoY %)": "history.indProd", "Capacity Utilization %": "history.capUtil" })} />
               <ReferenceLine yAxisId="left" y={0} stroke="rgba(255,255,255,0.2)" />
               <Line yAxisId="left" type="monotone" dataKey="Industrial Production (YoY %)" stroke="#10b981" dot={false} strokeWidth={1.5} />
               <Line yAxisId="right" type="monotone" dataKey="Capacity Utilization %" stroke="#8b5cf6" dot={false} strokeWidth={1.5} />

@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { TabButton } from "@/components/ui";
 import type { Holding } from "@/lib/types";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 
 interface Props {
   holdings: Holding[];
@@ -13,10 +15,13 @@ export function ScenarioTab({ holdings }: Props) {
   const [activeTab, setActiveTab] = useState<"Historical" | "Custom">("Historical");
   const [histEpisodes, setHistEpisodes] = useState<any[]>([]);
   const [stressResults, setStressResults] = useState<any>(null);
+  const [stressData, setStressData] = useState<any>(null);
   const [loadingStress, setLoadingStress] = useState(false);
   const [shocks, setShocks] = useState({ equities: -10, rates: 50, credit: 100 });
   const [customResult, setCustomResult] = useState<any>(null);
   const [loadingCustom, setLoadingCustom] = useState(false);
+  const stressScope = useSourceScope(provOf(stressData));
+  const customScope = useSourceScope(provOf(customResult));
 
   useEffect(() => {
     api.scenarioHistorical().then(setHistEpisodes).catch(console.error);
@@ -26,6 +31,7 @@ export function ScenarioTab({ holdings }: Props) {
     setLoadingStress(true);
     try {
       const res = await api.scenarioStress(holdings);
+      setStressData(res);
       setStressResults(res.episodes || []);
     } catch (e) {
       console.error(e);
@@ -63,10 +69,10 @@ export function ScenarioTab({ holdings }: Props) {
           >
             {loadingStress ? "Running..." : "🔴 Run Historical Stress Test"}
           </button>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4" {...stressScope}>
             {stressResults ? (
               stressResults.map((r: any, i: number) => (
-                <div key={i} className="p-4 bg-surface rounded-lg border border-border">
+                <div key={i} data-prov={`episodes.${r.scenario}`} data-prov-ctx={r.label || r.scenario} className="p-4 bg-surface rounded-lg border border-border">
                   <h3 className="font-semibold">{r.label || r.scenario}</h3>
                   <div className="text-sm text-text-secondary mt-1">
                     Return: {r.totalReturn !== null ? (r.totalReturn * 100).toFixed(2) + "%" : "N/A"}
@@ -124,11 +130,11 @@ export function ScenarioTab({ holdings }: Props) {
             {loadingCustom ? "Running..." : "🔴 Simulate Custom Shock"}
           </button>
           {customResult && (
-            <div className="p-4 bg-surface rounded-lg border border-border">
-              <h3 className="font-semibold">Estimated Impact: {(customResult.totalImpactPct * 100).toFixed(2)}%</h3>
+            <div className="p-4 bg-surface rounded-lg border border-border" {...customScope}>
+              <h3 data-prov="totalImpactPct" className="font-semibold">Estimated Impact: {(customResult.totalImpactPct * 100).toFixed(2)}%</h3>
               <ul className="mt-2 text-sm space-y-1">
                 {customResult.impacts?.map((imp: any, i: number) => (
-                  <li key={i}>
+                  <li key={i} data-prov={`impacts.${imp.factor}`} data-prov-ctx={imp.factor}>
                     {imp.factor} Impact: {(imp.impact * 100).toFixed(2)}% (Beta: {imp.beta?.toFixed(2)})
                   </li>
                 ))}
