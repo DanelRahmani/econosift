@@ -237,6 +237,7 @@ function MarketsPageInner() {
           {TABS.map((t) => (
             <button
               key={t}
+              data-active={tab === t}
               onClick={() => setTab(t)}
               className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
                 tab === t ? "bg-accent text-white" : "text-text-secondary hover:bg-surface-alt"

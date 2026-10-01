@@ -6,7 +6,7 @@ import { asOf } from "@/lib/series";
 import { useUrlState } from "@/lib/useUrlState";
 import type { RatesData, GlobalYieldCountry } from "@/lib/types";
 import { MultiCountryYieldChart } from "@/components/yield/MultiCountryYieldChart";
-import { Card as UiCard, PageSkeleton, TabButton } from "@/components/ui";
+import { Card as UiCard, PageSkeleton, ScrollableTabBar, TabButton } from "@/components/ui";
 import { CHART_COLORS } from "@/lib/format";
 import { PolicyDivergenceTable } from "@/components/policy/PolicyDivergenceTable";
 import { SovereignSpreadTable } from "@/components/sovereign/SovereignSpreadTable";
@@ -351,13 +351,13 @@ function YieldPageInner() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 border-b border-border overflow-x-auto no-scrollbar">
+      <ScrollableTabBar className="border-b border-border" innerClassName="gap-2">
         {TABS.map((t) => (
           <TabButton key={t} active={tab === t} onClick={() => setUrlState({ tab: t })}>
             {t}
           </TabButton>
         ))}
-      </div>
+      </ScrollableTabBar>
 
       {tab === "US Curve" && (
         <div className="bg-surface rounded-lg p-4 border border-border">
