@@ -9,6 +9,7 @@ from .. import provenance as pv
 from ..services import yfinance_service as yfs
 from ..services import metrics
 from ..services import fx_service
+from ..services import discount_rates
 
 router = APIRouter(prefix="/api/market", tags=["market"])
 
@@ -199,8 +200,14 @@ async def fx_rates_endpoint(base: str = "USD"):
 
 @router.get("/risk")
 async def risk(tickers: str = Query(...), period: str = "1y",
-               risk_free: float = 0.04, benchmark: str | None = None):
+               risk_free: float | None = None, benchmark: str | None = None):
     syms = _parse_tickers(tickers)
+    if risk_free is not None:
+        rf_source = "request parameter"
+    else:
+        risk_free = await asyncio.to_thread(discount_rates.short_risk_free_rate)
+        rf_source = ("fallback 4%" if discount_rates.short_risk_free_rate_is_fallback()
+                     else "FRED DGS3MO")
     benchmarks, bench_map = _benchmarks_for(syms, benchmark)
     all_syms = tuple(dict.fromkeys(syms + benchmarks))
 
@@ -217,12 +224,13 @@ async def risk(tickers: str = Query(...), period: str = "1y",
             m["benchmark"] = bench
             out_metrics.append(m)
 
-    return pv.attach({"metrics": out_metrics}, _risk_provenance(out_metrics, frame, period, risk_free))
+    return pv.attach({"metrics": out_metrics, "riskFree": risk_free, "riskFreeSource": rf_source},
+                     _risk_provenance(out_metrics, frame, period, risk_free, rf_source))
 
 
-def _risk_provenance(rows: list[dict], frame, period: str, risk_free: float) -> dict:
+def _risk_provenance(rows: list[dict], frame, period: str, risk_free: float, rf_source: str) -> dict:
     """``metrics.<ticker>`` and ``metrics.<ticker>.<field>`` for each risk row."""
-    rf = f"rf = the risk_free request parameter (server default 0.04), here {risk_free:g}"
+    rf = f"rf = {risk_free:g} ({rf_source})"
     prov: dict = {"*": pv.derived(
         "annualised statistics of daily log returns of the adjusted close; beta is benchmark-relative",
         [pv.ref("yahoo", None, f"Daily adjusted close, {period}", frequency="daily",
@@ -242,8 +250,8 @@ def _risk_provenance(rows: list[dict], frame, period: str, risk_free: float) -> 
             ("dailyMeanReturn", "mean(r)", "Mean daily log return"),
             ("var95", "5th percentile of r (historical 1-day VaR)", "1-day 95% VaR"),
             ("cvar95", "mean of r over days where r ≤ VaR95", "1-day 95% CVaR (expected shortfall)"),
-            ("sharpe", f"(mean(r) × 252 − rf) / (stdev(r, ddof=1) × √252); {rf}", "Sharpe ratio"),
-            ("sortino", f"(mean(r) × 252 − rf) / (√mean(min(r − rf/252, 0)²) × √252); {rf}", "Sortino ratio"),
+            ("sharpe", f"(mean(R) × 252 − rf) / (stdev(R, ddof=1) × √252) of simple returns R = close / previous close − 1; {rf}", "Sharpe ratio"),
+            ("sortino", f"(mean(R) × 252 − rf) / (√mean(min(R − rf/252, 0)²) × √252) of simple returns R; {rf}", "Sortino ratio"),
             ("beta", f"cov(r, r_benchmark) / var(r_benchmark) over common days, benchmark {bench}", "Beta"),
         ):
             prov[f"{base}.{field}"] = pv.derived(formula, inputs, title=title)

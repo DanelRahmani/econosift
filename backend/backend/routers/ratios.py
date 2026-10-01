@@ -6,14 +6,19 @@ from fastapi import APIRouter
 
 from .. import provenance as pv
 from ..services import yfinance_service as yfs
-from ..services import metrics
+from ..services import discount_rates, metrics
 
 router = APIRouter(prefix="/api/ratios", tags=["ratios"])
 
 
 @router.get("/{ticker}")
-async def ratios(ticker: str, period: str = "1y", risk_free: float = 0.04):
+async def ratios(ticker: str, period: str = "1y", risk_free: float | None = None):
     sym = ticker.upper()
+    if risk_free is not None:
+        rf_source = "request parameter"
+    else:
+        risk_free = await asyncio.to_thread(discount_rates.short_risk_free_rate)
+        rf_source = ("fallback 4%" if discount_rates.short_risk_free_rate_is_fallback() else "FRED DGS3MO")
     bench = yfs.benchmark_for(sym)
 
     bundle = await asyncio.to_thread(yfs.get_info, sym)
@@ -21,11 +26,11 @@ async def ratios(ticker: str, period: str = "1y", risk_free: float = 0.04):
 
     frame = await asyncio.to_thread(
         yfs.get_close_frame, tuple(dict.fromkeys([sym, bench])), period)
-    beta = sharpe = sortino = None
+    beta = sharpe = sortino = n_obs = None
     if frame is not None and not frame.empty and sym in frame.columns:
         bench_series = frame[bench] if bench in frame.columns else None
         m = metrics.risk_metrics(frame[sym], bench_series, risk_free)
-        beta, sharpe, sortino = m.get("beta"), m.get("sharpe"), m.get("sortino")
+        beta, sharpe, sortino, n_obs = m.get("beta"), m.get("sharpe"), m.get("sortino"), m.get("nObs")
 
     return pv.attach({
         "ticker": sym,
@@ -33,6 +38,9 @@ async def ratios(ticker: str, period: str = "1y", risk_free: float = 0.04):
         "beta": beta,
         "sharpe": sharpe,
         "sortino": sortino,
+        "riskFree": risk_free,
+        "riskFreeSource": rf_source,
+        "betaBasis": {"period": period, "frequency": "daily", "benchmark": bench, "nObs": n_obs},
         "zScore": payload["zScore"],
         "liquidity": payload["liquidity"],
         "leverage": payload["leverage"],
@@ -40,7 +48,7 @@ async def ratios(ticker: str, period: str = "1y", risk_free: float = 0.04):
         "profitability": payload["profitability"],
         "valuation": payload["valuation"],
         "unavailable": payload["unavailable"],
-    }, {**ratio_provenance(sym, bundle), **risk_provenance(sym, bench, frame, period, risk_free)})
+    }, {**ratio_provenance(sym, bundle), **risk_provenance(sym, bench, frame, period, risk_free, rf_source)})
 
 
 def stmt_date(bundle: dict, name: str) -> str | None:
@@ -122,18 +130,18 @@ _CROSS_CURRENCY_FORMULAS = {
 }
 
 
-def risk_provenance(sym: str, bench: str, frame, period: str, risk_free: float) -> dict:
+def risk_provenance(sym: str, bench: str, frame, period: str, risk_free: float, rf_source: str = "request parameter") -> dict:
     """beta / sharpe / sortino computed from ``period`` of adjusted closes against the benchmark."""
     inputs = [pv.yahoo(sym, f"Daily adjusted close, {period}", frequency="daily",
                        observed=pv.last_date(frame[sym]) if frame is not None and sym in frame.columns else None),
               pv.yahoo(bench, f"Benchmark daily adjusted close, {period}", frequency="daily",
                        observed=pv.last_date(frame[bench]) if frame is not None and bench in frame.columns else None)]
-    rf = f"rf = the risk_free request parameter (server default 0.04), here {risk_free:g}"
+    rf = f"rf = {risk_free:g} ({rf_source}; US 3-month Treasury yield unless the risk_free parameter is given)"
     return {
         "beta": pv.derived(f"cov(r, r_{bench}) / var(r_{bench}) of daily log returns over the common days",
                            inputs, title="Beta"),
-        "sharpe": pv.derived(f"(mean(r) × 252 − rf) / (stdev(r, ddof=1) × √252), r = daily log return; {rf}",
+        "sharpe": pv.derived(f"(mean(R) × 252 − rf) / (stdev(R, ddof=1) × √252), R = daily simple return (close / previous close − 1); {rf}",
                              inputs, title="Sharpe ratio"),
-        "sortino": pv.derived(f"(mean(r) × 252 − rf) / (√mean(min(r − rf/252, 0)²) × √252); {rf}",
+        "sortino": pv.derived(f"(mean(R) × 252 − rf) / (√mean(min(R − rf/252, 0)²) × √252), R = daily simple return; {rf}",
                               inputs, title="Sortino ratio"),
     }
