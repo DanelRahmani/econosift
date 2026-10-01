@@ -76,6 +76,63 @@ def _pivot_classic(high: float, low: float, close: float) -> dict:
     }
 
 
+def _displace_senkou(df: pd.DataFrame) -> None:
+    """pandas-ta displaces Senkou A/B by kijun - 1 = 25 bars; the standard Ichimoku displacement is 26."""
+    for name in ("ISA_9", "ISB_26"):
+        col = _find_col(df, [name])
+        if col:
+            df[col] = df[col].shift(1)
+
+
+def _today() -> pd.Timestamp:
+    """Reference date for deciding whether a week/month is over (patched in tests)."""
+    return pd.Timestamp.now().normalize()
+
+
+def _last_completed(df: pd.DataFrame, rule: str, today: pd.Timestamp) -> pd.Series | None:
+    """H/L/C of the most recent finished period (``rule`` = "W-FRI" or "ME"), or None.
+
+    The latest bucket is finished when the last bar is on or after the period's final weekday, or when
+    the reference date is already past the period's end (holiday-shortened week/month). Otherwise it is
+    still forming and the previous bucket is the one the pivots must use.
+    """
+    agg = df.resample(rule).agg({"High": "max", "Low": "min", "Close": "last"}).dropna()
+    if agg.empty:
+        return None
+    period_end = agg.index[-1]
+    last_weekday = pd.offsets.BDay().rollback(period_end)
+    if df.index[-1].normalize() >= last_weekday or today.normalize() > period_end:
+        return agg.iloc[-1]
+    return agg.iloc[-2] if len(agg) >= 2 else None
+
+
+def _pivot_points(df: pd.DataFrame, today: pd.Timestamp) -> dict[str, dict]:
+    """Classic pivots for the next daily / weekly / monthly period from the last completed one."""
+    pivots: dict[str, dict] = {}
+    if len(df) < 1:
+        return pivots
+
+    # Daily: use previous session
+    prev = df.iloc[-2] if len(df) >= 2 else df.iloc[-1]
+    h_d = _clean(prev.get("High"))
+    l_d = _clean(prev.get("Low"))
+    c_d = _clean(prev.get("Close"))
+    if h_d and l_d and c_d:
+        pivots["daily"] = _pivot_classic(h_d, l_d, c_d)
+
+    for key, rule in (("weekly", "W-FRI"), ("monthly", "ME")):
+        try:
+            row = _last_completed(df, rule, today)
+        except Exception:
+            continue
+        if row is None:
+            continue
+        h = _clean(row["High"]); l = _clean(row["Low"]); c = _clean(row["Close"])
+        if h and l and c:
+            pivots[key] = _pivot_classic(h, l, c)
+    return pivots
+
+
 def _fib_levels(swing_high: float, swing_low: float) -> list[dict]:
     diff = swing_high - swing_low
     ratios = [
@@ -136,7 +193,7 @@ def get_technicals(ticker: str, period: str = "1y") -> dict:
     # -----------------------------------------------------------------------
     if _HAS_TA:
         df.ta.macd(append=True)
-        df.ta.bbands(length=20, std=2, append=True)
+        df.ta.bbands(length=20, std=2, ddof=0, append=True)  # population std, as TA-Lib / most charting packages
         df.ta.atr(length=14, append=True)
         df.ta.obv(append=True)
         df.ta.cmf(length=20, append=True)
@@ -150,6 +207,7 @@ def get_technicals(ticker: str, period: str = "1y") -> dict:
         # Ichimoku — append=True puts ITS_9, IKS_26, ICS_26, ISA_9, ISB_26 into df
         try:
             df.ta.ichimoku(tenkan=9, kijun=26, senkou=52, append=True)
+            _displace_senkou(df)
         except Exception:
             pass
     else:
@@ -390,39 +448,7 @@ def get_technicals(ticker: str, period: str = "1y") -> dict:
     # -----------------------------------------------------------------------
     # Pivot Points (daily / weekly / monthly classic)
     # -----------------------------------------------------------------------
-    pivot_points: dict[str, dict] = {}
-    if len(df) >= 1:
-        # Daily: use previous session
-        prev = df.iloc[-2] if len(df) >= 2 else df.iloc[-1]
-        h_d = _clean(prev.get("High"))
-        l_d = _clean(prev.get("Low"))
-        c_d = _clean(prev.get("Close"))
-        if h_d and l_d and c_d:
-            pivot_points["daily"] = _pivot_classic(h_d, l_d, c_d)
-
-        # Weekly: use previous complete week
-        try:
-            weekly = df.resample("W-FRI").agg({"High": "max", "Low": "min", "Close": "last"})
-            weekly = weekly.dropna()
-            if len(weekly) >= 2:
-                prev_w = weekly.iloc[-2]
-                hw = _clean(prev_w["High"]); lw = _clean(prev_w["Low"]); cw = _clean(prev_w["Close"])
-                if hw and lw and cw:
-                    pivot_points["weekly"] = _pivot_classic(hw, lw, cw)
-        except Exception:
-            pass
-
-        # Monthly: use previous complete month
-        try:
-            monthly = df.resample("ME").agg({"High": "max", "Low": "min", "Close": "last"})
-            monthly = monthly.dropna()
-            if len(monthly) >= 2:
-                prev_m = monthly.iloc[-2]
-                hm = _clean(prev_m["High"]); lm = _clean(prev_m["Low"]); cm = _clean(prev_m["Close"])
-                if hm and lm and cm:
-                    pivot_points["monthly"] = _pivot_classic(hm, lm, cm)
-        except Exception:
-            pass
+    pivot_points = _pivot_points(df, _today())
 
     return pv.attach({
         "ticker": ticker,

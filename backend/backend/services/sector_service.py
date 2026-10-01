@@ -66,6 +66,31 @@ def _clean(v) -> float | None:
         return None
 
 
+def session_base(s, n_sessions: int) -> float | None:
+    """Close ``n_sessions`` trading sessions before the last close (``s.iloc[-1 - n]``).
+
+    One definition shared by the sector chart (``get_sector_returns``) and the sector table
+    (``get_sector_fundamentals``).  Sessions, not calendar dates, are used so 1M/3M/6M are 21/63/126
+    sessions, matching the window labels on the chart; a series too short to reach the base returns
+    ``None`` rather than silently falling back to its first row.
+    """
+    if s is None or n_sessions < 1 or len(s) <= n_sessions:
+        return None
+    return float(s.iloc[-1 - n_sessions])
+
+
+def ytd_base(s) -> float | None:
+    """Last close of the calendar year before the latest observation (the standard YTD base).
+
+    ``None`` when the history does not reach back to the prior year-end.
+    """
+    if s is None or len(s) == 0:
+        return None
+    jan1 = f"{s.index[-1].year}-01-01"
+    prior = s[s.index < jan1]
+    return float(prior.iloc[-1]) if len(prior) else None
+
+
 @cached("sector_returns")
 def get_sector_returns() -> dict:
     all_syms = tuple(list(SECTOR_ETFS.keys()) + ["SPY"])
@@ -75,21 +100,22 @@ def get_sector_returns() -> dict:
         return {"periods": {k: [] for k in ("1d", "1w", "1m", "3m", "ytd", "1y")}}
 
     frame = frame.sort_index()
-    today_year = frame.index[-1].year
-    ytd_start = frame[frame.index >= f"{today_year}-01-01"]
 
-    def _spy_ret(n_days: int | None, ytd: bool = False) -> float | None:
+    def _period_ret(s, n_days: int | None, ytd: bool, first_of_window: bool) -> float | None:
+        if len(s) < 2:
+            return None
+        if ytd:
+            base = ytd_base(s)
+        elif first_of_window:
+            base = float(s.iloc[0])
+        else:
+            base = session_base(s, n_days)
+        return _safe_pct(float(s.iloc[-1]), base)
+
+    def _spy_ret(n_days: int | None, ytd: bool = False, first_of_window: bool = False) -> float | None:
         if "SPY" not in frame.columns:
             return None
-        s = frame["SPY"].dropna()
-        if ytd:
-            ys = ytd_start["SPY"].dropna() if "SPY" in ytd_start.columns else s.iloc[:0]
-            return _safe_pct(float(s.iloc[-1]) if len(s) else None,
-                             float(ys.iloc[0]) if len(ys) else None)
-        if n_days is None or len(s) < 2:
-            return None
-        idx = max(0, len(s) - 1 - n_days)
-        return _safe_pct(float(s.iloc[-1]), float(s.iloc[idx]))
+        return _period_ret(frame["SPY"].dropna(), n_days, ytd, first_of_window)
 
     period_defs: list[tuple[str, int | None, bool]] = [
         ("1d", 1, False),
@@ -102,7 +128,8 @@ def get_sector_returns() -> dict:
 
     periods: dict[str, list[dict]] = {}
     for period_key, n_days, is_ytd in period_defs:
-        spy_ret = _spy_ret(n_days, ytd=is_ytd)
+        first_of_window = period_key == "1y"
+        spy_ret = _spy_ret(n_days, ytd=is_ytd, first_of_window=first_of_window)
         rows: list[dict] = []
         for etf, sector in SECTOR_ETFS.items():
             if etf not in frame.columns:
@@ -112,12 +139,7 @@ def get_sector_returns() -> dict:
             if len(s) < 2:
                 rows.append({"ticker": etf, "sector": sector, "changePercent": None, "vsSpy": None})
                 continue
-            if is_ytd:
-                ys = ytd_start[etf].dropna() if etf in ytd_start.columns else s.iloc[:0]
-                ret = _safe_pct(float(s.iloc[-1]), float(ys.iloc[0]) if len(ys) else None)
-            else:
-                idx = max(0, len(s) - 1 - n_days)
-                ret = _safe_pct(float(s.iloc[-1]), float(s.iloc[idx]))
+            ret = _period_ret(s, n_days, is_ytd, first_of_window)
             vs_spy = round(ret - spy_ret, 2) if ret is not None and spy_ret is not None else None
             rows.append({"ticker": etf, "sector": sector, "changePercent": ret, "vsSpy": vs_spy})
         periods[period_key] = rows
@@ -128,7 +150,7 @@ def get_sector_returns() -> dict:
     prov: dict = {"*": pv.derived("sector ETF returns over trading-day windows, and the difference from SPY",
                                   [closes], title="Sector returns", observed=as_of)}
     for period_key, n_days, is_ytd in period_defs:
-        base = ("first close on or after 1 January" if is_ytd else f"close {n_days} trading days earlier"
+        base = ("last close of the previous calendar year" if is_ytd else f"close {n_days} trading days earlier"
                 if period_key != "1y" else "first close of the 1-year window")
         prov[f"periods.{period_key}"] = pv.derived(f"(last close / {base} − 1) × 100 for each sector ETF",
                                                    [closes], title=f"Sector ETF return, {period_key}", observed=as_of)
@@ -175,9 +197,9 @@ def get_sector_fundamentals() -> list[dict]:
                 dd = (s - roll_max) / roll_max * 100
                 max_dd = round(float(dd.min()), 4) if not dd.empty else None
                 cur = float(s.iloc[-1])
-                ret1m = _safe_pct(cur, float(s.iloc[-22]) if len(s) > 21 else None)
-                ret3m = _safe_pct(cur, float(s.iloc[-63]) if len(s) > 62 else None)
-                ret6m = _safe_pct(cur, float(s.iloc[-126]) if len(s) > 125 else None)
+                ret1m = _safe_pct(cur, session_base(s, 21))
+                ret3m = _safe_pct(cur, session_base(s, 63))
+                ret6m = _safe_pct(cur, session_base(s, 126))
                 ret1y = _safe_pct(cur, float(s.iloc[0]))
 
         return {

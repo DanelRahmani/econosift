@@ -36,7 +36,8 @@ def _return_pct(frame: pd.DataFrame, period: str) -> pd.Series:
     """Compute per-column return% over the requested period.
 
     * ``1d``  → last close vs previous close.
-    * ``ytd`` → last close vs first close on/after 1 Jan of the latest year.
+    * ``ytd`` → last close vs the last close before 1 Jan of the latest year (the prior year-end).
+      A symbol with no close before 1 Jan has no honest base and is omitted (NaN).
     * others  → last close vs first close in the window.
 
     Returns a Series indexed by symbol.  Symbols without enough rows are
@@ -55,10 +56,10 @@ def _return_pct(frame: pd.DataFrame, period: str) -> pd.Series:
     if period == "ytd":
         latest_year = frame.index[-1].year
         jan1 = pd.Timestamp(latest_year, 1, 1)
-        ytd_frame = frame[frame.index >= jan1]
-        if ytd_frame.empty:
-            ytd_frame = frame
-        first = ytd_frame.iloc[0]
+        prior = frame[frame.index < jan1]
+        if prior.empty:
+            return pd.Series(dtype=float)
+        first = prior.ffill().iloc[-1]
     else:
         first = frame.iloc[0]
 
@@ -184,7 +185,7 @@ def treemap(index: str = "sp500", period: str = "1d") -> dict:
 
 _RETURN_FORMULA = {
     "1d": "(last close / previous close − 1) × 100",
-    "ytd": "(last close / first close on or after 1 January − 1) × 100",
+    "ytd": "(last close / last close of the previous calendar year − 1) × 100",
     "1w": "(last close / first close of the 1-month download window − 1) × 100",
     "1m": "(last close / first close of the 3-month download window − 1) × 100",
     "3m": "(last close / first close of the 6-month download window − 1) × 100",

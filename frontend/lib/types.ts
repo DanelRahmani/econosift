@@ -28,10 +28,16 @@ export interface RiskMetric {
   sortino: number | null;
   beta: number | null;
   returns: (number | null)[];
+  /** Number of daily returns the metrics were computed from. */
+  nObs?: number | null;
 }
 
 export interface RiskResponse {
   metrics: RiskMetric[];
+  /** Annual risk-free rate (decimal) used for Sharpe/Sortino. */
+  riskFree?: number | null;
+  /** Where riskFree came from, e.g. "FRED DGS3MO" or "fallback 4%". */
+  riskFreeSource?: string | null;
 }
 
 export interface Valuation {
@@ -68,6 +74,11 @@ export interface RatiosResponse {
   valuation: RatioGroup;
   /** Null ratios that could not be computed honestly, keyed by path ("valuation.psRatio", "zScore"). */
   unavailable?: Record<string, string>;
+  /** Annual risk-free rate (decimal) used for Sharpe/Sortino, and its source. */
+  riskFree?: number | null;
+  riskFreeSource?: string | null;
+  /** How `beta` was estimated: return window, frequency, benchmark index and sample size. */
+  betaBasis?: { period: string; frequency: string; benchmark: string; nObs: number | null } | null;
 }
 
 export interface SearchResult {

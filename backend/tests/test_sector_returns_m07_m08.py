@@ -1,0 +1,183 @@
+"""Offline known-value tests for Phase 54 audit findings M-07 and M-08.
+
+M-07: YTD return base must be the last close of the *prior* calendar year, not the first January close
+      (sector returns and the treemap).
+M-08: the sector table (fundamentals) and the sector chart (returns) must use one definition of the
+      N-session base: "close N trading sessions earlier" = ``series.iloc[-1 - N]``.
+
+No network: ``yfs.get_close_frame`` and ``yf.Ticker`` are monkeypatched.
+"""
+from __future__ import annotations
+
+import pandas as pd
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def _clear_caches():
+    from backend import cache
+    cache._caches.clear()
+    cache._stats.clear()
+    yield
+    cache._caches.clear()
+    cache._stats.clear()
+
+
+def _row(rows: list[dict], ticker: str) -> dict:
+    return next(r for r in rows if r["ticker"] == ticker)
+
+
+# ---------------------------------------------------------------------------
+# M-07 — YTD base
+# ---------------------------------------------------------------------------
+
+# Dec-30 and Dec-31 are the prior year; Jan-02 is the first January close.
+_YTD_INDEX = pd.to_datetime(["2025-12-30", "2025-12-31", "2026-01-02", "2026-01-05", "2026-01-06"])
+
+
+class TestSectorYtd:
+    def test_ytd_base_is_prior_year_end_close(self, monkeypatch):
+        from backend.services import sector_service, yfinance_service
+
+        # XLK: prior year-end close (31 Dec) = 110, first Jan close = 120, last = 132.
+        #   correct YTD = 132 / 110 - 1 = +20.00 %   (old code: 132 / 120 - 1 = +10.00 %)
+        # SPY: 31 Dec = 400, 2 Jan = 410, last = 440.
+        #   correct YTD = 440 / 400 - 1 = +10.00 %   -> XLK vs SPY = +10.00 pp
+        frame = pd.DataFrame({
+            "XLK": [100.0, 110.0, 120.0, 121.0, 132.0],
+            "SPY": [390.0, 400.0, 410.0, 415.0, 440.0],
+        }, index=_YTD_INDEX)
+        monkeypatch.setattr(yfinance_service, "get_close_frame", lambda syms, period: frame)
+
+        out = sector_service.get_sector_returns()
+        xlk = _row(out["periods"]["ytd"], "XLK")
+        assert xlk["changePercent"] == pytest.approx(20.0, abs=0.005)
+        assert xlk["vsSpy"] == pytest.approx(10.0, abs=0.005)
+
+    def test_ytd_is_none_when_history_misses_prior_year_end(self, monkeypatch):
+        from backend.services import sector_service, yfinance_service
+
+        # No row before 1 Jan -> there is no honest YTD base; never fall back to the first January close.
+        frame = pd.DataFrame({
+            "XLK": [120.0, 121.0, 132.0],
+            "SPY": [410.0, 415.0, 440.0],
+        }, index=pd.to_datetime(["2026-01-02", "2026-01-05", "2026-01-06"]))
+        monkeypatch.setattr(yfinance_service, "get_close_frame", lambda syms, period: frame)
+
+        out = sector_service.get_sector_returns()
+        xlk = _row(out["periods"]["ytd"], "XLK")
+        assert xlk["changePercent"] is None
+        assert xlk["vsSpy"] is None
+
+
+class TestTreemapYtd:
+    @pytest.fixture()
+    def patch_all(self, monkeypatch):
+        from backend.services import constituents, yfinance_service
+
+        members = [
+            {"symbol": "AAA", "name": "Alpha", "sector": "Technology", "industry": "Software"},
+            {"symbol": "BBB", "name": "Beta", "sector": "Financials", "industry": "Banks"},
+        ]
+        # AAA: 31 Dec = 110, 2 Jan = 120, last = 132 -> YTD = 132/110 - 1 = +20.00 % (old: +10.00 %)
+        # BBB: 31 Dec = 200, 2 Jan = 190, last = 180 -> YTD = 180/200 - 1 = -10.00 % (old: -5.26 %)
+        frame = pd.DataFrame({
+            "AAA": [100.0, 110.0, 120.0, 121.0, 132.0],
+            "BBB": [205.0, 200.0, 190.0, 185.0, 180.0],
+        }, index=_YTD_INDEX)
+        monkeypatch.setattr(constituents, "get_constituents", lambda idx: members)
+        monkeypatch.setattr(yfinance_service, "get_close_frame", lambda syms, period: frame)
+        monkeypatch.setattr(yfinance_service, "get_market_caps",
+                            lambda syms: {"AAA": 1e9, "BBB": 5e8})
+        return frame
+
+    def test_treemap_ytd_uses_prior_year_end(self, patch_all):
+        from backend.services.treemap_service import treemap
+
+        by = {s["symbol"]: s for s in treemap("sp500", "ytd")["stocks"]}
+        assert by["AAA"]["changePercent"] == pytest.approx(20.0, abs=0.005)
+        assert by["BBB"]["changePercent"] == pytest.approx(-10.0, abs=0.005)
+
+    def test_treemap_ytd_drops_symbol_without_prior_year_close(self, monkeypatch):
+        from backend.services import constituents, yfinance_service
+        from backend.services.treemap_service import treemap
+
+        members = [
+            {"symbol": "AAA", "name": "Alpha", "sector": "Technology", "industry": "Software"},
+            {"symbol": "NEW", "name": "Recent IPO", "sector": "Technology", "industry": "Software"},
+        ]
+        # NEW listed on 2 Jan: no December close, so no honest YTD base -> dropped.
+        frame = pd.DataFrame({
+            "AAA": [100.0, 110.0, 120.0, 121.0, 132.0],
+            "NEW": [float("nan"), float("nan"), 20.0, 21.0, 22.0],
+        }, index=_YTD_INDEX)
+        monkeypatch.setattr(constituents, "get_constituents", lambda idx: members)
+        monkeypatch.setattr(yfinance_service, "get_close_frame", lambda syms, period: frame)
+        monkeypatch.setattr(yfinance_service, "get_market_caps", lambda syms: {"AAA": 1e9, "NEW": 1e8})
+
+        syms = {s["symbol"] for s in treemap("sp500", "ytd")["stocks"]}
+        assert syms == {"AAA"}
+
+
+# ---------------------------------------------------------------------------
+# M-08 — table and chart share the N-session base
+# ---------------------------------------------------------------------------
+
+class _FakeTicker:
+    def __init__(self, sym):
+        self.info = {}
+
+
+class TestSectorTableMatchesChart:
+    @pytest.fixture()
+    def patch_all(self, monkeypatch):
+        from backend.services import sector_service, yfinance_service
+
+        # 130 business days, XLK close = 100 + i  (i = 0..129), so last = 229.
+        idx = pd.bdate_range(end="2026-06-30", periods=130)
+        frame = pd.DataFrame({
+            "XLK": [100.0 + i for i in range(130)],
+            "SPY": [100.0 + i for i in range(130)],
+        }, index=idx)
+        monkeypatch.setattr(yfinance_service, "get_close_frame", lambda syms, period: frame)
+        monkeypatch.setattr(sector_service.yf, "Ticker", _FakeTicker)
+
+    def test_three_month_is_63_sessions_back_in_both(self, patch_all):
+        from backend.services import sector_service
+
+        # 63 sessions before the last close (i = 129) is i = 66 -> 166.
+        #   229 / 166 - 1 = +37.95 %   (old table used i = 67 -> 167 -> +37.13 %)
+        chart = _row(sector_service.get_sector_returns()["periods"]["3m"], "XLK")["changePercent"]
+        table = _row(sector_service.get_sector_fundamentals(), "XLK")["return3m"]
+        assert chart == pytest.approx(37.95, abs=0.005)
+        assert table == pytest.approx(37.95, abs=0.005)
+
+    def test_six_month_is_126_sessions_back(self, patch_all):
+        from backend.services import sector_service
+
+        # 126 sessions before i = 129 is i = 3 -> 103.  229 / 103 - 1 = +122.33 %
+        # (old table used i = 4 -> 104 -> +120.19 %)
+        table = _row(sector_service.get_sector_fundamentals(), "XLK")["return6m"]
+        assert table == pytest.approx(122.33, abs=0.005)
+
+    def test_one_month_unchanged_and_consistent(self, patch_all):
+        from backend.services import sector_service
+
+        # 21 sessions back: i = 108 -> 208.  229 / 208 - 1 = +10.10 %
+        chart = _row(sector_service.get_sector_returns()["periods"]["1m"], "XLK")["changePercent"]
+        table = _row(sector_service.get_sector_fundamentals(), "XLK")["return1m"]
+        assert chart == pytest.approx(10.10, abs=0.005)
+        assert table == pytest.approx(10.10, abs=0.005)
+
+    def test_short_history_gives_none_not_a_clamped_number(self, monkeypatch):
+        from backend.services import sector_service, yfinance_service
+
+        # 40 rows cannot support a 63-session base: report None instead of silently using the first row.
+        idx = pd.bdate_range(end="2026-06-30", periods=40)
+        frame = pd.DataFrame({"XLK": [100.0 + i for i in range(40)],
+                              "SPY": [100.0 + i for i in range(40)]}, index=idx)
+        monkeypatch.setattr(yfinance_service, "get_close_frame", lambda syms, period: frame)
+        monkeypatch.setattr(sector_service.yf, "Ticker", _FakeTicker)
+
+        assert _row(sector_service.get_sector_returns()["periods"]["3m"], "XLK")["changePercent"] is None
+        assert _row(sector_service.get_sector_fundamentals(), "XLK")["return3m"] is None
