@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import type { CountryRate, DcfResponse, DcfSensitivity, ValuationFullResponse } from "@/lib/types";
 import { Card, Skeleton } from "@/components/ui";
@@ -94,6 +94,9 @@ export function DcfPanel({ tickers, sharedWacc = null }: { tickers: string[]; pe
   const [countryRates, setCountryRates] = useState<CountryRate[]>([]);
   const [selectedCountry, setSelectedCountry] = useState<string>("");
   const scope = useSourceScope(provOf(data));
+  // Latest parent override, read when a ticker is (re)seeded so the reseed does not drop it.
+  const sharedWaccRef = useRef(sharedWacc);
+  sharedWaccRef.current = sharedWacc;
 
   // Load live risk-free rates from backend
   useEffect(() => {
@@ -121,6 +124,7 @@ export function DcfPanel({ tickers, sharedWacc = null }: { tickers: string[]; pe
     if (!selectedTicker) return;
     let alive = true;
     setSelectedCountry("");
+    setData(null); // the previous ticker's result must not stay on screen while this one loads
     api
       .valuationFull(selectedTicker)
       .then((r) => {
@@ -128,14 +132,14 @@ export function DcfPanel({ tickers, sharedWacc = null }: { tickers: string[]; pe
         const d = defaultsFromFull(r);
         setDefaults(d);
         setDefaultsFromBackend(true);
-        setParams(d);
+        setParams(sharedWaccRef.current != null ? { ...d, wacc: sharedWaccRef.current } : d);
         setSeededFor(selectedTicker);
       })
       .catch(() => {
         if (!alive) return;
         setDefaults(FALLBACK_PARAMS);
         setDefaultsFromBackend(false);
-        setParams(FALLBACK_PARAMS);
+        setParams(sharedWaccRef.current != null ? { ...FALLBACK_PARAMS, wacc: sharedWaccRef.current } : FALLBACK_PARAMS);
         setSeededFor(selectedTicker);
       });
     return () => {

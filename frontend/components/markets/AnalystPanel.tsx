@@ -419,7 +419,9 @@ function fmtEstimateNumber(val: number, path: string[], sym: string): string {
   const leaf = path[path.length - 1] ?? "";
   const section = (path[0] ?? "").toLowerCase();
   if (leaf === "numberOfAnalysts") return String(Math.round(val));
-  if (leaf === "growth") return fmtPctFromFraction(val, 1);
+  // "growth" inside an estimate period, and top-level revenueGrowth / earningsGrowth / ... are fractions.
+  if (leaf === "growth" || /Growth$/.test(leaf)) return fmtPctFromFraction(val, 1);
+  if (leaf === "forwardEps") return fmtPrice(val, sym);
   if (path.length > 1 && section.includes("revenue")) return fmtMoneyCompact(val, sym);
   if (path.length > 1 && (section.includes("earnings") || section.includes("eps"))) return fmtPrice(val, sym);
   return fmtNum(val);

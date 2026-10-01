@@ -81,7 +81,8 @@ function piotroskiBands(maxScore: number): { strongMin: number; weakBelow: numbe
 
 /** Piotroski score badge with traffic-light color, bands scaled to maxScore. */
 function PiotroskiBadge({ score, maxScore }: { score: number | null; maxScore: number | null }) {
-  if (nil(score) || nil(maxScore)) {
+  // maxScore 0 = no test could be evaluated ("Insufficient data"): neutral, never a green 0 / 0.
+  if (nil(score) || nil(maxScore) || (maxScore as number) <= 0) {
     return <span className="px-2 py-0.5 rounded-md text-xs font-semibold bg-surface-alt text-text-secondary">{DASH}</span>;
   }
   const s = score as number;
@@ -120,9 +121,9 @@ function BeneishBadge({ mScore, manipulationLikely, note }: { mScore: number | n
  * 5-50 % neutral (no verdict: Ohlson probabilities are not calibrated for modern large caps,
  * so a mid value is not "good" and not an alarm), > 50 % red (the classic O-score cut-off).
  */
-function OhlsonBadge({ oScore, probDefault }: { oScore: number | null; probDefault: number | null }) {
+function OhlsonBadge({ oScore, probDefault, reason }: { oScore: number | null; probDefault: number | null; reason?: string }) {
   if (nil(oScore) && nil(probDefault)) {
-    return <span className="px-2 py-0.5 rounded-md text-xs font-semibold bg-surface-alt text-text-secondary">{DASH}</span>;
+    return <NaReason reason={reason} className="px-2 py-0.5 rounded-md text-xs font-semibold bg-surface-alt" />;
   }
   const prob = nil(probDefault) ? null : (probDefault as number) * 100;
   const cls =
@@ -495,6 +496,7 @@ export function ValuationKpiPanel({ kpis, wacc, fundamentals }: Props) {
                 <OhlsonBadge
                   oScore={ohlson?.oScore ?? null}
                   probDefault={ohlson?.probDefault ?? null}
+                  reason={ohlson?.reason}
                 />
               </div>
 

@@ -205,9 +205,7 @@ async def risk(tickers: str = Query(...), period: str = "1y",
     if risk_free is not None:
         rf_source = "request parameter"
     else:
-        risk_free = await asyncio.to_thread(discount_rates.short_risk_free_rate)
-        rf_source = ("fallback 4%" if discount_rates.short_risk_free_rate_is_fallback()
-                     else "FRED DGS3MO")
+        risk_free, rf_source = await asyncio.to_thread(discount_rates.short_risk_free_rate_with_source)
     benchmarks, bench_map = _benchmarks_for(syms, benchmark)
     all_syms = tuple(dict.fromkeys(syms + benchmarks))
 

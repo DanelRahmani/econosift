@@ -249,7 +249,7 @@ export interface Fundamentals {
   } | null;
   piotroski: { score: number | null; maxScore: number | null; criteria: Record<string, boolean | null> } | null;
   beneish: { mScore: number | null; manipulationLikely?: boolean | null; note?: string } | null;
-  ohlson: { oScore: number | null; probDefault: number | null } | null;
+  ohlson: { oScore: number | null; probDefault: number | null; reason?: string } | null;
   cashConversionCycle: {
     ccc: number | null; dso: number | null; dio: number | null; dpo: number | null;
     /** Reason per null field, e.g. banks (audit M-23). */

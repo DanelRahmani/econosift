@@ -111,3 +111,35 @@ def test_non_bank_cash_conversion_cycle_has_no_unavailable():
               "balance_sheet": {"Accounts Receivable": 100.0}, "cashflow": {}}
     r = fundamentals.cash_conversion_cycle(bundle)
     assert r["dso"] == pytest.approx(36.5) and "unavailable" not in r
+
+
+# ── verifier follow-ups ──
+
+def test_beneish_uses_quarterly_prior_year_when_one_annual_column():
+    # One annual column (2024) only; the prior year comes from the quarterly frames dated a year
+    # earlier, as on /corporate/health. Identical years -> every index 1 -> same M as the 2-year case.
+    two_year = fundamentals.beneish_m(_beneish_bundle())
+    b = _beneish_bundle()
+    q_cols = [pd.Timestamp("2024-12-31"), pd.Timestamp("2024-09-30"), pd.Timestamp("2024-06-30"),
+              pd.Timestamp("2024-03-31"), pd.Timestamp("2023-12-31"), pd.Timestamp("2023-09-30"),
+              pd.Timestamp("2023-06-30"), pd.Timestamp("2023-03-31")]
+    for key in ("financials_df", "balance_sheet_df", "cashflow_df"):
+        annual = b[key]
+        flow = key != "balance_sheet_df"
+        # flows: four quarters sum to the annual figure; stocks: the quarter-end balance.
+        q = pd.DataFrame({c: annual.iloc[:, 0] / (4 if flow else 1) for c in q_cols})
+        b[key.replace("_df", "_q_df")] = q
+        b[key] = annual.iloc[:, :1]
+    assert fundamentals.beneish_m(b)["mScore"] == pytest.approx(two_year["mScore"], abs=1e-9)
+
+
+def test_ohlson_converted_bundle_with_failed_fx_keeps_source_currency(monkeypatch):
+    # to_price_currency could not find a JPY->USD rate: _fx = {from: JPY, to: USD, rate: None} and the
+    # statements are still JPY. They must not be read as USD (SIZE 100x too large): null + reason.
+    monkeypatch.setattr(fundamentals, "_gnp_price_index", lambda: 660.0)
+    monkeypatch.setattr(dcf_engine, "_fx_rate", lambda a, b: None)
+    b = _ohlson_bundle("JPY")
+    b["info"]["currency"] = "USD"
+    b["_fx"] = {"from": "JPY", "to": "USD", "rate": None}
+    r = fundamentals.ohlson_o(b)
+    assert r["oScore"] is None and "JPY" in r["reason"]

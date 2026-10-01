@@ -62,8 +62,9 @@ def _patch_router(monkeypatch, fallback: bool):
     monkeypatch.setattr(ratios_router.yfs, "benchmark_for", lambda s: "SPY")
     monkeypatch.setattr(ratios_router.yfs, "get_info", lambda s: {"ticker": s, "info": {}})
     monkeypatch.setattr(ratios_router.yfs, "get_close_frame", lambda syms, period: frame)
-    monkeypatch.setattr(discount_rates, "short_risk_free_rate", lambda: 0.0252, raising=False)
-    monkeypatch.setattr(discount_rates, "short_risk_free_rate_is_fallback", lambda: fallback, raising=False)
+    # One lookup per request: a second call returning something else must not change the label.
+    answers = iter([None if fallback else 0.0252, 0.0252 if fallback else None])
+    monkeypatch.setattr(discount_rates, "_short_risk_free_rate_live", lambda: next(answers))
 
 
 def test_router_uses_short_rate_when_no_param(monkeypatch):
@@ -77,7 +78,7 @@ def test_router_uses_short_rate_when_no_param(monkeypatch):
 def test_router_reports_fallback_and_request_param(monkeypatch):
     _patch_router(monkeypatch, fallback=True)
     out = asyncio.run(ratios_router.ratios("xyz", "1y", None))
-    assert out["riskFreeSource"] == "fallback 4%"
+    assert out["riskFree"] == 0.04 and out["riskFreeSource"] == "fallback 4%"
     out = asyncio.run(ratios_router.ratios("xyz", "1y", 0.0))
     assert out["riskFree"] == 0.0 and out["riskFreeSource"] == "request parameter"
 

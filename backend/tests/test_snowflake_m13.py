@@ -75,3 +75,14 @@ def test_fcf_coverage_value_is_a_multiple_not_a_percent_ratio(monkeypatch):
     _, comps = sf._axis_dividend({"dividend_yield": 2.0, "fcf_yield": 0.05}, [], {"symbol": "X"})
     cov = next(c for c in comps if c["label"] == "FCF Coverage")
     assert cov["value"] == pytest.approx(2.5) and cov["score"] == 8.0
+
+
+def test_no_evaluable_piotroski_test_is_unscored_not_zero(monkeypatch):
+    # maxScore 0 ("Insufficient data") must drop the component, not score it 0 of 10 at weight 0.20.
+    monkeypatch.setattr(fundamentals, "_gnp_price_index", lambda: 660.0)
+    monkeypatch.setattr(sf, "compute_wacc", lambda b, beta: {"wacc": 0.08})
+    monkeypatch.setattr(sf, "piotroski_f", lambda b: {"score": 0, "maxScore": 0})
+    b = _bundle()
+    _, comps = sf._axis_health({}, [], b["info"], b)
+    pio = next(c for c in comps if c["label"] == "Piotroski F-Score")
+    assert pio["score"] is None

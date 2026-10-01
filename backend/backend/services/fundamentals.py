@@ -399,7 +399,8 @@ def beneish_m(bundle: dict) -> dict:
     if is_bank(bundle.get("info") or {}):
         return {"mScore": None, "note": "Beneish M-Score is not meaningful for banks: its receivables, "
                                          "gross-margin and asset-quality indexes do not describe a lender."}
-    result = _beneish(bundle.get("financials_df"), bundle.get("balance_sheet_df"), bundle.get("cashflow_df"))
+    result = _beneish(bundle.get("financials_df"), bundle.get("balance_sheet_df"), bundle.get("cashflow_df"),
+                      bundle.get("financials_q_df"), bundle.get("balance_sheet_q_df"), bundle.get("cashflow_q_df"))
     if result.get("mScore") is None:
         result["note"] = ("Beneish M-Score needs two fiscal years of statements (t and t-1) and at least six "
                           "of the eight indexes; Yahoo did not supply enough of them.")
@@ -437,7 +438,8 @@ def _statements_to_usd(bundle: dict) -> tuple[float | None, str]:
     """(USD per statement-currency unit, that currency); the rate is None when no FX rate exists."""
     info = bundle.get("info") or {}
     fx = bundle.get("_fx") or {}  # a bundle already converted by dcf_engine.to_price_currency
-    ccy = fx.get("to") or info.get("financialCurrency") or info.get("currency")
+    # When the conversion's FX lookup failed (rate None) the statements are still in the source currency.
+    ccy = (fx.get("to") if fx.get("rate") is not None else fx.get("from"))         or info.get("financialCurrency") or info.get("currency")
     if not ccy or ccy == "USD":
         return 1.0, ccy or "USD"
     from .dcf_engine import _fx_rate

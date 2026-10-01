@@ -398,8 +398,9 @@ def _axis_health(row: dict, peers: list[dict], info: dict, bundle: dict) -> tupl
 
     # Piotroski F-Score: the full nine tests; the prior year comes from the statement DataFrames in the bundle
     pio_result = piotroski_f(bundle)
-    max_score = pio_result.get("maxScore") or 1
-    pio_score = (pio_result.get("score") or 0) / max(max_score, 1) * 10.0
+    max_score = pio_result.get("maxScore") or 0
+    # No evaluable test means no score (dropped from the axis), not a fabricated worst score of 0.
+    pio_score = (pio_result.get("score") or 0) / max_score * 10.0 if max_score > 0 else None
 
     # Ohlson O-Score
     ohlson_result = ohlson_o(bundle)
@@ -435,7 +436,7 @@ def _axis_health(row: dict, peers: list[dict], info: dict, bundle: dict) -> tupl
          "score": _percentile(altman, _col_values(peers, "altman_z")),
          "value": altman},
         {"label": "Piotroski F-Score", "weight": 0.20,
-         "score": round(pio_score, 2),
+         "score": round(pio_score, 2) if pio_score is not None else None,
          "value": pio_result.get("score"),
          "detail": f"{pio_result.get('score')}/{max_score}"},
         {"label": "Ohlson O-Score", "weight": 0.15,

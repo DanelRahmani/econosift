@@ -17,8 +17,7 @@ async def ratios(ticker: str, period: str = "1y", risk_free: float | None = None
     if risk_free is not None:
         rf_source = "request parameter"
     else:
-        risk_free = await asyncio.to_thread(discount_rates.short_risk_free_rate)
-        rf_source = ("fallback 4%" if discount_rates.short_risk_free_rate_is_fallback() else "FRED DGS3MO")
+        risk_free, rf_source = await asyncio.to_thread(discount_rates.short_risk_free_rate_with_source)
     bench = yfs.benchmark_for(sym)
 
     bundle = await asyncio.to_thread(yfs.get_info, sym)

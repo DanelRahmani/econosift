@@ -325,6 +325,13 @@ def get_info(ticker: str) -> dict:
     out["financials_df"] = fin_df if fin_df is not None and not fin_df.empty else None
     out["balance_sheet_df"] = bs_df if bs_df is not None and not bs_df.empty else None
     out["cashflow_df"] = cf_df if cf_df is not None and not cf_df.empty else None
+    # Quarterly statements where Yahoo publishes only one annual column, so Beneish can date-match
+    # the prior year the way /corporate/health does (audit M-14).
+    for key, df, name in (("financials_q_df", fin_df, "quarterly_financials"),
+                          ("balance_sheet_q_df", bs_df, "quarterly_balance_sheet"),
+                          ("cashflow_q_df", cf_df, "quarterly_cashflow")):
+        q = _safe_stmt(t, name) if df is not None and not df.empty and df.shape[1] < 2 else None
+        out[key] = q if q is not None and not q.empty else None
 
     # ── Fix 1: Inject missing keys from alternative yfinance accessors ──
     price = info.get("currentPrice") or info.get("regularMarketPrice")

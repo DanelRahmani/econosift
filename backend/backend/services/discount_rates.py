@@ -354,6 +354,12 @@ def short_risk_free_rate() -> float:
     return live if live is not None else RISK_FREE_FALLBACK
 
 
+def short_risk_free_rate_with_source() -> tuple[float, str]:
+    """(short rate, its label) from one lookup, so the label always describes the rate used."""
+    live = _short_risk_free_rate_live()
+    return (live, "FRED DGS3MO") if live is not None else (RISK_FREE_FALLBACK, "fallback 4%")
+
+
 # ---------------------------------------------------------------------------
 # Cost of equity (CAPM)
 # ---------------------------------------------------------------------------
