@@ -80,3 +80,11 @@ Live ASML.AS: rf 5.26 % (US DGS10), ERP 4.23 % (NL), β 2.235 vs ^AEX (Yahoo β 
 
 Remaining: gate (container pytest, tsc, build + recreate, cache clear, live curls incl. ASML.AS wacc),
 docs (audit Medium status table + M-10, ACTIVE_ISSUES, CHANGELOG Phase 54 + 55 lines), push DEV.
+
+## ✅ Closed 2026-10-02
+
+Gate passed after Docker was restarted: container pytest all green, tsc clean, build + recreate, cache
+cleared, every live check in the prompt matched (plus ASML.AS / 0700.HK for M-10). The gate caught the
+Sectors heatmap still using the January YTD base (`f4824b8`). Docs: audit "Status of the Medium findings",
+ACTIVE_ISSUES (M-06…M-23 fixed, P3-16/17/27/28/31 resolved, P3-29…P3-34 new), CHANGELOG Phase 54 + 55.
+Open: PR DEV → main (owner), P1-19 / P1-18 (owner to choose).
