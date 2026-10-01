@@ -181,3 +181,20 @@ class TestSectorTableMatchesChart:
 
         assert _row(sector_service.get_sector_returns()["periods"]["3m"], "XLK")["changePercent"] is None
         assert _row(sector_service.get_sector_fundamentals(), "XLK")["return3m"] is None
+
+
+def test_sector_chart_endpoint_ytd_uses_prior_year_end(monkeypatch):
+    # /api/market/sectors?period=ytd (the Sectors heatmap) measured YTD from the first January close.
+    # Closes: 2025-12-31 100, 2026-01-02 110, latest 120 -> YTD = 120/100 - 1 = 20 % (not 120/110 - 1 = 9.09 %).
+    import asyncio
+    from backend.routers import market as market_router
+    idx = pd.to_datetime(["2025-12-30", "2025-12-31", "2026-01-02", "2026-03-02"])
+    asked = []
+
+    def frame(syms, period):
+        asked.append(period)
+        return pd.DataFrame({s: [99.0, 100.0, 110.0, 120.0] for s in syms}, index=idx)
+    monkeypatch.setattr(market_router.yfs, "get_close_frame", frame)
+    out = asyncio.run(market_router.sectors("ytd"))
+    assert asked == ["1y"]
+    assert all(r["changePercent"] == 20.0 for r in out["sectors"])
