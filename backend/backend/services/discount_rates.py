@@ -265,10 +265,12 @@ def tax_rate_for(info: dict, country: str) -> float:
 # Risk-free rate (US 10Y Treasury)
 # ---------------------------------------------------------------------------
 
-def _fetch_fred_latest(series_id: str) -> float | None:
-    """Synchronously fetch the latest observation of a FRED yield series (percent) as a decimal.
+def _fetch_fred_latest_obs(series_id: str, lookback_days: int = 30) -> tuple[float, str] | None:
+    """Latest observation of a FRED yield series (percent) as (decimal, ISO date).
 
-    Uses fredapi, then pandas_datareader; None when both fail or the value is implausible.
+    Uses fredapi, then pandas_datareader over the last *lookback_days* (monthly OECD series
+    lag one to two months, so they need a longer window); None when both fail or the value
+    is implausible.
     """
     # Try fredapi first
     try:
@@ -281,7 +283,7 @@ def _fetch_fred_latest(series_id: str) -> float | None:
             if len(s) > 0:
                 val = _clean(float(s.iloc[-1]))
                 if val is not None and 0 < val < 20:
-                    return val / 100.0
+                    return val / 100.0, str(s.index[-1])[:10]
     except Exception:
         pass
 
@@ -290,17 +292,23 @@ def _fetch_fred_latest(series_id: str) -> float | None:
         from datetime import datetime, timedelta
         import pandas_datareader.data as web
         end = datetime.today()
-        start = end - timedelta(days=30)
+        start = end - timedelta(days=lookback_days)
         df = web.DataReader(series_id, "fred", start=start, end=end)
         s = df.iloc[:, 0].dropna()
         if len(s) > 0:
             val = _clean(float(s.iloc[-1]))
             if val is not None and 0 < val < 20:
-                return val / 100.0
+                return val / 100.0, str(s.index[-1])[:10]
     except Exception:
         pass
 
     return None
+
+
+def _fetch_fred_latest(series_id: str) -> float | None:
+    """Latest observation of a FRED yield series (percent) as a decimal, or None."""
+    obs = _fetch_fred_latest_obs(series_id)
+    return obs[0] if obs else None
 
 
 def _fetch_dgs10() -> float | None:
@@ -361,6 +369,65 @@ def short_risk_free_rate_with_source() -> tuple[float, str]:
 
 
 # ---------------------------------------------------------------------------
+# Local-currency rate and beta for non-USD listings (audit M-10: owner chose
+# option B with a Blume-adjusted beta as the interim)
+# ---------------------------------------------------------------------------
+
+# Currency of each country's 10-year government bond, so the rate matches the price currency.
+_COUNTRY_CURRENCY: dict[str, str] = {
+    **{c: "EUR" for c in ("Netherlands", "Germany", "France", "Italy", "Spain", "Belgium", "Austria",
+                          "Finland", "Ireland", "Portugal")},
+    "United Kingdom": "GBP", "Japan": "JPY", "Switzerland": "CHF", "Canada": "CAD", "Australia": "AUD",
+    "Korea": "KRW", "India": "INR", "Sweden": "SEK", "Denmark": "DKK", "Norway": "NOK", "Poland": "PLN",
+    "Israel": "ILS", "South Africa": "ZAR", "Mexico": "MXN", "New Zealand": "NZD",
+}
+_LOCAL_RF_STALE_DAYS = 120  # monthly series publish one to two months late; older than this is stale
+
+
+def blume_adjust(beta: float | None) -> float | None:
+    """Blume (1971) adjusted beta, 0.67 * beta + 0.33: shrinks a raw beta toward 1."""
+    return None if beta is None else _clean(0.67 * beta + 0.33)
+
+
+def _major_currency(ccy: str | None) -> str:
+    from .dcf_engine import _MINOR_UNITS  # GBp -> GBP, ZAc -> ZAR, ILA -> ILS
+    ccy = ccy or "USD"
+    return _MINOR_UNITS.get(ccy, (ccy, 1.0))[0]
+
+
+@cached("rf10y_local")
+def _local_risk_free_live(series_id: str) -> dict | None:
+    """Latest local 10-year yield {value, asOf}, or None — a failure is never cached."""
+    obs = _fetch_fred_latest_obs(series_id, lookback_days=400)
+    return {"value": obs[0], "asOf": obs[1]} if obs else None
+
+
+def local_risk_free_rate(country: str, currency: str | None) -> dict:
+    """The 10-year government yield of *country* for a listing priced in *currency*.
+
+    Returns ``{value, source, asOf, stale}``, or ``{value: None, reason}`` when the country has no
+    10-year series, the price currency is not the country's, or FRED cannot be read. The US rate is
+    never substituted: it would discount local-currency cash flows at a USD rate.
+    """
+    from datetime import date
+
+    from .risk_free_service import ten_year_series
+    ccy = _major_currency(currency)
+    sid, bond_ccy = ten_year_series(country), _COUNTRY_CURRENCY.get(country)
+    if sid is None or bond_ccy is None:
+        return {"value": None, "reason": f"No 10-year government bond yield for {country} on FRED, so a "
+                                         f"{ccy} risk-free rate is unavailable; the US rate is not substituted."}
+    if ccy != bond_ccy:
+        return {"value": None, "reason": f"The listing is priced in {ccy} but {country}'s government bonds are "
+                                         f"in {bond_ccy}, so there is no matching {ccy} risk-free rate."}
+    live = _local_risk_free_live(sid)
+    if live is None:
+        return {"value": None, "reason": f"FRED {sid} could not be read; the US rate is not substituted."}
+    stale = (date.today() - date.fromisoformat(live["asOf"])).days > _LOCAL_RF_STALE_DAYS
+    return {"value": live["value"], "source": f"FRED {sid}", "asOf": live["asOf"], "stale": stale}
+
+
+# ---------------------------------------------------------------------------
 # Cost of equity (CAPM)
 # ---------------------------------------------------------------------------
 
@@ -381,11 +448,17 @@ def wacc(bundle: dict, beta: float | None) -> dict:
     """
     Compute WACC and its components from a yfinance bundle.
 
+    USD-priced listings use the US 10-year (DGS10) and the raw beta. Other listings use the local
+    10-year yield in the price currency and a Blume-adjusted beta against the local index (audit
+    M-10); without a local rate the cost of equity and WACC are None with a reason in
+    ``unavailable``, and without a local index beta = 1 is assumed.
+
     Returns
     -------
     dict with keys:
-        wacc, costOfEquity, costOfDebt, taxRate, beta, country,
-        riskFree, erp, weightEquity, weightDebt
+        wacc, costOfEquity, costOfDebt, taxRate, beta (the one used), rawBeta,
+        betaAdjustment, country, riskFree, riskFreeSource, riskFreeAsOf,
+        riskFreeStale, erp, weightEquity, weightDebt, unavailable
     All monetary values as decimals; None where unavailable.
     """
     info: dict = bundle.get("info") or {}
@@ -393,8 +466,32 @@ def wacc(bundle: dict, beta: float | None) -> dict:
     bs: dict = bundle.get("balance_sheet") or {}
 
     country = detect_country(info)
-    rf = risk_free_rate()
-    ke = cost_of_equity(beta, country, rf)
+    unavailable: dict[str, str] = {}
+    if _major_currency(info.get("currency")) == "USD":
+        live = _risk_free_rate_live()  # one lookup, so the label always describes the rate used
+        rf = live if live is not None else RISK_FREE_FALLBACK
+        rf_source = "FRED DGS10" if live is not None else "fallback 4%"
+        rf_as_of = rf_stale = None
+        raw_beta, beta_used, beta_adj = beta, beta, None
+    else:
+        local = local_risk_free_rate(country, info.get("currency"))
+        rf, rf_source = local["value"], local.get("source")
+        rf_as_of, rf_stale = local.get("asOf"), local.get("stale")
+        if rf is None:
+            unavailable["riskFree"] = local["reason"]
+        from .yfinance_service import has_local_benchmark
+        ticker = bundle.get("ticker") or ""
+        raw_beta = beta
+        if beta is not None and not has_local_benchmark(ticker):
+            raw_beta = None
+            unavailable["beta"] = (f"No local index is mapped for {ticker}, so its beta (measured against the "
+                                   "S&P 500) is not used; beta = 1 is assumed.")
+        elif beta is None:
+            unavailable["beta"] = "No beta against the local index could be computed; beta = 1 is assumed."
+        beta_used = blume_adjust(raw_beta)
+        beta_adj = "Blume" if raw_beta is not None else None
+
+    ke = cost_of_equity(beta_used, country, rf) if rf is not None else None
     erp = erp_for_country(country)
     tax = tax_rate_for(info, country)
 
@@ -422,8 +519,8 @@ def wacc(bundle: dict, beta: float | None) -> dict:
         if 0.01 <= raw_kd <= 0.15:
             kd = raw_kd
 
-    if kd is None:
-        kd = (rf or 0.04) + 0.02  # rf + credit spread default
+    if kd is None and rf is not None:
+        kd = rf + 0.02  # rf + credit spread default
 
     # --- Capital structure weights ---
     market_cap = _clean(info.get("marketCap"))
@@ -460,9 +557,15 @@ def wacc(bundle: dict, beta: float | None) -> dict:
         "costOfEquity": ke,
         "costOfDebt": _clean(kd),
         "taxRate": _clean(tax),
-        "beta": _clean(beta) if beta is not None else None,
+        "beta": _clean(beta_used) if beta_used is not None else None,
+        "rawBeta": _clean(raw_beta) if raw_beta is not None else None,
+        "betaAdjustment": beta_adj,
         "country": country,
-        "riskFree": _clean(rf),
+        "riskFree": _clean(rf) if rf is not None else None,
+        "riskFreeSource": rf_source,
+        "riskFreeAsOf": rf_as_of,
+        "riskFreeStale": rf_stale,
+        "unavailable": unavailable,
         "erp": _clean(erp),
         "weightEquity": _clean(we),
         "weightDebt": _clean(wd),

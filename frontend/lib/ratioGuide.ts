@@ -239,7 +239,7 @@ export const RISK_METRIC_GUIDES: Record<string, RiskMetricGuide> = {
     label: "Beta",
     blurb: "Sensitivity to the ticker's local index — 1.0 = moves with market, < 1 = defensive, > 1 = aggressive",
     meaning:
-      "Measures a stock's sensitivity to its local benchmark index (S&P 500 for US listings, ^AEX for Amsterdam, and so on). Computed from daily log returns over the selected period (see the window shown next to the value). Other betas in the app use different windows: Yahoo's is 5 years of monthly returns vs the S&P 500, and the CAPM/WACC beta uses 2 years of daily returns. A beta of 1 means the stock moves with the market; below 1 is defensive, above 1 is aggressive.",
+      "Measures a stock's sensitivity to its local benchmark index (S&P 500 for US listings, ^AEX for Amsterdam, and so on). Computed from daily log returns over the selected period (see the window shown next to the value). Other betas in the app use different windows: Yahoo's is 5 years of monthly returns vs the S&P 500, and the CAPM/WACC beta uses 2 years of daily returns (Blume-adjusted, 0.67β + 0.33, for listings not priced in USD). A beta of 1 means the stock moves with the market; below 1 is defensive, above 1 is aggressive.",
     format: "num",
     dir: "band",
     good: "0.7 – 1.3 (market-like)",

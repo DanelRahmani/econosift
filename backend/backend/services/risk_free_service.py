@@ -27,10 +27,34 @@ _COUNTRY_SERIES: dict[str, tuple[str, str]] = {
     "Australia":      ("IRLTLT01AUM156N", _TENOR_10Y),
     "Netherlands":    ("IRLTLT01NLM156N", _TENOR_10Y),
     "India":          ("INDIRLTLT01STM", _TENOR_10Y),
+    "Korea":          ("IRLTLT01KRM156N", _TENOR_10Y),
+    "Italy":          ("IRLTLT01ITM156N", _TENOR_10Y),
+    "Spain":          ("IRLTLT01ESM156N", _TENOR_10Y),
+    "Belgium":        ("IRLTLT01BEM156N", _TENOR_10Y),
+    "Austria":        ("IRLTLT01ATM156N", _TENOR_10Y),
+    "Finland":        ("IRLTLT01FIM156N", _TENOR_10Y),
+    "Ireland":        ("IRLTLT01IEM156N", _TENOR_10Y),
+    "Portugal":       ("IRLTLT01PTM156N", _TENOR_10Y),
+    "Sweden":         ("IRLTLT01SEM156N", _TENOR_10Y),
+    "Denmark":        ("IRLTLT01DKM156N", _TENOR_10Y),
+    "Norway":         ("IRLTLT01NOM156N", _TENOR_10Y),
+    "Poland":         ("IRLTLT01PLM156N", _TENOR_10Y),
+    "Israel":         ("IRLTLT01ILM156N", _TENOR_10Y),
+    "South Africa":   ("IRLTLT01ZAM156N", _TENOR_10Y),
+    "Mexico":         ("IRLTLT01MXM156N", _TENOR_10Y),
+    "New Zealand":    ("IRLTLT01NZM156N", _TENOR_10Y),
     "China":          ("IR3TIB01CNM156N", "3M interbank (proxy)"),
     "Brazil":         ("IRSTCI01BRM156N", "overnight rate (proxy)"),
     "Russia":         ("IRSTCI01RUM156N", "overnight rate (proxy)"),
 }
+
+
+
+def ten_year_series(country: str) -> str | None:
+    """FRED id of *country*'s 10-year government bond yield, or None (no series, or only a short-rate proxy)."""
+    sid, tenor = _COUNTRY_SERIES.get(country, (None, None))
+    return sid if tenor == _TENOR_10Y else None
+
 
 # An observation older than this is reported as stale (monthly OECD series
 # publish with a lag of one to two months).

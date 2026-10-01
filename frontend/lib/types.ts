@@ -206,12 +206,22 @@ export interface WaccInfo {
   costOfEquity: number | null;
   costOfDebt: number | null;
   taxRate: number | null;
+  /** Beta used in CAPM: Blume-adjusted for non-USD listings (audit M-10). */
   beta: number | null;
+  rawBeta?: number | null;
+  betaAdjustment?: "Blume" | null;
   country: string;
   riskFree: number | null;
+  /** "FRED DGS10", "fallback 4%", or the local 10-year series, e.g. "FRED IRLTLT01NLM156N". */
+  riskFreeSource?: string | null;
+  /** Month of the local (monthly, lagged) yield observation. */
+  riskFreeAsOf?: string | null;
+  riskFreeStale?: boolean | null;
   erp: number | null;
   weightEquity: number | null;
   weightDebt: number | null;
+  /** Reasons for a missing rate or beta, e.g. no local 10-year yield. */
+  unavailable?: { riskFree?: string; beta?: string };
 }
 export interface ValModel {
   model: string;

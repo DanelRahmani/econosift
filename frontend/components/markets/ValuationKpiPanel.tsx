@@ -143,6 +143,17 @@ function OhlsonBadge({ oScore, probDefault, reason }: { oScore: number | null; p
   );
 }
 
+/** Risk-free label naming the rate: US 10Y, or the local 10Y with its (monthly, lagged) as-of month. */
+function riskFreeLabel(w: WaccInfo): string {
+  const src = w.riskFreeSource ?? "";
+  if (src === "fallback 4%") return "Risk-Free (fallback 4%)";
+  if (src.startsWith("FRED IRLTLT") || src.startsWith("FRED INDIRLTLT")) {
+    const month = w.riskFreeAsOf ? w.riskFreeAsOf.slice(0, 7) : "";
+    return `Risk-Free (${w.country} 10Y${month ? `, ${month}` : ""}${w.riskFreeStale ? ", stale" : ""})`;
+  }
+  return src === "FRED DGS10" ? "Risk-Free (US 10Y)" : "Risk-Free";
+}
+
 /** Legend line under the Piotroski label, with bands scaled to the score's maximum. */
 function piotroskiLegend(maxScore: number | null): string {
   if (nil(maxScore)) return "≥7 Strong · 4–6 Neutral · <4 Weak (of 9)";
@@ -337,13 +348,18 @@ export function ValuationKpiPanel({ kpis, wacc, fundamentals }: Props) {
               WACC Breakdown
             </h3>
             <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5">
-              <Row label="WACC" value={fmtWacc(wacc.wacc)} prov="valuation.wacc.wacc" />
-              <Row label="Cost of Equity" value={fmtWacc(wacc.costOfEquity)} prov="valuation.wacc.costOfEquity" />
+              <Row label="WACC" value={fmtWacc(wacc.wacc)} prov="valuation.wacc.wacc" naReason={nil(wacc.wacc) ? wacc.unavailable?.riskFree : undefined} />
+              <Row label="Cost of Equity" value={fmtWacc(wacc.costOfEquity)} prov="valuation.wacc.costOfEquity" naReason={nil(wacc.costOfEquity) ? wacc.unavailable?.riskFree : undefined} />
               <Row label="Cost of Debt" value={fmtWacc(wacc.costOfDebt)} prov="valuation.wacc.costOfDebt" />
               <Row label="Tax Rate" value={fmtWacc(wacc.taxRate)} prov="valuation.wacc.taxRate" />
               <Row label="ERP" value={fmtWacc(wacc.erp)} prov="valuation.wacc.erp" />
-              <Row label="Risk-Free" value={fmtWacc(wacc.riskFree)} prov="valuation.wacc.riskFree" />
-              <Row label="Beta (2y daily, local index)" value={fmtNum(wacc.beta)} prov="valuation.wacc.beta" />
+              <Row label={riskFreeLabel(wacc)} value={fmtWacc(wacc.riskFree)} prov="valuation.wacc.riskFree" naReason={nil(wacc.riskFree) ? wacc.unavailable?.riskFree : undefined} />
+              <Row
+                label={wacc.betaAdjustment === "Blume" ? "Beta (Blume-adj., 2y daily vs local index)" : "Beta (2y daily, local index)"}
+                value={wacc.betaAdjustment === "Blume" && !nil(wacc.rawBeta) ? `${fmtNum(wacc.beta)} (raw ${fmtNum(wacc.rawBeta)})` : fmtNum(wacc.beta)}
+                prov="valuation.wacc.beta"
+                naReason={nil(wacc.beta) ? wacc.unavailable?.beta : undefined}
+              />
               <Row
                 label="Wt. Equity"
                 value={nil(wacc.weightEquity) ? DASH : fmtPct((wacc.weightEquity as number) * 100)}

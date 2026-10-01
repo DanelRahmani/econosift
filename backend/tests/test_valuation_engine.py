@@ -132,7 +132,8 @@ class TestValuationModelsShape:
     def test_wacc_dict_has_required_keys(self):
         w = self.result["wacc"]
         expected = {"wacc", "costOfEquity", "costOfDebt", "taxRate",
-                    "beta", "country", "riskFree", "erp", "weightEquity", "weightDebt"}
+                    "beta", "country", "riskFree", "erp", "weightEquity", "weightDebt",
+                    "rawBeta", "betaAdjustment", "riskFreeSource", "riskFreeAsOf", "riskFreeStale", "unavailable",}
         assert set(w.keys()) == expected
 
 

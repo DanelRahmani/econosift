@@ -16,9 +16,16 @@ _BENCHMARK_BY_SUFFIX = {
     "DE": "^GDAXI", "PA": "^FCHI", "AS": "^AEX", "MI": "FTSEMIB.MI",
     "MC": "^IBEX", "L": "^FTSE", "T": "^N225", "HK": "^HSI",
     "SS": "000001.SS", "SZ": "399001.SZ", "KS": "^KS11", "TO": "^GSPTSE",
-    "AX": "^AXJO", "SW": "^SSMI", "ST": "^OMX", "BR": "^BVSP",
+    "AX": "^AXJO", "SW": "^SSMI", "ST": "^OMX", "BR": "^BFX", "SA": "^BVSP",
+    "NS": "^NSEI", "BO": "^BSESN", "MX": "^MXX", "VI": "^ATX", "NZ": "^NZ50", "CO": "^OMXC25",
+    "HE": "^OMXH25", "LS": "PSI20.LS", "IR": "^ISEQ", "TA": "^TA125.TA", "JO": "^J203.JO",
 }
 DEFAULT_BENCHMARK = "^GSPC"
+
+
+def has_local_benchmark(ticker: str) -> bool:
+    """True when a suffixed (non-US) ticker maps to its own local index rather than the S&P 500."""
+    return "." in ticker and ticker.rsplit(".", 1)[-1].upper() in _BENCHMARK_BY_SUFFIX
 
 
 def benchmark_for(ticker: str) -> str:
