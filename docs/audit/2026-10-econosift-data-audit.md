@@ -210,7 +210,7 @@ Baseline: fresh Docker install (factory-reset volumes), cold scan of 105 endpoin
 
 | Metric | App value | Primary source value | Source & retrieval date | Match |
 |---|---|---|---|---|
-| US CPI inflation, Aug 2026 YoY | 3.71% | 3.35% | FRED API `CPIAUCSL`, 2026-10-01 | ✗ → fixed in `96aa195`: row-count lag spanned 13 months across the missing Oct-2025 print; lag now matched by date |
+| US CPI inflation, Aug 2026 YoY | 3.71% | 3.35% | FRED API `CPIAUCSL`, 2026-10-01 | ✗ → fixed in `96aa195` (row-count lag spanned 13 months across the missing Oct-2025 print; lag now matched by date); re-checked after rebuild: app 3.353% ✓ |
 | US real GDP, 2026-Q2 YoY | 2.19% | 2.19% | FRED API `GDPC1`, 2026-10-01 | ✓ |
 | US real GDP growth 2023 / 2024 / 2025 | 2.9 / 3.0 / 2.3 | 2.9 / 3.0 / 2.3 | FRED `A191RL1A225NBEA`, 2026-10-01 | ✓ (no partial 2026 value) |
 | US current account, % GDP 2023 / 2024 / 2025 | −3.34 / −4.05 / −3.63 | −3.34 / −4.05 / −3.63 | World Bank API `BN.CAB.XOKA.GD.ZS`, 2026-10-01 | ✓ (was the $mn trade balance before Phase 47) |
