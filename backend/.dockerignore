@@ -1,0 +1,9 @@
+# Local-only artefacts: virtualenvs, PyInstaller output and caches made the
+# `COPY . .` step take ~8 minutes and bloated the image.
+.venv/
+.venv.*/
+build/
+dist/
+**/__pycache__/
+.pytest_cache/
+.env
