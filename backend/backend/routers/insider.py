@@ -4,6 +4,8 @@
 """
 from __future__ import annotations
 
+import asyncio
+
 from fastapi import APIRouter, HTTPException
 
 from ..services import insider_aggregator
@@ -18,7 +20,9 @@ async def insider_aggregate():
     First run is slow (100+ seconds). Subsequent calls use cache (6h TTL).
     """
     try:
-        result = insider_aggregator.get_insider_aggregate()
+        # A worker thread: the aggregate fetches Form 4s for every S&P 500
+        # member synchronously and would otherwise freeze the event loop.
+        result = await asyncio.to_thread(insider_aggregator.get_insider_aggregate)
         if "error" in result:
             raise HTTPException(status_code=503, detail=result["error"])
         return result

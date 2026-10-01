@@ -6,7 +6,7 @@ import asyncio
 from fastapi import APIRouter, HTTPException, Query
 
 from .. import provenance as pv
-from ..services import edgar_service
+from ..services import edgar_service, thirteenf_service
 from ..services import yfinance_service as yfs
 
 router = APIRouter(prefix="/api/market", tags=["market"])
@@ -15,7 +15,7 @@ router = APIRouter(prefix="/api/market", tags=["market"])
 @router.get("/13f")
 async def holders_13f(ticker: str = Query(..., description="Ticker symbol, e.g. AAPL")):
     """Top 13F institutional holders from the most recent quarterly filing."""
-    return await edgar_service.get_13f_holders(ticker.upper())
+    return await thirteenf_service.get_13f_holders(ticker.upper())
 
 
 @router.get("/form4")

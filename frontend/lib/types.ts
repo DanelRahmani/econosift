@@ -1617,6 +1617,8 @@ export interface Holders13FResponse {
   asOf: string | null;
   reportingLag: string;
   holders: Holder13F[];
+  filers?: number | null;      // 13F filers reporting a position
+  totalShares?: number | null; // shares held across all of them
   error?: string | null;
 }
 export interface InsiderTransaction {
