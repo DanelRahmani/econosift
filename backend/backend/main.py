@@ -4,11 +4,14 @@ from __future__ import annotations
 import os
 import threading
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 
 from . import cache
+
+STALE_HEADER = "X-Data-Stale"
 
 from .middleware import DeduplicationMiddleware
 from .routers import (
@@ -38,10 +41,18 @@ async def lifespan(app: FastAPI):
         scheduler.shutdown(wait=False)
 
 
-async def _start_fetch_log() -> None:
+async def _start_fetch_log(response: Response) -> None:
     # Must be async: it runs in the request's own task, so the log it opens is
     # the one the endpoint and its threads report cache reads to.
-    cache.start_fetch_log()
+    def on_stale(fetched_at: float) -> None:
+        # Data past its TTL was served while it refreshes in the background;
+        # the header carries the oldest such fetch time for the UI's badge.
+        stamp = datetime.fromtimestamp(fetched_at, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        prev = response.headers.get(STALE_HEADER)
+        if prev is None or stamp < prev:
+            response.headers[STALE_HEADER] = stamp
+
+    cache.start_fetch_log(on_stale)
 
 
 app = FastAPI(title="EconoSift API", version="1.0.0", lifespan=lifespan,
@@ -85,6 +96,9 @@ app.add_middleware(
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
+    # The desktop build calls the backend cross-origin; without this the
+    # browser hides the header from fetch().
+    expose_headers=[STALE_HEADER],
 )
 app.add_middleware(DeduplicationMiddleware)
 

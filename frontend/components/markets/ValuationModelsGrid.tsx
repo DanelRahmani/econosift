@@ -48,7 +48,7 @@ function ModelCard({ model, spot, sym, fullWidth = false, label, prov }: ModelCa
           <span className="text-xs font-medium text-text-muted truncate">{displayLabel}</span>
         </div>
         <p className="text-xs text-text-muted mt-1 leading-snug">
-          {model.reason ?? "Insufficient data"}
+          <span className="font-semibold">n/a</span> — {model.reason ?? "insufficient data"}
         </p>
       </div>
     );
@@ -164,7 +164,7 @@ export function ValuationModelsGrid({ valuation }: { valuation: ValuationCore })
             <path d="M7 11V7a5 5 0 0 1 10 0v4" />
           </svg>
           <span className="text-xs text-text-muted">
-            Locked — insufficient data to compute this model
+            Locked — model not computed; the reason is shown on the card
           </span>
         </div>
       </div>

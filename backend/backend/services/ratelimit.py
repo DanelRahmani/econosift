@@ -16,19 +16,30 @@ from __future__ import annotations
 import logging
 import threading
 import time
+from collections import deque
 
 log = logging.getLogger(__name__)
 
 
 class RateLimiter:
-    """Bounded concurrency plus a minimum interval between request starts."""
+    """Bounded concurrency, a minimum interval between request starts, and
+    optionally at most ``max_per_window`` starts in any ``window`` seconds.
 
-    def __init__(self, name: str, min_interval: float, max_concurrent: int) -> None:
+    The interval alone does not hold a per-minute quota: with several callers
+    queued, starts run back to back at the interval for as long as the burst
+    lasts.
+    """
+
+    def __init__(self, name: str, min_interval: float, max_concurrent: int,
+                 max_per_window: int | None = None, window: float = 60.0) -> None:
         self.name = name
         self.min_interval = min_interval
+        self.max_per_window = max_per_window
+        self.window = window
         self._semaphore = threading.Semaphore(max_concurrent)
         self._lock = threading.Lock()
         self._last_start = 0.0
+        self._starts: deque[float] = deque()
 
     def acquire(self) -> None:
         self._semaphore.acquire()
@@ -38,7 +49,16 @@ class RateLimiter:
             gap = time.monotonic() - self._last_start
             if gap < self.min_interval:
                 time.sleep(self.min_interval - gap)
+            if self.max_per_window:
+                now = time.monotonic()
+                while self._starts and now - self._starts[0] >= self.window:
+                    self._starts.popleft()
+                if len(self._starts) >= self.max_per_window:
+                    time.sleep(self._starts[0] + self.window - now)
+                    self._starts.popleft()
             self._last_start = time.monotonic()
+            if self.max_per_window:
+                self._starts.append(self._last_start)
 
     def release(self) -> None:
         self._semaphore.release()
@@ -51,9 +71,10 @@ class RateLimiter:
         self.release()
 
 
-# FRED's documented ceiling is 120 requests/minute per key. 60ms between starts
-# with 4 in flight leaves generous headroom while barely affecting a warm run.
-fred_limiter = RateLimiter("fred", min_interval=0.06, max_concurrent=4)
+# FRED's documented ceiling is 120 requests/minute per key. The 60ms gap keeps
+# short bursts smooth; the 110/minute window is what actually holds the quota
+# (a cold start makes ~200 FRED calls, and without it FRED rate-limited us).
+fred_limiter = RateLimiter("fred", min_interval=0.06, max_concurrent=4, max_per_window=110)
 
 # Finnhub's free tier is 60 calls/minute — appreciably tighter, so 1.05s apart
 # and strictly serial.

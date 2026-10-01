@@ -37,7 +37,8 @@ export function EconoSiftGauge({
   const isInsufficient =
     composite.verdict === "Insufficient Data" || composite.value === null;
 
-  const gaugeValue = isInsufficient ? 50 : upsideToGaugeValue(composite.upsidePct);
+  // Empty gauge (not a mid-scale "fair value" reading) when there is no composite.
+  const gaugeValue = isInsufficient ? 0 : upsideToGaugeValue(composite.upsidePct);
   const gaugeColor = isInsufficient ? "#8a6770" : verdictColor;
 
   // Upside% sign colour
@@ -76,8 +77,10 @@ export function EconoSiftGauge({
       {/* ── Center readout ── */}
       <div className="text-center space-y-1 -mt-2">
         {isInsufficient ? (
-          <p className="text-text-secondary text-sm leading-snug max-w-[220px]">
-            Insufficient data to compute a composite fair value.
+          <p className="text-text-secondary text-sm leading-snug max-w-[240px]" data-prov="valuation.axiomFairValue">
+            <span className="font-semibold text-text-muted">n/a</span>
+            {" — "}
+            {composite.reason ?? "insufficient data to compute a composite fair value"}
           </p>
         ) : (
           <>

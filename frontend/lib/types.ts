@@ -66,6 +66,8 @@ export interface RatiosResponse {
   efficiency: RatioGroup;
   profitability: RatioGroup;
   valuation: RatioGroup;
+  /** Null ratios that could not be computed honestly, keyed by path ("valuation.psRatio", "zScore"). */
+  unavailable?: Record<string, string>;
 }
 
 export interface SearchResult {
@@ -215,6 +217,8 @@ export interface CompositeFairValue {
   upsidePct: number | null;
   verdict: ValVerdict;
   weightsUsed: Record<string, number>;
+  /** Set when value is null, e.g. "no model produced a positive value". */
+  reason?: string | null;
 }
 export interface ValuationCore {
   ticker: string;
@@ -274,6 +278,8 @@ export interface ValuationKpis {
   sector: string | null;
   industry: string | null;
   currency: string;
+  /** Null KPIs that could not be computed honestly (e.g. no FX rate for an ADR), with the reason. */
+  unavailable?: Record<string, string>;
 }
 export interface ValuationFullResponse {
   ticker: string;
@@ -1617,6 +1623,8 @@ export interface Holders13FResponse {
   asOf: string | null;
   reportingLag: string;
   holders: Holder13F[];
+  filers?: number | null;      // 13F filers reporting a position
+  totalShares?: number | null; // shares held across all of them
   error?: string | null;
 }
 export interface InsiderTransaction {
@@ -1649,6 +1657,8 @@ export interface SnowflakeComponent {
   percentile?: number | null;
   detail?: string | null;
   weight?: number;
+  /** Set when score is null, e.g. "not meaningful: negative multiple". */
+  reason?: string | null;
 }
 export interface SnowflakeAxisDetail {
   score: number | null;
@@ -2303,6 +2313,9 @@ export interface InsiderTopTrade {
 }
 export interface InsiderAggregateResponse {
   asOf: string | null;
+  /** SEC data set, e.g. "2026q2", and the trade dates it covers */
+  dataset?: string;
+  period?: { start: string; end: string };
   tickersChecked: number;
   tickersWithData: number;
   totalTransactions: number;

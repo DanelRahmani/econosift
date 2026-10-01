@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from datetime import date, datetime
 
 import pandas as pd
@@ -13,6 +14,15 @@ from ..sources._annual import yoy_pct
 from .ratelimit import fred_limiter
 
 log = logging.getLogger(__name__)
+
+# One retry after FRED says "Too Many Requests": a cached result with one series
+# missing would otherwise show a silent gap for the whole cache lifetime.
+_RATE_LIMIT_RETRY_S = 5.0
+
+
+def _is_rate_limited(exc: Exception) -> bool:
+    msg = str(exc).lower()
+    return "too many requests" in msg or "rate limit" in msg or "429" in msg
 
 
 def _fetch_fred_series_sync(
@@ -40,29 +50,37 @@ def _fetch_fred_series_sync(
     result: dict[str, list[dict]] = {}
     for sid in series_ids:
         try:
-            # Throttled: a cold cache fans out dozens of series at once and FRED
-            # caps at 120 requests/minute per key.
-            with fred_limiter:
-                if first_release:
-                    s = fred.get_series_first_release(sid)
-                    if s is not None and not s.empty and start:
-                        s = s[s.index >= pd.Timestamp(start)]
-                elif vintage:
-                    s = fred.get_series_as_of_date(sid, vintage)
-                    # ALFRED returns a long frame (date, realtime_start, value);
-                    # collapse to the latest value known as of the vintage date.
-                    if s is not None and len(s) and not isinstance(s, pd.Series):
-                        s = (
-                            s.sort_values("realtime_start")
-                            .groupby("date")["value"]
-                            .last()
-                        )
-                        s.index = pd.to_datetime(s.index)
-                        if start:
-                            s = s[s.index >= pd.Timestamp(start)]
-                        s = pd.to_numeric(s, errors="coerce").dropna()
-                else:
-                    s = fred.get_series(sid, observation_start=start)
+            for attempt in (0, 1):
+                try:
+                    # Throttled: a cold cache fans out dozens of series at once and FRED
+                    # caps at 120 requests/minute per key.
+                    with fred_limiter:
+                        if first_release:
+                            s = fred.get_series_first_release(sid)
+                            if s is not None and not s.empty and start:
+                                s = s[s.index >= pd.Timestamp(start)]
+                        elif vintage:
+                            s = fred.get_series_as_of_date(sid, vintage)
+                            # ALFRED returns a long frame (date, realtime_start, value);
+                            # collapse to the latest value known as of the vintage date.
+                            if s is not None and len(s) and not isinstance(s, pd.Series):
+                                s = (
+                                    s.sort_values("realtime_start")
+                                    .groupby("date")["value"]
+                                    .last()
+                                )
+                                s.index = pd.to_datetime(s.index)
+                                if start:
+                                    s = s[s.index >= pd.Timestamp(start)]
+                                s = pd.to_numeric(s, errors="coerce").dropna()
+                        else:
+                            s = fred.get_series(sid, observation_start=start)
+                    break
+                except Exception as exc:
+                    if attempt or not _is_rate_limited(exc):
+                        raise
+                    log.info("FRED rate-limited on %s; retrying once", sid)
+                    time.sleep(_RATE_LIMIT_RETRY_S)
             if s is None or s.empty:
                 result[sid] = []
                 continue

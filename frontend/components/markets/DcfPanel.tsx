@@ -7,6 +7,7 @@ import { Card, Skeleton } from "@/components/ui";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
 import { fmtNum, fmtPct, fmtPrice, fmtLarge, currencySymbol } from "@/lib/format";
+import { NaReason } from "@/components/markets/NaReason";
 
 // ── Slider config ──────────────────────────────────────────────────────────
 interface Params {
@@ -56,7 +57,7 @@ function heatColor(value: number | null, spot: number | null): string {
 }
 
 function isSensitivityFull(s: DcfResponse["sensitivity"]): s is DcfSensitivity {
-  return "fcfGrowthAxis" in s && Array.isArray((s as DcfSensitivity).fcfGrowthAxis);
+  return s != null && "fcfGrowthAxis" in s && Array.isArray((s as DcfSensitivity).fcfGrowthAxis);
 }
 
 // ── Main component ─────────────────────────────────────────────────────────
@@ -247,7 +248,9 @@ export function DcfPanel({ tickers, sharedWacc = null }: { tickers: string[]; pe
         {controls}
         <Card>
           <p className="text-sm font-semibold text-text-primary mb-1">DCF unavailable</p>
-          <p className="text-sm text-text-muted">{data.reason ?? "Insufficient data to compute DCF."}</p>
+          <p className="text-sm text-text-muted" data-prov="reason">
+            <span className="font-semibold">n/a</span> — {data.reason ?? "insufficient data to compute a DCF"}
+          </p>
           {data.asOf && (
             <p className="text-xs text-text-muted mt-3">as of {data.asOf}</p>
           )}
@@ -274,8 +277,9 @@ export function DcfPanel({ tickers, sharedWacc = null }: { tickers: string[]; pe
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
           <KpiTile
             label="Intrinsic Value"
-            value={fmtPrice(data.intrinsicValue, sym)}
-            valueClass="text-text-primary"
+            value={data.intrinsicValue !== null ? fmtPrice(data.intrinsicValue, sym) : "n/a"}
+            valueClass={data.intrinsicValue !== null ? "text-text-primary" : "text-text-muted"}
+            title={data.intrinsicValue === null ? (data.reason ?? undefined) : undefined}
           />
           <KpiTile
             label="Spot Price"
@@ -285,8 +289,8 @@ export function DcfPanel({ tickers, sharedWacc = null }: { tickers: string[]; pe
           />
           <KpiTile
             label="Upside"
-            value={upside !== null ? fmtPct(upside * 100) : "—"}
-            valueClass={upsideColor}
+            value={upside !== null ? fmtPct(upside * 100) : "n/a"}
+            valueClass={upside !== null ? upsideColor : "text-text-muted"}
             prov="upsidePct"
           />
           <KpiTile
@@ -302,6 +306,11 @@ export function DcfPanel({ tickers, sharedWacc = null }: { tickers: string[]; pe
             prov="inputs.netDebt"
           />
         </div>
+        {data.intrinsicValue === null && (
+          <p className="text-xs text-text-muted mt-3">
+            n/a — {data.reason ?? "intrinsic value could not be computed"}
+          </p>
+        )}
         <p className="text-xs text-text-muted mt-3">as of {data.asOf}</p>
       </Card>
 
@@ -340,10 +349,10 @@ export function DcfPanel({ tickers, sharedWacc = null }: { tickers: string[]; pe
                         {fmtPct(s.wacc * 100)}
                       </td>
                       <td className="py-2 text-right font-mono text-text-primary">
-                        {fmtPrice(s.intrinsicValue, sym)}
+                        {s.intrinsicValue !== null ? fmtPrice(s.intrinsicValue, sym) : <NaReason />}
                       </td>
                       <td className={`py-2 text-right font-mono ${uColor}`}>
-                        {s.upsidePct !== null ? fmtPct(s.upsidePct * 100) : "—"}
+                        {s.upsidePct !== null ? fmtPct(s.upsidePct * 100) : <NaReason />}
                       </td>
                     </tr>
                   );
@@ -397,10 +406,10 @@ export function DcfPanel({ tickers, sharedWacc = null }: { tickers: string[]; pe
                         title={
                           cellVal !== null
                             ? `FCF ${fmtPct(g * 100, 1)}, WACC ${fmtPct(w * 100, 1)} → ${fmtPrice(cellVal, sym)}`
-                            : "—"
+                            : "n/a"
                         }
                       >
-                        {cellVal !== null ? fmtPrice(cellVal, sym) : <span className="text-text-muted">—</span>}
+                        {cellVal !== null ? fmtPrice(cellVal, sym) : <NaReason />}
                       </div>
                     );
                   })}
@@ -420,14 +429,16 @@ function KpiTile({
   value,
   valueClass,
   prov,
+  title,
 }: {
   label: string;
   value: string;
   valueClass: string;
   prov?: string;
+  title?: string;
 }) {
   return (
-    <div className="space-y-0.5" data-prov={prov} data-prov-ctx={label}>
+    <div className="space-y-0.5" data-prov={prov} data-prov-ctx={label} title={title}>
       <p className="text-xs text-text-muted">{label}</p>
       <p className={`text-base font-mono font-semibold ${valueClass}`}>{value}</p>
     </div>

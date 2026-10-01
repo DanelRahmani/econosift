@@ -78,3 +78,24 @@ def test_configured_limiters_stay_inside_documented_provider_quotas():
     assert fred_limiter.min_interval > 0
     assert 60.0 / finnhub_limiter.min_interval <= 60
     assert finnhub_limiter._semaphore._value == 1        # Finnhub is serial
+
+
+def test_window_cap_blocks_past_the_per_window_quota():
+    """A sustained burst must not exceed the quota within one window (P1-14)."""
+    rl = RateLimiter("t", min_interval=0.0, max_concurrent=4, max_per_window=3, window=0.5)
+    start = time.monotonic()
+    for _ in range(3):
+        with rl:
+            pass
+    assert time.monotonic() - start < 0.2   # the first three go straight through
+    with rl:
+        pass
+    assert time.monotonic() - start >= 0.45  # the fourth waits for the window
+
+
+def test_fred_limiter_enforces_fred_per_minute_quota():
+    # FRED documents 120 requests/minute per key; a min-interval alone allowed
+    # ~160/min in a cold-start burst and FRED answered with rate-limit errors.
+    assert fred_limiter.window == 60.0
+    assert fred_limiter.max_per_window is not None
+    assert fred_limiter.max_per_window <= 120

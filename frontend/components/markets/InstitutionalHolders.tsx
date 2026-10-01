@@ -110,7 +110,9 @@ export function InstitutionalHolders({ ticker }: { ticker: string }) {
           </div>
           {data.asOf && (
             <p className="text-xs text-text-secondary mt-3">
-              Last report: {data.asOf} · {data.reportingLag}
+              Quarter ending {data.asOf} · {data.reportingLag}
+              {data.filers != null && data.totalShares != null &&
+                ` · ${data.filers.toLocaleString()} filers hold ${fmtShares(data.totalShares)} shares`}
             </p>
           )}
         </>

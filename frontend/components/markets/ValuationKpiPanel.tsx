@@ -10,6 +10,7 @@ import {
   currencySymbol,
 } from "@/lib/format";
 import type { ValuationKpis, WaccInfo, Fundamentals } from "@/lib/types";
+import { NaReason } from "@/components/markets/NaReason";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -55,11 +56,13 @@ function KpiTile({ label, value, prov }: { label: string; value: string; prov?: 
 }
 
 /** A two-column label/value row used inside extended tables. */
-function Row({ label, value, valueClass, prov }: { label: string; value: string; valueClass?: string; prov?: string }) {
+function Row({ label, value, valueClass, prov, naReason }: { label: string; value: string; valueClass?: string; prov?: string; naReason?: string }) {
   return (
     <>
       <dt className="text-text-secondary text-sm" data-prov={prov} data-prov-ctx={label}>{label}</dt>
-      <dd className={`text-right font-mono text-sm ${valueClass ?? ""}`} data-prov={prov} data-prov-ctx={label}>{value}</dd>
+      <dd className={`text-right font-mono text-sm ${valueClass ?? ""}`} data-prov={prov} data-prov-ctx={label}>
+        {naReason ? <NaReason reason={naReason} /> : value}
+      </dd>
     </>
   );
 }
@@ -166,6 +169,20 @@ function formatDupontValue(key: string, v: number | null): string {
 export function ValuationKpiPanel({ kpis, wacc, fundamentals }: Props) {
   const sym = currencySymbol(kpis.currency);
 
+  // ── Null KPIs the backend explained (e.g. ADR with no FX rate) ────────────
+  const naReasonOf = (key: string, v: number | null | undefined): string | undefined =>
+    nil(v) ? kpis.unavailable?.[key] : undefined;
+  const unavailableNotes = (
+    [
+      ["EV / FCF", "evToFcf", kpis.evToFcf],
+      ["FCF Yield", "fcfYield", kpis.fcfYield],
+      ["Book Value / Sh.", "bookValue", kpis.bookValue],
+    ] as [string, string, number | null][]
+  ).flatMap(([label, key, v]) => {
+    const r = naReasonOf(key, v);
+    return r ? [[label, r] as [string, string]] : [];
+  });
+
   // ── 52-week range string ──────────────────────────────────────────────────
   const rangeStr =
     nil(kpis.fiftyTwoWeekLow) && nil(kpis.fiftyTwoWeekHigh)
@@ -236,8 +253,8 @@ export function ValuationKpiPanel({ kpis, wacc, fundamentals }: Props) {
               Valuation &amp; Quality
             </h3>
             <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5">
-              <Row label="EV / FCF" value={fmtNum(kpis.evToFcf)} prov="kpis.evToFcf" />
-              <Row label="FCF Yield" value={fmtDecPct(kpis.fcfYield)} prov="kpis.fcfYield" />
+              <Row label="EV / FCF" value={fmtNum(kpis.evToFcf)} prov="kpis.evToFcf" naReason={naReasonOf("evToFcf", kpis.evToFcf)} />
+              <Row label="FCF Yield" value={fmtDecPct(kpis.fcfYield)} prov="kpis.fcfYield" naReason={naReasonOf("fcfYield", kpis.fcfYield)} />
               <Row
                 label="Short Float %"
                 value={nil(kpis.shortPercentOfFloat) ? DASH : fmtDecPct(kpis.shortPercentOfFloat)}
@@ -250,7 +267,7 @@ export function ValuationKpiPanel({ kpis, wacc, fundamentals }: Props) {
                 value={nil(roicVal) ? DASH : fmtPctFromFraction(roicVal)}
                 prov="fundamentals.roic.roic"
               />
-              <Row label="Book Value / Sh." value={nil(kpis.bookValue) ? DASH : `${sym}${fmtNum(kpis.bookValue)}`} prov="kpis.bookValue" />
+              <Row label="Book Value / Sh." value={nil(kpis.bookValue) ? DASH : `${sym}${fmtNum(kpis.bookValue)}`} prov="kpis.bookValue" naReason={naReasonOf("bookValue", kpis.bookValue)} />
               <Row
                 label="CAPM Required Ret."
                 value={fmtDecPct(wacc.costOfEquity)}
@@ -267,6 +284,13 @@ export function ValuationKpiPanel({ kpis, wacc, fundamentals }: Props) {
                 prov="kpis.averageVolume"
               />
             </dl>
+            {unavailableNotes.length > 0 && (
+              <ul className="mt-3 space-y-0.5 text-xs text-text-muted" data-prov="kpis.unavailable">
+                {unavailableNotes.map(([label, reason]) => (
+                  <li key={label}>{label}: n/a — {reason}</li>
+                ))}
+              </ul>
+            )}
             <p className="mt-3 text-xs text-text-muted">
               Short data: US-listed only.
             </p>

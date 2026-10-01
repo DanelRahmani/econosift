@@ -57,52 +57,109 @@ export function PageSkeleton({ text = "Loading…" }: { text?: string }) {
   );
 }
 
-// ── Scrollable tab bar with auto-show left/right arrows ─────────────────────
+// ── Scrollable tab bar: arrows + edge fades appear only where there is overflow ──
 
-export function ScrollableTabBar({ children, className = "" }: { children: ReactNode; className?: string }) {
+const SCROLL_FADE_PX = 40;
+
+function prefersReducedMotion() {
+  return typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+}
+
+/**
+ * Horizontal tab strip. The scrollbar is hidden, so overflow is signalled with
+ * an edge fade + arrow button on each overflowing side. Also: vertical mouse
+ * wheel scrolls it sideways (only while it can still move in that direction),
+ * and the active tab (child marked `data-active="true"` or `aria-selected="true"`)
+ * is kept in view. Pass sticky/background classes via `className`, tab gap via `innerClassName`.
+ */
+export function ScrollableTabBar({ children, className = "", innerClassName = "gap-0" }: { children: ReactNode; className?: string; innerClassName?: string }) {
   const ref = useRef<HTMLDivElement>(null);
-  const [overflow, setOverflow] = useState<"left" | "right" | "both" | null>(null);
+  const lastActive = useRef<Element | null>(null);
+  const [canLeft, setCanLeft] = useState(false);
+  const [canRight, setCanRight] = useState(false);
+
+  const check = () => {
+    const el = ref.current;
+    if (!el) return;
+    setCanLeft(el.scrollLeft > 1);
+    setCanRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 1);
+  };
 
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const check = () => {
-      const canScrollLeft = el.scrollLeft > 1;
-      const canScrollRight = el.scrollLeft + el.clientWidth < el.scrollWidth - 1;
-      if (canScrollLeft && canScrollRight) setOverflow("both");
-      else if (canScrollLeft) setOverflow("left");
-      else if (canScrollRight) setOverflow("right");
-      else setOverflow(null);
-    };
     check();
     const ro = new ResizeObserver(check);
     ro.observe(el);
+    Array.from(el.children).forEach((c) => ro.observe(c));
+    const onWheel = (e: WheelEvent) => {
+      if (Math.abs(e.deltaX) >= Math.abs(e.deltaY) || e.ctrlKey) return; // native horizontal gesture / pinch-zoom
+      const max = el.scrollWidth - el.clientWidth;
+      if (max <= 1) return; // no overflow: leave page scroll alone
+      const dy = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;
+      if ((dy < 0 && el.scrollLeft <= 0) || (dy > 0 && el.scrollLeft >= max - 1)) return; // at the end: let page scroll
+      e.preventDefault();
+      el.scrollLeft += dy;
+    };
     el.addEventListener("scroll", check, { passive: true });
-    return () => { ro.disconnect(); el.removeEventListener("scroll", check); };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => {
+      ro.disconnect();
+      el.removeEventListener("scroll", check);
+      el.removeEventListener("wheel", onWheel);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function scroll(amount: number) {
-    ref.current?.scrollBy({ left: amount, behavior: "smooth" });
+  // After every render: tabs may have changed width, and the active tab may have changed.
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    check();
+    const active = el.querySelector('[data-active="true"], [aria-selected="true"]');
+    if (!active || active === lastActive.current) return;
+    const first = lastActive.current === null;
+    lastActive.current = active;
+    const box = el.getBoundingClientRect();
+    const r = active.getBoundingClientRect();
+    const pad = SCROLL_FADE_PX;
+    let delta = 0;
+    if (r.left < box.left + pad) delta = r.left - box.left - pad;
+    else if (r.right > box.right - pad) delta = r.right - box.right + pad;
+    if (delta) {
+      el.scrollBy({ left: delta, behavior: first || prefersReducedMotion() ? "auto" : "smooth" });
+    }
+  });
+
+  function scrollByPage(dir: -1 | 1) {
+    const el = ref.current;
+    if (!el) return;
+    el.scrollBy({ left: dir * el.clientWidth * 0.8, behavior: prefersReducedMotion() ? "auto" : "smooth" });
   }
 
+  const arrowCls =
+    "absolute top-1/2 -translate-y-1/2 z-10 w-7 h-7 flex items-center justify-center rounded-full bg-surface border border-border shadow hover:bg-surface-alt transition-colors";
+
   return (
-    <div className={`relative ${className}`}>
-      {overflow && (overflow === "left" || overflow === "both") && (
-        <button onClick={() => scroll(-200)}
-          className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-7 h-7 flex items-center justify-center rounded-full bg-surface border border-border shadow hover:bg-surface-alt transition-colors"
-          aria-label="Scroll tabs left">
-          <svg className="w-3.5 h-3.5 text-text-secondary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
-        </button>
+    <div className={`relative min-w-0 ${className}`}>
+      {canLeft && (
+        <>
+          <div aria-hidden className="pointer-events-none absolute left-0 inset-y-0 z-10 w-10 bg-gradient-to-r from-background to-transparent" />
+          <button type="button" tabIndex={-1} onClick={() => scrollByPage(-1)} className={`${arrowCls} left-0`} aria-label="Scroll tabs left">
+            <svg className="w-3.5 h-3.5 text-text-secondary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
+          </button>
+        </>
       )}
-      <div ref={ref} className="flex overflow-x-auto no-scrollbar gap-0">
+      <div ref={ref} className={`flex overflow-x-auto no-scrollbar ${innerClassName}`}>
         {children}
       </div>
-      {overflow && (overflow === "right" || overflow === "both") && (
-        <button onClick={() => scroll(200)}
-          className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-7 h-7 flex items-center justify-center rounded-full bg-surface border border-border shadow hover:bg-surface-alt transition-colors"
-          aria-label="Scroll tabs right">
-          <svg className="w-3.5 h-3.5 text-text-secondary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
-        </button>
+      {canRight && (
+        <>
+          <div aria-hidden className="pointer-events-none absolute right-0 inset-y-0 z-10 w-10 bg-gradient-to-l from-background to-transparent" />
+          <button type="button" tabIndex={-1} onClick={() => scrollByPage(1)} className={`${arrowCls} right-0`} aria-label="Scroll tabs right">
+            <svg className="w-3.5 h-3.5 text-text-secondary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
+          </button>
+        </>
       )}
     </div>
   );
@@ -124,6 +181,7 @@ export function TabButton({
   return (
     <button
       onClick={onClick}
+      data-active={active}
       className={`px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
         active ? "border-accent text-accent" : "border-transparent text-text-secondary hover:text-text-primary"
       } ${className}`}

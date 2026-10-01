@@ -1,12 +1,15 @@
 """Thin, cached wrapper around yfinance."""
 from __future__ import annotations
 
+import logging
 import time
 import numpy as np
 import pandas as pd
 import yfinance as yf
 
 from ..cache import cached
+
+log = logging.getLogger(__name__)
 
 # Map common exchange suffixes to a sensible benchmark index.
 _BENCHMARK_BY_SUFFIX = {
@@ -218,15 +221,35 @@ def get_quote(ticker: str) -> dict:
     }
 
 
-@cached("yf_info")
+def _info_failed(bundle: dict) -> bool:
+    """True when Ticker.info failed or came back without a price.
+
+    Such a bundle still carries statements and a few derived keys, so the
+    default empty-result guard would cache it for an hour (and serve it stale
+    for a day): JPM then showed no price and every model locked.
+    """
+    info = bundle.get("info") or {}
+    if not (info.get("currentPrice") or info.get("regularMarketPrice")):
+        return True
+    # Under load Yahoo's profile/financials request can fail while the quote request succeeds:
+    # an equity then has a price but no sector, industry, debt, cash or revenue.
+    return info.get("quoteType") == "EQUITY" and not any(
+        info.get(k) for k in ("sector", "industry", "totalRevenue"))
+
+
+@cached("yf_info", skip_if=_info_failed)
 def get_info(ticker: str) -> dict:
     """Full .info dict plus financial statements for ratio analysis."""
     t = yf.Ticker(ticker)
-    out: dict = {"ticker": ticker}
-    try:
-        out["info"] = t.get_info() or {}
-    except Exception:
-        out["info"] = {}
+    out: dict = {"ticker": ticker, "info": {}}
+    for _ in range(2):  # one retry: Yahoo intermittently fails info calls under load
+        try:
+            out["info"] = t.get_info() or {}
+        except Exception:
+            log.warning("Ticker.info failed for %s", ticker, exc_info=True)
+            out["info"] = {}
+        if not _info_failed(out):
+            break
     info = out["info"]
 
     # ── Store raw DataFrames for multi-period consumers (Piotroski, Beneish) ──

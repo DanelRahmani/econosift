@@ -168,6 +168,20 @@ def _load_all_peers() -> list[dict]:
     return rows
 
 
+
+def _fallback_value_inputs(info: dict) -> tuple[float | None, float | None]:
+    """(EV/EBITDA, P/B) for a ticker outside the screener cache.
+
+    ADRs (TSM, NVO) quote in USD but report in TWD/DKK, so Yahoo's
+    enterpriseToEbitda / priceToBook mix currencies; rebuild them in the price
+    currency (audit M-01). Same-currency tickers keep Yahoo's values.
+    """
+    if info.get("financialCurrency") in (None, info.get("currency")):
+        return _safe(info.get("enterpriseToEbitda")), _safe(info.get("priceToBook"))
+    from .metrics import market_multiples
+    v = market_multiples({"info": info})["values"]
+    return v["evEbitda"], v["pbRatio"]
+
 def _peers_for(sector: str | None, industry: str | None,
                all_peers: list[dict]) -> list[dict]:
     """Return sector peers, falling back to industry then all if < 10."""
@@ -201,6 +215,25 @@ def _col_values(peers: list[dict], col: str) -> list[float]:
 # Axis scorers (full mode)
 # ---------------------------------------------------------------------------
 
+NOT_MEANINGFUL_MULTIPLE = "not meaningful: negative multiple"
+
+
+def _multiple_component(label: str, weight: float, value: float | None, peer_values: list[float]) -> dict:
+    """Value-axis component for a "lower is better" multiple (P/E, EV/EBITDA, EV/FCF, P/B).
+
+    A zero or negative multiple means negative earnings / cash flow / book, not
+    "cheap": a ranked-lowest -4.85x EV/FCF used to score 9.2/10 (audit M-02).
+    Such a value is scored None (dropped from the axis average) with a reason,
+    and non-positive peer values are left out of the ranking so they cannot
+    push positive multiples down the percentile either.
+    """
+    if value is not None and value <= 0:
+        return {"label": label, "weight": weight, "score": None, "value": value,
+                "reason": NOT_MEANINGFUL_MULTIPLE}
+    return {"label": label, "weight": weight, "value": value,
+            "score": _percentile(value, [p for p in peer_values if p > 0], invert=True)}
+
+
 def _axis_value(row: dict, peers: list[dict]) -> tuple[float | None, list[dict]]:
     peg = None
     pe = _safe(row.get("pe"))
@@ -209,25 +242,16 @@ def _axis_value(row: dict, peers: list[dict]) -> tuple[float | None, list[dict]]
         peg = min(pe / (eps_g * 100.0), 50.0)
 
     components = [
-        {"label": "P/E", "weight": 0.25,
-         "score": _percentile(pe, _col_values(peers, "pe"), invert=True),
-         "value": pe},
-        {"label": "EV/EBITDA", "weight": 0.20,
-         "score": _percentile(_safe(row.get("ev_ebitda") or row.get("evEbitda")),
-                               _col_values(peers, "ev_ebitda"), invert=True),
-         "value": _safe(row.get("ev_ebitda") or row.get("evEbitda"))},
-        {"label": "EV/FCF", "weight": 0.15,
-         "score": _percentile(_safe(row.get("ev_fcf") or row.get("evFcf")),
-                               _col_values(peers, "ev_fcf"), invert=True),
-         "value": _safe(row.get("ev_fcf") or row.get("evFcf"))},
+        _multiple_component("P/E", 0.25, pe, _col_values(peers, "pe")),
+        _multiple_component("EV/EBITDA", 0.20, _safe(row.get("ev_ebitda") or row.get("evEbitda")),
+                            _col_values(peers, "ev_ebitda")),
+        _multiple_component("EV/FCF", 0.15, _safe(row.get("ev_fcf") or row.get("evFcf")),
+                            _col_values(peers, "ev_fcf")),
         {"label": "FCF Yield", "weight": 0.20,
          "score": _percentile(_safe(row.get("fcf_yield") or row.get("fcfYield")),
                                _col_values(peers, "fcf_yield")),
          "value": _safe(row.get("fcf_yield") or row.get("fcfYield"))},
-        {"label": "P/B", "weight": 0.10,
-         "score": _percentile(_safe(row.get("pb")),
-                               _col_values(peers, "pb"), invert=True),
-         "value": _safe(row.get("pb"))},
+        _multiple_component("P/B", 0.10, _safe(row.get("pb")), _col_values(peers, "pb")),
         {"label": "PEG", "weight": 0.10,
          "score": _percentile(peg,
                                [min(r.get("pe") / (r.get("eps_growth") or r.get("epsGrowth") or 0.001 * 100), 50)
@@ -549,10 +573,10 @@ def compute_snowflake(ticker: str) -> dict:
         row = {
             "pe": _safe(info.get("trailingPE")),
             "forward_pe": _safe(info.get("forwardPE")),
-            "ev_ebitda": _safe(info.get("enterpriseToEbitda")),
+            "ev_ebitda": _fallback_value_inputs(info)[0],
             "ev_fcf": None,
             "fcf_yield": None,
-            "pb": _safe(info.get("priceToBook")),
+            "pb": _fallback_value_inputs(info)[1],
             "eps_growth": _safe(info.get("earningsGrowth")),
             "revenue_growth": _safe(info.get("revenueGrowth")),
             "roe": _safe(info.get("returnOnEquity")),

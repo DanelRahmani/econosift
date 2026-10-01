@@ -16,7 +16,7 @@ python-dotenv
 cachetools
 # Phase 0-12 additions
 arch
-edgartools
+edgartools>=5.59,<6  # Form 4 parsing uses the 5.x Form4.market_trades API
 financedatabase
 wikitextparser
 eurostat

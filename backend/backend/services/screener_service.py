@@ -39,7 +39,7 @@ except ImportError:
 from . import constituents as _constituents
 from . import yfinance_service as yfs
 from . import screener_cache
-from .metrics import altman_z
+from .metrics import altman_z, market_multiples
 
 # ---------------------------------------------------------------------------
 # Per-index refresh lock (prevents concurrent double-refresh of same index)
@@ -226,6 +226,18 @@ def _clean(v: Any) -> float | None:
         return None
 
 
+def _price_currency_multiples(bundle: dict, yahoo: dict) -> dict:
+    """ADRs / cross-listings report in another currency than they quote in, so Yahoo's
+    P/B, EV/EBITDA, P/S and EV-based figures mix currencies (audit M-01); rebuild them
+    in the price currency. Same-currency tickers keep the values passed in."""
+    info = bundle.get("info") or {}
+    if info.get("financialCurrency") in (None, info.get("currency")):
+        return yahoo
+    v = market_multiples(bundle)["values"]
+    return {"pb": v["pbRatio"], "evEbitda": v["evEbitda"], "evFcf": v["evToFcf"],
+            "fcfYield": v["fcfYield"], "psRatio": v["psRatio"]}
+
+
 def _fetch_ticker_fundamentals(sym: str) -> dict:
     """Fetch full info bundle for one ticker and return a partial screener row.
 
@@ -281,6 +293,10 @@ def _fetch_ticker_fundamentals(sym: str) -> dict:
         if fcf and mcap and mcap > 0:
             fcf_yield = _clean(fcf / mcap)
 
+        mult = _price_currency_multiples(bundle, {
+            "pb": _i("priceToBook"), "evEbitda": _i("enterpriseToEbitda"), "evFcf": ev_fcf,
+            "fcfYield": fcf_yield, "psRatio": _i("priceToSalesTrailing12Months")})
+
         # Altman Z
         az = altman_z(info, bs, fin)
 
@@ -296,12 +312,12 @@ def _fetch_ticker_fundamentals(sym: str) -> dict:
             # dividendYield: yfinance returns it in percent (e.g. 2.43 = 2.43%)
             "dividendYield":  _i("dividendYield"),
             "beta":           _i("beta"),
-            "pb":             _i("priceToBook"),
-            "evEbitda":       _i("enterpriseToEbitda"),
-            "evFcf":          ev_fcf,
-            "fcfYield":       fcf_yield,
+            "pb":             mult["pb"],
+            "evEbitda":       mult["evEbitda"],
+            "evFcf":          mult["evFcf"],
+            "fcfYield":       mult["fcfYield"],
             "roic":           roic,
-            "psRatio":        _i("priceToSalesTrailing12Months"),
+            "psRatio":        mult["psRatio"],
             # short interest
             "shortFloat":     _i("shortPercentOfFloat"),
             "shortRatio":     _i("shortRatio"),
@@ -660,6 +676,10 @@ def refresh_universe(index: str) -> int:
             if gp is not None and rev is not None and rev != 0:
                 gross_margin = _clean(gp / rev)
 
+            mult = _price_currency_multiples(bundle, {
+                "pb": _i("priceToBook"), "evEbitda": _i("enterpriseToEbitda"), "evFcf": ev_fcf,
+                "fcfYield": fcf_yield, "psRatio": _i("priceToSalesTrailing12Months")})
+
             az = altman_z(info, bs, fin)
 
             row = {
@@ -672,12 +692,12 @@ def refresh_universe(index: str) -> int:
                 "eps":            _i("trailingEps"),
                 "dividendYield":  _i("dividendYield"),
                 "beta":           _i("beta"),
-                "pb":             _i("priceToBook"),
-                "evEbitda":       _i("enterpriseToEbitda"),
-                "evFcf":          ev_fcf,
-                "fcfYield":       fcf_yield,
+                "pb":             mult["pb"],
+                "evEbitda":       mult["evEbitda"],
+                "evFcf":          mult["evFcf"],
+                "fcfYield":       mult["fcfYield"],
                 "roic":           roic,
-                "psRatio":        _i("priceToSalesTrailing12Months"),
+                "psRatio":        mult["psRatio"],
                 "shortFloat":     _i("shortPercentOfFloat"),
                 "shortRatio":     _i("shortRatio"),
                 "grossMargin":    gross_margin,

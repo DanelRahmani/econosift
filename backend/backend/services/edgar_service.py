@@ -1,4 +1,4 @@
-"""EDGAR service: 13F institutional holders and Form 4 insider transactions."""
+"""EDGAR service: Form 4 insider transactions (13F holders: thirteenf_service)."""
 from __future__ import annotations
 
 import asyncio
@@ -25,72 +25,13 @@ def _edgar_ready() -> bool:
     return True
 
 
-def _fetch_13f_sync(ticker: str) -> dict:
+def _num(v) -> float | None:
+    """A float, or None for a missing/NaN/unparseable cell."""
     try:
-        from edgar import Company  # type: ignore[import]
-    except ImportError:
-        return {"error": "edgartools not installed", "holders": [], "ticker": ticker, "asOf": None, "reportingLag": "45-day reporting lag"}
-
-    if not _edgar_ready():
-        return {"error": _NO_IDENTITY, "holders": [], "ticker": ticker, "asOf": None, "reportingLag": "45-day reporting lag"}
-    try:
-        company = Company(ticker)
-        time.sleep(0.1)
-        filings = company.get_filings(form="13F-HR")
-        if not filings or len(filings) == 0:
-            return {
-                "ticker": ticker,
-                "asOf": None,
-                "reportingLag": "45-day reporting lag",
-                "holders": [],
-                "error": "No 13F filings found",
-            }
-
-        latest = filings[0]
-        filing_date = str(latest.filing_date) if hasattr(latest, "filing_date") else str(date.today())
-        time.sleep(0.1)
-
-        holders: list[dict] = []
-        try:
-            obj = latest.obj() if hasattr(latest, "obj") else None
-            if obj is not None and hasattr(obj, "infotable"):
-                table = obj.infotable
-                if hasattr(table, "iterrows"):
-                    for _, row in table.iterrows():
-                        name = str(row.get("nameOfIssuer", row.get("name", "Unknown")))
-                        shares = int(row.get("sshPrnamt", row.get("shares", 0)) or 0)
-                        value = int(row.get("value", 0) or 0) * 1000  # 13F values in thousands
-                        holders.append({
-                            "name": name,
-                            "shares": shares,
-                            "value": value,
-                            "pctFloat": None,
-                            "changeShares": None,
-                            "changePct": None,
-                        })
-            # Sort by value descending, take top 10
-            holders.sort(key=lambda x: x["value"], reverse=True)
-            holders = holders[:10]
-        except Exception as exc:
-            log.warning("13F table parse failed for %s: %s", ticker, exc)
-            holders = []
-
-        return {
-            "ticker": ticker,
-            "asOf": filing_date,
-            "reportingLag": "45-day reporting lag",
-            "holders": holders,
-            "error": None,
-        }
-    except Exception as exc:
-        log.warning("get_13f_holders failed for %s: %s", ticker, exc)
-        return {
-            "ticker": ticker,
-            "asOf": None,
-            "reportingLag": "45-day reporting lag",
-            "holders": [],
-            "error": str(exc),
-        }
+        f = float(v)
+    except (TypeError, ValueError):
+        return None
+    return None if f != f else f  # NaN
 
 
 def _fetch_form4_sync(ticker: str, max_transactions: int | None = 50) -> dict:
@@ -136,60 +77,37 @@ def _fetch_form4_sync(ticker: str, max_transactions: int | None = 50) -> dict:
                 if obj is None:
                     continue
 
-                # Extract insider name and title
-                insider_name = "Unknown"
-                title = None
-                if hasattr(obj, "reporting_owner"):
-                    ro = obj.reporting_owner
-                    if hasattr(ro, "name"):
-                        insider_name = str(ro.name)
-                    if hasattr(ro, "relationship"):
-                        title = str(ro.relationship)
+                insider_name = str(getattr(obj, "insider_name", None) or "Unknown")
+                title = getattr(obj, "position", None) or None
 
-                # Extract transactions from non-derivative table
-                if hasattr(obj, "non_derivative_table"):
-                    tbl = obj.non_derivative_table
-                    if hasattr(tbl, "iterrows"):
-                        for _, row in tbl.iterrows():
-                            tx_code = str(row.get("transactionCode", "")).upper()
-                            if tx_code not in ("P", "S"):
-                                continue
-                            tx_type = "Buy" if tx_code == "P" else "Sell"
-                            shares = None
-                            try:
-                                shares = float(row.get("transactionShares", 0) or 0)
-                            except Exception:
-                                shares = 0.0
-                            price = None
-                            try:
-                                price_raw = row.get("transactionPricePerShare")
-                                if price_raw is not None:
-                                    price = float(price_raw)
-                            except Exception:
-                                pass
-                            total = round(shares * price, 2) if shares and price else None
-
-                            tx_date = str(fd)
-                            try:
-                                raw_date = row.get("transactionDate")
-                                if raw_date:
-                                    tx_date = str(raw_date)[:10]
-                            except Exception:
-                                pass
-
-                            transactions.append({
-                                "insiderName": insider_name,
-                                "title": title,
-                                "transactionType": tx_type,
-                                "shares": shares,
-                                "pricePerShare": price,
-                                "totalValue": total,
-                                "date": tx_date,
-                            })
-                            if max_transactions is not None and len(transactions) >= max_transactions:
-                                break
+                # edgartools 5: open-market trades as a DataFrame (None when
+                # the filing has none). Filter the codes here regardless.
+                trades = getattr(obj, "market_trades", None)
+                if trades is None:
+                    continue
+                for _, row in trades.iterrows():
+                    tx_code = str(row.get("Code", "")).upper()
+                    if tx_code not in ("P", "S"):
+                        continue
+                    shares = _num(row.get("Shares")) or 0.0
+                    price = _num(row.get("Price"))
+                    total = round(shares * price, 2) if shares and price else None
+                    raw_date = row.get("Date")
+                    transactions.append({
+                        "insiderName": insider_name,
+                        "title": title,
+                        "transactionType": "Buy" if tx_code == "P" else "Sell",
+                        "shares": shares,
+                        "pricePerShare": price,
+                        "totalValue": total,
+                        "date": str(raw_date)[:10] if raw_date else str(fd),
+                    })
+                    if max_transactions is not None and len(transactions) >= max_transactions:
+                        break
             except Exception as exc:
-                log.debug("Form4 filing parse error for %s: %s", ticker, exc)
+                # Warning, not debug: a parser that fails on every filing
+                # (as after an edgartools API change) must show up in the log.
+                log.warning("Form4 filing parse error for %s: %s", ticker, exc)
                 continue
 
             if max_transactions is not None and len(transactions) >= max_transactions:
@@ -217,30 +135,6 @@ def _form4_provenance(ticker: str, result: dict) -> dict:
         "transactions.totalValue": pv.derived("shares × price per share (blank if either is missing)", [filings],
                                               title="Transaction value"),
     }
-
-
-@async_cached("13f")
-async def get_13f_holders(ticker: str) -> dict:
-    """Fetch top 13F institutional holders for a ticker."""
-    try:
-        result = await asyncio.to_thread(_fetch_13f_sync, ticker)
-        if not result.get("error"):
-            result = pv.attach(result, {"*": pv.ref(
-                "sec_edgar", ticker, "Form 13F-HR information table, most recent filing",
-                units="shares; value in USD (reported value × 1000)", frequency="quarterly",
-                observed=result.get("asOf"),
-                note="observed is the filing date; the report period ends up to 45 days earlier. "
-                     "Holdings listed are those in the 13F-HR filings made under this ticker's SEC company record.")})
-        return result
-    except Exception as exc:
-        log.warning("get_13f_holders async error for %s: %s", ticker, exc)
-        return {
-            "ticker": ticker,
-            "asOf": None,
-            "reportingLag": "45-day reporting lag",
-            "holders": [],
-            "error": str(exc),
-        }
 
 
 @async_cached("form4")

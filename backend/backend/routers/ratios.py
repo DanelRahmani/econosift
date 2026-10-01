@@ -39,6 +39,7 @@ async def ratios(ticker: str, period: str = "1y", risk_free: float = 0.04):
         "efficiency": payload["efficiency"],
         "profitability": payload["profitability"],
         "valuation": payload["valuation"],
+        "unavailable": payload["unavailable"],
     }, {**ratio_provenance(sym, bundle), **risk_provenance(sym, bench, frame, period, risk_free)})
 
 
@@ -106,7 +107,19 @@ def ratio_provenance(sym: str, bundle: dict, prefix: str = "") -> dict:
                                    observed=src[needs[0]].get("observed"))
     for key, field in _VALUATION_FIELDS.items():
         prov[f"{p}valuation.{key}"] = pv.yahoo(sym, f"info.{field}")
+    # ADRs / cross-listings: these four are rebuilt from statement figures converted to the price currency.
+    if bundle.get("info", {}).get("financialCurrency") not in (None, bundle.get("info", {}).get("currency")):
+        for key, formula in _CROSS_CURRENCY_FORMULAS.items():
+            prov[f"{p}valuation.{key}"] = pv.derived(formula, [src["q"], src["b"], src["i"]], title=key)
     return prov
+
+
+_CROSS_CURRENCY_FORMULAS = {
+    "psRatio": "market cap / (TTM revenue × FX to the price currency)",
+    "pbRatio": "market cap / (stockholders' equity × FX to the price currency)",
+    "evEbitda": "EV / (EBITDA × FX), EV = market cap + (debt − cash) × FX",
+    "evRevenue": "EV / (TTM revenue × FX), EV = market cap + (debt − cash) × FX",
+}
 
 
 def risk_provenance(sym: str, bench: str, frame, period: str, risk_free: float) -> dict:

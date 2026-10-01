@@ -13,6 +13,7 @@ import { MultiCountryPortfolio } from "@/components/research/MultiCountryPortfol
 import { EventStudyTab } from "@/components/research/EventStudyTab";
 import { BacktestTab } from "@/components/research/BacktestTab";
 import { FactorRegimeTab } from "@/components/research/FactorRegimeTab";
+import { ScrollableTabBar } from "@/components/ui";
 import { useUrlState } from "@/lib/useUrlState";
 
 const TABS = [
@@ -49,11 +50,12 @@ function ResearchPageInner() {
         </p>
       </div>
 
-      <div className="flex gap-1 border-b border-border overflow-x-auto no-scrollbar sticky top-14 z-20 bg-background/95 backdrop-blur">
+      <ScrollableTabBar className="border-b border-border sticky top-14 z-20 bg-background/95 backdrop-blur" innerClassName="gap-1">
         {TABS.map((t) => (
           <button
             key={t.key}
             onClick={() => setUrlState({ tab: t.key })}
+            data-active={tab === t.key}
             className={`px-4 py-2 text-sm font-medium -mb-px border-b-2 transition-colors whitespace-nowrap ${
               tab === t.key
                 ? "border-accent text-text-primary"
@@ -63,7 +65,7 @@ function ResearchPageInner() {
             {t.label}
           </button>
         ))}
-      </div>
+      </ScrollableTabBar>
 
       {tab === "riskparity" && <RiskParityTab />}
       {tab === "carry" && <FxCarryTab />}
