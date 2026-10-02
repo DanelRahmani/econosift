@@ -33,5 +33,7 @@ no container pytest, no live checks, no Playwright. ACTIVE_ISSUES / CHANGELOG ar
 3. **Frontend.** Check that the Ichimoku chart handles 26 future rows (only senkouA/B set; x-axis domain).
    Add `fibDirection` / `fibSwing` and ratios `basis` to `types.ts`, and optionally show the direction,
    the ROE basis and the short-interest `universe` label. Then `tsc`.
+5. **P1-20 (new, owner request): per-page data refresh button, Dashboard first.** After the Phase 59 gate.
+   Decide the design with the owner before coding (see the row in ACTIVE_ISSUES.md).
 4. **Gate 1–7** from the plan (spec-verifier on the phase diff, rebuild, container pytest, cache clear +
    live checks AAPL technicals / JPM Piotroski (both pages) / TSM+NVO ratios, Playwright, docs, push).
