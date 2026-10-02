@@ -218,6 +218,8 @@ class TestWacc:
         expected_keys = {
             "wacc", "costOfEquity", "costOfDebt", "taxRate",
             "beta", "country", "riskFree", "erp", "weightEquity", "weightDebt",
+            # audit M-10: which rate and beta were used, and why one is missing
+            "rawBeta", "betaAdjustment", "riskFreeSource", "riskFreeAsOf", "riskFreeStale", "unavailable",
         }
         assert set(result.keys()) == expected_keys
 

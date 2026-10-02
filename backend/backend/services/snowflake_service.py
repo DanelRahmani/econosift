@@ -182,6 +182,35 @@ def _fallback_value_inputs(info: dict) -> tuple[float | None, float | None]:
     v = market_multiples({"info": info})["values"]
     return v["evEbitda"], v["pbRatio"]
 
+# Yahoo sector names -> the GICS names the screener cache uses (index constituent lists are GICS).
+_YAHOO_TO_GICS = {
+    "Technology": "Information Technology", "Healthcare": "Health Care",
+    "Financial Services": "Financials", "Consumer Cyclical": "Consumer Discretionary",
+    "Consumer Defensive": "Consumer Staples", "Basic Materials": "Materials",
+}
+MIN_PEERS = 10
+
+
+def _sector_peers(sector: str | None, industry: str | None,
+                  all_peers: list[dict]) -> tuple[list[dict], str | None]:
+    """(peers, scope) with scope "sector" | "industry"; ([], None) when there is no honest peer set.
+
+    Yahoo and GICS sector names are mapped to one vocabulary on both sides. Unlike
+    :func:`_peers_for` this never falls back to the whole universe (audit M-13: TSM was
+    ranked against all 527 cached stocks).
+    """
+    gics = lambda n: _YAHOO_TO_GICS.get(n, n)  # noqa: E731
+    if sector:
+        same = [r for r in all_peers if r.get("sector") and gics(r["sector"]) == gics(sector)]
+        if len(same) >= MIN_PEERS:
+            return same, "sector"
+    if industry:
+        same = [r for r in all_peers if r.get("industry") == industry]
+        if len(same) >= MIN_PEERS:
+            return same, "industry"
+    return [], None
+
+
 def _peers_for(sector: str | None, industry: str | None,
                all_peers: list[dict]) -> list[dict]:
     """Return sector peers, falling back to industry then all if < 10."""
@@ -361,34 +390,17 @@ def _axis_performance(row: dict, peers: list[dict], fin_df) -> tuple[float | Non
     return _weighted_avg(components), components
 
 
-def _axis_health(row: dict, peers: list[dict], info: dict,
-                 fin_df, bundle: dict) -> tuple[float | None, list[dict]]:
+def _axis_health(row: dict, peers: list[dict], info: dict, bundle: dict) -> tuple[float | None, list[dict]]:
     altman = _safe(row.get("altman_z") or row.get("altmanZ"))
     roic_val = _safe(row.get("roic"))
     cur_ratio = _safe(row.get("current_ratio") or row.get("currentRatio"))
     de = _safe(row.get("debt_to_equity") or row.get("debtToEquity"))
 
-    # Piotroski F-Score (full 9/9 with prior year if available)
-    prior_bundle: dict | None = None
-    if fin_df is not None:
-        try:
-            cols = sorted(fin_df.columns, reverse=True)
-            if len(cols) >= 2:
-                # Build a minimal prior-year bundle from the second-most-recent column
-                py_col = cols[1]
-                py_fin = {str(k): _safe(fin_df.loc[k, py_col]) for k in fin_df.index}
-                prior_bundle = {
-                    "info": info,  # share count not year-specific here
-                    "financials": py_fin,
-                    "balance_sheet": {},
-                    "cashflow": {},
-                }
-        except Exception:
-            pass
-
-    pio_result = piotroski_f(bundle, prior_year=prior_bundle)
-    max_score = pio_result.get("maxScore") or 1
-    pio_score = (pio_result.get("score") or 0) / max(max_score, 1) * 10.0
+    # Piotroski F-Score: the full nine tests; the prior year comes from the statement DataFrames in the bundle
+    pio_result = piotroski_f(bundle)
+    max_score = pio_result.get("maxScore") or 0
+    # No evaluable test means no score (dropped from the axis), not a fabricated worst score of 0.
+    pio_score = (pio_result.get("score") or 0) / max_score * 10.0 if max_score > 0 else None
 
     # Ohlson O-Score
     ohlson_result = ohlson_o(bundle)
@@ -424,7 +436,7 @@ def _axis_health(row: dict, peers: list[dict], info: dict,
          "score": _percentile(altman, _col_values(peers, "altman_z")),
          "value": altman},
         {"label": "Piotroski F-Score", "weight": 0.20,
-         "score": round(pio_score, 2),
+         "score": round(pio_score, 2) if pio_score is not None else None,
          "value": pio_result.get("score"),
          "detail": f"{pio_result.get('score')}/{max_score}"},
         {"label": "Ohlson O-Score", "weight": 0.15,
@@ -487,7 +499,7 @@ def _axis_dividend(row: dict, peers: list[dict], info: dict) -> tuple[float | No
          "value": payout},
         {"label": "FCF Coverage", "weight": 0.25,
          "score": _fcf_coverage_score(div_yield, fcf_yield),
-         "value": (fcf_yield / div_yield) if fcf_yield and div_yield else None},
+         "value": (fcf_yield / (div_yield / 100.0)) if fcf_yield and div_yield else None},
         {"label": "Dividend Consistency", "weight": 0.20,
          "score": _div_consistency_score(consistency_years),
          "value": consistency_years},
@@ -558,9 +570,6 @@ def compute_snowflake(ticker: str) -> dict:
         sector = None
         industry = None
 
-    peers = _peers_for(sector, industry, all_peers)
-    n_peers = len([p for p in peers if p.get("sector") == sector]) if sector else len(peers)
-
     # Fetch yfinance info (cached via cache.py)
     yf_ticker = yf.Ticker(ticker)
     try:
@@ -593,6 +602,13 @@ def compute_snowflake(ticker: str) -> dict:
         sector = info.get("sector")
         industry = info.get("industry")
 
+    # Peers are chosen once the sector is known (a ticker outside the cache gets it from Yahoo).
+    peers, peer_scope = _sector_peers(sector, industry, all_peers)
+    n_peers = len(peers)
+    peer_note = None if peers else (
+        "No peer set: the sector is unknown or fewer than 10 cached stocks share it, so percentile-ranked "
+        "components are not scored (the whole universe is not used instead).")
+
     # Fetch historical financials (for 3Y CAGR + full Piotroski)
     fin_df = None
     try:
@@ -604,6 +620,7 @@ def compute_snowflake(ticker: str) -> dict:
     bs_data = {}
     cf_data = {}
     fin_data = {}
+    bs_raw = cf_raw = None
     try:
         bs_raw = yf_ticker.balance_sheet
         if bs_raw is not None and not bs_raw.empty:
@@ -623,12 +640,16 @@ def compute_snowflake(ticker: str) -> dict:
         fin_data = {str(k): _safe(fin_df.loc[k, cols[0]]) for k in fin_df.index}
 
     bundle = {"info": info, "financials": fin_data, "balance_sheet": bs_data, "cashflow": cf_data}
+    # Statement DataFrames (newest column first) let piotroski_f build the prior year: all nine tests.
+    for key, df in (("financials_df", fin_df), ("balance_sheet_df", bs_raw), ("cashflow_df", cf_raw)):
+        if df is not None and not df.empty:
+            bundle[key] = df
 
     # Score axes
     val_score, val_comps = _axis_value(row, peers)
     growth_score, growth_comps = _axis_growth(row, peers, info)
     perf_score, perf_comps = _axis_performance(row, peers, fin_df)
-    health_score, health_comps = _axis_health(row, peers, info, fin_df, bundle)
+    health_score, health_comps = _axis_health(row, peers, info, bundle)
     div_score, div_comps = _axis_dividend(row, peers, info)
 
     scores = {
@@ -656,6 +677,7 @@ def compute_snowflake(ticker: str) -> dict:
         "sector": sector,
         "industry": industry,
         "sectorPeers": n_peers,
+        "peerGroup": {"scope": peer_scope, "n": n_peers, "reason": peer_note},
         "overallScore": overall,
         "verdict": _verdict(overall) if overall is not None else "Unknown",
         "scores": scores,
@@ -664,7 +686,7 @@ def compute_snowflake(ticker: str) -> dict:
         "axisDetails": axis_details,
     }, _provenance(
         ticker, bool(cache_rows),
-        _peer_scope(sector if cache_rows else None, industry if cache_rows else None, all_peers), n_peers))
+        peer_scope or "none", n_peers))
 
 
 # ---------------------------------------------------------------------------
@@ -831,8 +853,8 @@ def _provenance(ticker: str, in_cache: bool, peer_scope: str, n_peers: int) -> d
         "verdict": pv.derived("overall ≥ 8 Exceptional; ≥ 6 Strong; ≥ 4 Moderate; ≥ 2 Weak; else Poor",
                               ["overallScore"], title="Verdict"),
         "sectorPeers": pv.derived(
-            f"number of screener-cache stocks in the peer group; the group is the sector, or the industry, or "
-            f"the whole cache when the sector has fewer than 10 members (here: {peer_scope})", [peers],
+            f"number of screener-cache stocks in the peer group; the group is the sector (Yahoo names mapped to GICS), "
+            f"else the industry, else none when fewer than 10 share either (here: {peer_scope})", [peers],
             title="Peer group size"),
         "rewards": pv.derived("the three highest component scores across all axes", ["*"],
                               title="Top rewards"),
@@ -857,12 +879,3 @@ def _provenance(ticker: str, in_cache: bool, peer_scope: str, n_peers: int) -> d
                 f"{formula} (weight {weight:g})", [row, peers, yahoo], title=label, flags=comp_flags,
                 note="Uses returnOnAssets as a stand-in for ROIC." if comp_flags else None)
     return prov
-
-
-def _peer_scope(sector: str | None, industry: str | None, all_peers: list[dict]) -> str:
-    """Which peer group :func:`_peers_for` picks: sector, industry or the whole cache."""
-    if sector and len([r for r in all_peers if r.get("sector") == sector]) >= 10:
-        return "sector"
-    if industry and len([r for r in all_peers if r.get("industry") == industry]) >= 10:
-        return "industry"
-    return "whole cache"

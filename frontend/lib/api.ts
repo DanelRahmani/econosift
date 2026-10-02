@@ -105,8 +105,9 @@ export const api = {
   quote: (ticker: string) =>
     get<Quote>(`/market/quote/${encodeURIComponent(ticker)}`),
 
-  risk: (tickers: string, period: string, riskFree: number, benchmark?: string) =>
-    get<RiskResponse>(`/market/risk?tickers=${encodeURIComponent(tickers)}&period=${period}&risk_free=${riskFree}` +
+  risk: (tickers: string, period: string, riskFree?: number, benchmark?: string) =>
+    get<RiskResponse>(`/market/risk?tickers=${encodeURIComponent(tickers)}&period=${period}` +
+      (riskFree != null ? `&risk_free=${riskFree}` : "") +
       (benchmark ? `&benchmark=${encodeURIComponent(benchmark)}` : "")),
 
   valuation: (

@@ -22,7 +22,6 @@ from .discount_rates import (
     load_erp,
     load_sector_multiples,
     risk_free_rate,
-    risk_free_rate_is_fallback,
 )
 from . import dcf_engine
 from . import yfinance_service as yfs
@@ -147,6 +146,8 @@ class _Ctx:
         self.tax: float | None = self.wacc_dict.get("taxRate")
         self.country: str = self.wacc_dict.get("country") or "United States"
         self.rf: float | None = self.wacc_dict.get("riskFree")
+        # Why there is no discount rate, e.g. no local 10-year yield for the listing (audit M-10).
+        self.rate_reason: str | None = (self.wacc_dict.get("unavailable") or {}).get("riskFree")
         self.beta = beta
 
         # Per-share data
@@ -209,6 +210,11 @@ class _Ctx:
 # Model 1: DCF (Two-Stage) — reuses dcf_engine
 # ---------------------------------------------------------------------------
 
+def _no_rate(ctx: _Ctx, what: str) -> str:
+    """Lock reason for a missing WACC / cost of equity, naming the cause when it is known."""
+    return f"{what}: {ctx.rate_reason}" if ctx.rate_reason else what
+
+
 def _lock_non_positive(models: list[dict]) -> list[dict]:
     """Generic guard: an unlocked model with a per-share value <= 0 becomes null + reason.
 
@@ -231,7 +237,7 @@ def _model_dcf(ctx: _Ctx) -> dict:
     NAME = "DCF (Two-Stage)"
     wacc_val = ctx.wacc_val
     if wacc_val is None:
-        return _locked_model(NAME, "WACC unavailable")
+        return _locked_model(NAME, _no_rate(ctx, "WACC unavailable"))
 
     fcf_growth = ctx.growth or 0.08
     terminal_growth = 0.025
@@ -275,7 +281,7 @@ def _model_ddm(ctx: _Ctx) -> dict:
 
     ke = ctx.ke
     if ke is None:
-        return _locked_model(NAME, "Cost of equity unavailable")
+        return _locked_model(NAME, _no_rate(ctx, "Cost of equity unavailable"))
 
     # Perpetual dividend growth is the *sustainable* rate, retention x ROE, with ROE normalised
     # (capped at _ROE_CAP) and g capped at the risk-free rate (long-run nominal growth) and below ke.
@@ -490,7 +496,7 @@ def _model_rim(ctx: _Ctx) -> dict:
 
     ke = ctx.ke
     if ke is None:
-        return _locked_model(NAME, "Cost of equity unavailable")
+        return _locked_model(NAME, _no_rate(ctx, "Cost of equity unavailable"))
 
     roe = min(roe_raw, _ROE_CAP)
     payout = _dividend_payout(ctx.info) or 0.0
@@ -526,7 +532,7 @@ def _model_epv(ctx: _Ctx) -> dict:
 
     wacc_val = ctx.wacc_val
     if wacc_val is None:
-        return _locked_model(NAME, "WACC unavailable")
+        return _locked_model(NAME, _no_rate(ctx, "WACC unavailable"))
 
     # EBIT: try info then financials
     ebit_raw = (
@@ -589,7 +595,7 @@ def _capm_implied(ctx: _Ctx) -> dict:
             "model": "CAPM Implied",
             "value": None,
             "locked": True,
-            "reason": "Cost of equity unavailable",
+            "reason": _no_rate(ctx, "Cost of equity unavailable"),
             "detail": {},
         }
 
@@ -785,13 +791,26 @@ def provenance(bundle: dict, result: dict, beta: float | None, root: str = "valu
     }
 
     # -- discount rate ------------------------------------------------------
-    rf_fallback = risk_free_rate_is_fallback()
-    prov[k("wacc", "riskFree")] = pv.fred(
-        "DGS10", "US 10-year Treasury constant-maturity yield", units="decimal (FRED percent / 100)",
-        frequency="daily", flags=("fallback",) if rf_fallback else (),
-        note="The US 10-year yield is used for every listing country."
-             + (" FRED could not be read, so the hard-coded 4% stands in." if rf_fallback else ""))
     country = w.get("country") or "United States"
+    rf_source = w.get("riskFreeSource") or ""
+    rf_missing = (w.get("unavailable") or {}).get("riskFree")
+    if rf_source.startswith("FRED IRLTLT") or rf_source.startswith("FRED INDIRLTLT"):
+        # Non-USD listing: the local 10-year yield in the price currency (audit M-10).
+        prov[k("wacc", "riskFree")] = pv.fred(
+            rf_source.split(" ", 1)[1], f"{country} 10-year government bond yield (OECD, monthly average)",
+            units="decimal (FRED percent / 100)", frequency="monthly", observed=w.get("riskFreeAsOf"),
+            flags=("stale",) if w.get("riskFreeStale") else (),
+            note="Local-currency rate for a listing priced in that currency; OECD publishes it one to two "
+                 "months late, so the latest month is used.")
+    elif rf_missing:
+        prov[k("wacc", "riskFree")] = pv.derived("not available", title="Risk-free rate", note=rf_missing)
+    else:
+        rf_fallback = rf_source == "fallback 4%"
+        prov[k("wacc", "riskFree")] = pv.fred(
+            "DGS10", "US 10-year Treasury constant-maturity yield", units="decimal (FRED percent / 100)",
+            frequency="daily", flags=("fallback",) if rf_fallback else (),
+            note="Used for USD-priced listings; other currencies use their own 10-year yield."
+                 + (" FRED could not be read, so the hard-coded 4% stands in." if rf_fallback else ""))
     erp_data = load_erp()
     countries = erp_data.get("countries") or {}
     entry = countries.get(country)
@@ -811,13 +830,23 @@ def provenance(bundle: dict, result: dict, beta: float | None, root: str = "valu
         "country of the listing: info.exchange code, else keywords in info.fullExchangeName, else info.country "
         "if it is in the ERP table, else United States", [y("exchange"), y("fullExchangeName"), y("country")],
         title="Country used for the equity risk premium")
-    prov[k("wacc", "beta")] = (
-        pv.derived("cov(r, r_benchmark) / var(r_benchmark) of 2 years of daily log returns",
-                   [pv.yahoo(sym, "Daily adjusted close, 2y", frequency="daily"),
-                    pv.yahoo(yfs.benchmark_for(sym), "Benchmark daily adjusted close, 2y", frequency="daily")],
-                   title="Beta used in CAPM", note="Computed here, not Yahoo's info.beta.")
-        if beta is not None else
-        pv.derived("beta = 1.0 (no beta could be computed)", title="Beta used in CAPM", flags=("fallback",)))
+    raw_formula = "cov(r, r_benchmark) / var(r_benchmark) of 2 years of daily log returns"
+    beta_missing = (w.get("unavailable") or {}).get("beta")
+    if w.get("betaAdjustment") == "Blume":
+        prov[k("wacc", "beta")] = pv.derived(
+            f"0.67 × raw beta + 0.33 (Blume), raw beta = {raw_formula}",
+            [pv.yahoo(sym, "Daily adjusted close, 2y", frequency="daily"),
+             pv.yahoo(yfs.benchmark_for(sym), "Local index daily adjusted close, 2y", frequency="daily")],
+            title="Beta used in CAPM (Blume-adjusted, local index)",
+            note="Raw beta in wacc.rawBeta. The Blume adjustment shrinks a local-index beta toward 1.")
+    elif beta is not None and not beta_missing:
+        prov[k("wacc", "beta")] = pv.derived(
+            raw_formula, [pv.yahoo(sym, "Daily adjusted close, 2y", frequency="daily"),
+                          pv.yahoo(yfs.benchmark_for(sym), "Benchmark daily adjusted close, 2y", frequency="daily")],
+            title="Beta used in CAPM", note="Computed here, not Yahoo's info.beta.")
+    else:
+        prov[k("wacc", "beta")] = pv.derived("beta = 1.0", title="Beta used in CAPM", flags=("fallback",),
+                                             note=beta_missing or "No beta could be computed.")
     prov[k("wacc", "costOfEquity")] = pv.derived("risk-free rate + beta × equity risk premium (CAPM)",
                                                  [k("wacc", "riskFree"), k("wacc", "beta"), k("wacc", "erp")],
                                                  title="Cost of equity")

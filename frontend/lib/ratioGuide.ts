@@ -237,9 +237,9 @@ export interface RiskMetricGuide {
 export const RISK_METRIC_GUIDES: Record<string, RiskMetricGuide> = {
   beta: {
     label: "Beta",
-    blurb: "Sensitivity to the S&P 500 — 1.0 = moves with market, < 1 = defensive, > 1 = aggressive",
+    blurb: "Sensitivity to the ticker's local index — 1.0 = moves with market, < 1 = defensive, > 1 = aggressive",
     meaning:
-      "Measures a stock's sensitivity to the benchmark (S&P 500). Computed from 2 years of daily log returns. A beta of 1 means the stock moves with the market; below 1 is defensive, above 1 is aggressive.",
+      "Measures a stock's sensitivity to its local benchmark index (S&P 500 for US listings, ^AEX for Amsterdam, and so on). Computed from daily log returns over the selected period (see the window shown next to the value). Other betas in the app use different windows: Yahoo's is 5 years of monthly returns vs the S&P 500, and the CAPM/WACC beta uses 2 years of daily returns (Blume-adjusted, 0.67β + 0.33, for listings not priced in USD). A beta of 1 means the stock moves with the market; below 1 is defensive, above 1 is aggressive.",
     format: "num",
     dir: "band",
     good: "0.7 – 1.3 (market-like)",
@@ -252,7 +252,7 @@ export const RISK_METRIC_GUIDES: Record<string, RiskMetricGuide> = {
     label: "Sharpe Ratio",
     blurb: "Return per unit of risk — > 1.0 is good, higher means better risk-adjusted performance",
     meaning:
-      "Risk-adjusted return — excess return per unit of total volatility. (Return − RiskFree) ÷ StdDev. Annualised from daily log returns. Higher is better; > 1.0 is considered good.",
+      "Risk-adjusted return — excess return per unit of total volatility. (Return − RiskFree) ÷ StdDev. Annualised from daily simple returns (mean × 252, std × √252). Higher is better; > 1.0 is considered good.",
     format: "num",
     dir: "high",
     good: "≥ 1.0 (strong risk-adjusted return)",
@@ -265,7 +265,7 @@ export const RISK_METRIC_GUIDES: Record<string, RiskMetricGuide> = {
     label: "Sortino Ratio",
     blurb: "Like Sharpe but only penalises downside — higher means better downside-adjusted return",
     meaning:
-      "Like Sharpe but only penalises downside deviation (returns below zero). Better for assessing strategies where upside volatility is welcome. Annualised from daily log returns.",
+      "Like Sharpe but only penalises downside deviation: shortfalls of daily returns below the risk-free rate (the 3-month T-bill is the minimum acceptable return, not 0). Better for assessing strategies where upside volatility is welcome. Annualised from daily simple returns.",
     format: "num",
     dir: "high",
     good: "≥ 1.0 (strong downside-adjusted return)",

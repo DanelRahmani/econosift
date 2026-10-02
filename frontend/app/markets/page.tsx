@@ -154,7 +154,7 @@ function MarketsPageInner() {
 
   const { data: risk, isLoading: riskLoading } = useQuery({
     queryKey: ["market-risk", tickersKey, period, benchmark ?? ""],
-    queryFn: () => api.risk(tickersKey, period, 0.04, benchmark || undefined),
+    queryFn: () => api.risk(tickersKey, period, undefined, benchmark || undefined),
     staleTime: 5 * 60 * 1000,
     enabled: tickers.length > 0,
   });
@@ -173,7 +173,6 @@ function MarketsPageInner() {
 
   const events = eventsData ?? [];
   const riskScope = useSourceScope(provOf(risk));
-  const risk0 = risk?.metrics?.[0];
 
   function addTicker(sym: string) {
     const next = tickers.includes(sym) ? tickers : [...tickers, sym];
@@ -288,25 +287,48 @@ function MarketsPageInner() {
         <div className="space-y-6">
           <QuoteCards tickers={tickers} />
           {risk && (
-            <div className="grid grid-cols-3 gap-4" {...riskScope} data-prov-ctx={risk0?.ticker}>
-              <Card className="p-4" data-prov={`metrics.${risk0?.ticker}.var95`}>
-                <div className="text-xs text-text-secondary">VaR 95%</div>
-                <div className="text-xl font-bold mt-1">
-                  {risk.metrics?.[0]?.var95 != null ? `${(risk.metrics[0].var95 * 100).toFixed(1)}%` : "—"}
-                </div>
-              </Card>
-              <Card className="p-4" data-prov={`metrics.${risk0?.ticker}.sharpe`}>
-                <div className="text-xs text-text-secondary">Sharpe Ratio</div>
-                <div className="text-xl font-bold mt-1">
-                  {risk.metrics?.[0]?.sharpe != null ? risk.metrics[0].sharpe.toFixed(2) : "—"}
-                </div>
-              </Card>
-              <Card className="p-4" data-prov={`metrics.${risk0?.ticker}.beta`}>
-                <div className="text-xs text-text-secondary">Beta</div>
-                <div className="text-xl font-bold mt-1">
-                  {risk.metrics?.[0]?.beta != null ? risk.metrics[0].beta.toFixed(2) : "—"}
-                </div>
-              </Card>
+            <div className="space-y-4" {...riskScope}>
+              {(risk.metrics ?? []).map((m) => {
+                const n = m.nObs ?? m.returns?.length ?? null;
+                const rfStr = risk.riskFree != null
+                  ? `rf ${(risk.riskFree * 100).toFixed(2)}%${risk.riskFreeSource ? ` (${risk.riskFreeSource})` : ""}`
+                  : null;
+                return (
+                  <div key={m.ticker} data-prov-ctx={m.ticker}>
+                    <div className="flex flex-wrap items-baseline gap-x-3 mb-2">
+                      <span className="text-sm font-semibold font-mono">{m.ticker}</span>
+                      <span className="text-xs text-text-muted">
+                        {period} window · {n != null ? `${n} daily returns` : "sample size n/a"}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-4">
+                      <Card className="p-4" data-prov={`metrics.${m.ticker}.var95`}>
+                        <div className="text-xs text-text-secondary">1-day VaR 95%</div>
+                        <div className="text-xl font-bold mt-1">
+                          {m.var95 != null ? `${(m.var95 * 100).toFixed(1)}%` : "—"}
+                        </div>
+                        <div className="text-[11px] text-text-muted mt-1">historical, 5th percentile of daily returns</div>
+                      </Card>
+                      <Card className="p-4" data-prov={`metrics.${m.ticker}.sharpe`}>
+                        <div className="text-xs text-text-secondary">Sharpe Ratio</div>
+                        <div className="text-xl font-bold mt-1">
+                          {m.sharpe != null ? m.sharpe.toFixed(2) : "—"}
+                        </div>
+                        <div className="text-[11px] text-text-muted mt-1">{rfStr ?? "risk-free rate not reported"}</div>
+                      </Card>
+                      <Card className="p-4" data-prov={`metrics.${m.ticker}.beta`}>
+                        <div className="text-xs text-text-secondary">Beta</div>
+                        <div className="text-xl font-bold mt-1">
+                          {m.beta != null ? m.beta.toFixed(2) : "—"}
+                        </div>
+                        <div className="text-[11px] text-text-muted mt-1">
+                          {period} daily vs {m.benchmark || "benchmark"}
+                        </div>
+                      </Card>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
           <Card>

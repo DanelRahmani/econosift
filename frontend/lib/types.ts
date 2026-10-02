@@ -28,10 +28,16 @@ export interface RiskMetric {
   sortino: number | null;
   beta: number | null;
   returns: (number | null)[];
+  /** Number of daily returns the metrics were computed from. */
+  nObs?: number | null;
 }
 
 export interface RiskResponse {
   metrics: RiskMetric[];
+  /** Annual risk-free rate (decimal) used for Sharpe/Sortino. */
+  riskFree?: number | null;
+  /** Where riskFree came from, e.g. "FRED DGS3MO" or "fallback 4%". */
+  riskFreeSource?: string | null;
 }
 
 export interface Valuation {
@@ -68,6 +74,11 @@ export interface RatiosResponse {
   valuation: RatioGroup;
   /** Null ratios that could not be computed honestly, keyed by path ("valuation.psRatio", "zScore"). */
   unavailable?: Record<string, string>;
+  /** Annual risk-free rate (decimal) used for Sharpe/Sortino, and its source. */
+  riskFree?: number | null;
+  riskFreeSource?: string | null;
+  /** How `beta` was estimated: return window, frequency, benchmark index and sample size. */
+  betaBasis?: { period: string; frequency: string; benchmark: string; nObs: number | null } | null;
 }
 
 export interface SearchResult {
@@ -195,12 +206,22 @@ export interface WaccInfo {
   costOfEquity: number | null;
   costOfDebt: number | null;
   taxRate: number | null;
+  /** Beta used in CAPM: Blume-adjusted for non-USD listings (audit M-10). */
   beta: number | null;
+  rawBeta?: number | null;
+  betaAdjustment?: "Blume" | null;
   country: string;
   riskFree: number | null;
+  /** "FRED DGS10", "fallback 4%", or the local 10-year series, e.g. "FRED IRLTLT01NLM156N". */
+  riskFreeSource?: string | null;
+  /** Month of the local (monthly, lagged) yield observation. */
+  riskFreeAsOf?: string | null;
+  riskFreeStale?: boolean | null;
   erp: number | null;
   weightEquity: number | null;
   weightDebt: number | null;
+  /** Reasons for a missing rate or beta, e.g. no local 10-year yield. */
+  unavailable?: { riskFree?: string; beta?: string };
 }
 export interface ValModel {
   model: string;
@@ -237,9 +258,13 @@ export interface Fundamentals {
     fiveFactor: Record<string, number | null>;
   } | null;
   piotroski: { score: number | null; maxScore: number | null; criteria: Record<string, boolean | null> } | null;
-  beneish: { mScore: number | null; note?: string } | null;
-  ohlson: { oScore: number | null; probDefault: number | null } | null;
-  cashConversionCycle: { ccc: number | null; dso: number | null; dio: number | null; dpo: number | null } | null;
+  beneish: { mScore: number | null; manipulationLikely?: boolean | null; note?: string } | null;
+  ohlson: { oScore: number | null; probDefault: number | null; reason?: string } | null;
+  cashConversionCycle: {
+    ccc: number | null; dso: number | null; dio: number | null; dpo: number | null;
+    /** Reason per null field, e.g. banks (audit M-23). */
+    unavailable?: Partial<Record<"ccc" | "dso" | "dio" | "dpo", string>>;
+  } | null;
 }
 export interface AnalystData {
   ticker: string;
@@ -1674,6 +1699,8 @@ export interface SnowflakeResponse {
   sector: string | null;
   industry: string | null;
   sectorPeers: number;
+  /** Peer set behind the percentile ranks; `reason` is set when there is none (audit M-13). */
+  peerGroup?: { scope: string | null; n: number; reason: string | null };
   overallScore: number | null;
   verdict: string;
   scores: SnowflakeScores;

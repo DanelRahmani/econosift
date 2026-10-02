@@ -46,9 +46,9 @@ function fmtWacc(v: number | null | undefined): string {
 // ---------------------------------------------------------------------------
 
 /** A single KPI tile in the top strip. */
-function KpiTile({ label, value, prov }: { label: string; value: string; prov?: string }) {
+function KpiTile({ label, value, prov, hint }: { label: string; value: string; prov?: string; hint?: string }) {
   return (
-    <div className="flex flex-col gap-0.5 rounded-lg bg-surface-alt px-3 py-2.5 min-w-[6rem]" data-prov={prov} data-prov-ctx={label}>
+    <div className="flex flex-col gap-0.5 rounded-lg bg-surface-alt px-3 py-2.5 min-w-[6rem]" data-prov={prov} data-prov-ctx={label} title={hint}>
       <span className="text-xs text-text-muted truncate">{label}</span>
       <span className="font-mono text-xs lg:text-sm text-text-primary truncate" title={value}>{value}</span>
     </div>
@@ -67,15 +67,29 @@ function Row({ label, value, valueClass, prov, naReason }: { label: string; valu
   );
 }
 
-/** Piotroski score badge with traffic-light color. */
+/**
+ * Piotroski bands. The classic cut-offs are for the 9-point score: >= 7 strong,
+ * 4-6 neutral, < 4 weak. When fewer tests are computable (e.g. 7 for banks) the cut-offs
+ * are scaled by the same fractions of maxScore: strong >= ceil(7/9 x max), weak < ceil(4/9 x max).
+ */
+function piotroskiBands(maxScore: number): { strongMin: number; weakBelow: number } {
+  return {
+    strongMin: Math.ceil((7 * maxScore) / 9 - 1e-9),
+    weakBelow: Math.ceil((4 * maxScore) / 9 - 1e-9),
+  };
+}
+
+/** Piotroski score badge with traffic-light color, bands scaled to maxScore. */
 function PiotroskiBadge({ score, maxScore }: { score: number | null; maxScore: number | null }) {
-  if (nil(score) || nil(maxScore)) {
+  // maxScore 0 = no test could be evaluated ("Insufficient data"): neutral, never a green 0 / 0.
+  if (nil(score) || nil(maxScore) || (maxScore as number) <= 0) {
     return <span className="px-2 py-0.5 rounded-md text-xs font-semibold bg-surface-alt text-text-secondary">{DASH}</span>;
   }
   const s = score as number;
+  const { strongMin, weakBelow } = piotroskiBands(maxScore as number);
   const cls =
-    s >= 7 ? "bg-success/20 text-success" :
-    s >= 4 ? "bg-warning/20 text-warning" :
+    s >= strongMin ? "bg-success/20 text-success" :
+    s >= weakBelow ? "bg-warning/20 text-warning" :
     "bg-danger/20 text-danger";
   return (
     <span className={`px-2 py-0.5 rounded-md text-xs font-semibold ${cls}`}>
@@ -84,36 +98,67 @@ function PiotroskiBadge({ score, maxScore }: { score: number | null; maxScore: n
   );
 }
 
-/** Beneish M-Score badge. Red if mScore > -1.78 (possible manipulation). */
-function BeneishBadge({ mScore, note }: { mScore: number | null; note?: string }) {
-  if (nil(mScore) && !note) {
-    return <span className="px-2 py-0.5 rounded-md text-xs font-semibold bg-surface-alt text-text-secondary">{DASH}</span>;
+/**
+ * Beneish M-Score badge. Red when the backend flags `manipulationLikely` (M > −2.22, the
+ * 8-variable cut-off used on /corporate), green only for a real score below it. A missing
+ * score (with its backend note) is a neutral n/a, never green.
+ */
+function BeneishBadge({ mScore, manipulationLikely, note }: { mScore: number | null; manipulationLikely?: boolean | null; note?: string }) {
+  if (nil(mScore) || manipulationLikely == null) {
+    return <NaReason reason={note} className="px-2 py-0.5 rounded-md text-xs font-semibold bg-surface-alt" />;
   }
-  const manipulated = !nil(mScore) && (mScore as number) > -1.78;
+  const manipulated = manipulationLikely === true;
   const cls = manipulated ? "bg-danger/20 text-danger" : "bg-success/20 text-success";
-  const label = !nil(mScore)
-    ? `${(mScore as number).toFixed(2)}${manipulated ? " ⚠ Possible manip." : " ✓ Low risk"}`
-    : (note ?? DASH);
   return (
-    <span className={`px-2 py-0.5 rounded-md text-xs font-semibold ${cls}`}>{label}</span>
+    <span className={`px-2 py-0.5 rounded-md text-xs font-semibold ${cls}`}>
+      {`${(mScore as number).toFixed(2)}${manipulated ? " ⚠ Possible manip." : " ✓ Low risk"}`}
+    </span>
   );
 }
 
-/** Ohlson O-Score badge showing probability of default. */
-function OhlsonBadge({ oScore, probDefault }: { oScore: number | null; probDefault: number | null }) {
+/**
+ * Ohlson O-Score badge showing probability of default. Colour bands: < 5 % green (low),
+ * 5-50 % neutral (no verdict: Ohlson probabilities are not calibrated for modern large caps,
+ * so a mid value is not "good" and not an alarm), > 50 % red (the classic O-score cut-off).
+ */
+function OhlsonBadge({ oScore, probDefault, reason }: { oScore: number | null; probDefault: number | null; reason?: string }) {
   if (nil(oScore) && nil(probDefault)) {
-    return <span className="px-2 py-0.5 rounded-md text-xs font-semibold bg-surface-alt text-text-secondary">{DASH}</span>;
+    return <NaReason reason={reason} className="px-2 py-0.5 rounded-md text-xs font-semibold bg-surface-alt" />;
   }
   const prob = nil(probDefault) ? null : (probDefault as number) * 100;
-  const high = prob !== null && prob > 50;
-  const cls = high ? "bg-danger/20 text-danger" : "bg-success/20 text-success";
+  const cls =
+    prob === null ? "bg-surface-alt text-text-secondary" :
+    prob > 50 ? "bg-danger/20 text-danger" :
+    prob < 5 ? "bg-success/20 text-success" :
+    "bg-surface-alt text-text-secondary";
   const scoreStr = nil(oScore) ? "" : `O=${(oScore as number).toFixed(2)} · `;
   const probStr = prob !== null ? `P(default)=${prob.toFixed(1)}%` : "";
   return (
-    <span className={`px-2 py-0.5 rounded-md text-xs font-semibold ${cls}`}>
+    <span
+      className={`px-2 py-0.5 rounded-md text-xs font-semibold ${cls}`}
+      title="Ohlson probabilities are uncalibrated for modern large caps; read as a relative distress rank, not a literal default probability."
+    >
       {scoreStr}{probStr || DASH}
     </span>
   );
+}
+
+/** Risk-free label naming the rate: US 10Y, or the local 10Y with its (monthly, lagged) as-of month. */
+function riskFreeLabel(w: WaccInfo): string {
+  const src = w.riskFreeSource ?? "";
+  if (src === "fallback 4%") return "Risk-Free (fallback 4%)";
+  if (src.startsWith("FRED IRLTLT") || src.startsWith("FRED INDIRLTLT")) {
+    const month = w.riskFreeAsOf ? w.riskFreeAsOf.slice(0, 7) : "";
+    return `Risk-Free (${w.country} 10Y${month ? `, ${month}` : ""}${w.riskFreeStale ? ", stale" : ""})`;
+  }
+  return src === "FRED DGS10" ? "Risk-Free (US 10Y)" : "Risk-Free";
+}
+
+/** Legend line under the Piotroski label, with bands scaled to the score's maximum. */
+function piotroskiLegend(maxScore: number | null): string {
+  if (nil(maxScore)) return "≥7 Strong · 4–6 Neutral · <4 Weak (of 9)";
+  const { strongMin, weakBelow } = piotroskiBands(maxScore as number);
+  return `≥${strongMin} Strong · ${weakBelow}–${strongMin - 1} Neutral · <${weakBelow} Weak (of ${maxScore})`;
 }
 
 /** Short float color: >20% red, 10-20% orange, else default. */
@@ -190,7 +235,7 @@ export function ValuationKpiPanel({ kpis, wacc, fundamentals }: Props) {
       : `${nil(kpis.fiftyTwoWeekLow) ? DASH : fmtPrice(kpis.fiftyTwoWeekLow, sym)} – ${nil(kpis.fiftyTwoWeekHigh) ? DASH : fmtPrice(kpis.fiftyTwoWeekHigh, sym)}`;
 
   // ── KPI strip tiles ───────────────────────────────────────────────────────
-  const kpiTiles: { label: string; value: string; prov: string }[] = [
+  const kpiTiles: { label: string; value: string; prov: string; hint?: string }[] = [
     { label: "Price", value: fmtPrice(kpis.price, sym), prov: "kpis.price" },
     { label: "Market Cap", value: nil(kpis.marketCap) ? DASH : `${sym}${fmtLarge(kpis.marketCap)}`, prov: "kpis.marketCap" },
     { label: "P/E (TTM)", value: fmtNum(kpis.trailingPE), prov: "kpis.trailingPE" },
@@ -199,7 +244,7 @@ export function ValuationKpiPanel({ kpis, wacc, fundamentals }: Props) {
     { label: "Fwd EPS", value: nil(kpis.forwardEps) ? DASH : `${sym}${fmtNum(kpis.forwardEps)}`, prov: "kpis.forwardEps" },
     { label: "Div. Yield", value: nil(kpis.dividendYield) ? DASH : fmtPct(kpis.dividendYield), prov: "kpis.dividendYield" },
     { label: "52W Range", value: rangeStr, prov: "kpis.fiftyTwoWeekLow" },
-    { label: "Beta", value: fmtNum(kpis.beta), prov: "kpis.beta" },
+    { label: "Beta (5y mo.)", value: fmtNum(kpis.beta), prov: "kpis.beta", hint: "Yahoo beta: 5 years of monthly returns vs the S&P 500. The Ratios tab and Overview use the selected period of daily returns vs the ticker's local index." },
   ];
 
   // ── Short float color ─────────────────────────────────────────────────────
@@ -225,7 +270,7 @@ export function ValuationKpiPanel({ kpis, wacc, fundamentals }: Props) {
       {/* ── KPI Strip ─────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
         {kpiTiles.map((t) => (
-          <KpiTile key={t.label} label={t.label} value={t.value} prov={t.prov} />
+          <KpiTile key={t.label} label={t.label} value={t.value} prov={t.prov} hint={t.hint} />
         ))}
       </div>
 
@@ -277,6 +322,7 @@ export function ValuationKpiPanel({ kpis, wacc, fundamentals }: Props) {
                 label="Cash Conv. Cycle"
                 value={nil(ccc) ? DASH : `${fmtNum(ccc, 1)} days`}
                 prov="fundamentals.cashConversionCycle.ccc"
+                naReason={nil(ccc) ? fundamentals.cashConversionCycle?.unavailable?.ccc : undefined}
               />
               <Row
                 label="Avg. Volume"
@@ -302,13 +348,18 @@ export function ValuationKpiPanel({ kpis, wacc, fundamentals }: Props) {
               WACC Breakdown
             </h3>
             <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5">
-              <Row label="WACC" value={fmtWacc(wacc.wacc)} prov="valuation.wacc.wacc" />
-              <Row label="Cost of Equity" value={fmtWacc(wacc.costOfEquity)} prov="valuation.wacc.costOfEquity" />
+              <Row label="WACC" value={fmtWacc(wacc.wacc)} prov="valuation.wacc.wacc" naReason={nil(wacc.wacc) ? wacc.unavailable?.riskFree : undefined} />
+              <Row label="Cost of Equity" value={fmtWacc(wacc.costOfEquity)} prov="valuation.wacc.costOfEquity" naReason={nil(wacc.costOfEquity) ? wacc.unavailable?.riskFree : undefined} />
               <Row label="Cost of Debt" value={fmtWacc(wacc.costOfDebt)} prov="valuation.wacc.costOfDebt" />
               <Row label="Tax Rate" value={fmtWacc(wacc.taxRate)} prov="valuation.wacc.taxRate" />
               <Row label="ERP" value={fmtWacc(wacc.erp)} prov="valuation.wacc.erp" />
-              <Row label="Risk-Free" value={fmtWacc(wacc.riskFree)} prov="valuation.wacc.riskFree" />
-              <Row label="Beta" value={fmtNum(wacc.beta)} prov="valuation.wacc.beta" />
+              <Row label={riskFreeLabel(wacc)} value={fmtWacc(wacc.riskFree)} prov="valuation.wacc.riskFree" naReason={nil(wacc.riskFree) ? wacc.unavailable?.riskFree : undefined} />
+              <Row
+                label={wacc.betaAdjustment === "Blume" ? "Beta (Blume-adj., 2y daily vs local index)" : "Beta (2y daily, local index)"}
+                value={wacc.betaAdjustment === "Blume" && !nil(wacc.rawBeta) ? `${fmtNum(wacc.beta)} (raw ${fmtNum(wacc.rawBeta)})` : fmtNum(wacc.beta)}
+                prov="valuation.wacc.beta"
+                naReason={nil(wacc.beta) ? wacc.unavailable?.beta : undefined}
+              />
               <Row
                 label="Wt. Equity"
                 value={nil(wacc.weightEquity) ? DASH : fmtPct((wacc.weightEquity as number) * 100)}
@@ -397,7 +448,7 @@ export function ValuationKpiPanel({ kpis, wacc, fundamentals }: Props) {
                 <div className="min-w-0">
                   <p className="text-sm text-text-secondary">Piotroski F-Score</p>
                   <p className="text-xs text-text-muted mt-0.5">
-                    ≥7 Strong · 4–6 Neutral · &lt;4 Weak
+                    {piotroskiLegend(piotroski?.maxScore ?? null)}
                   </p>
                 </div>
                 <PiotroskiBadge
@@ -435,14 +486,18 @@ export function ValuationKpiPanel({ kpis, wacc, fundamentals }: Props) {
                 <div className="min-w-0">
                   <p className="text-sm text-text-secondary">Beneish M-Score</p>
                   <p className="text-xs text-text-muted mt-0.5">
-                    &gt;−1.78 = possible earnings manipulation
+                    &gt;−2.22 = possible earnings manipulation
                   </p>
                 </div>
                 <BeneishBadge
                   mScore={beneish?.mScore ?? null}
+                  manipulationLikely={beneish?.manipulationLikely}
                   note={beneish?.note}
                 />
               </div>
+              {nil(beneish?.mScore) && beneish?.note && (
+                <p className="text-xs text-text-muted" data-prov="fundamentals.beneish">n/a — {beneish.note}</p>
+              )}
 
               <div className="border-t border-border" />
 
@@ -457,6 +512,7 @@ export function ValuationKpiPanel({ kpis, wacc, fundamentals }: Props) {
                 <OhlsonBadge
                   oScore={ohlson?.oScore ?? null}
                   probDefault={ohlson?.probDefault ?? null}
+                  reason={ohlson?.reason}
                 />
               </div>
 

@@ -97,6 +97,9 @@ export function SnowflakeChart({ ticker, onAxisClick, compact = false }: Props) 
           <p className="text-xs text-text-muted">
             <span data-prov="sectorPeers">{data.sectorPeers} sector peers</span> · <span data-prov="sector">{data.sector ?? "Unknown sector"}</span>
           </p>
+          {data.peerGroup?.reason && (
+            <p className="text-xs text-text-muted" data-prov="peerGroup.reason">{data.peerGroup.reason}</p>
+          )}
         </div>
         <div className="text-right">
           <div className="text-2xl font-bold" style={{ color: verdictColor }} data-prov="overallScore">

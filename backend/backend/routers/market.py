@@ -9,6 +9,7 @@ from .. import provenance as pv
 from ..services import yfinance_service as yfs
 from ..services import metrics
 from ..services import fx_service
+from ..services import discount_rates
 
 router = APIRouter(prefix="/api/market", tags=["market"])
 
@@ -31,6 +32,16 @@ def _pct_change(series: pd.Series) -> float | None:
     if len(s) < 2 or s.iloc[0] == 0:
         return None
     return round((float(s.iloc[-1]) / float(s.iloc[0]) - 1.0) * 100.0, 2)
+
+
+def _ytd_change(series: pd.Series) -> float | None:
+    """YTD % change from the prior year-end close; None when the history does not reach it."""
+    from ..services.sector_service import ytd_base
+    s = series.dropna()
+    base = ytd_base(s)
+    if not base or len(s) == 0:
+        return None
+    return round((float(s.iloc[-1]) / base - 1.0) * 100.0, 2)
 
 
 def _benchmarks_for(syms: list[str], override: str | None) -> tuple[list[str], dict[str, str]]:
@@ -124,13 +135,19 @@ async def news(ticker: str):
 async def sectors(period: str = "1mo"):
     """Performance of the 11 S&P 500 sector SPDR ETFs over a period."""
     syms = tuple(e[0] for e in SECTOR_ETFS)
-    frame = await asyncio.to_thread(yfs.get_close_frame, syms, period)
+    ytd = period == "ytd"
+    # Yahoo's "ytd" window starts at the first January close; YTD is measured from the prior
+    # year-end close (audit M-07), so fetch a year and take that base, as the sector table does.
+    frame = await asyncio.to_thread(yfs.get_close_frame, syms, "1y" if ytd else period)
     rows = []
     for sym, name in SECTOR_ETFS:
-        change = _pct_change(frame[sym]) if frame is not None and sym in frame.columns else None
+        change = None
+        if frame is not None and sym in frame.columns:
+            change = _ytd_change(frame[sym]) if ytd else _pct_change(frame[sym])
         rows.append({"ticker": sym, "sector": name, "changePercent": change})
     rows.sort(key=lambda r: (r["changePercent"] is None, -(r["changePercent"] or 0)))
-    formula = f"(last adjusted close / first adjusted close in the {period} window − 1) × 100"
+    formula = ("(last adjusted close / last adjusted close of the previous calendar year − 1) × 100" if ytd
+               else f"(last adjusted close / first adjusted close in the {period} window − 1) × 100")
     prov = {"*": pv.derived(formula, [pv.ref("yahoo", None, "Sector SPDR ETF daily adjusted close",
                                              frequency="daily", observed=pv.last_date(frame))],
                             title="Sector ETF performance")}
@@ -199,8 +216,12 @@ async def fx_rates_endpoint(base: str = "USD"):
 
 @router.get("/risk")
 async def risk(tickers: str = Query(...), period: str = "1y",
-               risk_free: float = 0.04, benchmark: str | None = None):
+               risk_free: float | None = None, benchmark: str | None = None):
     syms = _parse_tickers(tickers)
+    if risk_free is not None:
+        rf_source = "request parameter"
+    else:
+        risk_free, rf_source = await asyncio.to_thread(discount_rates.short_risk_free_rate_with_source)
     benchmarks, bench_map = _benchmarks_for(syms, benchmark)
     all_syms = tuple(dict.fromkeys(syms + benchmarks))
 
@@ -217,12 +238,13 @@ async def risk(tickers: str = Query(...), period: str = "1y",
             m["benchmark"] = bench
             out_metrics.append(m)
 
-    return pv.attach({"metrics": out_metrics}, _risk_provenance(out_metrics, frame, period, risk_free))
+    return pv.attach({"metrics": out_metrics, "riskFree": risk_free, "riskFreeSource": rf_source},
+                     _risk_provenance(out_metrics, frame, period, risk_free, rf_source))
 
 
-def _risk_provenance(rows: list[dict], frame, period: str, risk_free: float) -> dict:
+def _risk_provenance(rows: list[dict], frame, period: str, risk_free: float, rf_source: str) -> dict:
     """``metrics.<ticker>`` and ``metrics.<ticker>.<field>`` for each risk row."""
-    rf = f"rf = the risk_free request parameter (server default 0.04), here {risk_free:g}"
+    rf = f"rf = {risk_free:g} ({rf_source})"
     prov: dict = {"*": pv.derived(
         "annualised statistics of daily log returns of the adjusted close; beta is benchmark-relative",
         [pv.ref("yahoo", None, f"Daily adjusted close, {period}", frequency="daily",
@@ -242,8 +264,8 @@ def _risk_provenance(rows: list[dict], frame, period: str, risk_free: float) -> 
             ("dailyMeanReturn", "mean(r)", "Mean daily log return"),
             ("var95", "5th percentile of r (historical 1-day VaR)", "1-day 95% VaR"),
             ("cvar95", "mean of r over days where r ≤ VaR95", "1-day 95% CVaR (expected shortfall)"),
-            ("sharpe", f"(mean(r) × 252 − rf) / (stdev(r, ddof=1) × √252); {rf}", "Sharpe ratio"),
-            ("sortino", f"(mean(r) × 252 − rf) / (√mean(min(r − rf/252, 0)²) × √252); {rf}", "Sortino ratio"),
+            ("sharpe", f"(mean(R) × 252 − rf) / (stdev(R, ddof=1) × √252) of simple returns R = close / previous close − 1; {rf}", "Sharpe ratio"),
+            ("sortino", f"(mean(R) × 252 − rf) / (√mean(min(R − rf/252, 0)²) × √252) of simple returns R; {rf}", "Sortino ratio"),
             ("beta", f"cov(r, r_benchmark) / var(r_benchmark) over common days, benchmark {bench}", "Beta"),
         ):
             prov[f"{base}.{field}"] = pv.derived(formula, inputs, title=title)

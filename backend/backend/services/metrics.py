@@ -35,23 +35,30 @@ def risk_metrics(asset_prices: pd.Series, bench_prices: pd.Series,
         return {
             "annVolatility": None, "dailyMeanReturn": None, "var95": None,
             "cvar95": None, "sharpe": None, "sortino": None, "beta": None,
-            "returns": [],
+            "returns": [], "nObs": 0,
         }
 
     daily_mean = r.mean()
-    ann_return = daily_mean * TRADING_DAYS
     ann_vol = r.std(ddof=1) * math.sqrt(TRADING_DAYS)
 
     var95 = np.percentile(r, 5)
     tail = r[r <= var95]
     cvar95 = tail.mean() if len(tail) else var95
 
-    # Downside deviation vs the daily risk-free MAR over all days (audit C-17).
-    shortfall = np.minimum(r - risk_free / TRADING_DAYS, 0.0)
-    downside_dev = math.sqrt(float((shortfall ** 2).mean())) * math.sqrt(TRADING_DAYS) if len(r) > 1 else None
+    # Sharpe / Sortino use simple returns and the arithmetic mean (audit M-18): the mean
+    # log return understates the annual return by about sigma^2 / 2, which flipped MSFT's
+    # Sharpe from +0.02 to -0.14. Volatility, VaR and beta above stay on log returns.
+    prices = asset_prices.dropna()
+    simple = (prices / prices.shift(1) - 1.0).dropna()
+    s_ann_return = simple.mean() * TRADING_DAYS
+    s_ann_vol = simple.std(ddof=1) * math.sqrt(TRADING_DAYS) if len(simple) > 1 else None
 
-    sharpe = (ann_return - risk_free) / ann_vol if ann_vol and ann_vol > 0 else None
-    sortino = ((ann_return - risk_free) / downside_dev
+    # Downside deviation vs the daily risk-free MAR over all days (audit C-17).
+    shortfall = np.minimum(simple - risk_free / TRADING_DAYS, 0.0)
+    downside_dev = math.sqrt(float((shortfall ** 2).mean())) * math.sqrt(TRADING_DAYS) if len(simple) > 1 else None
+
+    sharpe = (s_ann_return - risk_free) / s_ann_vol if s_ann_vol and s_ann_vol > 0 else None
+    sortino = ((s_ann_return - risk_free) / downside_dev
                if downside_dev and downside_dev > 0 else None)
 
     beta = None
@@ -74,6 +81,7 @@ def risk_metrics(asset_prices: pd.Series, bench_prices: pd.Series,
         "sortino": _clean(sortino),
         "beta": _clean(beta),
         "returns": [_clean(v) for v in r.tolist()],
+        "nObs": int(len(r)),
     }
 
 
@@ -98,6 +106,10 @@ def dcf_target(info: dict, fcf_growth: float, terminal_growth: float,
     except (TypeError, ValueError):
         return None
 
+    from .dcf_engine import is_bank  # lazy: dcf_engine imports this module
+    if fcf <= 0 or is_bank(info):  # same locks as dcf_engine.two_stage_dcf (Phase 53)
+        return None
+
     pv = 0.0
     cf = fcf
     for year in range(1, 6):
@@ -110,6 +122,8 @@ def dcf_target(info: dict, fcf_growth: float, terminal_growth: float,
     total_debt = float(info.get("totalDebt") or 0)
     cash = float(info.get("totalCash") or 0)
     equity_value = pv - total_debt + cash
+    if equity_value <= 0:
+        return None
     if shares <= 0:
         return None
     return _clean(equity_value / shares)
@@ -382,6 +396,18 @@ def compute_ratios(bundle: dict) -> dict:
                    if k in ("psRatio", "pbRatio", "evEbitda", "evRevenue")}
     if mm["statementToPriceFx"] is None:
         unavailable["zScore"] = next(iter(mm["unavailable"].values()))
+
+    # A bank's receivables are loans and its cash flow is deposits and trading flows, so
+    # DSO and FCF margin are not measures of collection speed or cash generation (audit M-23:
+    # JPM DSO 224 days, FCF margin -81 %).
+    from .dcf_engine import is_bank  # lazy: dcf_engine imports this module
+    if is_bank(info):
+        for k in ("dso", "receivablesTurnover"):  # receivables turnover is DSO inverted
+            efficiency[k] = None
+            unavailable[f"efficiency.{k}"] = "not meaningful for banks: receivables are loans, not trade credit"
+        profitability["fcfMargin"] = None
+        unavailable["profitability.fcfMargin"] = ("not meaningful for banks: operating cash flow is dominated "
+                                                  "by deposit, loan and trading flows")
 
     return {
         "liquidity": liquidity,

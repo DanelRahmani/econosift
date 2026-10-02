@@ -56,6 +56,33 @@ None rejected. Found while fixing: a half-failed Yahoo `info` call was cached fo
 | M-22 | Overview risk cards show the first ticker only, with no ticker, horizon (1-day) or sample size label | `markets/page.tsx:289-309` |
 | M-23 | Bank metrics shown as normal (JPM DSO 224 days, FCF margin −81 %); Piotroski bands not scaled to maxScore 7 | `metrics.py:196-223`; `fundamentals.py:536-578`; `ValuationKpiPanel.tsx:68-82` |
 
+### Status of the Medium findings (Phase 54, M-10 in Phase 55, 2026-10-02)
+
+All reproduced. Live values after the fix are from the rebuilt stack on 2026-10-02 (cache cleared first); "before" is the audit's or the fixing agent's live value. A fresh-context spec review of the whole diff found seven more wrong outputs, fixed with tests (listed under the table).
+
+| ID | Status | Before → after (live) | Tests |
+|---|---|---|---|
+| M-06 | ✅ fixed | AAPL quote card −1.53 % vs Treemap −1.22 % (from `fast_info.previous_close`) → quote −0.81 % = Treemap −0.81 % (last two daily closes) | `test_yf_quotes_m06_m12_m20.py` |
+| M-07 | ✅ fixed | XLE YTD 38.38 % (first January close) → 43.02 % in the table **and** the Sectors heatmap (prior year-end close). The heatmap's own endpoint still used the January base (40.07 %) until the live gate caught it. | `test_sector_returns_m07_m08.py` (incl. `test_sector_chart_endpoint_ytd_uses_prior_year_end`) |
+| M-08 | ✅ fixed | XLK 3M table 7.14 % vs chart 8.91 % → 9.66 % in both (63 sessions) | `test_sector_returns_m07_m08.py` |
+| M-09 | ✅ fixed | Samsung ERP 4.46 % (US) → 4.869 % (Korea), tax 21 % → 26.4 % | `TestKoreaMapping` |
+| M-10 | ✅ fixed (Phase 55, owner chose option B + Blume) | ASML.AS rf 5.26 % (US DGS10) → 3.285 % (NL 10Y, Aug 2026, labelled); beta 2.235 → 1.83 Blume (raw 2.24 vs ^AEX); ke 14.72 % → 11.03 %; WACC 14.68 % → 11.01 %, all EUR. Samsung uses the Korean 10Y 4.286 %. 0700.HK: no FRED 10Y → rf, ke, WACC null with the reason, models lock on it (the US rate is never substituted). USD-priced listings (AAPL, TSM ADR) unchanged on DGS10. `.BR` now maps to ^BFX (was Brazil's ^BVSP), plus 12 more local indexes. | `test_local_discount_rate_m10.py` |
+| M-11 | ✅ fixed | Live Damodaran parse read the 'Country Lookup' calculator (always fell back to the static file), `log` undefined → reads 'Regional breakdown' (157 countries, matches the static JSON), `log` defined, 30 s timeout | `TestLiveDamodaranParse` |
+| M-12 | ✅ fixed | Samsung forward EPS ₩47,965 (`0y`) → ₩71,030 (`+1y`) | `test_yf_quotes_m06_m12_m20.py` |
+| M-13 | ✅ fixed | Snowflake Piotroski 3/4 → full 9 tests; TSM "sector peers" 527 (whole universe) → 84 GICS peers (or none + `peerGroup.reason`, shown on the card); FCF coverage 0.067 → 6.7× | `test_snowflake_m13.py` |
+| M-14 | ✅ fixed | AAPL Beneish "not available" → −2.29, "not flagged" (reuses `/corporate/health`, cut-off −2.22, quarterly prior-year fallback); null + note for banks | `test_fundamentals_m14_m15.py` |
+| M-15 | ✅ fixed | Ohlson SIZE in statement currency → USD (null + reason without an FX rate); "P(default) 9.8 %" green → neutral band 5–50 % | `test_fundamentals_m14_m15.py` |
+| M-16 | ✅ fixed | AAPL DcfPanel defaulted to WACC 9 % / g 8 % → seeded from the engine's DCF: grid $168.40 = panel default $168.40; region selector relabelled "Cost of equity (β = 1)" | tsc + live browser check |
+| M-17 | ✅ fixed | Three unlabelled betas → "Beta (5y mo.)", "Beta (2y daily, local index)" (Blume-adj. for non-USD), Ratios "1y daily vs ^GSPC, n=250" | tsc + live browser check |
+| M-18 | ✅ fixed | Sharpe/Sortino on mean log returns with a hard-coded 4 % → simple returns, rf FRED DGS3MO 4.20 % (`riskFree`/`riskFreeSource` in the response); MSFT Sharpe −0.14 → +0.04 | `test_ratios_m18_m23.py` |
+| M-19 | ✅ fixed | AAPL monthly pivot P 313.26 → 329.42 (last completed month) | `test_technicals_m19.py` |
+| M-20 | ✅ fixed | Treemap GOOGL + GOOG (≈8.4T of area) → GOOGL only (also BRK-A/FOX/NWS…; Black-Litterman keeps every class) | `test_yf_quotes_m06_m12_m20.py` |
+| M-21 | ✅ fixed | Forward estimates `113624521680.00`, `0.07`, `27.00` → compact money, 7.0 %, 27 (top-level growth fractions and forward EPS too) | tsc |
+| M-22 | ✅ fixed | Overview risk cards for the first ticker only → one block per ticker: "1y window · 250 daily returns", "1-day VaR 95%", rf and source, beta basis | tsc + live browser check |
+| M-23 | ✅ fixed | JPM DSO 224 days, FCF margin −81 % → n/a "not meaningful for banks: …"; Piotroski bands scaled to maxScore (and a 0-of-0 score is neutral, not green) | `test_ratios_m18_m23.py`, `test_fundamentals_m14_m15.py` |
+
+None rejected. Spec review findings, fixed: Beneish lacked `/corporate/health`'s quarterly prior-year fallback; Ohlson read a converted bundle as USD when its FX lookup failed; Snowflake scored Piotroski 0/10 when no test could be evaluated; the rf label was looked up separately from the rate (a FRED retry could label the 4 % fallback "FRED DGS3MO"); top-level growth fractions printed raw; the Sharpe/Sortino guide still said log returns; the DCF panel dropped the region override on a ticker switch. Low items fixed alongside: P3-16 (Bollinger ddof 0), P3-17 shift (Senkou displaced 26), P3-27, P3-28. Follow-ups are P3-29 … P3-34 in `ACTIVE_ISSUES.md`.
+
 ## Low
 Bollinger uses sample std (ddof=1); Ichimoku cloud shifted 25 not 26 and the forward
 cloud is never emitted; Fibonacci always measured from the swing high, on closes;

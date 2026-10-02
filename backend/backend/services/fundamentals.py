@@ -367,8 +367,17 @@ def piotroski_f(bundle: dict, prior_year: dict | None = None) -> dict:
     return {
         "score": score,
         "maxScore": max_score,
+        "interpretation": _piotroski_band(score, max_score),
         "criteria": criteria,
     }
+
+
+def _piotroski_band(score: int, max_score: int) -> str:
+    """Strong / Average / Weak scaled to the tests evaluated (the classic 8-9 / 4-7 / 0-3 are fractions of 9)."""
+    if not max_score:
+        return "Insufficient data"
+    frac = score / max_score
+    return "Strong" if frac >= 7 / 9 else ("Average" if frac >= 4 / 9 else "Weak")
 
 
 # ---------------------------------------------------------------------------
@@ -376,25 +385,26 @@ def piotroski_f(bundle: dict, prior_year: dict | None = None) -> dict:
 # ---------------------------------------------------------------------------
 
 def beneish_m(bundle: dict) -> dict:
-    """Beneish M-Score (8-variable).
+    """Beneish M-Score (8-variable), reusing the ``/corporate/health`` computation.
 
-    All eight Beneish index variables require current-period AND prior-period
-    financials (t and t-1).  The single-period bundle does not carry historical
-    data, so the M-Score cannot be computed without fabricating numbers.
-
-    Returns
-    -------
-    dict with mScore=None and an explanatory note.
+    The index variables need the current and the prior fiscal year, which the
+    bundle carries as the raw statement DataFrames (``financials_df`` etc.,
+    newest column first). Returns that service's dict (``mScore``,
+    ``manipulationLikely``, ``interpretation``, ``indexes``, ...); ``mScore`` is
+    None with a ``note`` when the history is missing or the company is a bank
+    (receivables, gross margin and asset-quality indexes do not apply to one).
     """
-    return {
-        "mScore": None,
-        "note": (
-            "Beneish M-Score requires prior-period statements (t and t-1) for "
-            "all 8 index variables (DSRI, GMI, AQI, SGI, DEPI, SGAI, LVGI, TATA). "
-            "The yfinance snapshot bundle only carries the latest period; "
-            "prior-year data is not available."
-        ),
-    }
+    from .dcf_engine import is_bank
+    from .corporate_health_service import _beneish
+    if is_bank(bundle.get("info") or {}):
+        return {"mScore": None, "note": "Beneish M-Score is not meaningful for banks: its receivables, "
+                                         "gross-margin and asset-quality indexes do not describe a lender."}
+    result = _beneish(bundle.get("financials_df"), bundle.get("balance_sheet_df"), bundle.get("cashflow_df"),
+                      bundle.get("financials_q_df"), bundle.get("balance_sheet_q_df"), bundle.get("cashflow_q_df"))
+    if result.get("mScore") is None:
+        result["note"] = ("Beneish M-Score needs two fiscal years of statements (t and t-1) and at least six "
+                          "of the eight indexes; Yahoo did not supply enough of them.")
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -424,6 +434,18 @@ def _gnp_price_index_cached() -> float | None:
     return float(pts[-1]["value"]) / (sum(base) / len(base)) * 100.0
 
 
+def _statements_to_usd(bundle: dict) -> tuple[float | None, str]:
+    """(USD per statement-currency unit, that currency); the rate is None when no FX rate exists."""
+    info = bundle.get("info") or {}
+    fx = bundle.get("_fx") or {}  # a bundle already converted by dcf_engine.to_price_currency
+    # When the conversion's FX lookup failed (rate None) the statements are still in the source currency.
+    ccy = (fx.get("to") if fx.get("rate") is not None else fx.get("from"))         or info.get("financialCurrency") or info.get("currency")
+    if not ccy or ccy == "USD":
+        return 1.0, ccy or "USD"
+    from .dcf_engine import _fx_rate
+    return _fx_rate(ccy, "USD"), ccy
+
+
 def ohlson_o(bundle: dict) -> dict:
     """Ohlson O-Score (1980 logit model, 9 coefficients).
 
@@ -431,8 +453,7 @@ def ohlson_o(bundle: dict) -> dict:
         - 1.72*OENEG - 2.37*NITA - 1.83*FUTL + 0.285*INTWO - 0.521*CHIN
 
     where:
-        SIZE  = log(Total Assets / GNP Price Index)  — we use log(TA) as proxy
-                since GNP deflator is unavailable; conservative approximation.
+        SIZE  = log(Total Assets in USD millions / GNP Price Index, 1968 = 100)
         TLTA  = Total Liabilities / Total Assets
         WCTA  = Working Capital / Total Assets
         CLCA  = Current Liabilities / Current Assets
@@ -468,11 +489,16 @@ def ohlson_o(bundle: dict) -> dict:
     # SIZE = log(total assets in $ millions / GNP price-level index, 1968=100),
     # as in Ohlson (1980). log of raw dollars made SIZE ~20 larger, and with
     # its −0.407 coefficient pushed every O-score so low that the default
-    # probability read ~0 for all firms (audit C-11).
+    # probability read ~0 for all firms (audit C-11). The index is a US dollar
+    # deflator, so statements in another currency are converted first (audit M-15).
     price_index = _gnp_price_index()
     if price_index is None or total_assets <= 0:
         return {"oScore": None, "probDefault": None}
-    size = _clean(math.log(total_assets / 1e6 / (price_index / 100.0)))
+    to_usd, ccy = _statements_to_usd(bundle)
+    if to_usd is None:
+        return {"oScore": None, "probDefault": None,
+                "reason": f"No {ccy}/USD exchange rate available to express total assets in US dollars"}
+    size = _clean(math.log(total_assets * to_usd / 1e6 / (price_index / 100.0)))
     if size is None:
         return {"oScore": None, "probDefault": None}
 
@@ -545,6 +571,12 @@ def cash_conversion_cycle(bundle: dict) -> dict:
     dict: ccc, dso, dio, dpo — each float or None
     """
     info, fin, bs, _ = _unpack(bundle)
+
+    from .dcf_engine import is_bank
+    if is_bank(info):  # receivables are loans and there is no inventory or cost of goods (audit M-23)
+        why = "not meaningful for banks: receivables are loans, not trade credit"
+        return {"ccc": None, "dso": None, "dio": None, "dpo": None,
+                "unavailable": {"ccc": why, "dso": why, "dio": why, "dpo": why}}
 
     revenue = _clean(_g(fin, "Total Revenue"))
     cogs = _clean(_g(fin, "Cost Of Revenue", "Cost of Goods Sold"))
@@ -702,11 +734,16 @@ def provenance(bundle: dict, root: str = "fundamentals") -> dict:
         prov[k("piotroski", "criteria", key)] = d(f"{test} (latest fiscal year vs {prior})", [inc, bal, cfs],
                                                   title=key)
 
+    prov[k("beneish")] = d(
+        "M = −4.84 + 0.920·DSRI + 0.528·GMI + 0.404·AQI + 0.892·SGI + 0.115·DEPI − 0.172·SGAI + 4.679·TATA − "
+        "0.327·LVGI from the latest two annual statements (the same computation as /corporate/health); missing "
+        "indexes take the neutral value 1.0 (at most two, TATA required); M > −2.22 flags likely manipulation; "
+        "not computed for banks", [inc, bal, cfs], title="Beneish M-Score")
     gnp = pv.fred("GDPDEF", "US GDP implicit price deflator", frequency="quarterly",
                   note="Rebased to 1968 average = 100 and used in place of Ohlson's GNP price index.")
     prov[k("ohlson", "oScore")] = d(
         "−1.32 − 0.407·SIZE + 6.03·TLTA − 1.43·WCTA + 0.076·CLCA − 1.72·OENEG − 2.37·NITA − 1.83·FUTL + 0.285·INTWO "
-        "− 0.521·CHIN; SIZE = ln(total assets in $ millions / price index / 100), TLTA = liabilities / assets, "
+        "− 0.521·CHIN; SIZE = ln(total assets in US-dollar millions / (price index / 100)), TLTA = liabilities / assets, "
         "WCTA = working capital / assets, CLCA = current liabilities / current assets, OENEG = 1 if liabilities > "
         "assets, NITA = net income / assets, FUTL = operating cash flow / liabilities, INTWO = 1 if net income < 0 "
         "(this year only), CHIN = 0; a ratio that cannot be computed contributes 0",

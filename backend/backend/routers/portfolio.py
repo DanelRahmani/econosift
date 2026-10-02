@@ -431,7 +431,7 @@ async def black_litterman(req: BLRequest):
     views = [{"ticker": v.ticker.strip().upper(), "expectedReturn": v.expectedReturn}
              for v in req.views]
     caps = await asyncio.to_thread(
-        yfs.get_market_caps, tuple(h["ticker"] for h in holdings))
+        yfs.get_market_caps, tuple(h["ticker"] for h in holdings), False)  # BL prior needs every class
     result = await asyncio.to_thread(port.black_litterman, holdings, frame, views, req.risk_free, caps)
     if "error" in result:
         return result
