@@ -94,28 +94,24 @@ def ytd_base(s) -> float | None:
 @cached("sector_returns")
 def get_sector_returns() -> dict:
     all_syms = tuple(list(SECTOR_ETFS.keys()) + ["SPY"])
-    frame = yfs.get_close_frame(all_syms, "1y")
+    # "2y" so the 1Y base (252 sessions back) is inside the window; "1y" holds only ~250 sessions.
+    frame = yfs.get_close_frame(all_syms, "2y")
 
     if frame is None or frame.empty:
         return {"periods": {k: [] for k in ("1d", "1w", "1m", "3m", "ytd", "1y")}}
 
     frame = frame.sort_index()
 
-    def _period_ret(s, n_days: int | None, ytd: bool, first_of_window: bool) -> float | None:
+    def _period_ret(s, n_days: int | None, ytd: bool) -> float | None:
         if len(s) < 2:
             return None
-        if ytd:
-            base = ytd_base(s)
-        elif first_of_window:
-            base = float(s.iloc[0])
-        else:
-            base = session_base(s, n_days)
+        base = ytd_base(s) if ytd else session_base(s, n_days)
         return _safe_pct(float(s.iloc[-1]), base)
 
-    def _spy_ret(n_days: int | None, ytd: bool = False, first_of_window: bool = False) -> float | None:
+    def _spy_ret(n_days: int | None, ytd: bool = False) -> float | None:
         if "SPY" not in frame.columns:
             return None
-        return _period_ret(frame["SPY"].dropna(), n_days, ytd, first_of_window)
+        return _period_ret(frame["SPY"].dropna(), n_days, ytd)
 
     period_defs: list[tuple[str, int | None, bool]] = [
         ("1d", 1, False),
@@ -128,8 +124,7 @@ def get_sector_returns() -> dict:
 
     periods: dict[str, list[dict]] = {}
     for period_key, n_days, is_ytd in period_defs:
-        first_of_window = period_key == "1y"
-        spy_ret = _spy_ret(n_days, ytd=is_ytd, first_of_window=first_of_window)
+        spy_ret = _spy_ret(n_days, ytd=is_ytd)
         rows: list[dict] = []
         for etf, sector in SECTOR_ETFS.items():
             if etf not in frame.columns:
@@ -139,7 +134,7 @@ def get_sector_returns() -> dict:
             if len(s) < 2:
                 rows.append({"ticker": etf, "sector": sector, "changePercent": None, "vsSpy": None})
                 continue
-            ret = _period_ret(s, n_days, is_ytd, first_of_window)
+            ret = _period_ret(s, n_days, is_ytd)
             vs_spy = round(ret - spy_ret, 2) if ret is not None and spy_ret is not None else None
             rows.append({"ticker": etf, "sector": sector, "changePercent": ret, "vsSpy": vs_spy})
         periods[period_key] = rows
@@ -150,8 +145,7 @@ def get_sector_returns() -> dict:
     prov: dict = {"*": pv.derived("sector ETF returns over trading-day windows, and the difference from SPY",
                                   [closes], title="Sector returns", observed=as_of)}
     for period_key, n_days, is_ytd in period_defs:
-        base = ("last close of the previous calendar year" if is_ytd else f"close {n_days} trading days earlier"
-                if period_key != "1y" else "first close of the 1-year window")
+        base = "last close of the previous calendar year" if is_ytd else f"close {n_days} trading days earlier"
         prov[f"periods.{period_key}"] = pv.derived(f"(last close / {base} − 1) × 100 for each sector ETF",
                                                    [closes], title=f"Sector ETF return, {period_key}", observed=as_of)
         prov[f"periods.{period_key}.vsSpy"] = pv.derived(

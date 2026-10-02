@@ -16,6 +16,7 @@ import yfinance as yf
 from .. import provenance as pv
 from ..cache import cached
 from . import constituents
+from . import dcf_engine
 
 logger = logging.getLogger(__name__)
 
@@ -101,8 +102,12 @@ def _safe_div(a: float | None, b: float | None) -> float | None:
 # Z = 1.2*X1 + 1.4*X2 + 3.3*X3 + 0.6*X4 + 1.0*X5
 # ---------------------------------------------------------------------------
 
-def _altman_z(fin, bs, info: dict) -> dict:
-    """Compute Altman Z-Score and its 5 components."""
+def _altman_z(fin, bs, info: dict, fx_rate: float | None = 1.0) -> dict:
+    """Compute Altman Z-Score and its 5 components.
+
+    ``fx_rate`` turns statement currency into the price currency (ADRs: TWD -> USD), so x4 does not
+    divide a USD market cap by TWD liabilities (P2-38); None (FX unavailable) leaves x4 and Z null.
+    """
     # Balance sheet items
     total_assets = _latest_val(bs, "Total Assets")
     total_liabilities = _latest_val(bs, "Total Liabilities Net Minority Interest")
@@ -126,7 +131,8 @@ def _altman_z(fin, bs, info: dict) -> dict:
     x1 = _safe_div(working_capital, total_assets)
     x2 = _safe_div(retained_earnings, total_assets)
     x3 = _safe_div(ebit, total_assets)
-    x4 = _safe_div(market_cap, total_liabilities)
+    x4 = (_safe_div(market_cap, total_liabilities * fx_rate)
+          if fx_rate is not None and total_liabilities is not None else None)
     x5 = _safe_div(revenue, total_assets)
 
     z = None
@@ -491,7 +497,11 @@ def get_corporate_health(ticker: str) -> dict:
         industry = info.get("industry", "")
         is_financial = sector in ("Financial Services", "Financial") or "Bank" in industry or "Insurance" in industry
 
-        z_data = _altman_z(fin, bs, info)
+        fx = dcf_engine.to_price_currency({"info": info})["_fx"]
+        z_data = _altman_z(fin, bs, info, fx_rate=fx["rate"])
+        if fx["rate"] is None:
+            z_data["note"] = (f"Statements are in {fx['from']} and the price in {fx['to']}; no exchange rate is "
+                              "available, so market value / liabilities (and Z) cannot be computed.")
         z_data["isFinancial"] = is_financial
         if is_financial:
             z_data["note"] = "Altman Z-Score is not applicable to financial firms. Use with caution."

@@ -12,8 +12,6 @@ default to None so callers never need to guard for missing keys.
 """
 from __future__ import annotations
 
-import json
-import pathlib
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import pandas as pd
@@ -23,6 +21,7 @@ import yfinance as yf
 from .. import provenance as pv
 from ..cache import cached
 from ..config import FINNHUB_API_KEY, FRED_API_KEY
+from ..services import cb_meetings
 from ..services import constituents as _constituents
 from ..services import finnhub_service
 
@@ -48,15 +47,9 @@ def _event(**kwargs) -> dict:
 # Central-bank meetings
 # ---------------------------------------------------------------------------
 
-@cached("cb_meetings")
 def _load_cb_meetings() -> list[dict]:
-    """Load cb_meetings.json from backend/data/.  Returns [] on any error."""
-    try:
-        path = pathlib.Path(__file__).resolve().parents[2] / "data" / "cb_meetings.json"
-        with open(path, encoding="utf-8") as fh:
-            return json.load(fh)
-    except Exception:
-        return []
+    """Sourced meeting dates (bundled file + SNB iCal feed), see cb_meetings.py."""
+    return cb_meetings.get_meetings()
 
 
 # ---------------------------------------------------------------------------
@@ -349,9 +342,10 @@ def _provenance() -> dict:
     """Source map for the calendar (see provenance.py). Events carry no per-row source,
     so each category maps to the providers it is built from."""
     no_key = None if FINNHUB_API_KEY else "No Finnhub API key is configured, so this feed is empty."
-    macro = [pv.ref("econosift", None, "Central-bank meeting dates (bundled cb_meetings.json)",
-                    note="A static list shipped with the app; the file records no upstream source and is "
-                         "not refreshed from a live feed.")]
+    macro = [pv.ref("econosift", None, "Central-bank meeting dates (cb_meetings.json + SNB iCal feed)",
+                    note="Curated from each bank's published schedule (every row records its source URL and "
+                         "retrieval date); SNB dates come from the SNB's own iCal calendar when it is "
+                         "reachable. The list ends on cbScheduleEnds.")]
     macro.append(pv.ref("finnhub", "/calendar/economic", "Finnhub economic calendar", note=no_key))
     return {
         "*": pv.derived("Merged from the macro, earnings, dividends and ipos feeds below, filtered to the "
@@ -384,4 +378,5 @@ def calendar(index: str, start: str, end: str) -> dict:
             "fred": bool(FRED_API_KEY),
             "cbMeetings": True,
         },
+        "cbScheduleEnds": cb_meetings.schedule_end(_load_cb_meetings()),
     }, _provenance())

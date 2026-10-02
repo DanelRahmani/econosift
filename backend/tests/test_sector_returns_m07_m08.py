@@ -198,3 +198,65 @@ def test_sector_chart_endpoint_ytd_uses_prior_year_end(monkeypatch):
     out = asyncio.run(market_router.sectors("ytd"))
     assert asked == ["1y"]
     assert all(r["changePercent"] == 20.0 for r in out["sectors"])
+
+
+# ---------------------------------------------------------------------------
+# P2-31 — Treemap, sector chart and Sectors heatmap share the N-session base
+# ---------------------------------------------------------------------------
+
+# 300 business days, close = 100 + i (i = 0..299), last = 399.
+#   1w  =   5 sessions back: i = 294 -> 394.  399/394 - 1 =   +1.27 %
+#   1m  =  21 sessions back: i = 278 -> 378.  399/378 - 1 =   +5.56 %
+#   3m  =  63 sessions back: i = 236 -> 336.  399/336 - 1 =  +18.75 %
+#   6m  = 126 sessions back: i = 173 -> 273.  399/273 - 1 =  +46.15 %
+#   1y  = 252 sessions back: i =  47 -> 147.  399/147 - 1 = +171.43 %
+# Old treemap/heatmap base = first close of the download window (i = 0 -> 100: 1y +299 %).
+_P231_IDX = pd.bdate_range(end="2026-06-30", periods=300)
+_P231_EXPECTED = {"1w": 1.27, "1m": 5.56, "3m": 18.75, "1y": 171.43}
+
+
+class TestSessionBaseEverywhere:
+    @pytest.fixture()
+    def patch_all(self, monkeypatch):
+        from backend.services import constituents, sector_service, yfinance_service
+        members = [{"symbol": "XLK", "name": "Tech SPDR", "sector": "Technology", "industry": "ETF"}]
+
+        def frame(syms, period):
+            return pd.DataFrame({s: [100.0 + i for i in range(300)] for s in syms}, index=_P231_IDX)
+        monkeypatch.setattr(constituents, "get_constituents", lambda idx: members)
+        monkeypatch.setattr(yfinance_service, "get_close_frame", frame)
+        monkeypatch.setattr(yfinance_service, "get_market_caps", lambda syms: {"XLK": 1e9})
+        monkeypatch.setattr(sector_service.yf, "Ticker", _FakeTicker)
+
+    @pytest.mark.parametrize("period", ["1w", "1m", "3m", "1y"])
+    def test_treemap_equals_sector_chart(self, patch_all, period):
+        from backend import cache
+        from backend.services import sector_service
+        from backend.services.treemap_service import treemap
+
+        tile = treemap("sp500", period)["stocks"][0]["changePercent"]
+        cache._caches.clear()
+        chart = _row(sector_service.get_sector_returns()["periods"][period], "XLK")["changePercent"]
+        assert tile == pytest.approx(_P231_EXPECTED[period], abs=0.005)
+        assert chart == pytest.approx(_P231_EXPECTED[period], abs=0.005)
+
+    @pytest.mark.parametrize("period,expected", [("1mo", 5.56), ("3mo", 18.75), ("6mo", 46.15), ("1y", 171.43)])
+    def test_sectors_heatmap_uses_the_same_base(self, patch_all, period, expected):
+        import asyncio
+        from backend.routers import market as market_router
+
+        out = asyncio.run(market_router.sectors(period))
+        assert _row(out["sectors"], "XLK")["changePercent"] == pytest.approx(expected, abs=0.005)
+
+
+def test_treemap_short_history_drops_the_tile_instead_of_using_the_first_close(monkeypatch):
+    # 40 rows cannot reach a 63-session base: no tile rather than a mislabelled return.
+    from backend.services import constituents, yfinance_service
+    from backend.services.treemap_service import treemap
+    idx = pd.bdate_range(end="2026-06-30", periods=40)
+    monkeypatch.setattr(constituents, "get_constituents",
+                        lambda idx_: [{"symbol": "AAA", "name": "A", "sector": "T", "industry": "S"}])
+    monkeypatch.setattr(yfinance_service, "get_close_frame",
+                        lambda syms, period: pd.DataFrame({"AAA": [100.0 + i for i in range(40)]}, index=idx))
+    monkeypatch.setattr(yfinance_service, "get_market_caps", lambda syms: {"AAA": 1e9})
+    assert treemap("sp500", "3m")["stocks"] == []

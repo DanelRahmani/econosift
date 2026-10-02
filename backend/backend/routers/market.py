@@ -34,6 +34,19 @@ def _pct_change(series: pd.Series) -> float | None:
     return round((float(s.iloc[-1]) / float(s.iloc[0]) - 1.0) * 100.0, 2)
 
 
+_HEATMAP_SESSIONS = {"1mo": 21, "3mo": 63, "6mo": 126, "1y": 252}
+
+
+def _session_change(series: pd.Series, n: int) -> float | None:
+    """% change vs the close ``n`` sessions earlier (the sector chart's base); None when out of reach."""
+    from ..services.sector_service import session_base
+    s = series.dropna()
+    base = session_base(s, n)
+    if not base:
+        return None
+    return round((float(s.iloc[-1]) / base - 1.0) * 100.0, 2)
+
+
 def _ytd_change(series: pd.Series) -> float | None:
     """YTD % change from the prior year-end close; None when the history does not reach it."""
     from ..services.sector_service import ytd_base
@@ -138,15 +151,20 @@ async def sectors(period: str = "1mo"):
     ytd = period == "ytd"
     # Yahoo's "ytd" window starts at the first January close; YTD is measured from the prior
     # year-end close (audit M-07), so fetch a year and take that base, as the sector table does.
-    frame = await asyncio.to_thread(yfs.get_close_frame, syms, "1y" if ytd else period)
+    # 1mo/3mo/6mo/1y use the sector chart's session base (P2-31); "2y" so 252 sessions fit.
+    n = _HEATMAP_SESSIONS.get(period)
+    window = "1y" if ytd else ("2y" if period == "1y" else "1y") if n else period
+    frame = await asyncio.to_thread(yfs.get_close_frame, syms, window)
     rows = []
     for sym, name in SECTOR_ETFS:
         change = None
         if frame is not None and sym in frame.columns:
-            change = _ytd_change(frame[sym]) if ytd else _pct_change(frame[sym])
+            change = (_ytd_change(frame[sym]) if ytd else _session_change(frame[sym], n) if n
+                      else _pct_change(frame[sym]))
         rows.append({"ticker": sym, "sector": name, "changePercent": change})
     rows.sort(key=lambda r: (r["changePercent"] is None, -(r["changePercent"] or 0)))
     formula = ("(last adjusted close / last adjusted close of the previous calendar year − 1) × 100" if ytd
+               else f"(last adjusted close / adjusted close {n} trading sessions earlier − 1) × 100" if n
                else f"(last adjusted close / first adjusted close in the {period} window − 1) × 100")
     prov = {"*": pv.derived(formula, [pv.ref("yahoo", None, "Sector SPDR ETF daily adjusted close",
                                              frequency="daily", observed=pv.last_date(frame))],

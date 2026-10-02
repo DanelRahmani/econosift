@@ -2,16 +2,12 @@
 from __future__ import annotations
 
 import asyncio
-import json
-import logging
-import os
 from datetime import date
 
 from .. import provenance as pv
 from ..cache import async_cached
+from . import cb_meetings
 from . import macro_expansion_service as mes
-
-log = logging.getLogger(__name__)
 
 _START = "2005-01-01"
 _MAX_STALE_DAYS = 120
@@ -26,18 +22,8 @@ CB_SERIES: dict[str, list[str]] = {
     "SNB": ["IRSTCI01CHM156N", "IR3TIB01CHM156N"],
 }
 
-_CB_MEETINGS_PATH = os.path.normpath(
-    os.path.join(os.path.dirname(__file__), "..", "..", "data", "cb_meetings.json")
-)
-
-
 def _load_meetings() -> list[dict]:
-    try:
-        with open(_CB_MEETINGS_PATH) as f:
-            return json.load(f)
-    except Exception:
-        log.exception("Failed to load cb_meetings.json")
-        return []
+    return cb_meetings.get_meetings()
 
 
 def _next_meeting(bank: str, meetings: list[dict]) -> tuple[str | None, int | None]:
@@ -84,7 +70,7 @@ def _series_info(sid: str) -> tuple[str, str, bool]:
     return sid, "unknown", False
 
 
-def _provenance(current: dict[str, dict], balance_sheet: list[dict]) -> dict:
+def _provenance(current: dict[str, dict], balance_sheet: list[dict], meetings: list[dict]) -> dict:
     """``current.<bank>`` (rate) and ``history.<bank>`` share a ref naming the FRED series actually picked."""
     prov: dict = {"*": pv.ref("fred", None, "Federal Reserve Economic Data")}
     for cb, cur in current.items():
@@ -96,9 +82,12 @@ def _provenance(current: dict[str, dict], balance_sheet: list[dict]) -> dict:
                              "up for this bank." if proxy else None)
             prov[f"current.{cb}"] = prov[f"history.{cb}"] = r
         if cur.get("next_meeting"):
-            cal = pv.ref("other", None, "Central bank meeting calendar",
-                         note="Static file bundled with the app (backend/data/cb_meetings.json), not fetched.")
-            cal["providerName"] = "Bundled meeting calendar (cb_meetings.json)"
+            row = next((m for m in meetings if m["bank"] == cb and m["date"] == cur["next_meeting"]), {})
+            cal = pv.ref("other", None, "Central bank meeting calendar", url=row.get("source"),
+                         note="From the bank's published schedule" +
+                              (f", retrieved {row['retrieved']} (backend/data/cb_meetings.json)."
+                               if row.get("retrieved") else ", read live from its iCal calendar."))
+            cal["providerName"] = f"{cb} published meeting schedule"
             prov[f"current.{cb}.next_meeting"] = cal
             prov[f"current.{cb}.days_until"] = pv.derived(
                 "next meeting date minus today, in days", [f"current.{cb}.next_meeting"],
@@ -165,5 +154,6 @@ async def get_centralbanks() -> dict:
         if v is not None:
             balance_sheet.append({"date": rec["date"], "value": round(v / 1_000_000, 4)})
 
-    return pv.attach({"history": history, "current": current, "balance_sheet": balance_sheet},
-                     _provenance(current, balance_sheet))
+    return pv.attach({"history": history, "current": current, "balance_sheet": balance_sheet,
+                      "schedule_ends": cb_meetings.schedule_end(meetings)},
+                     _provenance(current, balance_sheet, meetings))

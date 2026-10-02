@@ -292,6 +292,12 @@ function CalendarPageInner() {
             onTzChange={handleTzChange}
           />
 
+          {data?.cbScheduleEnds && (
+            <p className="text-[11px] text-text-muted">
+              Central-bank meetings are listed through {data.cbScheduleEnds} (each bank&apos;s published schedule).
+            </p>
+          )}
+
           {/* API key notices */}
           {data && (!data.sources.finnhub || !data.sources.fred) && (
             <div className="flex flex-wrap gap-3">

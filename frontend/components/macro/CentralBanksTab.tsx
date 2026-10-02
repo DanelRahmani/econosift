@@ -126,6 +126,11 @@ export function CentralBanksTab() {
           );
         })}
       </div>
+      {data.schedule_ends && (
+        <p className="text-[10px] text-text-muted -mt-2">
+          Meeting dates from each bank&apos;s published schedule; listed through {data.schedule_ends}.
+        </p>
+      )}
 
       {/* Policy rate history chart */}
       <div className="card p-4">

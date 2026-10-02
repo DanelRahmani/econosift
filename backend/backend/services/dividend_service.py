@@ -12,6 +12,7 @@ import yfinance as yf
 
 from .. import provenance as pv
 from ..cache import cached
+from . import dcf_engine
 
 logger = logging.getLogger(__name__)
 
@@ -128,6 +129,9 @@ def get_dividend_analysis(ticker: str) -> dict:
         fcf = info.get("freeCashflow")
         if fcf is None:
             fcf = _latest_val(cashflow, "Free Cash Flow") if cashflow is not None else None
+        # FCF is in the statement currency (DKK for NVO); the dividend is in the price currency (P2-38).
+        fx_rate = dcf_engine.to_price_currency({"info": info})["_fx"]["rate"]
+        fcf = fcf * fx_rate if fcf is not None and fx_rate is not None else None
         payout_ratio = _safe_div(ttm_div, eps) if ttm_div and eps and eps > 0 else None
         fcf_payout = (_safe_div(ttm_div * shares, fcf)
                       if ttm_div and shares and fcf and fcf > 0 else None)

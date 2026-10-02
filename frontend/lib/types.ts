@@ -312,6 +312,9 @@ export interface ValuationFullResponse {
   valuation: ValuationCore;
   fundamentals: Fundamentals;
   analyst: AnalystData;
+  /** Yahoo answered with partial company data; the UI re-requests until it is complete (P2-39). */
+  degraded?: boolean;
+  degradedReason?: string | null;
 }
 export interface FactorResponse {
   ticker: string;
@@ -589,6 +592,8 @@ export interface CalendarResponse {
   dividends: CalendarEvent[];
   ipos: CalendarEvent[];
   sources: { finnhub: boolean; fred: boolean; cbMeetings: boolean };
+  /** Last date for which every central bank's meetings are listed (P1-15). */
+  cbScheduleEnds?: string | null;
 }
 
 // --- Phase 5: Screener Overhaul ---
@@ -2428,6 +2433,8 @@ export interface CentralBanksData {
   }>;
   current: Record<string, CbCurrent>;
   balance_sheet: Array<{ date: string; value: number }>;
+  /** Last date for which every bank's meetings are listed (P1-15). */
+  schedule_ends?: string | null;
 }
 
 // ── Phase 18A ──────────────────────────────────────────────────
