@@ -158,6 +158,7 @@ class AiSummary(Base):
     summary_text = Column(String, nullable=False)
     prompt_sent = Column(String)                     # for debugging
     created_at = Column(DateTime, default=_utcnow)
+    grounding = Column(String)                       # JSON: search sources + app-data sections (P1-19)
 
     __table_args__ = (
         Index("ix_ai_summary_lookup", "summary_type", "context_key"),
