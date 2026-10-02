@@ -338,7 +338,8 @@ class TestFactorDataUnavailable:
         monkeypatch.setattr(ff_mod, "load_ff_factors", lambda model="3": None)
         result = ff_mod.factor_regression("MSFT", model="3")
 
-        assert result["asOf"] == date.today().isoformat()
+        # no factor data was used, so there is no honest as-of date
+        assert "asOf" in result and result["asOf"] is None
 
     def test_no_raise_when_factors_empty_df(self, monkeypatch):
         import backend.services.fama_french as ff_mod

@@ -84,6 +84,25 @@ def _displace_senkou(df: pd.DataFrame) -> None:
             df[col] = df[col].shift(1)
 
 
+def _forward_senkou(last_vals: dict, span: pd.DataFrame | None) -> pd.DataFrame:
+    """The 26 projected Senkou A/B bars after the last bar (26-bar displacement).
+
+    ``last_vals`` are the last bar's pandas-ta values (25-bar displacement, taken before
+    ``_displace_senkou``); ``span`` is the frame pandas-ta's ``ichimoku`` returns for the future bars
+    (index = the 26 business days after the last bar, row j = 25-bar displacement of source bar n-25+j,
+    last row NaN). With the extra 1-bar shift: future bar 0 = ``last_vals``, future bar k = span row k-1,
+    so the historical cloud (shifted in place) and this one join with no gap or overlap.
+    """
+    cols = ["ISA_9", "ISB_26"]
+    if span is None or len(span) < 2:
+        return pd.DataFrame(columns=cols)
+    body = span[[c for c in cols if c in span.columns]].iloc[:-1]
+    first = pd.DataFrame([{c: last_vals.get(c) for c in body.columns}], dtype=float)
+    out = pd.concat([first, body.reset_index(drop=True)], ignore_index=True)
+    out.index = span.index[: len(out)]
+    return out
+
+
 def _today() -> pd.Timestamp:
     """Reference date for deciding whether a week/month is over (patched in tests)."""
     return pd.Timestamp.now().normalize()
@@ -106,14 +125,44 @@ def _last_completed(df: pd.DataFrame, rule: str, today: pd.Timestamp) -> pd.Seri
     return agg.iloc[-2] if len(agg) >= 2 else None
 
 
-def _pivot_points(df: pd.DataFrame, today: pd.Timestamp) -> dict[str, dict]:
-    """Classic pivots for the next daily / weekly / monthly period from the last completed one."""
+def _now_ny() -> pd.Timestamp:
+    """Current time in New York (patched in tests)."""
+    return pd.Timestamp.now(tz="America/New_York")
+
+
+def _last_session_complete(last_bar: pd.Timestamp, now: pd.Timestamp) -> bool:
+    """True when the last bar's US session is over: bar date before today in New York, or today after 16:00.
+
+    Limit: no trading calendar is available, so a holiday is treated like any other weekday, and a
+    holiday-shortened (e.g. 13:00 close) session counts as complete only from 16:00.
+    """
+    if now.tzinfo is None:
+        now = now.tz_localize("America/New_York")
+    else:
+        now = now.tz_convert("America/New_York")
+    d = last_bar.normalize().tz_localize(None) if last_bar.tzinfo else last_bar.normalize()
+    today = now.tz_localize(None).normalize()
+    if d < today:
+        return True
+    return d == today and now.hour >= 16
+
+
+def _pivot_points(df: pd.DataFrame, today: pd.Timestamp, now: pd.Timestamp | None = None) -> dict[str, dict]:
+    """Classic pivots for the next daily / weekly / monthly period from the last completed one.
+
+    Weekly / monthly limit: with no trading calendar, a week whose Friday is a holiday is only recognised
+    as complete via ``today`` (the reference date passing the period end), so it can read one period stale
+    until the following Saturday / month rollover.
+    """
     pivots: dict[str, dict] = {}
     if len(df) < 1:
         return pivots
 
-    # Daily: use previous session
-    prev = df.iloc[-2] if len(df) >= 2 else df.iloc[-1]
+    # Daily: the last COMPLETED session (the last bar may still be forming during US market hours)
+    if now is None:
+        now = _now_ny()
+    complete = _last_session_complete(df.index[-1], now)
+    prev = df.iloc[-1] if (complete or len(df) < 2) else df.iloc[-2]
     h_d = _clean(prev.get("High"))
     l_d = _clean(prev.get("Low"))
     c_d = _clean(prev.get("Close"))
@@ -133,7 +182,25 @@ def _pivot_points(df: pd.DataFrame, today: pd.Timestamp) -> dict[str, dict]:
     return pivots
 
 
-def _fib_levels(swing_high: float, swing_low: float) -> list[dict]:
+def _fib_swing(df: pd.DataFrame, window: int = 126) -> dict | None:
+    """Swing high / low from intraday High / Low over the last ``window`` bars, with the swing direction.
+
+    "downswing" = the low came after the high (levels retrace up from the low); "upswing" = the high
+    came after the low (levels retrace down from the high).
+    """
+    w = df.tail(window)
+    if w.empty:
+        return None
+    high = _clean(w["High"].max())
+    low = _clean(w["Low"].min())
+    if not high or not low or high <= low:
+        return None
+    direction = "downswing" if w["Low"].values.argmin() > w["High"].values.argmax() else "upswing"
+    return {"high": high, "low": low, "direction": direction,
+            "highDate": str(w["High"].idxmax().date()), "lowDate": str(w["Low"].idxmin().date())}
+
+
+def _fib_levels(swing_high: float, swing_low: float, direction: str = "upswing") -> list[dict]:
     diff = swing_high - swing_low
     ratios = [
         (0.0, "0%"), (0.236, "23.6%"), (0.382, "38.2%"),
@@ -141,7 +208,7 @@ def _fib_levels(swing_high: float, swing_low: float) -> list[dict]:
     ]
     levels = []
     for ratio, label in ratios:
-        price = swing_high - diff * ratio
+        price = swing_low + diff * ratio if direction == "downswing" else swing_high - diff * ratio
         levels.append({"level": ratio, "label": label, "price": round(price, 4)})
     return levels
 
@@ -191,6 +258,8 @@ def get_technicals(ticker: str, period: str = "1y") -> dict:
     # -----------------------------------------------------------------------
     # Compute indicators via pandas_ta (or fallback manual)
     # -----------------------------------------------------------------------
+    span_frame = None
+    last_senkou: dict = {}
     if _HAS_TA:
         df.ta.macd(append=True)
         df.ta.bbands(length=20, std=2, ddof=0, append=True)  # population std, as TA-Lib / most charting packages
@@ -206,8 +275,18 @@ def get_technicals(ticker: str, period: str = "1y") -> dict:
         df.ta.sma(length=200, append=True)
         # Ichimoku — append=True puts ITS_9, IKS_26, ICS_26, ISA_9, ISB_26 into df
         try:
-            df.ta.ichimoku(tenkan=9, kijun=26, senkou=52, append=True)
+            res = df.ta.ichimoku(tenkan=9, kijun=26, senkou=52, append=True)
+            if isinstance(res, tuple) and len(res) == 2:
+                span_frame = res[1]  # the 26 projected Senkou bars after the last bar
+            for name in ("ISA_9", "ISB_26"):
+                col = _find_col(df, [name])
+                if col:
+                    last_senkou[name] = _clean(df[col].iloc[-1])
             _displace_senkou(df)
+            # pandas-ta's Chikou is close.shift(-25); the standard displacement is 26 (close of t + 26)
+            ics = _find_col(df, ["ICS_26"])
+            if ics:
+                df[ics] = df[ics].shift(-1)
         except Exception:
             pass
     else:
@@ -318,10 +397,9 @@ def get_technicals(ticker: str, period: str = "1y") -> dict:
 
     ichimoku = []
     if tenkan_col or kijun_col:
-        # Include 26 extra future rows for cloud projection
-        ichi_idx = display_df.index.union(
-            pd.date_range(display_df.index[-1] + pd.Timedelta(days=1), periods=26, freq="B")
-        )
+        # Include the 26 projected Senkou bars (future business days) for the forward cloud
+        fwd = _forward_senkou(last_senkou, span_frame)
+        ichi_idx = display_df.index.union(fwd.index)
         for idx in ichi_idx:
             entry: dict = {"date": str(idx.date())}
             for key, col in [
@@ -331,6 +409,8 @@ def get_technicals(ticker: str, period: str = "1y") -> dict:
             ]:
                 if col and idx in df.index:
                     entry[key] = _clean(df.at[idx, col])
+                elif idx in fwd.index and key in ("senkouA", "senkouB"):
+                    entry[key] = _clean(fwd.at[idx, "ISA_9" if key == "senkouA" else "ISB_26"])
                 else:
                     entry[key] = None
             # Only emit rows that have at least one non-None value
@@ -440,15 +520,13 @@ def get_technicals(ticker: str, period: str = "1y") -> dict:
     # -----------------------------------------------------------------------
     # Fibonacci Retracement (auto-detect swing high/low from last 6 months)
     # -----------------------------------------------------------------------
-    swing_window = close.tail(126)
-    swing_high = _clean(swing_window.max())
-    swing_low = _clean(swing_window.min())
-    fib_levels = _fib_levels(swing_high, swing_low) if (swing_high and swing_low and swing_high > swing_low) else []
+    fib_swing = _fib_swing(df)
+    fib_levels = _fib_levels(fib_swing["high"], fib_swing["low"], fib_swing["direction"]) if fib_swing else []
 
     # -----------------------------------------------------------------------
     # Pivot Points (daily / weekly / monthly classic)
     # -----------------------------------------------------------------------
-    pivot_points = _pivot_points(df, _today())
+    pivot_points = _pivot_points(df, _today(), _now_ny())
 
     return pv.attach({
         "ticker": ticker,
@@ -475,6 +553,8 @@ def get_technicals(ticker: str, period: str = "1y") -> dict:
         "cmf": cmf_series,
         "atr": atr_series,
         "fibLevels": fib_levels,
+        "fibDirection": fib_swing["direction"] if fib_swing else None,
+        "fibSwing": fib_swing,
         "pivotPoints": pivot_points,
     }, _provenance(ticker, str(df.index[-1].date())))
 
@@ -508,7 +588,8 @@ def _provenance(ticker: str, as_of: str) -> dict:
                        "Bollinger Bands"),
         "ichimoku": d("Ichimoku (9, 26, 52), pandas_ta: Tenkan = mid of 9-day high/low, Kijun = mid of 26-day "
                       "high/low, Senkou A = (Tenkan + Kijun)/2 and Senkou B = mid of 52-day high/low both shifted "
-                      "26 days ahead, Chikou = close shifted 26 days back", "Ichimoku Cloud"),
+                      "26 days ahead, Chikou = close shifted 26 days back, "
+                      "plus the 26 projected future Senkou bars", "Ichimoku Cloud"),
         "macd": d("MACD (12, 26, 9): line = EMA12 − EMA26 of the close, signal = 9-day EMA of the line, "
                   "histogram = line − signal", "MACD"),
         "rsi": d("RSI(14) of the close, pandas_ta (Wilder smoothing)", "RSI (14)"),
@@ -518,11 +599,12 @@ def _provenance(ticker: str, as_of: str) -> dict:
         "obv": d("On-balance volume: running sum of volume, added on up-closes and subtracted on down-closes", "OBV"),
         "cmf": d("Chaikin Money Flow (20) = Σ money-flow volume / Σ volume over 20 sessions", "CMF (20)"),
         "atr": d("Average True Range (14), pandas_ta: Wilder-smoothed mean of the true range", "ATR (14)"),
-        "fibLevels": d("swing high / low = highest / lowest close of the last 126 sessions; level price = swing high "
-                       "− (swing high − swing low) × ratio for 0, 23.6, 38.2, 50, 61.8, 78.6 and 100%",
+        "fibLevels": d("swing high / low = highest intraday high / lowest intraday low of the last 126 sessions; "
+                       "upswing (high after low): level = swing high − range × ratio; downswing (low after high): "
+                       "level = swing low + range × ratio, for 0, 23.6, 38.2, 50, 61.8, 78.6 and 100%",
                        "Fibonacci retracement"),
         "pivotPoints": d(pivot, "Classic pivot points"),
-        "pivotPoints.daily": d(pivot + ", from the previous session's high / low / close", "Daily pivot points"),
+        "pivotPoints.daily": d(pivot + ", from the last completed session's high / low / close", "Daily pivot points"),
         "pivotPoints.weekly": d(pivot + ", from the previous complete week (Friday close)", "Weekly pivot points"),
         "pivotPoints.monthly": d(pivot + ", from the previous complete month", "Monthly pivot points"),
     }
@@ -575,5 +657,5 @@ def _empty_response(ticker: str, period: str) -> dict:
                     "week52High": None, "week52Low": None, "bbSqueeze": False},
         "prices": [], "bollinger": [], "ichimoku": [], "macd": [], "rsi": [],
         "stochRsi": [], "williamsR": [], "obv": [], "cmf": [], "atr": [],
-        "fibLevels": [], "pivotPoints": {},
+        "fibLevels": [], "fibDirection": None, "fibSwing": None, "pivotPoints": {},
     }

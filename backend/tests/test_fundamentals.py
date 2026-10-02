@@ -136,8 +136,10 @@ class TestROIC:
         assert result["investedCapital"] == pytest.approx(ic_expected, rel=1e-6)
         assert result["roic"] == pytest.approx(roic_expected, rel=1e-6)
 
-    def test_fallback_tax_rate(self):
-        """Missing effectiveTaxRate should fall back to 21 %."""
+    def test_fallback_tax_rate(self, monkeypatch):
+        """Missing effectiveTaxRate and no country rate fall back to 21 % (the WACC's chain)."""
+        from backend.services import discount_rates
+        monkeypatch.setattr(discount_rates, "load_erp", lambda: {"countries": {}})
         bundle = _make_bundle(effectiveTaxRate=None, operating_income=10_000)
         result = roic(bundle)
         assert result["nopat"] == pytest.approx(10_000 * 0.79, rel=1e-6)

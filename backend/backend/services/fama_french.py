@@ -236,8 +236,9 @@ def factor_regression(
         — OR —
         ticker, model, error, period, asOf  (when factor data unavailable)
     """
-    as_of = date.today().isoformat()
-    base = {"ticker": ticker, "model": model, "period": period, "asOf": as_of}
+    # asOf is the last factor date actually used in the regression (set once aligned);
+    # None on the error paths where no regression ran.
+    base = {"ticker": ticker, "model": model, "period": period, "asOf": None}
 
     # ---- Load factor data ------------------------------------------------
     factors = load_ff_factors(model)
@@ -294,6 +295,8 @@ def factor_regression(
 
     if len(merged) < 30:
         return {**base, "error": "insufficient aligned observations"}
+
+    as_of = pd.Timestamp(merged.index.max()).date().isoformat()
 
     # Excess return = ticker return - risk-free rate.
     excess_ret = (merged["ret"] - merged["RF"]).values

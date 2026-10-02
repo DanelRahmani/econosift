@@ -167,13 +167,15 @@ def _altman_z(fin, bs, info: dict, fx_rate: float | None = 1.0) -> dict:
 # Piotroski F-Score (9-point fundamental strength)
 # ---------------------------------------------------------------------------
 
-def _piotroski(fin, bs, cf, fin_q=None, bs_q=None, cf_q=None) -> dict:
+def _piotroski(fin, bs, cf, fin_q=None, bs_q=None, cf_q=None, is_bank: bool = False) -> dict:
     """Compute Piotroski F-Score with all 9 criteria.
 
     Parameters
     ----------
     fin, bs, cf : Annual financial statement DataFrames
     fin_q, bs_q, cf_q : Quarterly DataFrames (fallback if annual only has 1 column)
+    is_bank : current ratio, gross margin and asset turnover do not describe a
+        lender, so those three are not scored (P3-33)
     """
     net_income = _latest_val(fin, "Net Income")
     total_assets = _latest_val(bs, "Total Assets")
@@ -280,6 +282,14 @@ def _piotroski(fin, bs, cf, fin_q=None, bs_q=None, cf_q=None) -> dict:
     if c9:
         score += 1
 
+    reasons: dict[str, str] = {}
+    if is_bank:
+        for key in ("increasingCurrentRatio", "increasingGrossMargin", "increasingAssetTurnover"):
+            if criteria[key]:
+                score -= 1
+            criteria[key] = None
+            reasons[key] = "not meaningful for a bank (no current ratio, gross margin or asset turnover)"
+
     # A criterion without a prior-year comparison is not scored (None) —
     # previously it counted as a pass, inflating thin-data firms by up to +6
     # (audit C-14). The interpretation bands scale with what was scored.
@@ -290,6 +300,7 @@ def _piotroski(fin, bs, cf, fin_q=None, bs_q=None, cf_q=None) -> dict:
         "maxScore": max_score,
         "interpretation": ("Strong" if frac >= 7 / 9 else ("Average" if frac >= 4 / 9 else "Weak")) if max_score else "Insufficient data",
         "criteria": criteria,
+        "reasons": reasons,
     }
 
 
@@ -506,7 +517,7 @@ def get_corporate_health(ticker: str) -> dict:
         if is_financial:
             z_data["note"] = "Altman Z-Score is not applicable to financial firms. Use with caution."
 
-        piotroski_data = _piotroski(fin, bs, cf, fin_q, bs_q, cf_q)
+        piotroski_data = _piotroski(fin, bs, cf, fin_q, bs_q, cf_q, is_bank=dcf_engine.is_bank(info))
 
         beneish_data = _beneish(fin, bs, cf, fin_q, bs_q, cf_q)
         # Fiscal year end of the latest annual statements the scores use.
@@ -545,7 +556,8 @@ def _health_provenance(ticker: str, fy_end: str | None, quarterly_fallback: bool
         "piotroski": pv.derived(
             "one point per criterion met: ROA > 0, OCF > 0, ΔROA > 0, OCF > net income, Δleverage < 0, "
             "Δcurrent ratio > 0, no new shares, Δgross margin > 0, Δasset turnover > 0; criteria "
-            "without a prior year are not scored (maxScore shrinks)",
+            "without a prior year are not scored (maxScore shrinks); for banks the current ratio, gross "
+            "margin and asset turnover are not scored",
             [statements], title="Piotroski F-Score", observed=fy_end),
         "beneish": pv.derived(
             "M = −4.84 + 0.920·DSRI + 0.528·GMI + 0.404·AQI + 0.892·SGI + 0.115·DEPI − 0.172·SGAI "

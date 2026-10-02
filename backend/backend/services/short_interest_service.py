@@ -17,7 +17,8 @@ log = logging.getLogger(__name__)
 
 _BASE = "https://finnhub.io/api/v1"
 
-# S&P 500 top constituents for universe queries
+# Hard-coded large-cap sample (NOT the full S&P 500) -- ~500 per-ticker yfinance
+# .info calls are too heavy for one request, so the label says so honestly.
 _DEFAULT_UNIVERSE = [
     "AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "META", "TSLA", "BRK-B",
     "JPM", "V", "JNJ", "WMT", "PG", "MA", "UNH", "HD", "BAC", "XOM",
@@ -119,10 +120,12 @@ async def get_short_interest(ticker: str | None = None, universe: str | None = N
     Uses yfinance as primary source (free), Finnhub as optional premium fallback.
     """
     tickers_to_fetch: list[str] = []
+    universe_label = None
     if ticker:
         tickers_to_fetch = [ticker.upper()]
     elif universe == "sp500":
         tickers_to_fetch = list(_DEFAULT_UNIVERSE)
+        universe_label = f"S&P 500 sample ({len(tickers_to_fetch)} large caps)"
     else:
         tickers_to_fetch = ["AAPL"]
 
@@ -184,6 +187,8 @@ async def get_short_interest(ticker: str | None = None, universe: str | None = N
         # month, about two weeks in arrears).
         "asOf": as_of,
         "source": "yfinance",
+        "universe": universe_label,
+        "universeCount": len(tickers_to_fetch),
         "items": items,
         "mostShorted": most_shorted,
         "squeezeCandidates": squeeze_candidates,

@@ -85,7 +85,10 @@ def roic(bundle: dict) -> dict:
     info, fin, bs, _ = _unpack(bundle)
 
     ebit = _clean(_g(fin, "EBIT", "Operating Income"))
-    tax_rate = _clean(info.get("effectiveTaxRate")) or 0.21  # fallback 21 %
+    # Same tax rate as the WACC (effective rate, else the country's statutory
+    # rate, else 21 %), so ROIC vs WACC is like-for-like (P3-21).
+    from .discount_rates import detect_country, tax_rate_for
+    tax_rate = tax_rate_for(info, detect_country(info))
 
     nopat: float | None = None
     if ebit is not None:
@@ -360,6 +363,15 @@ def piotroski_f(bundle: dict, prior_year: dict | None = None) -> dict:
         "higherAssetTurnover": f9,
     }
 
+    # A lender has no current assets/liabilities split, gross profit or
+    # revenue-to-assets turnover that mean anything (P3-33): not scored.
+    reasons: dict[str, str] = {}
+    from .dcf_engine import is_bank
+    if is_bank(info):
+        for key in ("higherCurrentRatio", "higherGrossMargin", "higherAssetTurnover"):
+            criteria[key] = None
+            reasons[key] = "not meaningful for a bank (no current ratio, gross margin or asset turnover)"
+
     scored = [v for v in criteria.values() if v is not None]
     score = int(sum(scored))
     max_score = len(scored)
@@ -369,6 +381,7 @@ def piotroski_f(bundle: dict, prior_year: dict | None = None) -> dict:
         "maxScore": max_score,
         "interpretation": _piotroski_band(score, max_score),
         "criteria": criteria,
+        "reasons": reasons,
     }
 
 
@@ -696,11 +709,14 @@ def provenance(bundle: dict, root: str = "fundamentals") -> dict:
     prov: dict = {k(): d("ROIC, DuPont, Piotroski F-Score, Ohlson O-Score and cash conversion cycle from Yahoo's "
                          "annual statements", [inc, bal, cfs], title="Extended fundamentals")}
 
-    # ROIC: the 21% tax rate is used when info.effectiveTaxRate is missing or 0.
-    tax_fallback = (_clean(info.get("effectiveTaxRate")) or 0.0) == 0.0
+    # ROIC: the WACC's fallback tax rate is used when info.effectiveTaxRate is missing or outside (0, 60 %).
+    etr = _clean(info.get("effectiveTaxRate"))
+    tax_fallback = etr is None or not 0.0 < etr < 0.6
     tax_flag = ("fallback",) if tax_fallback else ()
-    tax_note = "21% tax rate assumed: Yahoo's effectiveTaxRate is missing." if tax_fallback else None
-    prov[k("roic", "nopat")] = d("EBIT (Operating Income if missing) × (1 − info.effectiveTaxRate, 21% if missing)",
+    tax_note = ("Country statutory tax rate (Damodaran; 21% if unknown) assumed: Yahoo's effectiveTaxRate is "
+                "missing or implausible.") if tax_fallback else None
+    prov[k("roic", "nopat")] = d("EBIT (Operating Income if missing) × (1 − tax rate); the tax rate is the WACC's: "
+                                 "info.effectiveTaxRate, else the country statutory rate, else 21%",
                                  [inc, snap], title="NOPAT", flags=tax_flag, note=tax_note)
     prov[k("roic", "investedCapital")] = d(
         "total debt + stockholders' equity − cash (balance sheet, else info.totalDebt / totalStockholderEquity / "
@@ -729,7 +745,8 @@ def provenance(bundle: dict, root: str = "fundamentals") -> dict:
     }
     prov[k("piotroski")] = d(
         f"count of the nine Piotroski tests that pass; a test needing the {prior} is skipped, and dropped from "
-        "maxScore, if that column or a line item is missing", [inc, bal, cfs], title="Piotroski F-Score")
+        "maxScore, if that column or a line item is missing; for banks the current ratio, gross margin and "
+        "asset turnover are not scored", [inc, bal, cfs], title="Piotroski F-Score")
     for key, test in piotroski.items():
         prov[k("piotroski", "criteria", key)] = d(f"{test} (latest fiscal year vs {prior})", [inc, bal, cfs],
                                                   title=key)

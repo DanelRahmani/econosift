@@ -347,8 +347,20 @@ def compute_ratios(bundle: dict) -> dict:
     # annual revenue (audit C-28).
     fcf = g(cf, "Free Cash Flow")
     fcf_revenue = revenue
+    try:
+        fy = f"FY{str(bundle['financials_df'].columns[0])[:4]}"
+    except Exception:
+        fy = "FY (latest fiscal year)"
+    fcf_basis = fy
     if fcf is None:
         fcf, fcf_revenue = info.get("freeCashflow"), info.get("totalRevenue")
+        fcf_basis = "TTM (Yahoo info)"
+
+    # Net debt nets cash AND short-term investments. The combined statement line already includes
+    # both, so it is preferred; otherwise add "Other Short Term Investments" to cash (never both).
+    cash_and_sti = g(bs, "Cash Cash Equivalents And Short Term Investments")
+    if cash_and_sti is None and cash is not None:
+        cash_and_sti = cash + (g(bs, "Other Short Term Investments") or 0)
 
     ratio = _ratio
 
@@ -359,10 +371,10 @@ def compute_ratios(bundle: dict) -> dict:
         "operatingCFRatio": ratio(op_cf, current_liab),
     }
     leverage = {
-        "debtToEquity": ratio(total_debt, equity) if total_debt else _clean(info.get("debtToEquity")),
+        "debtToEquity": ratio(total_debt, equity) if total_debt else _ratio(_clean(info.get("debtToEquity")), 100),  # Yahoo reports a percent
         "debtToAssets": ratio(total_debt, total_assets),
         "interestCoverage": ratio(op_income, abs(interest_exp)) if interest_exp else None,
-        "netDebtEbitda": ratio((total_debt or 0) - (cash or 0), ebitda) if total_debt else None,
+        "netDebtEbitda": ratio((total_debt or 0) - (cash_and_sti or 0), ebitda) if total_debt else None,
     }
     efficiency = {
         "assetTurnover": ratio(revenue, total_assets),
@@ -417,4 +429,5 @@ def compute_ratios(bundle: dict) -> dict:
         "valuation": valuation,
         "zScore": z_score,
         "unavailable": unavailable,
+        "basis": {"roe": fy, "fcfMargin": fcf_basis},
     }

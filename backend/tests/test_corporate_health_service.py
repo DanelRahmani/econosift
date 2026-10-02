@@ -51,6 +51,29 @@ def test_piotroski_missing_prior_is_not_a_pass():
     assert r["criteria"]["noShareDilution"] is None
 
 
+def test_piotroski_bank_drops_current_ratio_gross_margin_turnover():
+    """P3-33 on /corporate: two annual columns, every one of the nine criteria
+    improves, so a non-bank scores 9/9. For a bank the current ratio, gross
+    margin and asset turnover do not describe a lender → None, 6/6."""
+    fin = pd.DataFrame({pd.Timestamp("2025-12-31"): {"Net Income": 10.0, "Total Revenue": 100.0, "Gross Profit": 50.0},
+                        pd.Timestamp("2024-12-31"): {"Net Income": 8.0, "Total Revenue": 90.0, "Gross Profit": 40.0}})
+    bs = pd.DataFrame({pd.Timestamp("2025-12-31"): {"Total Assets": 100.0, "Current Assets": 60.0,
+                                                    "Current Liabilities": 30.0, "Long Term Debt": 20.0,
+                                                    "Ordinary Shares Number": 10.0},
+                       pd.Timestamp("2024-12-31"): {"Total Assets": 100.0, "Current Assets": 50.0,
+                                                    "Current Liabilities": 30.0, "Long Term Debt": 30.0,
+                                                    "Ordinary Shares Number": 10.0}})
+    cf = pd.DataFrame({pd.Timestamp("2025-12-31"): {"Operating Cash Flow": 15.0},
+                       pd.Timestamp("2024-12-31"): {"Operating Cash Flow": 12.0}})
+    # ROA 0.10 > 0.08, LTD 0.20 < 0.30, CR 2.0 > 1.67, GM 0.50 > 0.44, turnover 1.0 > 0.9.
+    assert ch._piotroski(fin, bs, cf)["maxScore"] == 9
+    r = ch._piotroski(fin, bs, cf, is_bank=True)
+    assert r["score"] == 6 and r["maxScore"] == 6
+    for key in ("increasingCurrentRatio", "increasingGrossMargin", "increasingAssetTurnover"):
+        assert r["criteria"][key] is None
+        assert "bank" in r["reasons"][key]
+
+
 def test_beneish_imputes_neutral_one_for_missing_indexes():
     """With every ratio index at its neutral 1.0 and TATA = 0, M is the sum
     of the coefficients plus the intercept: −4.84 + 0.920 + 0.528 + 0.404 +
