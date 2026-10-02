@@ -187,7 +187,7 @@ def _country_universe() -> list[dict]:
     import os as _os
 
     # Tier 1 — static JSON (always available, zero-latency)
-    static_path = _os.path.join(_os.path.dirname(__file__), "..", "..", "data", "country_universe.json")
+    static_path = _os.path.join(_os.path.dirname(__file__), "..", "reference", "country_universe.json")
     try:
         if _os.path.exists(static_path):
             with open(static_path, "r", encoding="utf-8") as fh:

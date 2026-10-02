@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
+import { useValuationFull } from "@/lib/useValuationFull";
 import type { CountryRate, DcfResponse, DcfSensitivity, ValuationFullResponse } from "@/lib/types";
 import { Card, Skeleton } from "@/components/ui";
 import { useSourceScope } from "@/components/provenance/SourceScope";
@@ -119,33 +120,38 @@ export function DcfPanel({ tickers, sharedWacc = null }: { tickers: string[]; pe
     }
   }
 
-  // Seed the sliders with the backend's own DCF assumptions whenever the ticker changes.
+  // The Valuation tab's own /valuation/full result (one shared query, P3-34), so the panel's
+  // defaults always match the model grid's DCF, also when a degraded bundle is replaced (P2-39).
+  const full = useValuationFull(selectedTicker);
+
   useEffect(() => {
-    if (!selectedTicker) return;
-    let alive = true;
     setSelectedCountry("");
     setData(null); // the previous ticker's result must not stay on screen while this one loads
-    api
-      .valuationFull(selectedTicker)
-      .then((r) => {
-        if (!alive) return;
-        const d = defaultsFromFull(r);
-        setDefaults(d);
-        setDefaultsFromBackend(true);
-        setParams(sharedWaccRef.current != null ? { ...d, wacc: sharedWaccRef.current } : d);
-        setSeededFor(selectedTicker);
-      })
-      .catch(() => {
-        if (!alive) return;
-        setDefaults(FALLBACK_PARAMS);
-        setDefaultsFromBackend(false);
-        setParams(sharedWaccRef.current != null ? { ...FALLBACK_PARAMS, wacc: sharedWaccRef.current } : FALLBACK_PARAMS);
-        setSeededFor(selectedTicker);
-      });
-    return () => {
-      alive = false;
-    };
   }, [selectedTicker]);
+
+  // Seed the sliders with the backend's own DCF assumptions once per ticker. A provisional seed (fallback
+  // after a failed request, or a degraded bundle) is replaced once by the full result; later refetches
+  // never reset the user's sliders.
+  const seed = useRef<{ ticker: string; provisional: boolean }>({ ticker: "", provisional: true });
+  useEffect(() => {
+    if (!selectedTicker) return;
+    const fresh = seed.current.ticker !== selectedTicker;
+    if (full.data) {
+      if (!fresh && !(seed.current.provisional && !full.data.degraded)) return;
+      const d = defaultsFromFull(full.data);
+      seed.current = { ticker: selectedTicker, provisional: !!full.data.degraded };
+      setDefaults(d);
+      setDefaultsFromBackend(true);
+      setParams(sharedWaccRef.current != null ? { ...d, wacc: sharedWaccRef.current } : d);
+      setSeededFor(selectedTicker);
+    } else if (fresh && full.failureCount > 0) {
+      seed.current = { ticker: selectedTicker, provisional: true };
+      setDefaults(FALLBACK_PARAMS);
+      setDefaultsFromBackend(false);
+      setParams(sharedWaccRef.current != null ? { ...FALLBACK_PARAMS, wacc: sharedWaccRef.current } : FALLBACK_PARAMS);
+      setSeededFor(selectedTicker);
+    }
+  }, [selectedTicker, full.data, full.failureCount]);
 
   // When the shared cost-of-equity override changes in the parent, apply it; clearing it
   // restores the ticker's own default WACC.

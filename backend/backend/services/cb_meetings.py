@@ -1,6 +1,6 @@
 """Central-bank meeting dates (P1-15).
 
-``backend/data/cb_meetings.json`` is curated from each bank's own published schedule; every row
+``backend/backend/reference/cb_meetings.json`` is curated from each bank's own published schedule; every row
 records its ``source`` URL and ``retrieved`` date. The SNB publishes its calendar as a yearly
 iCal file, so for the years in ``_SNB_FEEDS`` its rows are taken from the live feed instead (a
 moved assessment shows up without a code change); if the feed fails the bundled rows stand.
@@ -19,7 +19,8 @@ from ..cache import cached
 
 log = logging.getLogger(__name__)
 
-_PATH = pathlib.Path(__file__).resolve().parents[2] / "data" / "cb_meetings.json"
+# Shipped inside the package: /app/data is the persistent volume, which a rebuilt image never updates.
+_PATH = pathlib.Path(__file__).resolve().parents[1] / "reference" / "cb_meetings.json"
 
 # Yearly SNB calendars, linked from https://www.snb.ch/en/services-events/digital-services/rss-calendar-feeds
 _SNB_FEEDS = {

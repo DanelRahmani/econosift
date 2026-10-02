@@ -53,3 +53,62 @@ def test_quote_only_equity_response_counts_as_failed():
     assert yfs._info_failed({"info": {**quote_only, "industry": "Consumer Electronics"}}) is False
     # ETFs/indices have no sector or revenue by nature; a price is enough for them.
     assert yfs._info_failed({"info": {"quoteType": "ETF", "regularMarketPrice": 95.0}}) is False
+
+
+# ---------------------------------------------------------------------------
+# P2-39 — spaced retry, and a degraded flag on /valuation/full
+# ---------------------------------------------------------------------------
+
+QUOTE_ONLY = {"quoteType": "EQUITY", "currentPrice": 1186.0, "trailingPE": 38.0}
+FULL = {**QUOTE_ONLY, "sector": "Technology", "industry": "Semiconductor Equipment", "totalRevenue": 3.2e10}
+
+
+class _SeqTicker:
+    """Returns the queued info dicts in order (the last one repeats)."""
+    seq: list = []
+    calls = 0
+
+    def __init__(self, sym):
+        self.financials = self.balance_sheet = self.cashflow = pd.DataFrame()
+
+    def get_info(self):
+        _SeqTicker.calls += 1
+        return dict(_SeqTicker.seq[min(_SeqTicker.calls, len(_SeqTicker.seq)) - 1])
+
+
+def _seq(monkeypatch, seq):
+    _SeqTicker.seq, _SeqTicker.calls = seq, 0
+    slept: list[float] = []
+    monkeypatch.setattr(yfs.yf, "Ticker", _SeqTicker)
+    monkeypatch.setattr(yfs.time, "sleep", slept.append)
+    return slept
+
+
+def test_quote_only_bundle_gets_a_spaced_third_attempt(monkeypatch):
+    # Two quote-only answers in a row (the Phase 54 ASML case), the third, after a pause, is complete.
+    slept = _seq(monkeypatch, [QUOTE_ONLY, QUOTE_ONLY, FULL])
+    b = yfs.get_info.__wrapped__("ASML.AS")
+    assert b["info"]["sector"] == "Technology"
+    assert _SeqTicker.calls == 3
+    assert slept and all(s > 0 for s in slept)
+
+
+def test_full_marks_a_still_partial_bundle_degraded(monkeypatch):
+    import asyncio
+    from backend.routers import valuation as vr
+    _seq(monkeypatch, [QUOTE_ONLY])
+    monkeypatch.setattr(vr, "_beta_for", lambda sym: None)
+    monkeypatch.setattr(vr, "analyst_data", lambda sym: {})
+    out = asyncio.run(vr.full("ASML.AS"))
+    assert out["degraded"] is True
+    assert "partial company data" in out["degradedReason"]
+
+
+def test_full_is_not_degraded_for_a_complete_bundle(monkeypatch):
+    import asyncio
+    from backend.routers import valuation as vr
+    _seq(monkeypatch, [FULL])
+    monkeypatch.setattr(vr, "_beta_for", lambda sym: None)
+    monkeypatch.setattr(vr, "analyst_data", lambda sym: {})
+    out = asyncio.run(vr.full("ASML.AS"))
+    assert out["degraded"] is False and out["degradedReason"] is None

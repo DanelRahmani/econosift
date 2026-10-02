@@ -85,7 +85,7 @@ def _provenance(current: dict[str, dict], balance_sheet: list[dict], meetings: l
             row = next((m for m in meetings if m["bank"] == cb and m["date"] == cur["next_meeting"]), {})
             cal = pv.ref("other", None, "Central bank meeting calendar", url=row.get("source"),
                          note="From the bank's published schedule" +
-                              (f", retrieved {row['retrieved']} (backend/data/cb_meetings.json)."
+                              (f", retrieved {row['retrieved']} (backend/backend/reference/cb_meetings.json)."
                                if row.get("retrieved") else ", read live from its iCal calendar."))
             cal["providerName"] = f"{cb} published meeting schedule"
             prov[f"current.{cb}.next_meeting"] = cal

@@ -19,7 +19,7 @@ def test_schedule_does_not_run_out_within_60_days():
     horizon = datetime.date.today() + datetime.timedelta(days=60)
     for bank, last in cb_meetings.last_dates(cb_meetings.load_bundled()).items():
         assert datetime.date.fromisoformat(last) >= horizon, (
-            f"{bank} schedule ends {last}: add the next year's dates to backend/data/cb_meetings.json")
+            f"{bank} schedule ends {last}: add the next year's dates to backend/backend/reference/cb_meetings.json")
 
 
 _SNB_ICS = (
@@ -90,3 +90,15 @@ def test_schedule_end_is_the_earliest_last_date_across_banks():
             {"date": "2027-06-01", "bank": "Fed"}]
     assert cb_meetings.schedule_end(rows) == "2027-12-08"
     assert cb_meetings.schedule_end([]) is None
+
+
+def test_reference_files_ship_inside_the_package_not_the_data_volume():
+    # docker-compose mounts the persistent sqlite_data volume over /app/data, so a JSON kept there is
+    # frozen at the volume's first creation (live: the June cb_meetings.json survived every rebuild),
+    # and the desktop build bundles only the package. Both files must load from the package.
+    import pathlib
+    from backend.services import atlas_service, cb_meetings
+    pkg = pathlib.Path(cb_meetings.__file__).resolve().parents[1]
+    assert cb_meetings._PATH.is_relative_to(pkg) and cb_meetings._PATH.exists()
+    assert len(atlas_service._country_universe()) > 100
+    assert (pkg / "reference" / "country_universe.json").exists()
