@@ -379,6 +379,8 @@ def get_info(ticker: str) -> dict:
         fcf = cf_dict.get("Free Cash Flow")
         if fcf is not None:
             info["freeCashflow"] = fcf
+            # The annual statement, not a trailing figure: label it (P3-26).
+            info["_fcfPeriod"] = f"FY{pd.Timestamp(cf_df.columns[0]).year}" if cf_df is not None else "annual"
 
     # operatingCashflow: from cashflow statement dict
     if "operatingCashflow" not in info or info["operatingCashflow"] is None:

@@ -151,6 +151,7 @@ export interface DcfResponse {
   reason?: string;
   inputs: {
     ttmFcf: number | null;
+    fcfPeriod?: string;
     shares: number | null;
     netDebt: number | null;
     fcfGrowth: number;
@@ -2007,6 +2008,8 @@ export interface TechnicalsResponse {
   cmf: SubChartPoint[];
   atr: SubChartPoint[];
   fibLevels: FibLevel[];
+  fibDirection?: "upswing" | "downswing" | null;
+  fibSwing?: { high: number; low: number; direction: string; highDate: string; lowDate: string } | null;
   pivotPoints: Record<'daily' | 'weekly' | 'monthly', PivotSet>;
 }
 

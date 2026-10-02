@@ -353,7 +353,7 @@ export function DcfPanel({ tickers, sharedWacc = null }: { tickers: string[]; pe
             prov="upsidePct"
           />
           <KpiTile
-            label="TTM FCF"
+            label={`${data.inputs.fcfPeriod ?? "TTM"} FCF`}
             value={data.inputs.ttmFcf !== null ? fmtLarge(data.inputs.ttmFcf) : "—"}
             valueClass="text-text-primary"
             prov="inputs.ttmFcf"

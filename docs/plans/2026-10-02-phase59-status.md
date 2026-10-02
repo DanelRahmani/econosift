@@ -1,5 +1,8 @@
 # Phase 59 status — 2026-10-02 (stopped at 91 % of the 5-hour usage window)
 
+> **Completed 2026-10-03:** items 1–4 below are done and the full gate passed; see CHANGELOG "Phase 59".
+> P1-20 (item 5) is next.
+
 Committed on `DEV`. Fixes are unit-tested; the full local backend suite passes, and the technicals tests
 (pandas_ta) passed in the container. **The phase gate has NOT run**: no spec-verifier, no Docker rebuild,
 no container pytest, no live checks, no Playwright. ACTIVE_ISSUES / CHANGELOG are not updated yet.

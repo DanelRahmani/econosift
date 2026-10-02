@@ -70,7 +70,7 @@ class TestKnownGoodCase:
     def test_inputs_keys(self):
         inp = self.result["inputs"]
         expected_keys = {"ttmFcf", "shares", "netDebt", "fcfGrowth", "terminalGrowth", "wacc", "stage1Years",
-                         "fcfBasis", "statementCurrency", "fxRate"}
+                         "fcfBasis", "fcfPeriod", "statementCurrency", "fxRate"}
         assert set(inp.keys()) == expected_keys
 
     def test_inputs_values(self):
@@ -274,3 +274,15 @@ class TestNonPositiveEquity:
         assert result["locked"] is True
         assert result["intrinsicValue"] is None
         assert result["reason"] == "not meaningful: equity value ≤ 0 after net debt"
+
+
+def test_fcf_period_is_labelled_from_its_source():
+    """P3-26: when Yahoo has no trailing freeCashflow, get_info fills it from the
+    annual statement and marks it _fcfPeriod = "FY2025"; the DCF must say FY2025,
+    not TTM. A real trailing figure (no marker) stays TTM."""
+    annual = _make_bundle()
+    annual["info"]["_fcfPeriod"] = "FY2025"
+    inp = two_stage_dcf(annual, fcf_growth=0.08, terminal_growth=0.025, wacc=0.09)["inputs"]
+    assert inp["fcfPeriod"] == "FY2025"
+    assert "TTM" not in inp["fcfBasis"] and "FY2025" in inp["fcfBasis"]
+    assert two_stage_dcf(_make_bundle(), fcf_growth=0.08, terminal_growth=0.025, wacc=0.09)["inputs"]["fcfPeriod"] == "TTM"

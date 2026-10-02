@@ -323,8 +323,10 @@ def get_technicals(ticker: str, period: str = "1y") -> dict:
     last_vol = _clean(volume.iloc[-1])
     vol_ratio = (last_vol / avg_vol_20) if (last_vol and avg_vol_20 and avg_vol_20 > 0) else None
 
-    high52 = _clean(close.tail(252).max())
-    low52 = _clean(close.tail(252).min())
+    # Intraday highs/lows, the same definition as Yahoo's fiftyTwoWeekHigh/Low
+    # on the Overview tab (P3-19).
+    high52 = _clean(df["High"].tail(252).max())
+    low52 = _clean(df["Low"].tail(252).min())
     week52pos = None
     if high52 and low52 and high52 > low52:
         week52pos = _clean((last_close - low52) / (high52 - low52) * 100.0)
@@ -579,9 +581,9 @@ def _provenance(ticker: str, as_of: str) -> dict:
                                 "signal line, else Bearish", "MACD signal"),
         "summary.volumeVs20d": d("last session's volume / mean volume of the last 20 sessions", "Volume vs 20-day"),
         "summary.week52Position": d("(close − 52-week low) / (52-week high − 52-week low) × 100, high and low "
-                                    "taken from closing prices of the last 252 sessions", "52-week position"),
-        "summary.week52High": d("highest close of the last 252 sessions (not the intraday high)", "52-week high"),
-        "summary.week52Low": d("lowest close of the last 252 sessions (not the intraday low)", "52-week low"),
+                                    "taken from the intraday highs and lows of the last 252 sessions", "52-week position"),
+        "summary.week52High": d("highest intraday high of the last 252 sessions", "52-week high"),
+        "summary.week52Low": d("lowest intraday low of the last 252 sessions", "52-week low"),
         "summary.bbSqueeze": d("true when the latest Bollinger bandwidth (20-day, 2σ) is below 5%", "Bollinger squeeze"),
         "bollinger": d("Bollinger Bands (20, 2σ): mid = 20-day SMA of the close, upper / lower = mid ± 2 × standard "
                        "deviation; %B = (close − lower) / (upper − lower); bandwidth = (upper − lower) / mid × 100",

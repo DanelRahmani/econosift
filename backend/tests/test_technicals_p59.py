@@ -160,3 +160,16 @@ def test_get_technicals_exposes_the_fib_direction(monkeypatch):
     assert out["fibDirection"] == expect
     assert out["fibSwing"]["high"] == pytest.approx(tail["High"].max())
     assert out["fibSwing"]["low"] == pytest.approx(tail["Low"].min())
+
+
+# â”€â”€ P3-19: one 52-week range definition (intraday, like Yahoo's fiftyTwoWeekHigh/Low) â”€â”€
+
+def test_week52_range_uses_intraday_highs_and_lows(monkeypatch):
+    """The fixture's High/Low are close Â± 1.5, so the intraday 52-week high is the
+    highest close of the last 252 bars + 1.5 (and the low that close âˆ’ 1.5)."""
+    frame = _frame()
+    monkeypatch.setattr(ts.yf, "download", lambda *a, **k: frame)
+    s = ts.get_technicals.__wrapped__("AAPL", "1y")["summary"]
+    last = frame.tail(252)
+    assert s["week52High"] == pytest.approx(last["Close"].max() + 1.5)
+    assert s["week52Low"] == pytest.approx(last["Close"].min() - 1.5)

@@ -178,6 +178,10 @@ def two_stage_dcf(
     # flow is not FCF at all and is no longer substituted (audit C-27); the
     # levered-FCF-at-WACC approximation is disclosed in the inputs.
     fcf_raw = info.get("freeCashflow")
+    # get_info marks an annual-statement fill (no trailing figure) with its fiscal year (P3-26).
+    fcf_period = info.get("_fcfPeriod") or "TTM"
+    fcf_basis = ("levered FCF (Yahoo freeCashflow), TTM" if fcf_period == "TTM"
+                 else f"levered FCF (annual cash-flow statement, {fcf_period}; Yahoo has no trailing figure)")
     shares_raw = info.get("sharesOutstanding")
     total_debt_raw = info.get("totalDebt") or 0
     total_cash_raw = info.get("totalCash") or 0
@@ -229,7 +233,8 @@ def two_stage_dcf(
                 "terminalGrowth": terminal_growth,
                 "wacc": wacc,
                 "stage1Years": stage1_years,
-                "fcfBasis": "levered FCF (Yahoo freeCashflow), TTM",
+                "fcfBasis": fcf_basis,
+                "fcfPeriod": fcf_period,
                 "statementCurrency": fx.get("from"),
                 "fxRate": fx.get("rate"),
             },
@@ -324,7 +329,8 @@ def two_stage_dcf(
             "terminalGrowth": terminal_growth,
             "wacc": wacc,
             "stage1Years": stage1_years,
-            "fcfBasis": "levered FCF (Yahoo freeCashflow), TTM",
+            "fcfBasis": fcf_basis,
+            "fcfPeriod": fcf_period,
             "statementCurrency": fx.get("from"),
             "fxRate": fx.get("rate"),
         },
@@ -357,7 +363,9 @@ def provenance(sym: str, result: dict, root: str = "", *, growth=None, wacc=None
     fx = [pv.yahoo(f"{from_ccy}{to_ccy}=X", f"Latest close, {from_ccy} to {to_ccy}", frequency="daily")] if converted else []
     conv = f" × FX rate ({from_ccy}→{to_ccy})" if converted else ""
 
-    fcf = pv.yahoo(sym, "info.freeCashflow: trailing-twelve-month levered free cash flow (Yahoo)")
+    period = inp.get("fcfPeriod") or "TTM"
+    fcf = pv.yahoo(sym, "info.freeCashflow: trailing-twelve-month levered free cash flow (Yahoo)" if period == "TTM"
+                   else f"Free Cash Flow, annual cash-flow statement {period} (Yahoo has no trailing figure)")
     prov = {
         k("inputs", "ttmFcf"): pv.derived(f"Yahoo freeCashflow{conv}", [fcf, *fx], title="Free cash flow used")
         if converted else fcf,
