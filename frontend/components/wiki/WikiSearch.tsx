@@ -4,10 +4,14 @@ import { useState, useEffect, useRef } from "react";
 
 interface Props {
   onSearch: (query: string) => void;
+  /** Text to show when the page opens on a search (deep link). */
+  initialValue?: string;
 }
 
-export function WikiSearch({ onSearch }: Props) {
-  const [value, setValue] = useState("");
+export function WikiSearch({ onSearch, initialValue = "" }: Props) {
+  const [value, setValue] = useState(initialValue);
+  // A later deep link to another term (page already open) replaces the box's text.
+  useEffect(() => { setValue(initialValue); }, [initialValue]);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {

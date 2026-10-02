@@ -2565,6 +2565,19 @@ export interface AiSummaryResponse {
   model_used: string;
   created_at: string;
   cached: boolean;
+  /** Google Search grounding (P1-19); null for summaries generated before grounding. */
+  grounding?: AiGrounding | null;
+  /** EconoSift data the numbers were taken from; null for pre-grounding summaries. */
+  appData?: { asOf: string; sections: string[]; unavailable: Record<string, string> } | null;
+}
+export interface AiGrounding {
+  sources: { title: string; uri: string }[];
+  searchQueries: string[];
+  /** Google's search-suggestion widget (HTML), which must be shown with grounded answers. */
+  searchEntryPoint: string | null;
+  searchUsed: boolean;
+  /** Set when Google Search was refused and the summary uses EconoSift data only. */
+  searchNote: string | null;
 }
 export interface AiSummaryHistoryItem {
   id: number;

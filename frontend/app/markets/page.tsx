@@ -25,6 +25,7 @@ import { SectorReturnsChart } from "@/components/sectors/SectorReturnsChart";
 import { SectorFundamentalsTable } from "@/components/sectors/SectorFundamentalsTable";
 import { SectorRotationClock } from "@/components/sectors/SectorRotationClock";
 import { SectorIndustryDrillDown } from "@/components/sectors/SectorIndustryDrillDown";
+import { MARKETS_TABS } from "@/lib/pageTabs";
 import type {
   TreemapResponse, SectorReturnsResponse,
   SectorFundamentalsResponse, SectorRotationResponse, SectorDrillResponse,
@@ -51,7 +52,7 @@ const BENCHMARKS = [
   { value: "^RUT", label: "Russell 2000" },
 ];
 const SEC_PERIODS = ["1d", "1w", "1m", "3m", "ytd", "1y"] as const;
-const TABS = ["Overview", "Technicals", "Valuation", "Ratios", "News & Events", "Sectors", "Treemap", "Short Interest"] as const;
+const TABS = MARKETS_TABS;
 type Tab = (typeof TABS)[number];
 
 function MarketsPageInner() {
@@ -137,7 +138,7 @@ function MarketsPageInner() {
       Portfolio: `/portfolio${tickers.length ? `?t=${tickersKey}` : ""}`,
       Rankings: "/screener",
       Screener: "/screener",
-      FX: "/macro?tab=FX",
+      FX: "/macro?tab=fx",
     };
     if (urlState.tab && redirectMap[urlState.tab]) {
       router.replace(redirectMap[urlState.tab]);
@@ -190,7 +191,7 @@ function MarketsPageInner() {
       const redirects: Record<string, string> = {
         Portfolio: `/portfolio?t=${tickersKey}`,
         Screener: "/screener",
-        FX: "/macro?tab=FX",
+        FX: "/macro?tab=fx",
       };
       const dest = redirects[t];
       if (dest) router.push(dest);

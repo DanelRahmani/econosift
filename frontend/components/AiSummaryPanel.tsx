@@ -25,6 +25,58 @@ interface Props {
   onGenerate: (model: string, force: boolean, selected: string[]) => Promise<AiSummaryResponse>;
 }
 
+/**
+ * Where the summary's content came from: the EconoSift data sections (numbers) and the Google
+ * Search sources Gemini reported (news). Summaries generated before grounding keep the old warning.
+ */
+function Grounding({ result }: { result: AiSummaryResponse }) {
+  const g = result.grounding;
+  const app = result.appData;
+  if (!g || !app) {
+    return (
+      <p className="text-xs text-warning">
+        Written by Google Gemini from its own knowledge (generated before summaries were grounded in app data).
+        Figures may be out of date or wrong; regenerate for a grounded summary.
+      </p>
+    );
+  }
+  const missing = Object.values(app.unavailable ?? {});
+  return (
+    <div className="space-y-1.5 text-xs" data-testid="ai-grounding">
+      <p className="text-text-muted">
+        Numbers from EconoSift data as of {app.asOf}
+        {app.sections.length ? ` (${app.sections.join(", ")})` : ""}
+        {g.searchUsed ? "; news and context from Google Search." : "."} The model can still misquote: check figures against the panels.
+      </p>
+      {missing.length > 0 && <p className="text-warning">Not included: {missing.join("; ")}.</p>}
+      {g.searchNote && <p className="text-warning">{g.searchNote}</p>}
+      {g.sources.length > 0 && (
+        <div>
+          <p className="text-text-secondary font-medium">Search sources</p>
+          <ul className="list-disc pl-4 space-y-0.5">
+            {g.sources.map((s) => (
+              <li key={s.uri}>
+                <a href={s.uri} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">
+                  {s.title}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {g.searchEntryPoint && (
+        // Google requires its search suggestions to be shown with grounded answers; sandboxed, links open a new tab.
+        <iframe
+          title="Google Search suggestions"
+          srcDoc={g.searchEntryPoint}
+          sandbox="allow-popups allow-popups-to-escape-sandbox"
+          className="w-full h-16 border-0 rounded"
+        />
+      )}
+    </div>
+  );
+}
+
 export function AiSummaryPanel({ summaryType, title, options, searchPlaceholder, onGenerate }: Props) {
   const [model, setModel] = useState("gemini-2.5-flash");
   const [loading, setLoading] = useState(false);
@@ -257,11 +309,7 @@ export function AiSummaryPanel({ summaryType, title, options, searchPlaceholder,
           <div className="text-sm text-text-secondary whitespace-pre-line leading-relaxed">
             {result.summary_text}
           </div>
-          {/* No EconoSift data is sent with the prompt (see backend ai_service). */}
-          <p className="text-xs text-warning">
-            Written by Google Gemini from its own knowledge — none of the data on this page is sent to it.
-            Figures may be out of date or wrong; check them against the panels above.
-          </p>
+          <Grounding result={result} />
           {/* Regenerate button */}
           <button
             onClick={() => handleGenerate(true)}

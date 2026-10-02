@@ -14,12 +14,13 @@ import { CentralBanksTab } from "@/components/macro/CentralBanksTab";
 import { CurveNoiseTab } from "@/components/yield/CurveNoiseTab";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
+import { YIELD_TABS } from "@/lib/pageTabs";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   BarChart, Bar, ReferenceLine,
 } from "recharts";
 
-const TABS = ["US Curve", "Foreign Spreads", "Global Yields", "Real & Breakeven", "Curve Noise", "US Rates Detail", "Policy Tracker", "Sovereign Risk", "Central Banks", "Default Risk"] as const;
+const TABS = YIELD_TABS;
 
 function KpiCard({ label, value, badge, prov, ctx }: { label: string; value: string; badge?: string; prov?: string; ctx?: string }) {
   return (

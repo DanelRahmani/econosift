@@ -58,3 +58,22 @@ def init_db():
     """Create all tables if they don't exist. Idempotent (CREATE TABLE IF NOT EXISTS)."""
     from . import db_models  # noqa: F401 — side-effect: registers ORM models
     Base.metadata.create_all(bind=engine)
+    _add_missing_columns()
+
+
+# Columns added to existing tables after release; create_all only creates missing tables.
+_ADDED_COLUMNS = {"ai_summary": {"grounding": "TEXT"}}
+
+
+def _add_missing_columns() -> None:
+    """Idempotently ALTER TABLE ... ADD COLUMN for columns newer than the user's database."""
+    from sqlalchemy import inspect, text
+    insp = inspect(engine)
+    with engine.begin() as conn:
+        for table, cols in _ADDED_COLUMNS.items():
+            if not insp.has_table(table):
+                continue
+            have = {c["name"] for c in insp.get_columns(table)}
+            for name, ddl in cols.items():
+                if name not in have:
+                    conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {name} {ddl}"))

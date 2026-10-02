@@ -7,6 +7,7 @@ import { ThemeToggle } from "./ThemeToggle";
 import { LearningToggle } from "./LearningToggle";
 import { RefreshingBadge } from "./RefreshingBadge";
 import { useTheme } from "./ThemeProvider";
+import { CommandPalette, OPEN_COMMAND_PALETTE } from "./CommandPalette";
 
 const primaryTabs = [
   { href: "/dashboard", label: "Dashboard" },
@@ -171,11 +172,25 @@ export function Navbar() {
           </div>
         </div>
         <div className="ml-auto flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => window.dispatchEvent(new Event(OPEN_COMMAND_PALETTE))}
+            aria-label="Search pages, tabs, tickers and Wiki (Ctrl+K)"
+            className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg border border-border text-sm text-text-muted hover:text-text-primary hover:bg-surface-alt transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"
+                 strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
+            </svg>
+            <span className="hidden lg:inline">Search</span>
+            <kbd className="hidden lg:inline text-[10px] border border-border rounded px-1">Ctrl K</kbd>
+          </button>
           <RefreshingBadge />
           <LearningToggle />
           <ThemeToggle />
         </div>
       </div>
+      <CommandPalette />
     </nav>
   );
 }

@@ -15,21 +15,9 @@ import { BacktestTab } from "@/components/research/BacktestTab";
 import { FactorRegimeTab } from "@/components/research/FactorRegimeTab";
 import { ScrollableTabBar } from "@/components/ui";
 import { useUrlState } from "@/lib/useUrlState";
+import { RESEARCH_TABS } from "@/lib/pageTabs";
 
-const TABS = [
-  { key: "riskparity", label: "Risk Parity" },
-  { key: "carry", label: "FX Carry" },
-  { key: "momentum", label: "Momentum" },
-  { key: "moments", label: "Realized Moments" },
-  { key: "crossasset", label: "Cross-Asset" },
-  { key: "fxmacro", label: "FX-Macro Link" },
-  { key: "multicountry", label: "Multi-Country" },
-  { key: "dupont", label: "Sector DuPont" },
-  { key: "econlab", label: "Econometric Lab" },
-  { key: "eventstudy", label: "Event Study" },
-  { key: "factorregime", label: "Factor Regime" },
-  { key: "backtest", label: "Backtester" },
-] as const;
+const TABS = RESEARCH_TABS;
 type TabKey = (typeof TABS)[number]["key"];
 
 function resolveTab(param: string): TabKey {
