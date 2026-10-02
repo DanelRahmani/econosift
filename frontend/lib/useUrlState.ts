@@ -31,6 +31,25 @@ export function useUrlState<T extends Record<string, string>>(
     return init;
   });
 
+  // Follow URL changes made from outside the page (the command palette jumping to another tab of
+  // the page that is already open, browser back/forward). Only differing keys update state, so the
+  // write-back below, which leaves the URL equal to state, cannot loop.
+  useEffect(() => {
+    setState((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      for (const key of Object.keys(defaults) as (keyof T)[]) {
+        const v = (searchParams.get(key as string) ?? defaults[key]) as T[keyof T];
+        if (v !== prev[key]) {
+          next[key] = v;
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
   // Skip first effect fire — URL already matches the value read on mount.
   const initialized = useRef(false);
 

@@ -9,6 +9,7 @@ import { CentralBanksTab } from "@/components/macro/CentralBanksTab";
 import { TabButton } from "@/components/ui";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
+import { POLICY_TABS } from "@/lib/pageTabs";
 
 // ─── Shared KPI card ────────────────────────────────────────────────
 function KpiCard({ label, value, sub, prov }: { label: string; value: string; sub?: string; prov?: string }) {
@@ -22,12 +23,7 @@ function KpiCard({ label, value, sub, prov }: { label: string; value: string; su
 }
 
 // ─── Tab definitions ────────────────────────────────────────────────
-const TABS = [
-  { id: "policy", label: "Policy Tracker" },
-  { id: "sovereign", label: "Sovereign Risk" },
-  { id: "centralbanks", label: "Central Banks" },
-  { id: "default", label: "Default Risk" },
-] as const;
+const TABS = POLICY_TABS;
 type TabId = (typeof TABS)[number]["id"];
 
 function resolveTab(param: string): TabId {

@@ -25,6 +25,7 @@ import { StressTesting } from "@/components/portfolio/StressTesting";
 import { ScenarioTab } from "@/components/portfolio/ScenarioTab";
 import { TransactionLog } from "@/components/portfolio/TransactionLog";
 import { WalkthroughBanner } from "@/components/WalkthroughBanner";
+import { PORTFOLIO_TABS } from "@/lib/pageTabs";
 
 const LS_KEY = "econosift_portfolio";
 const LEGACY_LS_KEY = "axiom_portfolio";
@@ -39,7 +40,7 @@ const DEFAULT_HOLDINGS: Holding[] = [
 const PERIODS = ["1y", "2y", "3y"] as const;
 type Period = (typeof PERIODS)[number];
 
-const TABS = ["Overview", "Risk", "Attribution", "Optimize", "Scenario", "Transactions"] as const;
+const TABS = PORTFOLIO_TABS;
 type Tab = (typeof TABS)[number];
 
 function loadFromStorage(): Holding[] {

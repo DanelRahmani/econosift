@@ -4,23 +4,9 @@ import { Suspense } from "react";
 import dynamic from "next/dynamic";
 import { RegimeOverlay } from "./RegimeOverlay";
 import { ScrollableTabBar, PageSkeleton, TabButton } from "@/components/ui";
+import { MACRO_TABS } from "@/lib/pageTabs";
 
-const TABS = [
-  { id: "overview", label: "Overview" },
-  { id: "inflation", label: "Inflation" },
-  { id: "employment", label: "Growth & Employment" },
-  { id: "housing", label: "Housing" },
-  { id: "fiscal", label: "Fiscal" },
-  { id: "labor", label: "Labor" },
-  { id: "energy", label: "Energy & Climate" },
-  { id: "inequality", label: "Inequality" },
-  { id: "business", label: "Business Dynamism" },
-  { id: "commodities", label: "Commodities" },
-  { id: "fx", label: "FX" },
-  { id: "leading", label: "Leading Indicators" },
-  { id: "financial", label: "Financial & Funding Conditions" },
-  { id: "sentiment", label: "Sentiment & Positioning" },
-];
+const TABS = MACRO_TABS;
 
 const MacroOverviewLazy = dynamic(() =>
   import("./MacroOverview").then((m) => ({ default: m.MacroOverview }))
