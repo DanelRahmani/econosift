@@ -7,7 +7,7 @@ import {
 } from "recharts";
 import { Card } from "@/components/ui";
 import { chartTooltipStyle, chartPalette } from "@/components/ui";
-import { fmtPct } from "@/lib/format";
+import { fmtPctFromFraction } from "@/lib/format";
 import { api } from "@/lib/api";
 import type { StressTestResponse, StressScenarioResult } from "@/lib/types";
 import { useSourceScope } from "@/components/provenance/SourceScope";
@@ -45,7 +45,7 @@ function ScenarioCard({
         </div>
         <div className="text-right">
           <div className={`text-lg font-bold tabular-nums ${(scenario.totalReturn ?? 0) < 0 ? "text-danger" : "text-success"}`}>
-            {scenario.totalReturn !== null ? fmtPct(scenario.totalReturn * 100) : "—"}
+            {scenario.totalReturn !== null ? fmtPctFromFraction(scenario.totalReturn) : "—"}
           </div>
           <div className="text-xs text-text-muted">Total return</div>
         </div>
@@ -59,7 +59,7 @@ function ScenarioCard({
             <div>
               <span className="text-text-muted">Max DD: </span>
               <span className={`font-semibold ${(scenario.maxDrawdown ?? 0) < -0.1 ? "text-danger" : ""}`}>
-                {scenario.maxDrawdown !== null ? fmtPct(scenario.maxDrawdown * 100) : "—"}
+                {scenario.maxDrawdown !== null ? fmtPctFromFraction(scenario.maxDrawdown) : "—"}
               </span>
             </div>
             <button

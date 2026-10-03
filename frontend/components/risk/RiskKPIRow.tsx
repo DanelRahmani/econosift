@@ -2,7 +2,7 @@
 
 import { Card } from "@/components/ui";
 import type { RiskMetric, ExtendedRiskTicker } from "@/lib/types";
-import { fmtNum, fmtPctFromFraction, fmtPct } from "@/lib/format";
+import { fmtNum, fmtPctFromFraction } from "@/lib/format";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import type { Provenance } from "@/lib/provenance";
 
@@ -60,7 +60,7 @@ export function RiskKPIRow({ base, extended, ticker, period, baseProv, extendedP
         <KPI
           prov={`${baseKey}.annVolatility`}
           label="Realised Vol (Ann.)"
-          value={vol30 !== null ? fmtPct(vol30 * 100) : "—"}
+          value={vol30 !== null ? fmtPctFromFraction(vol30) : "—"}
           sub="1-year window"
           danger={vol30 !== null && vol30 > 0.4}
         />
@@ -68,7 +68,7 @@ export function RiskKPIRow({ base, extended, ticker, period, baseProv, extendedP
           prov={`${extendedKey}.maxDrawdown`}
           scope={extendedScope}
           label={`Max Drawdown${period ? ` (${period.toUpperCase()})` : ""}`}
-          value={maxDD !== null ? fmtPct(maxDD * 100) : "—"}
+          value={maxDD !== null ? fmtPctFromFraction(maxDD) : "—"}
           danger={maxDD !== null && maxDD < -0.2}
         />
         <KPI
@@ -80,7 +80,7 @@ export function RiskKPIRow({ base, extended, ticker, period, baseProv, extendedP
         <KPI
           prov={`${baseKey}.var95`}
           label="VaR 95% (1-day)"
-          value={var95 !== null ? fmtPct(var95 * 100) : "—"}
+          value={var95 !== null ? fmtPctFromFraction(var95) : "—"}
           sub="Historical (5th pct.)"
           danger={var95 !== null && var95 < -0.03}
         />

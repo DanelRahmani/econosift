@@ -7,7 +7,7 @@ import {
 } from "recharts";
 import { Card } from "@/components/ui";
 import { chartTooltipStyle, chartPalette } from "@/components/ui";
-import { fmtPct, fmtNum } from "@/lib/format";
+import { fmtPctFromFraction, fmtNum } from "@/lib/format";
 import { api } from "@/lib/api";
 import type { MonteCarloResult } from "@/lib/types";
 import { useSourceScope } from "@/components/provenance/SourceScope";
@@ -102,10 +102,10 @@ export function MonteCarloPanel({ ticker, theme }: Props) {
         <div className="space-y-4">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             {[
-              { label: "VaR 95%", value: fmtPct((result.var95 ?? 0) * 100), danger: true, prov: "var95" },
-              { label: "VaR 99%", value: fmtPct((result.var99 ?? 0) * 100), danger: true, prov: "var99" },
-              { label: "Expected", value: fmtPct((result.expected ?? 0) * 100), danger: false, prov: "expected" },
-              { label: "Worst Case", value: fmtPct((result.worstCase ?? 0) * 100), danger: true, prov: "worstCase" },
+              { label: "VaR 95%", value: fmtPctFromFraction(result.var95), danger: true, prov: "var95" },
+              { label: "VaR 99%", value: fmtPctFromFraction(result.var99), danger: true, prov: "var99" },
+              { label: "Expected", value: fmtPctFromFraction(result.expected), danger: false, prov: "expected" },
+              { label: "Worst Case", value: fmtPctFromFraction(result.worstCase), danger: true, prov: "worstCase" },
             ].map(({ label, value, danger, prov }) => (
               <div key={label} data-prov={prov}>
                 <div className="text-xs text-text-muted">{label}</div>

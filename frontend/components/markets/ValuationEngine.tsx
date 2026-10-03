@@ -7,7 +7,7 @@ import type { ValuationFullResponse, FactorResponse } from "@/lib/types";
 import { Card, Skeleton } from "@/components/ui";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
-import { fmtNum, fmtPct } from "@/lib/format";
+import { fmtNum, fmtPctFromFraction } from "@/lib/format";
 import { ValuationKpiPanel } from "@/components/markets/ValuationKpiPanel";
 import { ValuationModelsGrid } from "@/components/markets/ValuationModelsGrid";
 import { EconoSiftGauge } from "@/components/markets/EconoSiftGauge";
@@ -173,7 +173,7 @@ function FamaFrench({ ticker }: { ticker: string }) {
             ))}
           </div>
           <div className="flex flex-wrap gap-4 text-xs text-text-muted">
-            <span data-prov="alpha">Alpha (ann.): <span className="font-mono text-text-primary">{data.alpha != null ? fmtPct(data.alpha * 100) : "—"}</span></span>
+            <span data-prov="alpha">Alpha (ann.): <span className="font-mono text-text-primary">{data.alpha != null ? fmtPctFromFraction(data.alpha) : "—"}</span></span>
             <span data-prov="rSquared">R²: <span className="font-mono text-text-primary">{fmtNum(data.rSquared, 3)}</span></span>
             <span>n: <span className="font-mono text-text-primary">{data.nObs ?? "—"}</span></span>
           </div>

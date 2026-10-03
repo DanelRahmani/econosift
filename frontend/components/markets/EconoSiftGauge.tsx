@@ -2,7 +2,7 @@
 
 import { Card, SemiGauge, chartPalette } from "@/components/ui";
 import { useTheme } from "@/components/ThemeProvider";
-import { fmtPrice, fmtPct, currencySymbol } from "@/lib/format";
+import { fmtPrice, currencySymbol, fmtPctFromFraction } from "@/lib/format";
 import type { CompositeFairValue } from "@/lib/types";
 
 const VERDICT_COLORS: Record<string, string> = {
@@ -111,7 +111,7 @@ export function EconoSiftGauge({
                 data-prov="valuation.axiomFairValue.upsidePct"
               >
                 {composite.upsidePct >= 0 ? "+" : ""}
-                {fmtPct(composite.upsidePct * 100, 1)} upside
+                {fmtPctFromFraction(composite.upsidePct, 1)} upside
               </p>
             )}
           </>
@@ -141,7 +141,7 @@ export function EconoSiftGauge({
                   />
                 </div>
                 <span className="text-xs font-mono text-text-secondary w-10 text-right">
-                  {fmtPct(weight * 100, 0)}
+                  {fmtPctFromFraction(weight, 0)}
                 </span>
               </div>
             ))}

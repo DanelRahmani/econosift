@@ -13,7 +13,7 @@ import {
   ReferenceLine,
 } from "recharts";
 import type { AnalystData } from "@/lib/types";
-import { fmtNum, fmtPct, fmtPctFromFraction, fmtPrice, fmtLarge, currencySymbol } from "@/lib/format";
+import { fmtNum, fmtPctFromFraction, fmtPrice, fmtLarge, currencySymbol } from "@/lib/format";
 import { Card, chartPalette, chartTooltipStyle } from "@/components/ui";
 import { useTheme } from "@/components/ThemeProvider";
 
@@ -595,7 +595,7 @@ function GrowthEstimatesSection({
                             : "text-text-muted"
                         }`}
                       >
-                        {isNum ? fmtPct(val * 100) : "—"}
+                        {isNum ? fmtPctFromFraction(val) : "—"}
                       </td>
                     );
                   })}

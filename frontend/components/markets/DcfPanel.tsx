@@ -7,7 +7,7 @@ import type { CountryRate, DcfResponse, DcfSensitivity, ValuationFullResponse } 
 import { Card, Skeleton } from "@/components/ui";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
-import { fmtNum, fmtPct, fmtPrice, fmtLarge, currencySymbol } from "@/lib/format";
+import { fmtNum, fmtPrice, fmtLarge, currencySymbol, fmtPctFromFraction } from "@/lib/format";
 import { NaReason } from "@/components/markets/NaReason";
 import { useRefreshNonce } from "@/lib/refresh";
 
@@ -249,7 +249,7 @@ export function DcfPanel({ tickers, sharedWacc = null }: { tickers: string[]; pe
                 <span className="font-mono">
                   {s.isInt
                     ? String(Math.round(params[s.key]))
-                    : fmtPct(params[s.key] * 100)}
+                    : fmtPctFromFraction(params[s.key])}
                 </span>
               </div>
               <input
@@ -350,7 +350,7 @@ export function DcfPanel({ tickers, sharedWacc = null }: { tickers: string[]; pe
           />
           <KpiTile
             label="Upside"
-            value={upside !== null ? fmtPct(upside * 100) : "n/a"}
+            value={upside !== null ? fmtPctFromFraction(upside) : "n/a"}
             valueClass={upside !== null ? upsideColor : "text-text-muted"}
             prov="upsidePct"
           />
@@ -404,16 +404,16 @@ export function DcfPanel({ tickers, sharedWacc = null }: { tickers: string[]; pe
                     >
                       <td className="py-2 font-medium text-text-primary">{s.scenario}</td>
                       <td className="py-2 text-right font-mono text-text-secondary">
-                        {fmtPct(s.fcfGrowth * 100)}
+                        {fmtPctFromFraction(s.fcfGrowth)}
                       </td>
                       <td className="py-2 text-right font-mono text-text-secondary">
-                        {fmtPct(s.wacc * 100)}
+                        {fmtPctFromFraction(s.wacc)}
                       </td>
                       <td className="py-2 text-right font-mono text-text-primary">
                         {s.intrinsicValue !== null ? fmtPrice(s.intrinsicValue, sym) : <NaReason />}
                       </td>
                       <td className={`py-2 text-right font-mono ${uColor}`}>
-                        {s.upsidePct !== null ? fmtPct(s.upsidePct * 100) : <NaReason />}
+                        {s.upsidePct !== null ? fmtPctFromFraction(s.upsidePct) : <NaReason />}
                       </td>
                     </tr>
                   );
@@ -443,7 +443,7 @@ export function DcfPanel({ tickers, sharedWacc = null }: { tickers: string[]; pe
               {/* WACC header row */}
               {sensitivity.waccAxis.map((w) => (
                 <div key={w} className="px-1 py-1 font-mono text-text-muted text-center">
-                  {fmtPct(w * 100, 1)}
+                  {fmtPctFromFraction(w, 1)}
                 </div>
               ))}
 
@@ -452,7 +452,7 @@ export function DcfPanel({ tickers, sharedWacc = null }: { tickers: string[]; pe
                 <>
                   {/* Row label */}
                   <div key={`label-${g}`} className="px-1 py-1 font-mono text-text-muted text-right self-center">
-                    {fmtPct(g * 100, 1)}
+                    {fmtPctFromFraction(g, 1)}
                   </div>
 
                   {/* Cells */}
@@ -466,7 +466,7 @@ export function DcfPanel({ tickers, sharedWacc = null }: { tickers: string[]; pe
                         style={{ backgroundColor: bg }}
                         title={
                           cellVal !== null
-                            ? `FCF ${fmtPct(g * 100, 1)}, WACC ${fmtPct(w * 100, 1)} → ${fmtPrice(cellVal, sym)}`
+                            ? `FCF ${fmtPctFromFraction(g, 1)}, WACC ${fmtPctFromFraction(w, 1)} → ${fmtPrice(cellVal, sym)}`
                             : "n/a"
                         }
                       >

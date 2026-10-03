@@ -2,7 +2,7 @@
 
 import { Card } from "@/components/ui";
 import type { ExtendedRiskTicker } from "@/lib/types";
-import { fmtNum, fmtPct, exportToCsv } from "@/lib/format";
+import { fmtNum, exportToCsv, fmtPctFromFraction } from "@/lib/format";
 
 interface Props {
   tickers: ExtendedRiskTicker[];
@@ -10,7 +10,7 @@ interface Props {
 
 function pct(v: number | null | undefined) {
   if (v === null || v === undefined) return "—";
-  return fmtPct(v * 100);
+  return fmtPctFromFraction(v);
 }
 
 function ratioColor(v: number | null, good: (n: number) => boolean) {
