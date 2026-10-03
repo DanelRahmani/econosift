@@ -15,6 +15,7 @@ import { Sparkline } from "@/components/screener/Sparkline";
 import { fmtNum, fmtPct, fmtLarge } from "@/lib/format";
 import { SnowflakeMini } from "@/components/markets/SnowflakeMini";
 import { DataFreshnessBadge } from "@/components/DataFreshnessBadge";
+import { useRefreshNonce } from "@/lib/refresh";
 
 // ─── Constants ────────────────────────────────────────────────────────────
 
@@ -150,6 +151,7 @@ function ScreenerPageInner() {
   }, []);
 
   // Fetch universe whenever parameters change
+  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
   useEffect(() => {
     let alive = true;
     setLoading(true);
@@ -170,7 +172,7 @@ function ScreenerPageInner() {
       });
 
     return () => { alive = false; };
-  }, [index, activePresets, sortKey, sortDir]);
+  }, [index, activePresets, sortKey, sortDir, refreshNonce]);
 
   const handleSetIndex = useCallback((v: IndexKey) => {
     setUrlState({ index: v });
@@ -214,7 +216,7 @@ function ScreenerPageInner() {
       .then(setSnowflakeScores)
       .catch(() => setSnowflakeScores({}));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewMode, data]);
+  }, [viewMode, data, refreshNonce]);
 
   return (
     <main className="max-w-screen-2xl mx-auto px-4 py-6 space-y-6">

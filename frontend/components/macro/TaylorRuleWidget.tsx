@@ -6,6 +6,7 @@ import { CHART_COLORS } from "@/lib/format";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf, type Provenance } from "@/lib/provenance";
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend } from "recharts";
+import { useRefreshNonce } from "@/lib/refresh";
 
 export function TaylorRuleWidget() {
   const [data, setData] = useState<any[]>([]);
@@ -16,6 +17,7 @@ export function TaylorRuleWidget() {
   // Use dark as default since chartPalette dark values work reasonably in both themes
   const pal = chartPalette("dark");
 
+  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
   useEffect(() => {
     setLoading(true);
     api.macroTaylorRule()
@@ -25,7 +27,7 @@ export function TaylorRuleWidget() {
       })
       .catch(e => setError(e.toString()))
       .finally(() => setLoading(false));
-  }, []);
+  }, [refreshNonce]);
 
   if (loading) return <PageSkeleton text="Loading Taylor Rule…" />;
   if (error) return <div className="text-red-500 text-sm">Failed to load Taylor Rule data: {error}</div>;

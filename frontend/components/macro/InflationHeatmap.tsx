@@ -6,6 +6,7 @@ import type { MacroResponse, Country } from "@/lib/types";
 import { Card, Skeleton } from "@/components/ui";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
+import { useRefreshNonce } from "@/lib/refresh";
 
 // Map a CPI inflation value to a colour: blue (low/deflation) → red (high).
 function heatColor(v: number | null): string {
@@ -34,6 +35,7 @@ export function InflationHeatmap({ selected, countries }: { selected: string[]; 
   const key = selected.join(",");
   const scope = useSourceScope(provOf(data));
 
+  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
   useEffect(() => {
     if (!selected.length) { setData(null); return; }
     let live = true;
@@ -44,7 +46,7 @@ export function InflationHeatmap({ selected, countries }: { selected: string[]; 
       .finally(() => live && setLoading(false));
     return () => { live = false; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key]);
+  }, [key, refreshNonce]);
 
   const years = useMemo(
     () => Array.from({ length: SPAN }, (_, i) => String(startYear + i)),

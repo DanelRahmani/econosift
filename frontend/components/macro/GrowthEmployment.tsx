@@ -22,6 +22,7 @@ import {
   Bar,
   Cell,
 } from "recharts";
+import { useRefreshNonce } from "@/lib/refresh";
 
 const GRID = "rgba(255,255,255,0.08)";
 const RECESSION_FILL = "rgba(120,120,120,0.18)";
@@ -60,13 +61,14 @@ export function GrowthEmployment() {
   const [nfpRange, setNfpRange] = useState<"5Y" | "All">("5Y");
   const scope = useSourceScope(provOf(data));
 
+  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
   useEffect(() => {
     api
       .macroEmployment()
       .then(setData)
       .catch(() => setError(true))
       .finally(() => setLoading(false));
-  }, []);
+  }, [refreshNonce]);
 
   if (loading) {
     return (

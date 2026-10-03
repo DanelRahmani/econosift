@@ -14,6 +14,7 @@ import { buildAtlasScale } from "@/lib/atlasScale";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
 import type { AtlasIndicator, AtlasRegion, AtlasTimelineResponse } from "@/lib/types";
+import { useRefreshNonce } from "@/lib/refresh";
 
 const DEFAULT_INDICATOR = "gdp_growth";
 const YEAR_MIN = 2000;
@@ -51,6 +52,7 @@ export default function AtlasPage() {
   }, []);
 
   // Fetch timeline whenever indicator changes
+  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
   useEffect(() => {
     let alive = true;
     setLoadingTimeline(true);
@@ -60,7 +62,7 @@ export default function AtlasPage() {
       .catch(() => alive && setError(`Failed to load data for ${indicator}`))
       .finally(() => alive && setLoadingTimeline(false));
     return () => { alive = false; };
-  }, [indicator]);
+  }, [indicator, refreshNonce]);
 
   // Memoised region -> member ISO3 set
   const members = useMemo<Set<string>>(() => {

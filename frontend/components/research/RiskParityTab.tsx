@@ -11,6 +11,7 @@ import { api } from "@/lib/api";
 import type { RiskParityWeights, RiskParityBacktest } from "@/lib/types";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
+import { useRefreshNonce } from "@/lib/refresh";
 
 const PERIODS = ["1y", "3y", "5y"] as const;
 const COLORS = ["#6366f1", "#f59e0b", "#10b981", "#ef4444", "#3b82f6", "#a855f7", "#ec4899", "#14b8a6"];
@@ -53,7 +54,8 @@ export function RiskParityTab() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [input, period, mode]);
 
-  useEffect(() => { loadWeights(); }, [loadWeights]);
+  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
+  useEffect(() => { loadWeights(); }, [loadWeights, refreshNonce]);
 
   const runBacktest = () => {
     if (tickers.length < 2) return;

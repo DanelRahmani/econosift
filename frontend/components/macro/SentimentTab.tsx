@@ -4,6 +4,7 @@ import type { CotData, CotContract } from "@/lib/types";
 import { Card } from "@/components/ui";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
+import { useRefreshNonce } from "@/lib/refresh";
 
 function CotIndexBar({ value }: { value: number | null }) {
   if (value == null) return <span className="text-text-secondary">—</span>;
@@ -33,10 +34,11 @@ export function SentimentTab() {
   const scope = useSourceScope(provOf(data));
   const cotScope = useSourceScope(provOf(cotData));
 
+  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
   useEffect(() => {
     api.macroSentiment().then(setData).catch(console.error).finally(() => setLoading(false));
     api.macroCot().then(setCotData).catch(() => {});
-  }, []);
+  }, [refreshNonce]);
 
   if (loading) return <div className="h-64 animate-pulse bg-surface rounded"></div>;
   if (!data || data.error) return <div className="text-red-500">{data?.error || "Failed to load"}</div>;

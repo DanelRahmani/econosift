@@ -15,6 +15,7 @@ import { CountrySelector } from "./CountrySelector";
 import { IndicatorSelector } from "./IndicatorSelector";
 import { MacroChart } from "./MacroChart";
 import { AiSummaryPanel } from "@/components/AiSummaryPanel";
+import { useRefreshNonce } from "@/lib/refresh";
 
 const CURRENT_YEAR = new Date().getFullYear();
 const FORECASTABLE = new Set([
@@ -56,6 +57,7 @@ export function MacroOverview() {
   const canForecast = FORECASTABLE.has(indicator);
   const selKey = selected.join(",");
 
+  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
   useEffect(() => {
     if (!selected.length) { setData(null); return; }
     let active = true;
@@ -65,7 +67,7 @@ export function MacroOverview() {
       .catch(() => active && setData(null))
       .finally(() => active && setLoading(false));
     return () => { active = false; };
-  }, [selKey, indicator, start, end]);
+  }, [selKey, indicator, start, end, refreshNonce]);
 
   useEffect(() => {
     if (!showForecast || !canForecast || !selected.length) { setForecast([]); setForecastProv(undefined); return; }

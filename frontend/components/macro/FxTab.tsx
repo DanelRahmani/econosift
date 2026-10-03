@@ -6,6 +6,7 @@ import { Card } from "@/components/ui";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
 import { FxWidget } from "./FxWidget";
+import { useRefreshNonce } from "@/lib/refresh";
 
 function cellBg(change: number | null): string {
   if (change == null) return "bg-surface-alt";
@@ -54,6 +55,7 @@ export function FxTab() {
   const heatmapScope = useSourceScope(provOf(heatmap));
   const pppScope = useSourceScope(provOf(ppp));
 
+  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
   useEffect(() => {
     api
       .macroFxHeatmap()
@@ -66,7 +68,7 @@ export function FxTab() {
       .then(setPpp)
       .catch(() => setPppError(true))
       .finally(() => setPppLoading(false));
-  }, []);
+  }, [refreshNonce]);
 
   return (
     <div className="space-y-6">

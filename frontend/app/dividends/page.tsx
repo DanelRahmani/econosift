@@ -12,6 +12,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine,
 } from "recharts";
+import { useRefreshNonce } from "@/lib/refresh";
 
 const GRID = "rgba(255,255,255,0.08)";
 
@@ -52,12 +53,13 @@ function DividendsPageInner() {
       .finally(() => setLoading(false));
   }, []);
 
+  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
   useEffect(() => {
     if (ticker) {
       fetchAnalysis(ticker);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [refreshNonce]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

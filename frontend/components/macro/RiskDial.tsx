@@ -5,6 +5,7 @@ import type { RiskDialData, RiskDialBacktest } from "@/lib/types";
 import { Card, ChartSkeleton } from "@/components/ui";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
+import { useRefreshNonce } from "@/lib/refresh";
 
 /**
  * Composite risk dial — Phase 43 (task D3).
@@ -40,13 +41,14 @@ export function RiskDial() {
   const scope = useSourceScope(provOf(data));
   const btScope = useSourceScope(provOf(bt));
 
+  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
   useEffect(() => {
     api.macroRiskDial()
       .then(setData)
       .catch(() => setData({ available: false, reason: "unavailable" }))
       .finally(() => setLoading(false));
     api.macroRiskDialBacktest().then(setBt).catch(() => setBt(null));
-  }, []);
+  }, [refreshNonce]);
 
   if (loading) return <ChartSkeleton />;
 

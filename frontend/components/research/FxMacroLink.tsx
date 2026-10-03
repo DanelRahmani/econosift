@@ -7,6 +7,7 @@ import { api } from "@/lib/api";
 import type { FxMacroLinkItem } from "@/lib/types";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf, type Provenance } from "@/lib/provenance";
+import { useRefreshNonce } from "@/lib/refresh";
 
 export function FxMacroLink() {
   const [links, setLinks] = useState<FxMacroLinkItem[]>([]);
@@ -17,13 +18,14 @@ export function FxMacroLink() {
   const [linksProv, setLinksProv] = useState<Provenance | undefined>();
   const scope = useSourceScope(linksProv);
 
+  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
   useEffect(() => {
     setLoading(true);
     api.fxMacroLink()
       .then((r) => { setLinks(r.links || []); setLinksProv(provOf(r)); })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-  }, []);
+  }, [refreshNonce]);
 
   const link = links[selected];
   const linkKey = `links.${link?.label}`;

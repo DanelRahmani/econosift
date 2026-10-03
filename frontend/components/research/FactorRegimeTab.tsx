@@ -7,6 +7,7 @@ import { provOf } from "@/lib/provenance";
 import { PageSkeleton, Card, chartPalette } from "@/components/ui";
 import { CHART_COLORS, fmtPctFromFraction } from "@/lib/format";
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, Legend, CartesianGrid } from "recharts";
+import { useRefreshNonce } from "@/lib/refresh";
 
 function signColor(v: number | null | undefined): string {
   if (v == null) return "";
@@ -31,9 +32,10 @@ export function FactorRegimeTab() {
   const pal = chartPalette("dark");
   const scope = useSourceScope(provOf(data));
 
+  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
   useEffect(() => {
     api.researchFactorRegime().then(setData).catch(() => setData(null)).finally(() => setLoading(false));
-  }, []);
+  }, [refreshNonce]);
 
   const factorKeys = useMemo(() => (data?.factors ?? []).map((f) => f.factor), [data]);
   const cumulative = data?.cumulative ?? [];

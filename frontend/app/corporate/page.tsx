@@ -9,6 +9,7 @@ import { useUrlState } from "@/lib/useUrlState";
 import { EarningsQuality } from "@/components/corporate/EarningsQuality";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
+import { useRefreshNonce } from "@/lib/refresh";
 
 function KpiCard({ label, value, sub, color }: {
   label: string; value: string; sub?: string; color?: string;
@@ -57,12 +58,13 @@ function CorporatePageInner() {
       .finally(() => setLoading(false));
   }, []);
 
+  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
   useEffect(() => {
     if (ticker) {
       fetchHealth(ticker);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [refreshNonce]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

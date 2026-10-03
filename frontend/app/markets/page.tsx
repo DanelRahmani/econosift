@@ -30,6 +30,7 @@ import type {
   TreemapResponse, SectorReturnsResponse,
   SectorFundamentalsResponse, SectorRotationResponse, SectorDrillResponse,
 } from "@/lib/types";
+import { useRefreshNonce } from "@/lib/refresh";
 
 const ValuationTab = lazy(() =>
   import("@/components/markets/ValuationTab").then((m) => ({ default: m.ValuationTab }))
@@ -91,6 +92,7 @@ function MarketsPageInner() {
   const [drillData, setDrillData] = useState<SectorDrillResponse | null>(null);
   const [drillLoading, setDrillLoading] = useState(false);
 
+  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
   useEffect(() => {
     if (tab !== "Sectors") return;
     let alive = true;
@@ -100,7 +102,7 @@ function MarketsPageInner() {
       .catch(() => {})
       .finally(() => { if (alive) setSecLoading(false); });
     return () => { alive = false; };
-  }, [tab]);
+  }, [tab, refreshNonce]);
 
   useEffect(() => {
     if (!selectedSector) { setDrillData(null); return; }
@@ -111,7 +113,7 @@ function MarketsPageInner() {
       .catch(() => { if (alive) setDrillData(null); })
       .finally(() => { if (alive) setDrillLoading(false); });
     return () => { alive = false; };
-  }, [selectedSector]);
+  }, [selectedSector, refreshNonce]);
 
   // Treemap state
   const [tmIndex, setTmIndex] = useState<"sp500" | "ndx" | "dow">("sp500");
@@ -129,7 +131,7 @@ function MarketsPageInner() {
       .catch(() => {})
       .finally(() => { if (alive) setTmLoading(false); });
     return () => { alive = false; };
-  }, [tab, tmIndex, tmPeriod]);
+  }, [tab, tmIndex, tmPeriod, refreshNonce]);
 
   // Redirect old deprecated tabs
   useEffect(() => {

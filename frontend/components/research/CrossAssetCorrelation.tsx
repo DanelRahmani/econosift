@@ -6,6 +6,7 @@ import { api } from "@/lib/api";
 import type { CrossAssetCorrelation } from "@/lib/types";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
+import { useRefreshNonce } from "@/lib/refresh";
 
 const ASSET_PRESETS: Record<string, string[]> = {
   "Stocks": ["SPY", "QQQ", "IWM", "EFA", "EEM"],
@@ -34,7 +35,8 @@ export function CrossAssetCorrelation() {
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { fetchData(); }, [period]);
+  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
+  useEffect(() => { fetchData(); }, [period, refreshNonce]);
 
   const toggleAsset = (ticker: string) => {
     setSelectedAssets((prev) =>

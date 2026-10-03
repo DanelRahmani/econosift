@@ -7,10 +7,12 @@ import { Card, Skeleton } from "@/components/ui";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
 import { fmtPct, fmtPrice, currencySymbol } from "@/lib/format";
+import { useRefreshNonce } from "@/lib/refresh";
 
 export function QuoteCards({ tickers }: { tickers: string[] }) {
   const [quotes, setQuotes] = useState<Record<string, Quote | null>>({});
 
+  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
   useEffect(() => {
     let active = true;
     tickers.forEach(async (t) => {
@@ -24,7 +26,7 @@ export function QuoteCards({ tickers }: { tickers: string[] }) {
     return () => {
       active = false;
     };
-  }, [tickers]);
+  }, [tickers, refreshNonce]);
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">

@@ -9,6 +9,7 @@ import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
 import { fmtNum, fmtPct, fmtPrice, fmtLarge, currencySymbol } from "@/lib/format";
 import { NaReason } from "@/components/markets/NaReason";
+import { useRefreshNonce } from "@/lib/refresh";
 
 // ── Slider config ──────────────────────────────────────────────────────────
 interface Params {
@@ -167,6 +168,7 @@ export function DcfPanel({ tickers, sharedWacc = null }: { tickers: string[]; pe
   }, [tickers, selectedTicker]);
 
   // Debounced fetch – 500ms after any change (mirrors ValuationTab pattern)
+  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
   useEffect(() => {
     if (!selectedTicker || seededFor !== selectedTicker) return;
     const t = setTimeout(async () => {
@@ -188,7 +190,7 @@ export function DcfPanel({ tickers, sharedWacc = null }: { tickers: string[]; pe
       }
     }, 500);
     return () => clearTimeout(t);
-  }, [selectedTicker, seededFor, params]);
+  }, [selectedTicker, seededFor, params, refreshNonce]);
 
   // ── Early states ──────────────────────────────────────────────────────────
   if (!tickers.length) {

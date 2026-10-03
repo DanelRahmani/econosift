@@ -20,6 +20,7 @@ import {
   Bar,
   Cell,
 } from "recharts";
+import { useRefreshNonce } from "@/lib/refresh";
 
 const GRID = "rgba(255,255,255,0.08)";
 const RECESSION_FILL = "rgba(120,120,120,0.18)";
@@ -55,6 +56,7 @@ export function HousingTab() {
   const scope = useSourceScope(provOf(data));
   const globalScope = useSourceScope(provOf(globalHousing));
 
+  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
   useEffect(() => {
     api
       .macroHousing()
@@ -62,7 +64,7 @@ export function HousingTab() {
       .catch(() => setError(true))
       .finally(() => setLoading(false));
     api.macroHousingGlobal().then(setGlobalHousing).catch(() => {});
-  }, []);
+  }, [refreshNonce]);
 
   if (loading) {
     return (

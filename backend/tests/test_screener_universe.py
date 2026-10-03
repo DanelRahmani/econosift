@@ -444,3 +444,15 @@ def test_refresh_endpoint(client, monkeypatch):
     assert resp.status_code == 200
     data = resp.json()
     assert data["started"] is True
+
+
+def test_universe_provenance_is_dated_by_the_snapshot(client, monkeypatch):
+    # P1-20: the Navbar's "Data as of" reads provenance fetchedAt. The universe
+    # is a stored snapshot, so its fetchedAt is the snapshot time (asOf), not
+    # the time of the request.
+    from backend.services import screener_service
+    monkeypatch.setattr(screener_service, "query", lambda **kw: {
+        "index": "dow", "results": [{"ticker": "AAPL"}], "count": 1,
+        "asOf": "2026-10-02T09:47:14.485149+00:00", "stale": False})
+    resp = client.get("/api/screener/universe?index=dow")
+    assert resp.json()["provenance"]["*"]["fetchedAt"] == "2026-10-02T09:47:14Z"

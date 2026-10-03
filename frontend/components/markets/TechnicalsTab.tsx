@@ -13,6 +13,7 @@ import { api } from "@/lib/api";
 import type {
   TechnicalsResponse, BollingerPoint, IchimokuPoint, FibLevel, PivotSet,
 } from "@/lib/types";
+import { useRefreshNonce } from "@/lib/refresh";
 
 const PERIODS = ["1mo", "3mo", "6mo", "1y", "2y"] as const;
 type Period = (typeof PERIODS)[number];
@@ -145,6 +146,7 @@ export function TechnicalsTab({ ticker }: { ticker: string }) {
   const [showSubCharts, setShowSubCharts] = useState(true);
   const scope = useSourceScope(provOf(data));
 
+  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
   useEffect(() => {
     if (!ticker) return;
     setLoading(true);
@@ -154,7 +156,7 @@ export function TechnicalsTab({ ticker }: { ticker: string }) {
       .then(setData)
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-  }, [ticker, period]);
+  }, [ticker, period, refreshNonce]);
 
   function toggleOverlay(o: Overlay) {
     setActiveOverlays((prev) => {

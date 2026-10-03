@@ -23,6 +23,7 @@ import {
   Bar,
   Cell,
 } from "recharts";
+import { useRefreshNonce } from "@/lib/refresh";
 
 const GRID = "rgba(255,255,255,0.08)";
 
@@ -70,6 +71,7 @@ export function FinancialConditions() {
   const fundingScope = useSourceScope(provOf(fundingData));
   const gapsScope = useSourceScope(provOf(creditGaps));
 
+  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
   useEffect(() => {
     api
       .macroFinancialConditions()
@@ -78,7 +80,7 @@ export function FinancialConditions() {
       .finally(() => setLoading(false));
     api.macroFunding().then(setFundingData).catch(() => {});
     api.macroCreditGaps().then(setCreditGaps).catch(() => {});
-  }, []);
+  }, [refreshNonce]);
 
   if (loading) {
     return (

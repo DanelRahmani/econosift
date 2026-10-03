@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { ThemeToggle } from "./ThemeToggle";
 import { LearningToggle } from "./LearningToggle";
 import { RefreshingBadge } from "./RefreshingBadge";
+import { RefreshBar } from "./RefreshBar";
 import { useTheme } from "./ThemeProvider";
 import { CommandPalette, OPEN_COMMAND_PALETTE } from "./CommandPalette";
 
@@ -185,6 +186,7 @@ export function Navbar() {
             <span className="hidden lg:inline">Search</span>
             <kbd className="hidden lg:inline text-[10px] border border-border rounded px-1">Ctrl K</kbd>
           </button>
+          <RefreshBar />
           <RefreshingBadge />
           <LearningToggle />
           <ThemeToggle />

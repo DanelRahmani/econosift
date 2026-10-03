@@ -11,6 +11,7 @@ import { useTheme } from "@/components/ThemeProvider";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
 import { legendProv } from "./legendProv";
+import { useRefreshNonce } from "@/lib/refresh";
 
 const CB_COLORS: Record<string, string> = {
   Fed: "#3b82f6",
@@ -51,12 +52,13 @@ export function CentralBanksTab() {
   const [timeSpan, setTimeSpan] = useState<number>(120); // default 10Y
   const scope = useSourceScope(provOf(data));
 
+  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
   useEffect(() => {
     api.macroCentralBanks()
       .then(setData)
       .catch(() => setError(true))
       .finally(() => setLoading(false));
-  }, []);
+  }, [refreshNonce]);
 
   if (loading) {
     return (

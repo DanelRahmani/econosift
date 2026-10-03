@@ -7,6 +7,7 @@ import { Card, Skeleton } from "@/components/ui";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
 import { fmtNum } from "@/lib/format";
+import { useRefreshNonce } from "@/lib/refresh";
 
 const BASES = ["USD", "EUR", "GBP", "JPY", "CHF"];
 const TARGETS = "EUR,GBP,JPY,CNY,CHF,CAD,AUD,INR";
@@ -17,6 +18,7 @@ export function FxWidget() {
   const [loading, setLoading] = useState(false);
   const scope = useSourceScope(provOf(data));
 
+  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
   useEffect(() => {
     let active = true;
     setLoading(true);
@@ -27,7 +29,7 @@ export function FxWidget() {
     return () => {
       active = false;
     };
-  }, [base]);
+  }, [base, refreshNonce]);
 
   return (
     <Card {...scope}>

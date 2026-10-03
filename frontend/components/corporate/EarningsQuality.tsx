@@ -6,6 +6,7 @@ import type { EarningsQualityData } from "@/lib/types";
 import { Card, PageSkeleton, ToggleChip } from "@/components/ui";
 import { SourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
+import { useRefreshNonce } from "@/lib/refresh";
 
 const UNIVERSES: { key: "dow" | "ndx" | "sp500"; label: string }[] = [
   { key: "dow", label: "Dow 30" },
@@ -44,6 +45,7 @@ export function EarningsQuality() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
   useEffect(() => {
     setLoading(true);
     setError(null);
@@ -52,7 +54,7 @@ export function EarningsQuality() {
       .then((d) => setData(d))
       .catch((e) => setError(e instanceof Error ? e.message : "Failed to fetch data"))
       .finally(() => setLoading(false));
-  }, [universe]);
+  }, [universe, refreshNonce]);
 
   return (
     <div className="space-y-6">

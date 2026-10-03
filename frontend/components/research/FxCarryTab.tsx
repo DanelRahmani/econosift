@@ -9,6 +9,7 @@ import { api } from "@/lib/api";
 import type { CarryTable, CarryBacktest, CarryRow } from "@/lib/types";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
+import { useRefreshNonce } from "@/lib/refresh";
 
 const tooltipStyle = {
   backgroundColor: "var(--color-surface-alt)",
@@ -34,10 +35,11 @@ export function FxCarryTab() {
   const tableScope = useSourceScope(provOf(table));
   const backtestScope = useSourceScope(provOf(backtest));
 
+  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
   useEffect(() => {
     setLoading(true);
     api.carryTable("3y").then(setTable).catch(() => setTable(null)).finally(() => setLoading(false));
-  }, []);
+  }, [refreshNonce]);
 
   const runBacktest = () => {
     setBtLoading(true);

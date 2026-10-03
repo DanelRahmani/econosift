@@ -7,6 +7,7 @@ import { Card, Skeleton } from "@/components/ui";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
 import { fmtPct } from "@/lib/format";
+import { useRefreshNonce } from "@/lib/refresh";
 
 function Cell({ value }: { value: number | null }) {
   const tone = value === null ? "text-text-muted" : value >= 0 ? "text-success" : "text-danger";
@@ -22,6 +23,7 @@ export function RankingsTab({ tickers }: { tickers: string[] }) {
   const [loading, setLoading] = useState(false);
   const scope = useSourceScope(provOf(data));
 
+  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
   useEffect(() => {
     if (!tickers.length) { setData(null); return; }
     let active = true;
@@ -31,7 +33,7 @@ export function RankingsTab({ tickers }: { tickers: string[] }) {
       .catch(() => active && setData(null))
       .finally(() => active && setLoading(false));
     return () => { active = false; };
-  }, [tickers]);
+  }, [tickers, refreshNonce]);
 
   if (!tickers.length) {
     return <Card><div className="text-text-muted text-sm">Add tickers to rank by momentum.</div></Card>;

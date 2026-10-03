@@ -21,6 +21,7 @@ import type {
   IVSmilePoint,
   OIProfile,
 } from "@/lib/types";
+import { useRefreshNonce } from "@/lib/refresh";
 
 const TABS = ["Chain", "Volatility", "OI Profile", "Monte Carlo"] as const;
 type Tab = (typeof TABS)[number];
@@ -150,13 +151,14 @@ function OptionsPageInner() {
     }
   }, [ticker, expiry]);
 
+  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
   useEffect(() => {
     fetchTickerData();
-  }, [fetchTickerData]);
+  }, [fetchTickerData, refreshNonce]);
 
   useEffect(() => {
     if (expiry) fetchExpiryData();
-  }, [fetchExpiryData, expiry]);
+  }, [fetchExpiryData, expiry, refreshNonce]);
 
   function handleSearch(sym: string) {
     setUrlState({ t: sym.toUpperCase(), e: "" });

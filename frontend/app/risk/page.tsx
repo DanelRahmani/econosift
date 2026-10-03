@@ -23,6 +23,7 @@ import type {
   RollingMetricsResponse,
   ExtendedRiskResponse,
 } from "@/lib/types";
+import { useRefreshNonce } from "@/lib/refresh";
 
 const PERIODS = ["1y", "2y", "3y"] as const;
 type Period = (typeof PERIODS)[number];
@@ -139,12 +140,13 @@ function RiskPageInner() {
     }
   }, [tickersStr, period, window]);
 
+  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
   useEffect(() => {
     fetchBase();
     fetchRolling();
     fetchExtended();
     fetchCorr();
-  }, [fetchBase, fetchRolling, fetchExtended, fetchCorr]);
+  }, [fetchBase, fetchRolling, fetchExtended, fetchCorr, refreshNonce]);
 
   const primaryTicker = tickersStr.split(",")[0].trim().toUpperCase() || "AAPL";
   const firstBase = baseMetrics[0] ?? null;

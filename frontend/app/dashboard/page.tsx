@@ -11,54 +11,49 @@ import { SectorHeatmap } from "@/components/markets/SectorHeatmap";
 import { AiSummaryPanel } from "@/components/AiSummaryPanel";
 import { WalkthroughBanner } from "@/components/WalkthroughBanner";
 import { api } from "@/lib/api";
-import { RefreshProvider } from "@/lib/refresh";
-import { RefreshBar } from "@/components/RefreshBar";
 
 /**
  * Phase 2 dashboard landing page. Layout: sticky breadth bar → Fear & Greed +
  * regime / session status → global indices → yield curve + top movers → sector
  * performance. All panels are compute tier 🟢 (run on load) and independently
  * cached, so a slow source degrades gracefully without blocking the page.
- * Refresh re-fetches every panel past the cache (P1-20).
+ * The Navbar's Refresh re-fetches every panel past the cache (P1-20).
  */
 export default function DashboardPage() {
   return (
-    <RefreshProvider>
-      <div className="space-y-6">
-        <WalkthroughBanner pageKey="dashboard" />
-        <RefreshBar />
-        <BreadthBar />
+    <div className="space-y-6">
+      <WalkthroughBanner pageKey="dashboard" />
+      <BreadthBar />
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-1">
-            <FearGreedGauge />
-          </div>
-          <div className="lg:col-span-2 space-y-6">
-            <Card>
-              <h2 className="text-sm font-semibold mb-3 text-text-secondary">Macro Regime &amp; Session</h2>
-              <div className="flex flex-wrap items-center gap-4">
-                <RegimeDetector country="US" countryName="United States" />
-                <MarketSession />
-              </div>
-            </Card>
-            <GlobalIndices />
-          </div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-1">
+          <FearGreedGauge />
         </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <YieldCurve />
-          <TopMovers />
+        <div className="lg:col-span-2 space-y-6">
+          <Card>
+            <h2 className="text-sm font-semibold mb-3 text-text-secondary">Macro Regime &amp; Session</h2>
+            <div className="flex flex-wrap items-center gap-4">
+              <RegimeDetector country="US" countryName="United States" />
+              <MarketSession />
+            </div>
+          </Card>
+          <GlobalIndices />
         </div>
-
-        <SectorHeatmap />
-
-        <AiSummaryPanel
-          summaryType="dashboard"
-          title="AI Daily Briefing"
-          onGenerate={(model, force) => api.aiDashboard(model, force)}
-        />
       </div>
-    </RefreshProvider>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <YieldCurve />
+        <TopMovers />
+      </div>
+
+      <SectorHeatmap />
+
+      <AiSummaryPanel
+        summaryType="dashboard"
+        title="AI Daily Briefing"
+        onGenerate={(model, force) => api.aiDashboard(model, force)}
+      />
+    </div>
   );
 }
 

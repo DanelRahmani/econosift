@@ -51,25 +51,28 @@ import type {
 } from "./types";
 
 import { noteResponse, STALE_HEADER } from "./staleData";
-import { refreshHeaders, requestDone, requestStarted } from "./refresh";
+import { REFRESH_HEADER, requestDone, requestStarted } from "./refresh";
 
 // Relative by default (Docker/web hit /api via nginx); the Tauri desktop build
 // sets NEXT_PUBLIC_API_URL=http://localhost:8000 in .env.production.
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
 async function get<T>(path: string): Promise<T> {
-  requestStarted();
+  const refreshing = requestStarted();
   let data: unknown;
   try {
-    data = await getJson(path);
+    data = await getJson(path, refreshing);
     return data as T;
   } finally {
-    requestDone(data);
+    requestDone(refreshing, data);
   }
 }
 
-async function getJson(path: string): Promise<unknown> {
-  const res = await fetch(`${API_BASE}/api${path}`, { cache: "no-store", headers: refreshHeaders() });
+async function getJson(path: string, refreshing: boolean): Promise<unknown> {
+  const res = await fetch(`${API_BASE}/api${path}`, {
+    cache: "no-store",
+    headers: refreshing ? { [REFRESH_HEADER]: "1" } : undefined,
+  });
   if (!res.ok) {
     // Surface the server's reason (FastAPI `detail`) so a page can say *why*
     // data is missing instead of a bare status code.

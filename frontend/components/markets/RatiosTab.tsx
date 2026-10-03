@@ -12,6 +12,7 @@ import {
   RATIO_GUIDE, ratioTone, ratioRanges, TONE_TEXT, TONE_DOT,
   RISK_METRIC_GUIDES, type RiskMetricGuide,
 } from "@/lib/ratioGuide";
+import { useRefreshNonce } from "@/lib/refresh";
 
 const PCT_KEYS = new Set([
   "grossMargin", "operatingMargin", "netMargin", "ebitdaMargin",
@@ -326,6 +327,7 @@ export function RatiosTab({ tickers }: { tickers: string[] }) {
     }
   }, [tickers, selectedTicker]);
 
+  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
   useEffect(() => {
     if (!selectedTicker) return;
     let active = true;
@@ -337,7 +339,7 @@ export function RatiosTab({ tickers }: { tickers: string[] }) {
     return () => {
       active = false;
     };
-  }, [selectedTicker]);
+  }, [selectedTicker, refreshNonce]);
 
   return (
     <div className="space-y-4" {...scope} data-prov-ctx={selectedTicker}>

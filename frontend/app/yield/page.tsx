@@ -19,6 +19,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   BarChart, Bar, ReferenceLine,
 } from "recharts";
+import { useRefreshNonce } from "@/lib/refresh";
 
 const TABS = YIELD_TABS;
 
@@ -40,9 +41,10 @@ function USRatesDetailTab() {
   const [loading, setLoading] = useState(true);
   const scope = useSourceScope(provOf(data));
 
+  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
   useEffect(() => {
     api.macroRates().then(setData).catch(() => {}).finally(() => setLoading(false));
-  }, []);
+  }, [refreshNonce]);
 
   if (loading) return <PageSkeleton text="Loading rates data…" />;
   if (!data) return <div className="text-muted text-sm py-8 text-center">Rates data unavailable.</div>;
