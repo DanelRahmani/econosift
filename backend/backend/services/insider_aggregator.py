@@ -47,10 +47,11 @@ def get_insider_aggregate() -> dict:
     if latest is None:
         return {"error": "No SEC insider transactions data set is available", "asOf": None}
     quarter, trades, url = latest
-    return aggregate(trades, sp500, quarter, url)
+    return aggregate(trades, sp500, quarter, url, built_at=insider_dataset.built_at(quarter))
 
 
-def aggregate(trades: pd.DataFrame, sp500: list[dict], quarter: str, url: str | None = None) -> dict:
+def aggregate(trades: pd.DataFrame, sp500: list[dict], quarter: str, url: str | None = None,
+              built_at: str | None = None) -> dict:
     """Aggregate the reduced trades of one quarterly data set (see
     :func:`insider_dataset.reduce_dataset`) over the given constituents.
     Only trades dated inside the quarter count; late filings of older
@@ -184,6 +185,8 @@ def aggregate(trades: pd.DataFrame, sp500: list[dict], quarter: str, url: str | 
         "sectorSentiment": pv.derived("buys and sells per GICS sector", ["*"], title="Sector sentiment"),
         "topTrades": pv.derived("largest transactions by value", ["*"], title="Top trades"),
     }
+    if built_at:  # a stored data set: fetched when it was written, not at request time (P3-35)
+        filings["fetchedAt"] = prov["*"]["fetchedAt"] = built_at
     return pv.attach({
         "asOf": end.isoformat(),
         "dataset": quarter,

@@ -91,6 +91,16 @@ def _build_region_map():
             _GEC_REGIONS[gec] = ""
 
 
+def _factbook_path(gec_code: str) -> Path | None:
+    """The stored factbook JSON file of a GEC code: region subfolder first, then flat."""
+    _build_region_map()
+    region = _GEC_REGIONS.get(gec_code)
+    if region and (_DATA_DIR / region / f"{gec_code}.json").exists():
+        return _DATA_DIR / region / f"{gec_code}.json"
+    path = _DATA_DIR / f"{gec_code}.json"
+    return path if path.exists() else None
+
+
 def _load_factbook_file(gec_code: str) -> dict | None:
     """Load a single factbook country JSON file by GEC code."""
     _build_region_map()

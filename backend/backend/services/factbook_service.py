@@ -270,15 +270,21 @@ def _extract_sections(entry: dict) -> list[dict]:
     return sections
 
 
-def _provenance(sections: list[dict], rest_titles: set[str], fb_titles: set[str], aircraft: bool) -> dict:
-    """Source map for a country profile (see provenance.py). Sections are keyed by title."""
+def _provenance(sections: list[dict], rest_titles: set[str], fb_titles: set[str], aircraft: bool,
+                rest_time: str | None = None, fb_time: str | None = None) -> dict:
+    """Source map for a country profile (see provenance.py). Sections are keyed by title.
+    ``rest_time`` / ``fb_time`` are when the stored files were downloaded (P3-35)."""
     rest = pv.ref("other", None, "REST Countries dataset (mledoze/countries)",
                   url="https://github.com/mledoze/countries",
                   note="Names, codes, borders, currencies and languages; a static file downloaded by the app.")
     rest["providerName"] = "REST Countries (mledoze/countries)"
     fb = pv.ref("factbook", None, "CIA World Factbook country profile",
-                note="From a downloaded snapshot of the factbook/factbook.json GitHub mirror; the snapshot date "
-                     "is not recorded, and multi-year fields show their latest year without naming it.")
+                note="From a downloaded snapshot of the factbook/factbook.json GitHub mirror (Fetched is when "
+                     "it was downloaded); multi-year fields show their latest year without naming it.")
+    if rest_time:
+        rest["fetchedAt"] = rest_time
+    if fb_time:
+        fb["fetchedAt"] = fb_time
     prov: dict = {"*": rest}
     for sec in sections:
         title = sec["title"]
@@ -327,13 +333,16 @@ def get_country_profile(iso2: str) -> dict | None:
         rest_titles.add("People and Society")  # merged into the factbook section of that name
     fb_titles: set[str] = set()
     aircraft = False
+    fb_time = None
 
     # Try to merge in CIA Factbook data
     try:
-        from .factbook_profiles_service import get_factbook_profile, _load_factbook_file, _extract_field, ISO2_TO_GEC as FB_ISO2
+        from .factbook_profiles_service import get_factbook_profile, _load_factbook_file, _factbook_path, _extract_field, ISO2_TO_GEC as FB_ISO2
         fb_sections = get_factbook_profile(iso2)
         if fb_sections:
             fb_titles = {s["title"] for s in fb_sections}
+            fb_path = _factbook_path(FB_ISO2.get(iso2, ""))
+            fb_time = pv.file_time(fb_path) if fb_path else None
             # Merge duplicates: REST Geography → factbook Geography, REST People → factbook People
             fb_by_title = {s["title"]: s for s in fb_sections}
             rest_by_title = {s["title"]: s for s in sections}
@@ -421,4 +430,5 @@ def get_country_profile(iso2: str) -> dict | None:
         "continent": str(region),  # region is the continent in REST Countries
         "borders": border_iso2s,
         "sections": sections,
-    }, _provenance(sections, rest_titles, fb_titles, aircraft))
+    }, _provenance(sections, rest_titles, fb_titles, aircraft,
+                   rest_time=pv.file_time(_resolve_path() or ""), fb_time=fb_time))

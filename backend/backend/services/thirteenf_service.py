@@ -301,7 +301,7 @@ def _holders_sync(ticker: str) -> dict:
     out = lookup(ticker)
     if out["error"]:
         return out
-    return pv.attach(out, {"*": pv.ref(
+    ref = pv.ref(
         "sec_edgar", None, f"Form 13F data set, filings {have['window']}", url=have["url"],
         units="shares; value in USD", frequency="quarterly", observed=have["period"],
         note=f"Positions reported on Form 13F-HR by institutional managers for the quarter ending "
@@ -309,7 +309,10 @@ def _holders_sync(ticker: str) -> dict:
              f"amounts excluded); a restated report replaces the original and new-holdings amendments are "
              f"added. Filings whose values imply ~1/1000 of other filers' prices are read as reported in "
              f"thousands and multiplied by 1,000. Top {_SHOW} of {out['filers']} filers by shares (CUSIP {out['cusip']}). % float and "
-             f"quarter-on-quarter change are not computed.")})
+             f"quarter-on-quarter change are not computed.")
+    # A stored data set: fetched when it was built, not at request time (P3-35).
+    ref["fetchedAt"] = have["builtAt"]
+    return pv.attach(out, {"*": ref})
 
 
 @async_cached("13f")

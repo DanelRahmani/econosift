@@ -153,11 +153,14 @@ def _response(summary_type: str, context_key: str, model: str, text: str, cached
     # ``generated_at`` is when a cached summary was actually written.
     observed = generated_at.date().isoformat() if generated_at else None
     stale = summary_type == "dashboard" and generated_at is not None and generated_at.date() < _utcnow().date()
-    return pv.attach(out, {"*": pv.ref(
+    ref = pv.ref(
         "gemini", model, f"AI-generated {summary_type} summary", observed=observed,
         flags=["stale"] if stale else [],
         note=(_AI_NOTE if record else _AI_NOTE_UNGROUNDED)
-             + (" This daily briefing was generated on an earlier day." if stale else ""))})
+             + (" This daily briefing was generated on an earlier day." if stale else ""))
+    if generated_at:  # a stored summary: dated by its generation, not the request (P3-35)
+        ref["fetchedAt"] = pv.stamp(generated_at)
+    return pv.attach(out, {"*": ref})
 
 
 def _record_of(row: AiSummary) -> dict | None:
