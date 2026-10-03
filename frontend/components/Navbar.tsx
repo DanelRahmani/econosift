@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useLayoutEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ThemeToggle } from "./ThemeToggle";
@@ -87,14 +87,31 @@ export function Navbar() {
 
   const isMoreActive = allMoreHrefs.some((href) => pathname?.startsWith(href));
 
+  // Sliding pill behind the active primary tab.
+  const tabsRef = useRef<HTMLDivElement>(null);
+  const [pill, setPill] = useState<{ left: number; width: number } | null>(null);
+  useLayoutEffect(() => {
+    const box = tabsRef.current;
+    if (!box) return;
+    const place = () => {
+      const el = box.querySelector<HTMLElement>('[data-active="true"]');
+      setPill(el ? { left: el.offsetLeft, width: el.offsetWidth } : null);
+    };
+    place();
+    const ro = new ResizeObserver(place); // fonts loading or the window resizing move the tabs
+    ro.observe(box);
+    return () => ro.disconnect();
+  }, [pathname]);
+
   return (
-    <nav className="sticky top-0 z-50 bg-surface/80 border-b border-border backdrop-blur">
-      <div className="max-w-7xl mx-auto px-4 h-14 flex items-center gap-6">
+    <nav className="sticky top-0 z-50 bg-background/70 border-b border-border/70 backdrop-blur-xl backdrop-saturate-150">
+      <div aria-hidden className="pointer-events-none absolute inset-x-0 -bottom-px h-px bg-gradient-to-r from-transparent via-accent-light/50 to-transparent" />
+      <div className="max-w-7xl mx-auto px-4 h-14 flex items-center gap-3 sm:gap-6">
         <Link href="/dashboard" aria-label="EconoSift home" className="shrink-0">
           <span
             role="img"
             aria-label="EconoSift"
-            className="block w-[180px] h-14 bg-center bg-no-repeat"
+            className="block w-[132px] sm:w-[180px] h-14 bg-center bg-no-repeat"
             style={{
               backgroundImage: `url('/econosift-logo-${theme}.png')`,
               backgroundSize: "100% auto",
@@ -102,17 +119,25 @@ export function Navbar() {
           />
         </Link>
         <div className="hidden md:flex items-center gap-1 min-w-0 flex-1">
-          <div className="flex items-center gap-1 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+          <div ref={tabsRef} className="relative flex items-center gap-1 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+            {pill && (
+              <span
+                aria-hidden
+                className="absolute inset-y-0 left-0 rounded-lg bg-accent shadow-[0_6px_20px_-8px_rgb(var(--primary-light)/0.8),inset_0_1px_0_rgb(255_255_255/0.15)] transition-[transform,width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]"
+                style={{ transform: `translateX(${pill.left}px)`, width: pill.width }}
+              />
+            )}
             {primaryTabs.map((t) => {
               const active = pathname?.startsWith(t.href);
               return (
                 <Link
                   key={t.href}
                   href={t.href}
-                  className={`shrink-0 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
+                  data-active={active ? "true" : undefined}
+                  className={`relative shrink-0 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors duration-200 whitespace-nowrap ${
                     active
-                      ? "bg-accent text-white"
-                      : "text-text-secondary hover:text-text-primary hover:bg-surface-alt"
+                      ? `text-white ${pill ? "" : "bg-accent"}`
+                      : "text-text-secondary hover:text-text-primary hover:bg-surface-alt/70"
                   }`}
                 >
                   {t.label}
@@ -141,7 +166,7 @@ export function Navbar() {
             </button>
             {menuOpen && (
               <div
-                className="absolute top-full right-0 mt-1 w-56 bg-surface border border-border rounded-xl shadow-xl overflow-hidden z-[100]"
+                className="absolute top-full right-0 mt-1 w-56 bg-surface/95 backdrop-blur-xl border border-border rounded-xl shadow-2xl overflow-hidden z-[100] origin-top-right animate-[pop-in_0.18s_cubic-bezier(0.22,1,0.36,1)]"
                 style={{ position: "absolute", top: "100%", right: 0, marginTop: "4px" }}
               >
                 {moreGroups.map((group) => (
