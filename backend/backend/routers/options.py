@@ -49,7 +49,10 @@ def _expiries_sync(ticker: str) -> list[str]:
 @router.get("/expiries")
 async def expiries(ticker: str = Query(..., description="Ticker symbol, e.g. AAPL")):
     """List all available option expiry dates for a ticker."""
-    return await asyncio.to_thread(_expiries_sync, ticker.upper())
+    t = ticker.upper()
+    rows = await asyncio.to_thread(_expiries_sync, t)
+    return pv.attach({"ticker": t, "expiries": rows},
+                     {"*": _chain_ref(t, "Option expiry dates listed for the ticker (Ticker.options)")})
 
 
 @cached("options_ivmetrics")
@@ -153,7 +156,20 @@ def _term_sync(ticker: str) -> list:
 @router.get("/termstructure")
 async def term_structure(ticker: str = Query(..., description="Ticker symbol, e.g. AAPL")):
     """IV term structure: ATM IV and straddle cost per expiry, sorted by DTE."""
-    return await asyncio.to_thread(_term_sync, ticker.upper())
+    t = ticker.upper()
+    rows = await asyncio.to_thread(_term_sync, t)
+    chain = _chain_ref(t, "Option chains (calls and puts) for every listed expiry")
+    return pv.attach({"ticker": t, "points": rows}, {
+        "*": chain,
+        "points.dte": pv.derived("expiry date − today, in calendar days", [], title="Days to expiry"),
+        "points.atmIV": pv.derived(
+            "Yahoo impliedVolatility × 100 of the call at the strike nearest spot; back-solved from the call mid "
+            "price (Black-Scholes, Brent root-find, no dividend yield) when Yahoo's is 0.1% or lower; blank above "
+            "500%", [chain, _spot_ref(t), _rf_ref()], title="At-the-money implied volatility", flags=("delayed",)),
+        "points.straddle": pv.derived(
+            "ATM call mid + put mid at the strike nearest spot, mid = (bid + ask) ÷ 2", [chain, _spot_ref(t)],
+            title="Straddle cost", flags=("delayed",)),
+    })
 
 
 @cached("options_smile")
@@ -167,7 +183,20 @@ async def iv_smile(
     expiry: str = Query(..., description="Expiry date YYYY-MM-DD"),
 ):
     """IV smile: call and put IV by moneyness (0.70–1.30) for a given expiry."""
-    return await asyncio.to_thread(_smile_sync, ticker.upper(), expiry)
+    t = ticker.upper()
+    rows = await asyncio.to_thread(_smile_sync, t, expiry)
+    chain = _chain_ref(t, f"Option chain for expiry {expiry}")
+    iv = ("Yahoo impliedVolatility × 100; back-solved from the mid price (Black-Scholes, Brent root-find, no "
+          "dividend yield) when Yahoo's is 0.1% or lower; blank above 500%")
+    return pv.attach({"ticker": t, "expiry": expiry, "points": rows}, {
+        "*": chain,
+        "points.moneyness": pv.derived("strike ÷ spot, kept between 0.70 and 1.30", [chain, _spot_ref(t)],
+                                       title="Moneyness"),
+        "points.callIV": pv.derived(iv, [chain, _spot_ref(t), _rf_ref()], title="Call implied volatility",
+                                    flags=("delayed",)),
+        "points.putIV": pv.derived(iv, [chain, _spot_ref(t), _rf_ref()], title="Put implied volatility",
+                                   flags=("delayed",)),
+    })
 
 
 @cached("options_oi")

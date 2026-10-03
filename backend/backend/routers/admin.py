@@ -1,6 +1,7 @@
 """Backend health dashboard: cache stats and data-source availability."""
 from __future__ import annotations
 
+import asyncio
 import os
 import re
 import time
@@ -55,6 +56,8 @@ async def health():
             "totalMisses": total_misses,
             "overallHitRate": round(total_hits / total, 4) if total else None,
             "ttlSeconds": cache._CACHE_TTL,
+            # Entries cached before an upgrade added sources (P2-33); Admin suggests a clear.
+            "provenanceGaps": await asyncio.to_thread(cache.provenance_gaps),
         },
         "config": {
             "fredApiKey": bool(FRED_API_KEY),

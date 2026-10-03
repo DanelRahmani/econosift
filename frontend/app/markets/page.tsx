@@ -88,8 +88,10 @@ function MarketsPageInner() {
   const secKpiScope = useSourceScope(provOf(secReturns));
   const secChartScope = useSourceScope(provOf(secReturns));
   const secRotationScope = useSourceScope(provOf(secRotation));
+  const secFundScope = useSourceScope(provOf(secFundamentals));
   const [selectedSector, setSelectedSector] = useState<string | null>(null);
   const [drillData, setDrillData] = useState<SectorDrillResponse | null>(null);
+  const drillScope = useSourceScope(provOf(drillData));
   const [drillLoading, setDrillLoading] = useState(false);
 
   const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
@@ -441,11 +443,11 @@ function MarketsPageInner() {
                   onSectorClick={(s) => setSelectedSector(s === selectedSector ? null : s)} /> : null}
           </Card>
           {/* Fundamentals */}
-          <Card>
+          <Card {...secFundScope}>
             <h3 className="text-sm font-semibold text-text-secondary mb-4">Sector ETF Fundamentals</h3>
             {secLoading || !secFundamentals ? (
               <ChartSkeleton height="h-48" />
-            ) : <SectorFundamentalsTable data={secFundamentals} />}
+            ) : <SectorFundamentalsTable data={secFundamentals.sectors ?? []} />}
           </Card>
           {/* Rotation clock */}
           <Card {...secRotationScope}>
@@ -459,8 +461,8 @@ function MarketsPageInner() {
           </Card>
           {/* Industry drill-down */}
           {selectedSector && (
-            <Card>
-              <SectorIndustryDrillDown sector={selectedSector} data={drillData} loading={drillLoading} />
+            <Card {...drillScope}>
+              <SectorIndustryDrillDown sector={selectedSector} data={drillData?.industries ?? null} loading={drillLoading} />
             </Card>
           )}
         </div>

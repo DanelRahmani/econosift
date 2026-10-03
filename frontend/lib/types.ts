@@ -864,6 +864,21 @@ export interface IVSmilePoint {
   putIV: number | null;
 }
 
+// Wrapped in objects (P2-32) so each response carries its own provenance map.
+export interface OptionsExpiriesResponse {
+  ticker: string;
+  expiries: string[];
+}
+export interface IVTermStructureResponse {
+  ticker: string;
+  points: IVTermPoint[];
+}
+export interface IVSmileResponse {
+  ticker: string;
+  expiry: string;
+  points: IVSmilePoint[];
+}
+
 export interface OIProfile {
   strikes: number[];
   callOI: number[];
@@ -1715,9 +1730,11 @@ export interface SnowflakeResponse {
   axisDetails: Record<string, SnowflakeAxisDetail>;
 }
 export interface SnowflakeBatchResponse {
-  [ticker: string]: {
-    overallScore: number | null;
-    scores: SnowflakeScores;
+  scores: {
+    [ticker: string]: {
+      overallScore: number | null;
+      scores: SnowflakeScores;
+    };
   };
 }
 
@@ -1754,7 +1771,9 @@ export interface SectorFundamentals {
   return6m: number | null;
   return1y: number | null;
 }
-export type SectorFundamentalsResponse = SectorFundamentals[];
+export interface SectorFundamentalsResponse {
+  sectors: SectorFundamentals[];
+}
 export interface SectorBubble {
   ticker: string;
   sector: string;
@@ -1774,7 +1793,10 @@ export interface IndustryGroup {
   industry: string;
   stocks: Array<{ symbol: string; name: string; change1d: number | null }>;
 }
-export type SectorDrillResponse = IndustryGroup[];
+export interface SectorDrillResponse {
+  sector: string;
+  industries: IndustryGroup[];
+}
 
 // --- Phase 11: Portfolio Analytics ---
 export interface Holding {
@@ -1817,7 +1839,10 @@ export interface RiskContribItem {
   marginalContrib: number | null;
   pctContrib: number | null;
 }
-export type RiskContribData = RiskContribItem[];
+export interface RiskContribData {
+  holdings: RiskContribItem[];
+  error?: string;
+}
 
 export interface CAPMData {
   alpha: number | null;         // daily alpha
@@ -1841,14 +1866,17 @@ export interface RollingData {
   beta: DateValuePoint[];
 }
 
-// Kelly returns a list (one per holding)
+// Kelly returns one row per holding
 export interface KellyRow {
   ticker: string;
   annReturn: number | null;
   annVolatility: number | null;
   kellyFraction: number | null;
 }
-export type KellyData = KellyRow[];
+export interface KellyData {
+  holdings: KellyRow[];
+  error?: string;
+}
 
 export interface FFFactorRow {
   /** Factor name as the backend emits it (e.g. "MktRF", "SMB", "HML"). */
@@ -1907,7 +1935,7 @@ export interface BLData {
   error?: string;
 }
 
-// Stress test returns a list of scenario objects
+// Stress test returns one object per scenario
 export interface StressScenario {
   scenario: string;
   label: string;
@@ -1919,7 +1947,10 @@ export interface StressScenario {
   benchmark: DateValuePoint[];
   error?: string;
 }
-export type StressData = StressScenario[];
+export interface StressData {
+  scenarios: StressScenario[];
+  error?: string;
+}
 
 // --- Phase 12 Technicals ---
 export interface TechnicalSummary {
@@ -2092,6 +2123,8 @@ export interface HealthResponse {
     totalMisses: number;
     overallHitRate: number | null;
     ttlSeconds: number;
+    /** Cached entries from before an upgrade added sources (P2-33). */
+    provenanceGaps?: { total: number; byName: Record<string, number> };
   };
   config: { fredApiKey: boolean; finnhubApiKey: boolean; geminiApiKey: boolean };
   database: DbHealth;

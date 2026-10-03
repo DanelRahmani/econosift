@@ -256,13 +256,28 @@ async def risk_contribution(req: PortfolioRequest):
     """Marginal and percentage risk contribution per holding."""
     holdings = _normalise(req.holdings)
     if not holdings:
-        return []
+        return {"holdings": []}
 
     frame = await _load_frame(holdings, req.period)
     if frame is None:
         return _empty()
 
-    return await asyncio.to_thread(port.risk_contribution, holdings, frame)
+    rows = await asyncio.to_thread(port.risk_contribution, holdings, frame)
+    px = _px_ref(frame)
+    prov: dict = {"*": pv.derived(
+        "Each holding's share of portfolio volatility from the annualised covariance matrix Σ of daily log returns "
+        "(prices forward-filled, × 252); weights normalised over the holdings found", [px],
+        title="Risk contribution")}
+    for r in rows:
+        t = r["ticker"]
+        prov[f"holdings.{t}.weight"] = pv.derived("requested weight ÷ sum of requested weights (negatives floored at 0)",
+                                                  [], title="Weight")
+        prov[f"holdings.{t}.marginalContrib"] = pv.derived(
+            "wᵢ × (Σw)ᵢ ÷ σp, where σp = √(wᵀΣw)", [px], title="Contribution to portfolio volatility")
+        prov[f"holdings.{t}.pctContrib"] = pv.derived(
+            "the holding's contribution ÷ the sum of all holdings' contributions", [f"holdings.{t}.marginalContrib"],
+            title="Share of portfolio risk")
+    return pv.attach({"holdings": rows}, prov)
 
 
 @router.post("/capm")
@@ -336,13 +351,27 @@ async def kelly(req: PortfolioRequest):
     """Kelly criterion fractions for each holding (on-demand)."""
     holdings = _normalise(req.holdings)
     if not holdings:
-        return []
+        return {"holdings": []}
 
     frame = await _load_frame(holdings, req.period)
     if frame is None:
         return _empty()
 
-    return await asyncio.to_thread(port.kelly_criterion, holdings, frame, req.risk_free)
+    rows = await asyncio.to_thread(port.kelly_criterion, holdings, frame, req.risk_free)
+    px = _px_ref(frame)
+    rf = _req_rf_ref()
+    prov: dict = {"*": pv.derived(
+        "Kelly fraction of each holding on its own, from annualised statistics of its daily simple returns "
+        "(prices forward-filled); blank with fewer than 20 prices", [px, rf], title="Kelly criterion")}
+    for r in rows:
+        t = r["ticker"]
+        prov[f"holdings.{t}.annReturn"] = pv.derived("mean daily simple return × 252", [px], title="Annual return")
+        prov[f"holdings.{t}.annVolatility"] = pv.derived("√(sample variance of daily simple returns × 252)", [px],
+                                                         title="Annual volatility")
+        prov[f"holdings.{t}.kellyFraction"] = pv.derived(
+            "(annual return − risk-free rate) ÷ annual variance, limited to between 0 and 1",
+            [f"holdings.{t}.annReturn", f"holdings.{t}.annVolatility", rf], title="Kelly fraction")
+    return pv.attach({"holdings": rows}, prov)
 
 
 @router.post("/ff")
@@ -468,7 +497,7 @@ async def stress(req: PortfolioRequest):
     """Historical stress test across GFC / COVID / rate-shock / dot-com (compute-on-demand)."""
     holdings = _normalise(req.holdings)
     if not holdings:
-        return []
+        return {"scenarios": []}
 
     syms = [h["ticker"] for h in holdings]
     bench = yfs.benchmark_for(syms[0])
@@ -477,7 +506,24 @@ async def stress(req: PortfolioRequest):
     if frame is None:
         return _empty()
 
-    return await asyncio.to_thread(port.stress_test_portfolio, holdings, frame, bench)
+    rows = await asyncio.to_thread(port.stress_test_portfolio, holdings, frame, bench)
+    px = _px_ref(frame)
+    prov: dict = {"*": pv.derived(
+        "The portfolio's daily simple returns Σ wᵢ·rᵢ (weights normalised over the holdings found, holdings not yet "
+        "listed excluded that day) replayed over each fixed historical window", [px], title="Historical stress test")}
+    for r in rows:
+        k = r["scenario"]
+        prov[f"scenarios.{k}.totalReturn"] = pv.derived(
+            "cumulative portfolio return over the scenario window (compounded daily log returns)", [px],
+            title="Scenario return")
+        prov[f"scenarios.{k}.maxDrawdown"] = pv.derived(
+            "worst (portfolio value ÷ running peak − 1) within the scenario window", [px], title="Scenario max drawdown")
+        prov[f"scenarios.{k}.returnsTimeSeries"] = pv.derived(
+            "cumulative portfolio return, day by day, over the scenario window", [px], title="Scenario path")
+        prov[f"scenarios.{k}.benchmark"] = pv.derived(
+            f"cumulative return of the benchmark ({bench}) over the same window; {_BENCH_NOTE}", [px],
+            title="Benchmark path")
+    return pv.attach({"scenarios": rows}, prov)
 
 
 # ---------------------------------------------------------------------------

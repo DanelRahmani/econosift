@@ -5,7 +5,9 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
 import { api } from "@/lib/api";
-import type { Holding, StressScenario } from "@/lib/types";
+import type { Holding, StressData, StressScenario } from "@/lib/types";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 
 interface Props {
   holdings: Holding[];
@@ -78,16 +80,18 @@ function ScenarioCard({ scenario }: { scenario: StressScenario }) {
 }
 
 export function StressTesting({ holdings, period }: Props) {
-  const [scenarios, setScenarios] = useState<StressScenario[] | null>(null);
+  const [data, setData] = useState<StressData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const scope = useSourceScope(provOf(data));
+  const scenarios = data?.scenarios;
 
   async function run() {
     setLoading(true);
     setError(null);
     try {
       const d = await api.portfolioStress(holdings, period);
-      setScenarios(d);
+      setData(d);
     } catch {
       setError("Failed to run stress tests");
     } finally {
@@ -96,7 +100,7 @@ export function StressTesting({ holdings, period }: Props) {
   }
 
   return (
-    <div className="rounded-xl border border-border bg-surface p-4 space-y-4">
+    <div className="rounded-xl border border-border bg-surface p-4 space-y-4" {...scope}>
       <div className="flex items-center justify-between">
         <h3 className="font-semibold text-sm">Historical Stress Testing</h3>
         <button

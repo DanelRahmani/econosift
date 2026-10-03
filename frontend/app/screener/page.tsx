@@ -4,8 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState, Suspense } from "rea
 import { api } from "@/lib/api";
 import type { PresetDef, ScreenerCacheRow, ScreenerUniverseResponse, SnowflakeBatchResponse } from "@/lib/types";
 import { Card, Skeleton, PageSkeleton } from "@/components/ui";
-import { useSourceScope } from "@/components/provenance/SourceScope";
-import { provOf } from "@/lib/provenance";
+import { SourceScope, useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf, type Provenance } from "@/lib/provenance";
 import { useUrlState } from "@/lib/useUrlState";
 import { PresetPills } from "@/components/screener/PresetPills";
 import { ResultTabs, RESULT_TABS } from "@/components/screener/ResultTabs";
@@ -61,9 +61,11 @@ function SegCtrl<T extends string>({
 function SparkCard({
   row,
   snowflake,
+  snowflakeProv,
 }: {
   row: ScreenerCacheRow;
-  snowflake?: SnowflakeBatchResponse[string];
+  snowflake?: SnowflakeBatchResponse["scores"][string];
+  snowflakeProv?: Provenance;
 }) {
   const positive = (row.changePercent ?? 0) >= 0;
   return (
@@ -88,11 +90,13 @@ function SparkCard({
           className="flex-1"
         />
         {snowflake && (
-          <SnowflakeMini
-            scores={snowflake.scores}
-            overallScore={snowflake.overallScore}
-            size={72}
-          />
+          <SourceScope prov={snowflakeProv}>
+            <SnowflakeMini
+              scores={snowflake.scores}
+              overallScore={snowflake.overallScore}
+              size={72}
+            />
+          </SourceScope>
         )}
       </div>
       <div className="flex items-center justify-between text-xs text-text-secondary">
@@ -136,7 +140,7 @@ function ScreenerPageInner() {
   const [presetDefs, setPresetDefs] = useState<PresetDef[]>([]);
   const [data, setData] = useState<ScreenerUniverseResponse | null>(null);
   const [loading, setLoading] = useState(true);
-  const [snowflakeScores, setSnowflakeScores] = useState<SnowflakeBatchResponse>({});
+  const [snowflake, setSnowflake] = useState<SnowflakeBatchResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const scope = useSourceScope(provOf(data));
@@ -213,8 +217,8 @@ function ScreenerPageInner() {
     if (viewMode !== "charts" || results.length === 0) return;
     const tickers = results.map((r) => r.symbol).slice(0, 100); // cap at 100
     api.snowflakeBatch(tickers)
-      .then(setSnowflakeScores)
-      .catch(() => setSnowflakeScores({}));
+      .then(setSnowflake)
+      .catch(() => setSnowflake(null));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewMode, data, refreshNonce]);
 
@@ -341,7 +345,8 @@ function ScreenerPageInner() {
             ) : (
               <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
                 {results.map((row) => (
-                  <SparkCard key={row.symbol} row={row} snowflake={snowflakeScores[row.symbol]} />
+                  <SparkCard key={row.symbol} row={row} snowflake={snowflake?.scores?.[row.symbol]}
+                             snowflakeProv={provOf(snowflake)} />
                 ))}
               </div>
             )}

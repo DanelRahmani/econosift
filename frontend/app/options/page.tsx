@@ -6,8 +6,8 @@ import { useTheme } from "@/components/ThemeProvider";
 import { Skeleton, TabButton } from "@/components/ui";
 import { SearchBar } from "@/components/SearchBar";
 import { useUrlState } from "@/lib/useUrlState";
-import { useSourceScope } from "@/components/provenance/SourceScope";
-import { provOf } from "@/lib/provenance";
+import { SourceScope, useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf, type Provenance } from "@/lib/provenance";
 import { IVKPIRow } from "@/components/options/IVKPIRow";
 import { ChainTable } from "@/components/options/ChainTable";
 import { IVTermStructure } from "@/components/options/IVTermStructure";
@@ -51,10 +51,13 @@ function OptionsPageInner() {
   const [termStructure, setTermStructure] = useState<IVTermPoint[]>([]);
   const [smile, setSmile] = useState<IVSmilePoint[]>([]);
   const [oiProfile, setOiProfile] = useState<OIProfile | null>(null);
+  // Expiries, term structure and smile each carry their own map (P2-32).
+  const [expiriesProv, setExpiriesProv] = useState<Provenance | undefined>();
+  const [termProv, setTermProv] = useState<Provenance | undefined>();
+  const [smileProv, setSmileProv] = useState<Provenance | undefined>();
 
-  // Expiries, term structure and smile are bare lists with no map of their own; they sit under the
-  // ivmetrics scope (same Yahoo option-chain source). The chain response has its own scope for the spot line.
-  const kpisScope = useSourceScope(provOf(kpis));
+  // The chain response has its own scope for the spot line.
+  const expiriesScope = useSourceScope(expiriesProv);
   const chainScope = useSourceScope(provOf(chain));
 
   // Loading states
@@ -72,6 +75,7 @@ function OptionsPageInner() {
     // Reset expiry-dependent data
     setChain(null);
     setSmile([]);
+    setSmileProv(undefined);
     setOiProfile(null);
     setUrlState({ e: "" });
     setExpiries([]);
@@ -98,19 +102,23 @@ function OptionsPageInner() {
     }
 
     if (expiriesResult.status === "fulfilled") {
-      const exps = expiriesResult.value ?? [];
+      const exps = expiriesResult.value?.expiries ?? [];
       setExpiries(exps);
+      setExpiriesProv(provOf(expiriesResult.value));
       if (exps.length > 0) {
         setUrlState({ e: exps[0] });
       }
     } else {
       setExpiries([]);
+      setExpiriesProv(undefined);
     }
 
     if (termResult.status === "fulfilled") {
-      setTermStructure(termResult.value ?? []);
+      setTermStructure(termResult.value?.points ?? []);
+      setTermProv(provOf(termResult.value));
     } else {
       setTermStructure([]);
+      setTermProv(undefined);
     }
   }, [ticker]);
 
@@ -139,9 +147,11 @@ function OptionsPageInner() {
     }
 
     if (smileResult.status === "fulfilled") {
-      setSmile(smileResult.value ?? []);
+      setSmile(smileResult.value?.points ?? []);
+      setSmileProv(provOf(smileResult.value));
     } else {
       setSmile([]);
+      setSmileProv(undefined);
     }
 
     if (oiResult.status === "fulfilled") {
@@ -193,7 +203,7 @@ function OptionsPageInner() {
       <IVKPIRow kpis={kpis} loading={kpisLoading} />
 
       {/* Expiry selector */}
-      <div className="flex items-center gap-3 flex-wrap" {...kpisScope}>
+      <div className="flex items-center gap-3 flex-wrap" {...expiriesScope}>
         <span className="text-sm text-text-muted font-medium">Expiry:</span>
         {expiriesLoading ? (
           <Skeleton className="h-9 w-40 rounded-lg" />
@@ -259,9 +269,13 @@ function OptionsPageInner() {
 
         {/* Volatility Tab */}
         {tab === "Volatility" && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4" {...kpisScope}>
-            <IVTermStructure data={termStructure} loading={termLoading} theme={theme} />
-            <IVSmile data={smile} loading={smileLoading} theme={theme} />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <SourceScope prov={termProv}>
+              <IVTermStructure data={termStructure} loading={termLoading} theme={theme} />
+            </SourceScope>
+            <SourceScope prov={smileProv}>
+              <IVSmile data={smile} loading={smileLoading} theme={theme} />
+            </SourceScope>
           </div>
         )}
 

@@ -15,7 +15,7 @@ import type {
   RollingMetricsResponse, ExtendedRiskResponse, CorrelationResponse,
   GarchResult, HurstResult, OUResponse, CointegrationResult,
   MonteCarloResult, StressTestResponse,
-  OptionsKPIs, OptionsChain, IVTermPoint, IVSmilePoint, OIProfile, MCOptionsResult,
+  OptionsKPIs, OptionsChain, OptionsExpiriesResponse, IVTermStructureResponse, IVSmileResponse, OIProfile, MCOptionsResult,
   RatesData, InflationData, EmploymentData, HousingData, CommoditiesData,
   FxHeatmapData, FxPppData, LeadingData, FinancialConditionsData, CotData,
   Holders13FResponse, Form4Response,
@@ -23,7 +23,7 @@ import type {
   SectorReturnsResponse, SectorFundamentalsResponse, SectorRotationResponse, SectorDrillResponse,
   Holding,
   PortfolioAnalysis, CorrelationData, RiskContribData, CAPMData, RollingData,
-  KellyData, FFData, FrontierData, MCData, BLData, StressScenario,
+  KellyData, FFData, FrontierData, MCData, BLData, StressData,
   TechnicalsResponse,
   AtlasIndicator, AtlasRegion, AtlasTimelineResponse, AtlasSnapshotResponse,
   RiskParityWeights, RiskParityBacktest, CarryTable, CarryBacktest, MomentumResponse,
@@ -328,7 +328,7 @@ export const api = {
 
   // --- Phase 7: Options & IV Module ---
   optionsExpiries: (ticker: string) =>
-    get<string[]>(`/options/expiries?ticker=${encodeURIComponent(ticker)}`),
+    get<OptionsExpiriesResponse>(`/options/expiries?ticker=${encodeURIComponent(ticker)}`),
 
   optionsKPIs: (ticker: string) =>
     get<OptionsKPIs>(`/options/ivmetrics?ticker=${encodeURIComponent(ticker)}`),
@@ -337,10 +337,10 @@ export const api = {
     get<OptionsChain>(`/options/chain?ticker=${encodeURIComponent(ticker)}&expiry=${encodeURIComponent(expiry)}`),
 
   optionsTermStructure: (ticker: string) =>
-    get<IVTermPoint[]>(`/options/termstructure?ticker=${encodeURIComponent(ticker)}`),
+    get<IVTermStructureResponse>(`/options/termstructure?ticker=${encodeURIComponent(ticker)}`),
 
   optionsSmile: (ticker: string, expiry: string) =>
-    get<IVSmilePoint[]>(`/options/smile?ticker=${encodeURIComponent(ticker)}&expiry=${encodeURIComponent(expiry)}`),
+    get<IVSmileResponse>(`/options/smile?ticker=${encodeURIComponent(ticker)}&expiry=${encodeURIComponent(expiry)}`),
 
   optionsOIProfile: (ticker: string, expiry: string) =>
     get<OIProfile>(`/options/oiprofile?ticker=${encodeURIComponent(ticker)}&expiry=${encodeURIComponent(expiry)}`),
@@ -471,7 +471,7 @@ export const api = {
   portfolioBL: (holdings: Holding[], views: { ticker: string; expectedReturn: number }[], period: string): Promise<BLData> =>
     post("/portfolio/blacklitterman", { holdings, views, period }),
 
-  portfolioStress: (holdings: Holding[], period: string): Promise<StressScenario[]> =>
+  portfolioStress: (holdings: Holding[], period: string): Promise<StressData> =>
     post("/portfolio/stress", { holdings, period }),
 
   fetchTechnicals: (ticker: string, period = "1y"): Promise<TechnicalsResponse> =>

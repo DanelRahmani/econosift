@@ -113,6 +113,39 @@ def stats() -> dict:
     return out
 
 
+def provenance_gaps() -> dict:
+    """Persistent cache entries that predate source annotations (P2-33).
+
+    A cache whose dict entries carry a ``"provenance"`` map shows its function
+    now attaches one, so its dict entries without a map were cached before the
+    upgrade and will serve without sources until they expire. Caches that never
+    attach a map, list values and error payloads are not counted.
+    Returns ``{"total": n, "byName": {cache_name: n}}``.
+    """
+    seen: dict[str, list[int]] = {}  # name -> [with a map, without one]
+    try:
+        from backend.database import SessionLocal
+        from backend.db_models import CacheEntry
+        with SessionLocal() as db:
+            rows = db.query(CacheEntry.cache_name, CacheEntry.value_json).all()
+    except Exception:
+        return {"total": 0, "byName": {}}
+    for name, raw in rows:
+        if not raw or not raw.startswith("{"):
+            continue  # not a dict
+        if '"provenance"' in raw:  # cheap: Admin polls this, so parse only rows without a map
+            seen.setdefault(name, [0, 0])[0] += 1
+            continue
+        try:
+            value = json.loads(raw)
+        except ValueError:
+            continue
+        if "error" not in value:
+            seen.setdefault(name, [0, 0])[1] += 1
+    by_name = {n: c[1] for n, c in seen.items() if c[0] and c[1]}
+    return {"total": sum(by_name.values()), "byName": by_name}
+
+
 def _make_key(args, kwargs) -> tuple:
     return args + tuple(sorted(kwargs.items()))
 
