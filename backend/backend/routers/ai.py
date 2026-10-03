@@ -24,6 +24,9 @@ log = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/ai", tags=["ai"])
 
+# Company summaries cover at most this many selected tickers.
+_MAX_TICKERS = 6
+
 
 def _utcnow() -> datetime:
     """Naive UTC now — matches AiSummary.created_at, which is stored naive."""
@@ -164,6 +167,15 @@ def _record_of(row: AiSummary) -> dict | None:
         return None
 
 
+def _per_ticker(record: dict | None) -> bool:
+    """Whether a cached multi-ticker summary was built from each ticker's own
+    data (sections named "quote AAPL"); older ones fetched the joined string as
+    one symbol and must be regenerated."""
+    app = (record or {}).get("appData") or {}
+    labels = list(app.get("sections") or []) + list((app.get("unavailable") or {}).keys())
+    return any(" " in label for label in labels)
+
+
 async def _generate(summary_type: str, context_key: str, model: str, task: str, facts: dict,
                     sections: list[str], unavailable: dict[str, str]) -> dict:
     result = await ai_service.generate_summary(task, facts, model)
@@ -178,25 +190,44 @@ async def _generate(summary_type: str, context_key: str, model: str, task: str, 
 
 @router.post("/company")
 async def ai_company(body: CompanyRequest):
-    ticker = body.ticker.strip().upper()
-    if not ticker:
+    # Markets sends the selected ticker pills comma-joined; each one is fetched
+    # on its own (fetched as one symbol, the summary described a "combined entity").
+    tickers = sorted(dict.fromkeys(t.strip().upper() for t in body.ticker.split(",") if t.strip()))[:_MAX_TICKERS]
+    if not tickers:
         raise HTTPException(status_code=400, detail="Ticker is required.")
+    key = ",".join(tickers)
 
     if not body.force_regenerate:
-        cached = await asyncio.to_thread(_cached_lookup, "company", ticker)
-        if cached and cached.summary_text and not cached.summary_text.startswith("Error:"):
-            return _response("company", ticker, cached.model_used, cached.summary_text, True, cached.created_at,
+        cached = await asyncio.to_thread(_cached_lookup, "company", key)
+        if (cached and cached.summary_text and not cached.summary_text.startswith("Error:")
+                and (len(tickers) == 1 or _per_ticker(_record_of(cached)))):
+            return _response("company", key, cached.model_used, cached.summary_text, True, cached.created_at,
                              _record_of(cached))
 
     from . import valuation as valuation_router
     from ..services import yfinance_service as yfs
-    (quote, q_err), (full, f_err) = await asyncio.gather(
-        _section("quote", asyncio.to_thread(yfs.get_quote, ticker)),
-        _section("valuation", valuation_router.full(ticker)))
-    unavailable = {k: v for k, v in (("quote", q_err), ("valuation", f_err)) if v}
-    facts = {"ticker": ticker, "asOf": _utcnow().date().isoformat(), **ai_context.company_block(quote, full)}
-    sections = [s for s in ("quote", "valuation") if s not in unavailable]
-    return await _generate("company", ticker, body.model, ai_service.build_company_prompt(ticker), facts,
+    multi = len(tickers) > 1
+    fetched = await asyncio.gather(*(
+        _section(f"{name} {t}" if multi else name, coro)
+        for t in tickers
+        for name, coro in (("quote", asyncio.to_thread(yfs.get_quote, t)),
+                           ("valuation", valuation_router.full(t)))))
+    unavailable: dict[str, str] = {}
+    sections: list[str] = []
+    blocks = {}
+    for i, t in enumerate(tickers):
+        (quote, q_err), (full, f_err) = fetched[2 * i], fetched[2 * i + 1]
+        for name, err in (("quote", q_err), ("valuation", f_err)):
+            label = f"{name} {t}" if multi else name
+            if err:
+                unavailable[label] = err
+            else:
+                sections.append(label)
+        blocks[t] = ai_context.company_block(quote, full)
+    as_of = _utcnow().date().isoformat()
+    facts = ({"tickers": blocks, "asOf": as_of} if multi
+             else {"ticker": key, "asOf": as_of, **blocks[key]})
+    return await _generate("company", key, body.model, ai_service.build_company_prompt(tickers), facts,
                            sections, unavailable)
 
 
