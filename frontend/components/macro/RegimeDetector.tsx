@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
+import { useRefreshNonce } from "@/lib/refresh";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf, resolveRefs, type Provenance, type SourceRef } from "@/lib/provenance";
 
@@ -58,6 +59,7 @@ export function RegimeDetector({ country, countryName }: Props) {
   const [gdpProv, setGdpProv] = useState<Provenance | undefined>(undefined);
   const [cpiProv, setCpiProv] = useState<Provenance | undefined>(undefined);
 
+  const refreshNonce = useRefreshNonce(); // re-fetch on the page's Refresh (P1-20)
   useEffect(() => {
     setLoading(true);
     setGdp(null);
@@ -79,7 +81,7 @@ export function RegimeDetector({ country, countryName }: Props) {
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [country]);
+  }, [country, refreshNonce]);
 
   const regime = classify(gdp, cpi);
 

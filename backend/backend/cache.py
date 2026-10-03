@@ -26,6 +26,9 @@ _REFRESH_RETRY = 5 * 60
 # A value computed from a stale input is rebuilt after this long, by when the
 # input's own refresh has usually landed.
 _STALE_INPUT_RETRY = 60
+# A refresh request (P1-20) recomputes an entry only if it is older than this,
+# so repeated clicks and concurrent endpoints sharing an input hit the source once.
+_REFRESH_MIN_AGE = 60
 
 def _utcnow() -> datetime:
     """Naive UTC now — matches CacheEntry.created_at, which is stored naive."""
@@ -191,6 +194,29 @@ class _Computing:
         return self._stale[0]
 
 
+# Set for a request the user asked to refresh (P1-20 page Refresh button):
+# every cached function it reads is recomputed, see ``_refresh_due``. Threads
+# and tasks started for background refreshes get a fresh context, so it does
+# not leak into them.
+_refresh: contextvars.ContextVar[bool] = contextvars.ContextVar("cache_refresh", default=False)
+
+
+def set_refresh(on: bool) -> None:
+    """Bypass the cache for the rest of the current request/context."""
+    _refresh.set(on)
+
+
+def _refresh_due(name: str, raw_key) -> bool:
+    """In a refresh request: True unless this key's in-memory entry was fetched
+    within ``_REFRESH_MIN_AGE`` (then it is served as a normal hit)."""
+    if not _refresh.get():
+        return False
+    if raw_key not in _get_cache(name):
+        return True
+    fetched = _times(name).get(raw_key)
+    return fetched is None or time.time() - fetched >= _REFRESH_MIN_AGE
+
+
 def _mark_used_stale() -> None:
     flag = _used_stale.get()
     if flag is not None:
@@ -285,6 +311,22 @@ def _refresh_done(ck, ok: bool) -> None:
             st.retry_at = time.time() + _REFRESH_RETRY
 
 
+def _held_value(name: str, raw_key, entry):
+    """For a refresh whose source failed: the value already held (memory, else
+    the persistent ``entry``), reported with its real fetch time; else None."""
+    cache = _get_cache(name)
+    if raw_key in cache:
+        _hit(name, raw_key)
+        return cache[raw_key]
+    if entry is None:
+        return None
+    value, fetched, fresh = entry
+    _note_fetch(fetched)
+    if not fresh:
+        _flag_stale(fetched)
+    return value
+
+
 def _is_empty_result(result) -> bool:
     """Default predicate: treat None, empty containers and failure envelopes
     as 'no data'.
@@ -325,6 +367,13 @@ def cached(name: str | None = None, skip_if=None):
         def wrapper(*args, **kwargs):
             cache = _get_cache(cache_name)
             raw_key = _make_key(args, kwargs)
+            if _refresh_due(cache_name, raw_key):
+                ck = (cache_name, raw_key)
+                with _sync_locks.get(ck):
+                    if not _refresh_due(cache_name, raw_key):  # refreshed while we waited
+                        _hit(cache_name, raw_key)
+                        return cache[raw_key]
+                    return refresh_now(ck, args, kwargs)
             if raw_key in cache:
                 _hit(cache_name, raw_key)
                 return cache[raw_key]
@@ -386,6 +435,26 @@ def cached(name: str | None = None, skip_if=None):
             persistent.set(str_key, result, fetched)  # persist to DB
             return result, True
 
+        def refresh_now(ck, args, kwargs):
+            """Recompute for a refresh request; caller holds the key lock. If
+            the source fails, the value already held is served, not nothing."""
+            str_key = _json.dumps(ck[1], default=str, sort_keys=True)
+            _record(cache_name, False)
+            try:
+                result, fresh = compute(ck, str_key, args, kwargs)
+            except Exception:
+                log.warning("refresh of %s failed", cache_name, exc_info=True)
+                held = _held_value(cache_name, ck[1], persistent.get_entry(str_key))
+                if held is None:
+                    raise
+                return held
+            if fresh:
+                _refresh_done(ck, True)
+            if not is_empty(result):
+                return result
+            held = _held_value(cache_name, ck[1], persistent.get_entry(str_key))
+            return result if held is None else held
+
         def refresh(ck, str_key, args, kwargs):
             # A new thread starts with an empty context, so nothing it reads
             # reports into the request that served the stale value.
@@ -425,6 +494,13 @@ def async_cached(name: str | None = None, skip_if=None):
         async def wrapper(*args, **kwargs):
             cache = _get_cache(cache_name)
             raw_key = _make_key(args, kwargs)
+            if _refresh_due(cache_name, raw_key):
+                ck = (cache_name, raw_key)
+                async with _locks.get(ck):
+                    if not _refresh_due(cache_name, raw_key):  # refreshed while we waited
+                        _hit(cache_name, raw_key)
+                        return cache[raw_key]
+                    return await refresh_now(ck, args, kwargs)
             if raw_key in cache:
                 _hit(cache_name, raw_key)
                 return cache[raw_key]
@@ -487,6 +563,28 @@ def async_cached(name: str | None = None, skip_if=None):
             _times(cache_name)[ck[1]] = fetched
             await asyncio.to_thread(persistent.set, str_key, result, fetched)  # persist to DB
             return result, True
+
+        async def refresh_now(ck, args, kwargs):
+            """Recompute for a refresh request; caller holds the key lock. If
+            the source fails, the value already held is served, not nothing."""
+            str_key = _json.dumps(ck[1], default=str, sort_keys=True)
+            _record(cache_name, False)
+            try:
+                result, fresh = await compute(ck, str_key, args, kwargs)
+            except Exception:
+                log.warning("refresh of %s failed", cache_name, exc_info=True)
+                entry = await asyncio.to_thread(persistent.get_entry, str_key)
+                held = _held_value(cache_name, ck[1], entry)
+                if held is None:
+                    raise
+                return held
+            if fresh:
+                _refresh_done(ck, True)
+            if not is_empty(result):
+                return result
+            entry = await asyncio.to_thread(persistent.get_entry, str_key)
+            held = _held_value(cache_name, ck[1], entry)
+            return result if held is None else held
 
         async def refresh(ck, str_key, args, kwargs):
             ok = False

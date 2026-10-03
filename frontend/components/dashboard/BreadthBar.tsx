@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { LineChart, Line, ResponsiveContainer, YAxis } from "recharts";
 import { api } from "@/lib/api";
+import { useRefreshNonce } from "@/lib/refresh";
 import type { BreadthResponse } from "@/lib/types";
 import { Skeleton } from "@/components/ui";
 import { fmtNum } from "@/lib/format";
@@ -20,6 +21,7 @@ export function BreadthBar({ index = "sp500" }: { index?: string }) {
   const [loading, setLoading] = useState(true);
   const scope = useSourceScope(provOf(data));
 
+  const refreshNonce = useRefreshNonce(); // re-fetch on the page's Refresh (P1-20)
   useEffect(() => {
     let alive = true;
     setLoading(true);
@@ -28,7 +30,7 @@ export function BreadthBar({ index = "sp500" }: { index?: string }) {
       .catch(() => alive && setData(null))
       .finally(() => alive && setLoading(false));
     return () => { alive = false; };
-  }, [index]);
+  }, [index, refreshNonce]);
 
   if (loading && !data) return <Skeleton className="h-20" />;
   if (!data || data.status === "unavailable" || !data.total)

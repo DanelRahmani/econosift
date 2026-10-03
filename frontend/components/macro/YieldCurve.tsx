@@ -5,6 +5,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
 import { api } from "@/lib/api";
+import { useRefreshNonce } from "@/lib/refresh";
 import type { YieldCurveResponse } from "@/lib/types";
 import { Card, Skeleton, chartTooltipStyle, chartPalette } from "@/components/ui";
 import { useTheme } from "@/components/ThemeProvider";
@@ -19,6 +20,7 @@ export function YieldCurve() {
   const [loading, setLoading] = useState(true);
   const scope = useSourceScope(provOf(data));
 
+  const refreshNonce = useRefreshNonce(); // re-fetch on the page's Refresh (P1-20)
   useEffect(() => {
     let live = true;
     api.yieldCurve()
@@ -26,7 +28,7 @@ export function YieldCurve() {
       .catch(() => live && setData(null))
       .finally(() => live && setLoading(false));
     return () => { live = false; };
-  }, []);
+  }, [refreshNonce]);
 
   const rows = data?.points.map((p) => ({ tenor: p.tenor, yield: p.yield })) ?? [];
 
