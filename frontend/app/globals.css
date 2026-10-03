@@ -234,9 +234,33 @@ main h1 {
   to { opacity: 1; }
 }
 
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: none; }
+}
+
 @keyframes pop-in {
   from { opacity: 0; transform: translateY(-4px) scale(0.98); }
   to { opacity: 1; transform: none; }
+}
+
+/* Tables inside cards: row hover and quieter headers. :where() keeps the
+   specificity at zero, so a row's own highlight classes still win. */
+:where(.card table tbody tr) {
+  transition: background-color 0.15s ease;
+}
+:where(.card table tbody tr:hover) {
+  background-color: rgb(var(--foreground) / 0.035);
+}
+:where(.card table thead th) {
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+
+/* Hand-rolled active pills/segments (bg-accent + text-white) get the same
+   glow as the Navbar pill; zero specificity, so explicit shadows win. */
+:where(.bg-accent.text-white) {
+  box-shadow: 0 4px 16px -6px rgb(var(--primary-light) / 0.7), inset 0 1px 0 rgb(255 255 255 / 0.14);
 }
 
 @media (prefers-reduced-motion: reduce) {

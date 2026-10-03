@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { useRefreshNonce } from "@/lib/refresh";
 import { useSourceScope } from "@/components/provenance/SourceScope";
@@ -60,12 +60,18 @@ export function RegimeDetector({ country, countryName }: Props) {
   const [cpiProv, setCpiProv] = useState<Provenance | undefined>(undefined);
 
   const refreshNonce = useRefreshNonce(); // re-fetch on the page's Refresh (P1-20)
+  const shownFor = useRef<string | null>(null);
   useEffect(() => {
-    setLoading(true);
-    setGdp(null);
-    setCpi(null);
-    setGdpProv(undefined);
-    setCpiProv(undefined);
+    // A new country starts blank; a Refresh keeps the current reading on
+    // screen until the new one arrives.
+    if (shownFor.current !== country) {
+      setLoading(true);
+      setGdp(null);
+      setCpi(null);
+      setGdpProv(undefined);
+      setCpiProv(undefined);
+      shownFor.current = country;
+    }
     const year = new Date().getFullYear();
     Promise.all([
       api.macroData(country, "gdp_growth", year - 3, year),

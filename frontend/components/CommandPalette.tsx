@@ -141,14 +141,14 @@ export function CommandPalette() {
   let index = -1;
   return (
     <div
-      className="fixed inset-0 z-[200] bg-black/40 backdrop-blur-sm flex items-start justify-center px-4 pt-[12vh]"
+      className="fixed inset-0 z-[200] bg-black/50 backdrop-blur-sm flex items-start justify-center px-4 pt-[12vh] animate-[fade-in_0.15s_ease-out]"
       onMouseDown={(e) => { if (e.target === e.currentTarget) close(); }}
     >
       <div
         role="dialog"
         aria-modal="true"
         aria-label="Command palette"
-        className="w-full max-w-xl bg-surface border border-border rounded-xl shadow-2xl overflow-hidden"
+        className="w-full max-w-xl bg-surface/95 backdrop-blur-xl border border-border rounded-2xl shadow-[0_24px_64px_-16px_rgb(0_0_0/0.6),inset_0_1px_0_rgb(var(--highlight)/var(--highlight-a))] overflow-hidden animate-[pop-in_0.2s_cubic-bezier(0.22,1,0.36,1)]"
       >
         <div className="flex items-center gap-2 px-4 border-b border-border">
           <svg className="w-4 h-4 text-text-muted shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"
@@ -193,7 +193,7 @@ export function CommandPalette() {
                         onMouseEnter={() => setActive(i)}
                         onMouseDown={(e) => { e.preventDefault(); go(item); }}
                         className={`mx-1 px-3 py-2 rounded-lg flex items-center justify-between gap-3 cursor-pointer text-sm ${
-                          selected ? "bg-accent/10 text-text-primary" : "text-text-secondary"
+                          selected ? "bg-accent-light/10 text-text-primary shadow-[inset_2px_0_0_rgb(var(--primary-light))]" : "text-text-secondary"
                         }`}
                       >
                         <span className="truncate">{item.label}</span>
