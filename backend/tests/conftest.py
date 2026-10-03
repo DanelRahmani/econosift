@@ -6,8 +6,16 @@ default suite deterministic and dependency-free.
 """
 from __future__ import annotations
 
+import os
 import sys
+import tempfile
 from pathlib import Path
+
+# P2-36: pin a throwaway SQLite DB before anything imports backend.database.
+# _fresh_caches clears both cache tiers before every test, so an inherited
+# DATABASE_URL (the live ./data DB inside the container) would be wiped.
+_TEST_DB = Path(tempfile.gettempdir()) / "econosift_pytest.db"
+os.environ["DATABASE_URL"] = f"sqlite:///{_TEST_DB.as_posix()}"
 
 import pytest
 from fastapi.testclient import TestClient
