@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import type { HousingData, GlobalHousingData } from "@/lib/types";
 import { Card } from "@/components/ui";
-import { shortCountryName } from "@/lib/format";
+import { shortCountryName, categoryBarHeight } from "@/lib/format";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
 import {
@@ -258,7 +258,7 @@ export function HousingTab() {
           <p className="text-xs text-text-secondary mb-3">
             BIS residential property prices, inflation-adjusted. YoY% change shown.
           </p>
-          <ResponsiveContainer width="100%" height={320}>
+          <ResponsiveContainer width="100%" height={categoryBarHeight(globalHousing.countries.filter((c) => c.yoyChange != null).length)}>
             <BarChart
               data={globalHousing.countries.filter((c) => c.yoyChange != null).map((c) => ({
                 name: c.name,

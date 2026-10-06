@@ -20,6 +20,7 @@ import {
   BarChart, Bar, ReferenceLine,
 } from "recharts";
 import { useRefreshNonce } from "@/lib/refresh";
+import { useKeyboardShortcuts, tabKeys } from "@/lib/useKeyboardShortcuts";
 
 const TABS = YIELD_TABS;
 
@@ -309,7 +310,7 @@ function GlobalYieldsTab({ data: countries }: { data: GlobalYieldCountry[] }) {
           >
             <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
             <XAxis type="number" tickFormatter={(v) => `${v}%`} tick={{ fontSize: 11 }} />
-            <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={95} />
+            <YAxis type="category" interval={0} dataKey="name" tick={{ fontSize: 11 }} width={95} />
             <Tooltip formatter={(v: number) => [`${v?.toFixed(2)}%`]} />
             <Bar dataKey="yield" fill="#3b82f6" radius={[0, 3, 3, 0]} name="Nominal 10Y" />
             <Bar dataKey="real" fill="#10b981" radius={[0, 3, 3, 0]} name="Real Yield" />
@@ -323,6 +324,7 @@ function GlobalYieldsTab({ data: countries }: { data: GlobalYieldCountry[] }) {
 function YieldPageInner() {
   const [urlState, setUrlState] = useUrlState({ tab: "US Curve" });
   const tab = urlState.tab;
+  useKeyboardShortcuts({ onTabSwitch: tabKeys(TABS, (t) => setUrlState({ tab: t })) }); // P2-07
   const { data, isLoading, error } = useQuery({
     queryKey: ["yieldCurves"],
     queryFn: api.yieldCurves,

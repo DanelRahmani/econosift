@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import type { TradeData } from "@/lib/types";
 import { Card, PageSkeleton } from "@/components/ui";
-import { shortCountryName } from "@/lib/format";
+import { shortCountryName, categoryBarHeight } from "@/lib/format";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
 import {
@@ -108,14 +108,14 @@ export default function TradePage() {
           <p className="text-xs text-text-secondary mb-3">
             Higher values indicate more export-oriented economies
           </p>
-          <ResponsiveContainer width="100%" height={400}>
+          <ResponsiveContainer width="100%" height={categoryBarHeight(countries.filter((c) => c.kpis.exportsGdp != null).length)}>
             <BarChart
               data={countries.filter((c) => c.kpis.exportsGdp != null).map((c) => ({ name: c.name, value: c.kpis.exportsGdp }))}
               layout="vertical" margin={{ left: 80, right: 40 }}
             >
               <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
               <XAxis type="number" tickFormatter={(v) => `${v}%`} tick={{ fontSize: 11 }} />
-              <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={90} tickFormatter={shortCountryName} />
+              <YAxis type="category" interval={0} dataKey="name" tick={{ fontSize: 11 }} width={90} tickFormatter={shortCountryName} />
               <Tooltip formatter={(v: number) => [`${v?.toFixed(1)}%`, "Exports/GDP"]} />
               <ReferenceLine x={summary.avgExportsGdp ?? 0} stroke="#6366f1" strokeDasharray="4 4" label="Avg" />
               <Bar dataKey="value" radius={[0, 4, 4, 0]} fill="#6366f1" fillOpacity={0.8}>
@@ -135,14 +135,14 @@ export default function TradePage() {
           <p className="text-xs text-text-secondary mb-3">
             Higher values indicate greater reliance on foreign goods and services
           </p>
-          <ResponsiveContainer width="100%" height={400}>
+          <ResponsiveContainer width="100%" height={categoryBarHeight(countries.filter((c) => c.kpis.importsGdp != null).length)}>
             <BarChart
               data={countries.filter((c) => c.kpis.importsGdp != null).map((c) => ({ name: c.name, value: c.kpis.importsGdp }))}
               layout="vertical" margin={{ left: 80, right: 40 }}
             >
               <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
               <XAxis type="number" tickFormatter={(v) => `${v}%`} tick={{ fontSize: 11 }} />
-              <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={90} tickFormatter={shortCountryName} />
+              <YAxis type="category" interval={0} dataKey="name" tick={{ fontSize: 11 }} width={90} tickFormatter={shortCountryName} />
               <Tooltip formatter={(v: number) => [`${v?.toFixed(1)}%`, "Imports/GDP"]} />
               <ReferenceLine x={summary.avgImportsGdp ?? 0} stroke="#f59e0b" strokeDasharray="4 4" label="Avg" />
               <Bar dataKey="value" radius={[0, 4, 4, 0]} fill="#f59e0b" fillOpacity={0.8}>
@@ -162,7 +162,7 @@ export default function TradePage() {
           <p className="text-xs text-text-secondary mb-3">
             Green = surplus · Red = deficit. Surplus countries export more than they import.
           </p>
-          <ResponsiveContainer width="100%" height={400}>
+          <ResponsiveContainer width="100%" height={categoryBarHeight(countries.filter((c) => c.kpis.tradeBalance != null).length)}>
             <BarChart
               data={countries.filter((c) => c.kpis.tradeBalance != null).map((c) => ({
                 name: c.name,
@@ -173,7 +173,7 @@ export default function TradePage() {
             >
               <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
               <XAxis type="number" tickFormatter={(v) => `${v}%`} tick={{ fontSize: 11 }} />
-              <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={90} tickFormatter={shortCountryName} />
+              <YAxis type="category" interval={0} dataKey="name" tick={{ fontSize: 11 }} width={90} tickFormatter={shortCountryName} />
               <Tooltip formatter={(v: number) => [`${v > 0 ? "+" : ""}${v?.toFixed(1)}%`, "Trade Balance"]} />
               <ReferenceLine x={0} stroke="rgba(255,255,255,0.3)" />
               <Bar dataKey="value" radius={[0, 4, 4, 0]}>
@@ -194,7 +194,7 @@ export default function TradePage() {
           <p className="text-xs text-text-secondary mb-3">
             Measures total trade relative to economic size. Higher = more globally integrated.
           </p>
-          <ResponsiveContainer width="100%" height={400}>
+          <ResponsiveContainer width="100%" height={categoryBarHeight(countries.filter((c) => c.kpis.tradeOpenness != null).length)}>
             <BarChart
               data={countries
                 .filter((c) => c.kpis.tradeOpenness != null)
@@ -204,7 +204,7 @@ export default function TradePage() {
             >
               <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
               <XAxis type="number" tickFormatter={(v) => `${v}%`} tick={{ fontSize: 11 }} />
-              <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={90} tickFormatter={shortCountryName} />
+              <YAxis type="category" interval={0} dataKey="name" tick={{ fontSize: 11 }} width={90} tickFormatter={shortCountryName} />
               <Tooltip formatter={(v: number) => [`${v?.toFixed(1)}%`, "Trade Openness"]} />
               <Bar dataKey="value" radius={[0, 4, 4, 0]} fill="#8b5cf6" fillOpacity={0.8} />
             </BarChart>
