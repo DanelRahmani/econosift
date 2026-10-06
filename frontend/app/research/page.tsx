@@ -16,6 +16,7 @@ import { FactorRegimeTab } from "@/components/research/FactorRegimeTab";
 import { ScrollableTabBar } from "@/components/ui";
 import { useUrlState } from "@/lib/useUrlState";
 import { RESEARCH_TABS } from "@/lib/pageTabs";
+import { useKeyboardShortcuts, tabKeys } from "@/lib/useKeyboardShortcuts";
 
 const TABS = RESEARCH_TABS;
 type TabKey = (typeof TABS)[number]["key"];
@@ -28,6 +29,7 @@ function resolveTab(param: string): TabKey {
 function ResearchPageInner() {
   const [urlState, setUrlState] = useUrlState({ tab: "riskparity" });
   const tab = resolveTab(urlState.tab);
+  useKeyboardShortcuts({ onTabSwitch: tabKeys(TABS, (t) => setUrlState({ tab: t.key })) }); // P2-07
 
   return (
     <main className="max-w-7xl mx-auto px-4 py-6 space-y-6">

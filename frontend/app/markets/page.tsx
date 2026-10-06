@@ -31,6 +31,7 @@ import type {
   SectorFundamentalsResponse, SectorRotationResponse, SectorDrillResponse,
 } from "@/lib/types";
 import { useRefreshNonce } from "@/lib/refresh";
+import { useKeyboardShortcuts, tabKeys, periodKeys } from "@/lib/useKeyboardShortcuts";
 
 const ValuationTab = lazy(() =>
   import("@/components/markets/ValuationTab").then((m) => ({ default: m.ValuationTab }))
@@ -120,6 +121,17 @@ function MarketsPageInner() {
   // Treemap state
   const [tmIndex, setTmIndex] = useState<"sp500" | "ndx" | "dow">("sp500");
   const [tmPeriod, setTmPeriod] = useState<string>("1d");
+  // P2-07: 1–9 pick a tab; ←/→ step the period control the active tab shows.
+  useKeyboardShortcuts({
+    onTabSwitch: tabKeys(TABS, (t) => setUrlState({ tab: t })),
+    ...(tab === "Sectors"
+      ? periodKeys(SEC_PERIODS, secPeriod, setSecPeriod)
+      : tab === "Treemap"
+        ? periodKeys(SEC_PERIODS as readonly string[], tmPeriod, setTmPeriod)
+        : tab === "Overview" || tab === "Technicals" || tab === "Valuation"
+          ? periodKeys(PERIODS, period, (p) => setUrlState({ p }))
+          : {}),
+  });
   const [tmData, setTmData] = useState<TreemapResponse | null>(null);
   const [tmLoading, setTmLoading] = useState(false);
   const tmScope = useSourceScope(provOf(tmData));

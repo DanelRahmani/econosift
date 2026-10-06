@@ -22,6 +22,7 @@ import type {
   OIProfile,
 } from "@/lib/types";
 import { useRefreshNonce } from "@/lib/refresh";
+import { useKeyboardShortcuts, tabKeys } from "@/lib/useKeyboardShortcuts";
 
 const TABS = ["Chain", "Volatility", "OI Profile", "Monte Carlo"] as const;
 type Tab = (typeof TABS)[number];
@@ -42,6 +43,7 @@ function OptionsPageInner() {
   const ticker = urlState.t.toUpperCase();
   const expiry = urlState.e;
   const tab = (TABS as readonly string[]).includes(urlState.tab) ? (urlState.tab as Tab) : "Chain";
+  useKeyboardShortcuts({ onTabSwitch: tabKeys(TABS, (t) => setUrlState({ tab: t })) }); // P2-07
   const [showOTMOnly, setShowOTMOnly] = useState(false);
 
   // Data

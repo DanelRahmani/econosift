@@ -3,11 +3,13 @@ import { useState } from "react";
 import { CurrencyCrisisPanel } from "@/components/stability/CurrencyCrisisPanel";
 import { BankingStabilityPanel } from "@/components/stability/BankingStabilityPanel";
 import { ScrollableTabBar, TabButton } from "@/components/ui";
+import { useKeyboardShortcuts, tabKeys } from "@/lib/useKeyboardShortcuts";
 
 const TABS = ["Currency Crisis", "Banking Stability"] as const;
 
 export default function StabilityPage() {
   const [tab, setTab] = useState<(typeof TABS)[number]>("Currency Crisis");
+  useKeyboardShortcuts({ onTabSwitch: tabKeys(TABS, setTab) }); // P2-07
 
   return (
     <div className="p-6 space-y-6">

@@ -26,6 +26,7 @@ import { ScenarioTab } from "@/components/portfolio/ScenarioTab";
 import { TransactionLog } from "@/components/portfolio/TransactionLog";
 import { WalkthroughBanner } from "@/components/WalkthroughBanner";
 import { PORTFOLIO_TABS } from "@/lib/pageTabs";
+import { useKeyboardShortcuts, tabKeys, periodKeys } from "@/lib/useKeyboardShortcuts";
 
 const LS_KEY = "econosift_portfolio";
 const LEGACY_LS_KEY = "axiom_portfolio";
@@ -71,6 +72,11 @@ function PortfolioPageInner() {
 
   const period = (PERIODS as readonly string[]).includes(urlState.p) ? (urlState.p as Period) : "3y";
   const tab = (TABS as readonly string[]).includes(urlState.tab) ? (urlState.tab as Tab) : "Overview";
+  // P2-07: 1–9 pick a tab, ←/→ step the period.
+  useKeyboardShortcuts({
+    onTabSwitch: tabKeys(TABS, (t) => setUrlState({ tab: t })),
+    ...periodKeys(PERIODS, period, (p) => setUrlState({ p })),
+  });
 
   const [holdings, setHoldings] = useState<Holding[]>(DEFAULT_HOLDINGS);
 

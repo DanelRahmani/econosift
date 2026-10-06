@@ -16,6 +16,7 @@ import { fmtNum, fmtPct, fmtLarge } from "@/lib/format";
 import { SnowflakeMini } from "@/components/markets/SnowflakeMini";
 import { DataFreshnessBadge } from "@/components/DataFreshnessBadge";
 import { useRefreshNonce } from "@/lib/refresh";
+import { useKeyboardShortcuts, tabKeys } from "@/lib/useKeyboardShortcuts";
 
 // ─── Constants ────────────────────────────────────────────────────────────
 
@@ -136,6 +137,7 @@ function ScreenerPageInner() {
   const [sortKey, setSortKey] = useState("marketCap");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const resultTab = urlState.tab as ResultTab;
+  useKeyboardShortcuts({ onTabSwitch: tabKeys(RESULT_TABS, (t) => setUrlState({ tab: t })) }); // P2-07
 
   const [presetDefs, setPresetDefs] = useState<PresetDef[]>([]);
   const [data, setData] = useState<ScreenerUniverseResponse | null>(null);
