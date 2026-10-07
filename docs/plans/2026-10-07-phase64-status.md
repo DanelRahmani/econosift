@@ -1,6 +1,6 @@
 # Phase 64: final status (2026-10-08)
 
-Phase 64 is done and pushed to `DEV`, except one verification step (DESK-01-V, below). No PR yet: the owner opens `DEV` → `main` when ready.
+Phase 64 is done and pushed to `DEV`. No PR yet: the owner opens `DEV` → `main` when ready.
 
 ## Owner decisions (Step 0, 2026-10-07; recorded in each row)
 - P2-41 (a) prune non-members.
@@ -39,15 +39,7 @@ Phase 64 is done and pushed to `DEV`, except one verification step (DESK-01-V, b
 - **Live checks:** one endpoint/ticker at a time; all pages 200.
 
 ## Open / next
-- **DESK-01-V:** `run.py` logging fix committed (test_run_frozen_log.py; a simulated frozen run writes uvicorn lines). Still to do: run the
-  REBUILT frozen exe with a scratch `ECONOSIFT_DATA_DIR` and confirm `backend.log` gets "Uvicorn running on". The rebuild
-  (`desktop\build-windows.ps1`) was still running at session end; check `target/release/binaries/econosift-backend/econosift-backend.exe`
-  has a 2026-10-08 timestamp, then:
-  - start it from a scratch folder with `ECONOSIFT_DATA_DIR` set;
-  - wait for `GET http://127.0.0.1:8000/api/health` = 200;
-  - stop it;
-  - grep `backend.log`.
-  Never start it from the repo root, and never install over the owner's installed app.
+- **DESK-01-V: RESOLVED 2026-10-08.** The rebuilt frozen exe, started with a scratch `ECONOSIFT_DATA_DIR`, writes "Uvicorn running on http://127.0.0.1:8000" (and the other startup lines) to `backend.log`; the working folder stays empty. The last installer build's NSIS packaging step (makensis) exited 4. The backend and app exe built fine, so this is not a code issue; rerun `desktopuild-windows.ps1` when an installer is needed (close any open Explorer window on the bundle folder).
 - **New issues:**
   - P2-43: DDM blows up when g is capped at ke − 0.5 pp (KO 424 vs ~86).
   - P2-44: the Central Banks tab and FX carry are still on MRO/OECD.
