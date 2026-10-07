@@ -26,6 +26,19 @@ if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
 Copy-Item (Join-Path $backend "dist\econosift-backend") $stage -Recurse -Force
 if (-not (Test-Path (Join-Path $stage "econosift-backend.exe"))) { throw "Backend exe not staged" }
 
+# A plain `cargo build --release` (or `tauri dev`) resolves resources from
+# target\release\binaries, which `tauri build` only refreshes when it bundles.
+# Replace that copy too, and drop the pre-rename axiom-backend, so a local
+# test never runs a stale backend that ignores ECONOSIFT_DATA_DIR (P3-37).
+$targetBin = Join-Path $desktop "src-tauri\target\release\binaries"
+if (Test-Path $targetBin) {
+    foreach ($old in @("econosift-backend", "axiom-backend")) {
+        $p = Join-Path $targetBin $old
+        if (Test-Path $p) { Remove-Item $p -Recurse -Force }
+    }
+    Copy-Item $stage (Join-Path $targetBin "econosift-backend") -Recurse -Force
+}
+
 Write-Host "==> [3/3] tauri build (frontend + Rust + NSIS)..." -ForegroundColor Cyan
 $env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"
 Push-Location $desktop

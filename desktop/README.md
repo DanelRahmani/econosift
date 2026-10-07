@@ -51,6 +51,13 @@ approval before opening the app the first time.
 The script runs the three stages (freeze backend → stage into resources →
 `tauri build`). To run stages manually, see the commands inside the script.
 
+**Local testing without the installer.** A plain `cargo build --release` or `tauri dev` runs the backend
+from `src-tauri/target/release/binaries/`, which `tauri build` does not refresh on its own. The script replaces
+that copy with the freshly staged backend; if you stage by hand, delete `target/release/binaries/` first, or a
+stale backend that ignores `ECONOSIFT_DATA_DIR` will write its database into the working directory. Never start
+the desktop backend from the repo root: its working-directory fallback would open the Docker stack's
+`./data/axiomfinance.db`.
+
 ## Notes
 
 - **Auto-updater is disabled** (`tauri.conf.json`) — it needs signing keys.
