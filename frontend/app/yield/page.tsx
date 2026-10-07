@@ -576,7 +576,7 @@ function DefaultRiskTab() {
   });
   const scope = useSourceScope(provOf(data));
 
-  if (isLoading) return <div className="p-8 text-muted">Computing default probabilities…</div>;
+  if (isLoading) return <div className="p-8 text-muted">Computing sovereign risk scores…</div>;
   if (error || !data) return <div className="p-8 text-red-400">Failed to load default model.</div>;
   if (data.error) return <div className="p-8 text-amber-400">{data.error}</div>;
 
@@ -588,8 +588,8 @@ function DefaultRiskTab() {
     <div className="space-y-6" {...scope}>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <KpiCard prov="countries" label="Countries" value={String(countries.length)} />
-        <KpiCard prov="countries" label="High Risk" value={String(redCount)} badge=">20%" />
-        <KpiCard prov="countries" label="Medium Risk" value={String(yellowCount)} badge="5-20%" />
+        <KpiCard prov="countries" label="High Risk" value={String(redCount)} badge="score ≥ 20" />
+        <KpiCard prov="countries" label="Medium Risk" value={String(yellowCount)} badge="score 5–20" />
         <KpiCard prov="model" label="Pseudo R²" value={model?.pseudoR2?.toFixed(3) ?? "—"} />
       </div>
 
@@ -624,26 +624,30 @@ function DefaultRiskTab() {
       )}
 
       <UiCard className="p-4">
-        <h2 className="text-sm font-medium mb-3 text-muted">Default Probabilities · sorted by 5Y risk</h2>
+        <h2 className="text-sm font-medium mb-1 text-muted">Relative Default Risk · sorted by score</h2>
+        <p className="text-xs text-text-muted mb-3">
+          Score 0–100 from a weakly calibrated logistic model (few post-2000 default episodes in its training set).
+          Read it as a ranking, not a default probability.
+        </p>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-text-secondary border-b border-border text-xs">
-                <th className="py-2 text-left">Country</th>
-                <th className="py-2 text-right">1Y Prob</th>
-                <th className="py-2 text-right">5Y Prob</th>
+                <th className="py-2 text-right">Rank</th>
+                <th className="py-2 text-left pl-3">Country</th>
+                <th className="py-2 text-right">Risk score</th>
                 <th className="py-2 text-center">Signal</th>
               </tr>
             </thead>
             <tbody>
               {countries.map((c) => (
                 <tr key={c.iso3} className="border-b border-border/30 hover:bg-surface-alt/50" data-prov="countries" data-prov-ctx={c.name}>
-                  <td className="py-1.5">
+                  <td className="py-1.5 text-right font-mono">{c.rank}</td>
+                  <td className="py-1.5 pl-3">
                     <span className="font-mono text-xs text-text-muted mr-2">{c.iso3}</span>
                     {c.name}
                   </td>
-                  <td className="py-1.5 text-right font-mono">{(c.prob1y * 100).toFixed(1)}%</td>
-                  <td className="py-1.5 text-right font-mono">{(c.prob5y * 100).toFixed(1)}%</td>
+                  <td className="py-1.5 text-right font-mono">{c.score.toFixed(1)}</td>
                   <td className="py-1.5 text-center">
                     <span className={`inline-block w-3 h-3 rounded-full ${
                       c.signal === "red" ? "bg-red-500" : c.signal === "yellow" ? "bg-amber-500" : "bg-green-500"

@@ -1597,8 +1597,10 @@ export interface SovereignDefaultModel {
 export interface SovereignDefaultCountry {
   iso3: string;
   name: string;
-  prob1y: number;
-  prob5y: number;
+  /** Relative risk score, 0-100 (100 x model output). Weakly calibrated: a ranking, not a probability. */
+  score: number;
+  /** 1 = highest score; ties share the lower rank. */
+  rank: number;
   signal: "green" | "yellow" | "red";
 }
 export interface SovereignDefaultData {
