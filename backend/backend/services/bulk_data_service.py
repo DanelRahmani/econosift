@@ -218,11 +218,17 @@ def _download_famafrench(client: httpx.Client | None = None) -> dict:
         return {"rows": 0, "error": str(exc)}
 
 
+def famafrench_path() -> pathlib.Path | None:
+    """The downloaded Fama-French parquet, or None if not downloaded."""
+    return FF_PATH if FF_PATH.exists() else None
+
+
 def load_famafrench(start_year: int = 2000) -> pd.DataFrame | None:
-    if not FF_PATH.exists():
+    path = famafrench_path()
+    if path is None:
         return None
     try:
-        df = pd.read_parquet(FF_PATH)
+        df = pd.read_parquet(path)
         return df[df["year"] >= start_year]
     except Exception as exc:
         logger.warning("load_famafrench failed: %s", exc)
@@ -300,20 +306,20 @@ def _download_imf() -> dict:
     return {"rows": total_rows, "error": "; ".join(errors) if errors else None}
 
 
+def imf_path(indicator_key: str) -> pathlib.Path | None:
+    """The downloaded IMF WEO parquet for an indicator key, or None if not downloaded."""
+    from ..sources.source_imf import INDICATOR_MAP as IMAP
+    label = IMF_INDICATORS.get(IMAP.get(indicator_key) or "")
+    path = DATA_DIR / f"imf_{label}.parquet" if label else None
+    return path if path is not None and path.exists() else None
+
+
 def load_imf(indicator_key: str, iso2_list: list[str],
              start: int, end: int) -> pd.DataFrame | None:
-    from ..sources.source_imf import INDICATOR_MAP as IMAP
     from ..config import iso2_to_iso3
 
-    imf_code = IMAP.get(indicator_key)
-    if not imf_code:
-        return None
-    label = IMF_INDICATORS.get(imf_code)
-    if not label:
-        return None
-
-    path = DATA_DIR / f"imf_{label}.parquet"
-    if not path.exists():
+    path = imf_path(indicator_key)
+    if path is None:
         return None
 
     iso3_set = {iso2_to_iso3(c) for c in iso2_list}

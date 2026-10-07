@@ -16,6 +16,7 @@ from typing import Any
 from .. import provenance as pv
 from .metrics import _clean
 from .discount_rates import (
+    bundled_as_of,
     wacc as compute_wacc,
     cost_of_equity,
     detect_country,
@@ -825,6 +826,10 @@ def provenance(bundle: dict, result: dict, beta: float | None, root: str = "valu
                          flags=("proxy",))
     else:
         erp_ref = pv.derived("hard-coded 5% equity risk premium", title="Equity risk premium", flags=("fallback",))
+    # A bundled snapshot is dated by its own asOf, not by this request.
+    erp_stamp = bundled_as_of(erp_data)
+    if erp_stamp and erp_ref["provider"] == "damodaran":
+        erp_ref["fetchedAt"] = erp_stamp
     prov[k("wacc", "erp")] = erp_ref
     prov[k("wacc", "country")] = pv.derived(
         "country of the listing: info.exchange code, else keywords in info.fullExchangeName, else info.country "
@@ -867,6 +872,8 @@ def provenance(bundle: dict, result: dict, beta: float | None, root: str = "valu
             "damodaran", "ctryprem", f"Statutory corporate tax rate, {country}", units="decimal",
             frequency="annual", observed=observed, url=erp_data.get("sourceUrl"),
             note="Used because Yahoo's effectiveTaxRate was missing or outside 0-60%.")
+        if erp_stamp:
+            prov[k("wacc", "taxRate")]["fetchedAt"] = erp_stamp
     else:
         prov[k("wacc", "taxRate")] = pv.derived("hard-coded 21% US statutory rate", title="Tax rate",
                                                 flags=("fallback",))
@@ -911,6 +918,8 @@ def provenance(bundle: dict, result: dict, beta: float | None, root: str = "valu
                           observed=sm.get("asOf"), url=sm.get("sourceUrl"),
                           note="Static snapshot bundled with the app: median of Damodaran's US industry multiples "
                                "mapped to sectors.")
+    if sm_stamp := bundled_as_of(sm):
+        prov[m_mult]["fetchedAt"] = sm_stamp
     formulas = {
         "DDM (Gordon Growth)": ("D1 / (ke − g), D1 = dividendRate (Yahoo's forward annual rate), g = (1 − payout ratio) × ROE (ROE capped at 25%), "
                                 "capped at the risk-free rate and at ke − 0.5pp; earnings growth is not used",

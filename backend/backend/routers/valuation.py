@@ -179,11 +179,12 @@ async def risk_free_rates():
 
 def _risk_free_provenance(rates: list[dict]) -> dict:
     """``rates.<country>`` (FRED yield or hard-coded fallback) and ``rates.<country>.erp`` per row."""
-    from ..services.discount_rates import load_erp
+    from ..services.discount_rates import bundled_as_of, load_erp
     erp_data = load_erp()
     table = erp_data.get("countries") or {}
     as_of = erp_data.get("asOf")
     erp_obs = as_of if isinstance(as_of, str) and as_of[:2] == "20" else None
+    erp_stamp = bundled_as_of(erp_data)  # a bundled snapshot is dated by its own asOf
     prov: dict = {"*": pv.ref("fred", None, "Government bond and money-market rates by country")}
     for r in rates:
         name = r["name"]
@@ -206,6 +207,8 @@ def _risk_free_provenance(rates: list[dict]) -> dict:
             prov[f"{key}.erp"] = pv.ref("damodaran", "ctryprem", f"Total equity risk premium, {name}",
                                         units="decimal (source percent / 100)", frequency="annual",
                                         observed=erp_obs, url=erp_data.get("sourceUrl"))
+            if erp_stamp:
+                prov[f"{key}.erp"]["fetchedAt"] = erp_stamp
         else:
             prov[f"{key}.erp"] = pv.ref("econosift", None, f"{name}: hard-coded equity risk premium (no Damodaran row)",
                                         units="decimal", flags=("fallback",))

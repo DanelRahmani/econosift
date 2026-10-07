@@ -5,8 +5,10 @@ import io
 import json
 import logging
 import math
+from datetime import date, datetime, timezone
 from pathlib import Path
 
+from .. import provenance as pv
 from ..cache import cached
 from .metrics import _clean
 
@@ -179,6 +181,19 @@ def load_erp() -> dict:
             return json.load(f)
     except Exception:
         return {"matureMarketERP": 4.46, "countries": {}}
+
+
+def bundled_as_of(data: dict) -> str | None:
+    """``fetchedAt`` for data read from a bundled JSON snapshot: its own ``asOf`` date.
+
+    None when it has no ISO date (the live Damodaran download is ``"live"``): that
+    data is dated by its cache entry.
+    """
+    try:
+        d = date.fromisoformat(str(data.get("asOf")))
+    except ValueError:
+        return None
+    return pv.stamp(datetime(d.year, d.month, d.day, tzinfo=timezone.utc))
 
 
 @cached("sector_multiples_json")

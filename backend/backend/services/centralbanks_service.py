@@ -88,6 +88,8 @@ def _provenance(current: dict[str, dict], balance_sheet: list[dict], meetings: l
                               (f", retrieved {row['retrieved']} (backend/backend/reference/cb_meetings.json)."
                                if row.get("retrieved") else ", read live from its iCal calendar."))
             cal["providerName"] = f"{cb} published meeting schedule"
+            if retrieved := cb_meetings.retrieved_time([row]):
+                cal["fetchedAt"] = retrieved
             prov[f"current.{cb}.next_meeting"] = cal
             prov[f"current.{cb}.days_until"] = pv.derived(
                 "next meeting date minus today, in days", [f"current.{cb}.next_meeting"],
