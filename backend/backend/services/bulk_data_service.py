@@ -134,17 +134,18 @@ def _download_worldbank() -> dict:
     return {"rows": total_rows, "error": "; ".join(errors) if errors else None}
 
 
+def worldbank_path(indicator_key: str) -> pathlib.Path | None:
+    """The downloaded World Bank parquet for an indicator key, or None if not downloaded."""
+    from ..sources.source_worldbank import INDICATOR_MAP as WB_MAP
+    label = WB_INDICATORS.get(WB_MAP.get(indicator_key) or "")
+    path = DATA_DIR / f"wb_{label}.parquet" if label else None
+    return path if path is not None and path.exists() else None
+
+
 def load_worldbank(indicator_key: str, iso3_list: list[str],
                    start: int, end: int) -> pd.DataFrame | None:
-    from ..sources.source_worldbank import INDICATOR_MAP as WB_MAP
-    wb_code = WB_MAP.get(indicator_key)
-    if not wb_code:
-        return None
-    label = WB_INDICATORS.get(wb_code)
-    if not label:
-        return None
-    path = DATA_DIR / f"wb_{label}.parquet"
-    if not path.exists():
+    path = worldbank_path(indicator_key)
+    if path is None:
         return None
     try:
         df = pd.read_parquet(path)

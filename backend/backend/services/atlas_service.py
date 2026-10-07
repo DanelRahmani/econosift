@@ -435,8 +435,14 @@ def _timeline_provenance(indicator: str, meta: dict, policy: str, wb_data: dict,
         note = None
         if indicator == "debt_gdp":
             note = "This World Bank series is central-government debt; IMF general-government debt is used first."
-        refs.append(pv.ref("worldbank", wb_code, meta["label"], units=meta["unit"], frequency="annual",
-                           observed=str(wb_yr) if wb_yr else None, note=note))
+        wb_ref = pv.ref("worldbank", wb_code, meta["label"], units=meta["unit"], frequency="annual",
+                        observed=str(wb_yr) if wb_yr else None, note=note)
+        # The downloaded bulk file is read first when present: date the data by it (P3-35).
+        from .bulk_data_service import worldbank_path
+        bulk = worldbank_path(indicator)
+        if bulk is not None and (when := pv.file_time(bulk)):
+            wb_ref["fetchedAt"] = when
+        refs.append(wb_ref)
     imf_code = _IMF_CODES.get(indicator)
     if imf_code and policy != "wb_only" and any(c.get("imfYears") for c in countries):
         imf_ref = pv.ref(

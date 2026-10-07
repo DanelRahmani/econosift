@@ -124,3 +124,36 @@ def test_stored_ai_summary_is_dated_by_its_generation(monkeypatch):
 
     assert out["cached"] is True
     assert out["provenance"]["*"]["fetchedAt"] == JULY_15_NOON_ISO
+
+
+def test_regime_from_world_bank_bulk_files_is_dated_by_them(tmp_path, monkeypatch):
+    import pandas as pd
+    from backend.services import regime_service as rs
+
+    gdp, cpi = tmp_path / "wb_gdp_growth.parquet", tmp_path / "wb_inflation.parquet"
+    for f in (gdp, cpi):
+        f.write_bytes(b"x")
+        os.utime(f, (JULY_15_NOON, JULY_15_NOON))
+    monkeypatch.setattr(rs, "_WB_GDP_PATH", gdp)
+    monkeypatch.setattr(rs, "_WB_CPI_PATH", cpi)
+    q = pd.Series([2.0], index=pd.to_datetime(["2025-12-31"]))
+
+    prov = rs._provenance("BR", [{"date": "2025-12-31", "gdpGrowth": 2.0, "cpiInflation": 4.0}], q, q, 2.0, 3.0)
+
+    assert prov["series.gdpGrowth"]["fetchedAt"] == JULY_15_NOON_ISO
+    assert prov["series.cpiInflation"]["fetchedAt"] == JULY_15_NOON_ISO
+
+
+def test_atlas_world_bank_series_from_the_bulk_file_is_dated_by_it(tmp_path, monkeypatch):
+    from backend.services import atlas_service as at, bulk_data_service as bulk
+
+    f = tmp_path / "wb_gdp_growth.parquet"
+    f.write_bytes(b"x")
+    os.utime(f, (JULY_15_NOON, JULY_15_NOON))
+    monkeypatch.setattr(bulk, "worldbank_path", lambda key: f if key == "gdp_growth" else None)
+    meta = {"label": "GDP growth", "unit": "%"}
+
+    prov = at._timeline_provenance("gdp_growth", meta, "wb_only", {"BRA": {2024: 3.1}}, {}, [])
+
+    assert prov["*"]["provider"] == "worldbank"
+    assert prov["*"]["fetchedAt"] == JULY_15_NOON_ISO

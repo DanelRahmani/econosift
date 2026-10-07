@@ -310,6 +310,10 @@ def _provenance(country: str, series: list[dict], gdp_q: pd.Series, cpi_q: pd.Se
         cpi = pv.ref("worldbank", "FP.CPI.TOTL.ZG", "Inflation, consumer prices", units="annual %",
                      frequency="annual", observed=obs("cpiInflation"),
                      note="Annual value dated 31 December and shown on the quarterly axis.")
+        # Read from the downloaded bulk files: fetched when they were written (P3-35).
+        for ref, path in ((gdp, _WB_GDP_PATH), (cpi, _WB_CPI_PATH)):
+            if when := pv.file_time(path):
+                ref["fetchedAt"] = when
     prov: dict = {}
     if not gdp_q.empty:
         prov["series.gdpGrowth"] = prov["current.gdpGrowth"] = gdp
