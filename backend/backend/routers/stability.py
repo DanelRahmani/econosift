@@ -18,6 +18,6 @@ async def currency_crisis():
 
 @router.get("/banking")
 async def banking():
-    """Banking stability dashboard: NPL ratios, capital adequacy,
-    bank Z-scores, domestic credit growth, and BIS credit gaps."""
+    """Banking stability dashboard: NPL ratios, bank capital to assets,
+    bank Z-scores, domestic credit (% of GDP), and BIS credit gaps."""
     return await get_banking_stability()
