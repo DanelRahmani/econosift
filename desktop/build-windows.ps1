@@ -46,6 +46,7 @@ npm run build
 if ($LASTEXITCODE -ne 0) { throw "tauri build failed" }
 Pop-Location
 
+# Newest installer: older bundles (e.g. "Axiom Finance_*") stay in the folder.
 $installer = Get-ChildItem (Join-Path $desktop "src-tauri\target\release\bundle\nsis\*-setup.exe") |
-    Select-Object -First 1
+    Sort-Object LastWriteTime -Descending | Select-Object -First 1
 Write-Host "`nDONE. Installer: $($installer.FullName)" -ForegroundColor Green
