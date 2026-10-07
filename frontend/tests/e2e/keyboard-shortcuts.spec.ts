@@ -55,3 +55,26 @@ test("number keys switch Macro tabs", async ({ page }) => {
     await expect(page).toHaveURL(/tab=inflation/, { timeout: 1_000 });
   });
 });
+
+test("[ and ] step Macro tabs past the ninth, clamped at the ends (P2-42)", async ({ page }) => {
+  // Macro has 16 tabs; keys 1–9 stop at "business" (9th). From it, ] reaches commodities (10th) and fx (11th).
+  await page.goto("/macro?tab=business", { waitUntil: "domcontentloaded" });
+  await pressUntil(page, "]", async () => {
+    await expect(page).toHaveURL(/tab=commodities/, { timeout: 1_000 });
+  });
+  await page.keyboard.press("]");
+  await expect(page).toHaveURL(/tab=fx/);
+  await page.keyboard.press("[");
+  await page.keyboard.press("[");
+  await expect(page).toHaveURL(/tab=business/);
+
+  // The last tab clamps: ] on "sovereign" (16th) stays there.
+  await page.goto("/macro?tab=sovereign", { waitUntil: "domcontentloaded" });
+  await pressUntil(page, "[", async () => {
+    await expect(page).toHaveURL(/tab=policy/, { timeout: 1_000 });
+  });
+  await page.keyboard.press("]");
+  await expect(page).toHaveURL(/tab=sovereign/);
+  await page.keyboard.press("]");
+  await expect(page).toHaveURL(/tab=sovereign/);
+});

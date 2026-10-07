@@ -24,7 +24,7 @@ import type {
   ExtendedRiskResponse,
 } from "@/lib/types";
 import { useRefreshNonce } from "@/lib/refresh";
-import { useKeyboardShortcuts, tabKeys, periodKeys } from "@/lib/useKeyboardShortcuts";
+import { useKeyboardShortcuts, tabKeys, tabStepKeys, periodKeys } from "@/lib/useKeyboardShortcuts";
 
 const PERIODS = ["1y", "2y", "3y"] as const;
 type Period = (typeof PERIODS)[number];
@@ -62,6 +62,7 @@ function RiskPageInner() {
   // P2-07: 1–9 pick a tab, ←/→ step the period.
   useKeyboardShortcuts({
     onTabSwitch: tabKeys(TABS, (t) => setUrlState({ tab: t })),
+    ...tabStepKeys(TABS, (t) => t === tab, (t) => setUrlState({ tab: t })),
     ...periodKeys(PERIODS, period, (p) => setUrlState({ p })),
   });
 

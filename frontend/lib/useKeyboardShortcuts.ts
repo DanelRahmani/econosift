@@ -3,6 +3,8 @@ import { useEffect, useRef } from "react";
 
 export interface ShortcutHandlers {
   onTabSwitch?: (index: number) => void;   // 1-9
+  onTabPrev?: () => void;                  // [
+  onTabNext?: () => void;                  // ]
   onPeriodPrev?: () => void;
   onPeriodNext?: () => void;
 }
@@ -14,7 +16,8 @@ function isTyping(target: EventTarget | null): boolean {
 }
 
 /**
- * Page keyboard shortcuts (P2-07): 1–9 pick the page's Nth tab, ←/→ step its period
+ * Page keyboard shortcuts (P2-07): 1–9 pick the page's Nth tab, [ / ] step to the
+ * previous / next tab (P2-42: reaches tabs past the ninth), ←/→ step its period
  * control. Only the handlers a page passes are bound, so Ctrl+K stays with the global
  * command palette. Keys typed into a field, or pressed with a modifier, are left alone.
  */
@@ -29,6 +32,12 @@ export function useKeyboardShortcuts(handlers: ShortcutHandlers) {
       if (e.key >= "1" && e.key <= "9" && h.onTabSwitch) {
         e.preventDefault();
         h.onTabSwitch(Number(e.key));
+      } else if (e.key === "[" && h.onTabPrev) {
+        e.preventDefault();
+        h.onTabPrev();
+      } else if (e.key === "]" && h.onTabNext) {
+        e.preventDefault();
+        h.onTabNext();
       } else if (e.key === "ArrowLeft" && h.onPeriodPrev) {
         e.preventDefault();
         h.onPeriodPrev();
@@ -47,6 +56,18 @@ export function tabKeys<T>(tabs: readonly T[], select: (tab: T) => void) {
   return (n: number) => {
     const t = tabs[n - 1];
     if (t !== undefined) select(t);
+  };
+}
+
+/**
+ * Handlers for `[` / `]` on a tab list: step one tab, clamped at both ends. A page
+ * whose current tab isn't in the list (it shows its default) counts as on the first.
+ */
+export function tabStepKeys<T>(tabs: readonly T[], isCurrent: (tab: T) => boolean, select: (tab: T) => void) {
+  const i = Math.max(tabs.findIndex(isCurrent), 0);
+  return {
+    onTabPrev: () => { if (i > 0) select(tabs[i - 1]); },
+    onTabNext: () => { if (i < tabs.length - 1) select(tabs[i + 1]); },
   };
 }
 

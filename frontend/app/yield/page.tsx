@@ -20,7 +20,7 @@ import {
   BarChart, Bar, ReferenceLine,
 } from "recharts";
 import { useRefreshNonce } from "@/lib/refresh";
-import { useKeyboardShortcuts, tabKeys } from "@/lib/useKeyboardShortcuts";
+import { useKeyboardShortcuts, tabKeys, tabStepKeys } from "@/lib/useKeyboardShortcuts";
 
 const TABS = YIELD_TABS;
 
@@ -324,7 +324,10 @@ function GlobalYieldsTab({ data: countries }: { data: GlobalYieldCountry[] }) {
 function YieldPageInner() {
   const [urlState, setUrlState] = useUrlState({ tab: "US Curve" });
   const tab = urlState.tab;
-  useKeyboardShortcuts({ onTabSwitch: tabKeys(TABS, (t) => setUrlState({ tab: t })) }); // P2-07
+  useKeyboardShortcuts({
+    onTabSwitch: tabKeys(TABS, (t) => setUrlState({ tab: t })),
+    ...tabStepKeys(TABS, (t) => t === tab, (t) => setUrlState({ tab: t })),
+  }); // P2-07
   const { data, isLoading, error } = useQuery({
     queryKey: ["yieldCurves"],
     queryFn: api.yieldCurves,
