@@ -29,7 +29,10 @@ test("13F panel loads the previous quarter on request and shows the QoQ change",
     route.fulfill({ json: posted ? loaded : { ...base, change: missing } }));
 
   await page.goto("/markets?t=AAPL&tab=News+%26+Events", { waitUntil: "domcontentloaded" });
-  const panel = page.locator("div", { has: page.getByRole("heading", { name: "Institutional Holders (13F)" }) }).last();
+  // The card is the panel's source-scope root (it also names the ticker for the Source menu).
+  const panel = page.locator('[data-prov-scope][data-prov-ctx="AAPL"]', {
+    has: page.getByRole("heading", { name: "Institutional Holders (13F)" }),
+  });
   await expect(panel.getByText("% Shs Out")).toBeVisible({ timeout: 60_000 });
   await expect(panel.getByText("2.00%")).toBeVisible();
   await expect(panel.getByText(/QoQ change: n\/a/)).toBeVisible();

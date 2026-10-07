@@ -29,7 +29,7 @@ function ChangeCell({ v, pct }: { v: number | null; pct: number | null }) {
   const color = isPos ? "text-success" : "text-danger";
   return (
     <td className={`py-2 pr-4 text-right font-mono text-sm ${color}`} data-prov="change">
-      {arrow} {fmtShares(v)}{pct != null ? ` (${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%)` : " (new)"}
+      {arrow} {fmtShares(v != null ? Math.abs(v) : null)}{pct != null ? ` (${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%)` : " (new)"}
     </td>
   );
 }
