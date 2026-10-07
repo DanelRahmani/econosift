@@ -1,91 +1,60 @@
-# Phase 64: status note (checkpoint 2, 2026-10-07)
+# Phase 64: final status (2026-10-08)
 
-Second checkpoint, written when the 5-hour plan limit reached 95%. It lets a fresh session resume. Prompt: `docs/plans/2026-10-07-phase64-prompt.md`.
-The packet specs the agents ran were in the session scratchpad `packets/` folder, which may be gone; the key content is summarised below.
+Phase 64 is done and pushed to `DEV`, except one verification step (DESK-01-V, below). No PR yet: the owner opens `DEV` → `main` when ready.
 
-## Owner decisions (Step 0, 2026-10-07). Each is copied word for word into its row when that item is committed.
-| ID | Decision |
-|----|----------|
-| Scope | Full Phase 64 (A + B + C) |
-| P2-41 | (a) Prune non-members (the nightly rebuild deletes rows for symbols in no tracked index; a member whose fetch failed is kept) |
-| P2-35 | (a) Point-in-time members; the residual (delisted names that Yahoo no longer serves) is labelled |
-| P2-29 | (c) BIS official rates + per-row rate-type labels; proxy only as a labelled fallback; ECB on the deposit facility rate |
-| P2-30 | (a) Relative risk score/rank, no "probability" wording, numbers unchanged |
-| P2-27 | (a) Relabel as merger news: no acquirer/target/value claims unless parsed with certainty |
-| P2-26 | (a) Document the definition on the panel + Wiki, no code change |
-| P2-42 | (b) `[` / `]` previous/next tab on every tabbed page |
-| P2-34 unmounted | (a) Delete after repo-scout |
-| P2-10 / P2-15 | (a) Skipped this phase; they stay open |
+## Owner decisions (Step 0, 2026-10-07; recorded in each row)
+- P2-41 (a) prune non-members.
+- P2-35 (a) point-in-time members.
+- P2-29 (c) BIS rates + per-row labels.
+- P2-30 (a) score/rank wording.
+- P2-27 (a) relabel as merger news.
+- P2-26 (a) document the definition.
+- P2-42 (b) `[` / `]`.
+- P2-34 unmounted components: (a) delete.
+- P2-10 / P2-15: (a) skipped; still open.
+- Later decisions:
+  - Disable the Git LFS lock verify for this repo (the push was blocked).
+  - Do not install over the existing EconoSift desktop install; verify with the frozen exe instead.
 
-## Committed on DEV (pushed up to f52c227)
-| ID | Commit | Test |
-|----|--------|------|
-| P2-41 prune screener non-members | 55c345e | test_screener_prune.py |
-| P2-30 sovereign risk score + rank | e71df98 | test_sovereign_default_score.py |
-| P2-34 A4 theme tokens + NaN% | d1ebd59 | e2e/theme-tokens.spec.ts (static) |
-| P2-34 A2 part: CAPM tile, no daily-alpha fallback | 3f69523 | e2e/capm-alpha.spec.ts (static) |
-| P2-34 A1 IV30 total variance, Calmar CAGR, GK overnight, MC seed | a2f99a4 | options/advanced_risk/realized_moments tests |
-| P2-42 `[`/`]` tab keys | c3941f0 | e2e/keyboard-shortcuts.spec.ts (not yet run vs Docker) |
-| P2-34 A3 macro/stability (9 items) | 9d57722 | test_macro_honesty_p64.py |
-| P2-34 unmounted components deleted | 866f747 | grep: each referenced only by itself |
-| P2-29 BIS policy rates | b2579d2 | test_policy_service.py |
-| P2-35 breadth point-in-time members | b09094f | test_breadth_pit.py |
-| P2-26 highs/lows definition | f52c227 | text only (tile title + Wiki) |
+## Delivered (all on DEV)
+| ID | Before → after (live) | Test |
+|----|-----------------------|------|
+| P2-29 | ECB 2.65 MRO → 2.50 BIS deposit facility rate; BoJ 0.977 interbank → 1.25; Fed 3.75 effective → 3.875 target midpoint; all rows from BIS. Cold-cache parse 125 s → 5.5 s | test_policy_service.py |
+| P2-41 | 527 screener rows, 9 stale → 518, none stale; also prunes on every `refresh_universe` | test_screener_prune.py |
+| P2-35 | Breadth over point-in-time members; 16 former members without Yahoo data reported | test_breadth_pit.py |
+| P2-30 | `prob1y` / `prob5y` → `score` / `rank`; signal from the unrounded score | test_sovereign_default_score.py |
+| P2-27 | acquirer "FDUSD" / target "CSLM" guessed from a headline → merger news with Finnhub ticker tags | test_ma_service.py |
+| P2-34 | IV30 total variance, Calmar CAGR, GK overnight term, MC seed, DDM single growth, unknown currency null, CAPM tile, monthly-CPI real yields, banking fields, recession/TOTCI/rotation, theme tokens, NaN%, 7 dead components | several (see the ACTIVE_ISSUES Recently Fixed rows) |
+| P2-42 | `[` / `]` step tabs on every tabbed page | keyboard-shortcuts.spec.ts |
+| P2-26 | Definition in the served Wiki entry and as a caption on the breadth panel | test_wiki_p64.py |
+| P3-36 | IMF / FF bulk files, Damodaran JSON, CB meetings, Doing Business dated by their own file/date | test_provenance_files_p64.py |
+| P3-37 | The build refreshes target/release/binaries; verified on a local build | (build check) |
 
-The rows carry their owner decisions; none is marked RESOLVED yet (that happens at the gate).
+## Gate
+- **Spec review:** a fresh-context spec-verifier review found 3 blockers (Wiki edited in the wrong file, wrong Macro tabs in the e2e test, prune only at startup), all fixed with tests.
+- **Docker:** rebuilt and recreated; the cache was cleared because response shapes changed.
+- **Container pytest:** green except `test_insider_aggregate_does_not_block_the_event_loop`, a flaky timing test (P3-38).
+- **tsc:** clean.
+- **Playwright:** 40/40 against Docker.
+- **Live checks:** one endpoint/ticker at a time; all pages 200.
 
-## In flight / uncommitted at checkpoint (review before committing; never commit blind)
-- **P2-34 A2 rest** (packet-executor, sonnet; resumed once after an interruption). **DONE after checkpoint 2 (agent: its pytest -k run, tsc and 5 Playwright static tests green), not yet reviewed.** Its follow-ups: (1) widen `currency` fields in types.ts that can now be null (e.g. ValuationKpis.currency ~L306) to `string | null`; (2) the new technicals currency test reaches the network via get_quote: stub it; (3) the static `$${` scan is scoped to components/markets; `app/dividends/page.tsx:171` hard-codes `$` on a per-share axis (follow-up); (4) existing tests adapted: test_valuation_audit_m02_m03_m05 (DDM values), test_fundamentals (`currency: USD` in the bundle), test_discount_rates_m09_m11 (same).
-  - Scope: DDM uses Yahoo's forward `dividendRate` as D1 (no second growth); an unknown quote currency → null + reason, never USD;
-    `technicals_service` returns `currency`; TechnicalsTab uses `currencySymbol(data.currency)`; `currencySymbol(undefined)` → "".
-  - Files: valuation_engine, dcf_engine, analyst_service, fundamentals, discount_rates, yfinance_service, technicals_service,
-    routers/valuation.py, lib/format.ts, markets components; tests test_valuation_p64.py, test_valuation_audit_m02_m03_m05.py,
-    frontend/tests/e2e/currency-symbol.spec.ts.
-  - **Types:** `frontend/lib/types.ts` still has the uncommitted `TechnicalsResponse.currency?: string | null` (orchestrator, belongs to
-    this item).
-  - Verify: `cd backend && python -m pytest tests/ -q -p no:warnings -k "valuation or dcf or analyst or fundamentals or discount or technicals or dividend or yfinance"`,
-    then tsc and `npx playwright test tests/e2e/currency-symbol.spec.ts tests/e2e/percent-format.spec.ts`.
-- **P2-27 merger news** (packet-executor, haiku; backend only). **Backend DONE after the checkpoint (agent reports 7/7 tests in test_ma_service.py), not yet reviewed; uncommitted on purpose: it changes the response shape, so commit it together with the page rewrite.**
-  - ma_service returns `{asOf, source, news:[{date|null, headline, related[], sector|null, source, url}], monthlyCount, sectorCount}`.
-    No acquirer/target/value, and no "today" stand-in date. Test: backend/tests/test_ma_service.py.
-  - **The orchestrator must then rewrite** `frontend/app/mergers/page.tsx` + `MADeal`/`MAData` in types.ts to the new shape: title "Merger
-    news", columns Date / Headline / Tagged tickers / Sector / Source, KPIs news items + tagged sectors, no value KPI or column,
-    monthly chart = count. Then tsc.
-- **P3-37** (orchestrator, uncommitted).
-  - desktop/build-windows.ps1 now also refreshes `src-tauri/target/release/binaries/econosift-backend` (and drops the stale `axiom-backend`)
-    after staging; desktop/README.md documents local testing and the repo-root warning.
-  - Still to do: run `powershell -ExecutionPolicy Bypass -File desktop\build-windows.ps1` (prereqs exist: backend/.venv pyinstaller,
-    cargo), confirm `target/release/binaries/econosift-backend` is the new copy and the backend honours ECONOSIFT_DATA_DIR. Then
-    commit. The same build serves DESK-01-V: install, launch, check `%APPDATA%/AxiomFinance|EconoSift/backend.log` gets uvicorn lines,
-    uninstall.
-
-## Not started
-- **P3-36:** IMF WEO / Fama-French file_time stamps.
-  - Add `imf_path` / `famafrench_path` next to `bulk_data_service.worldbank_path`, and stamp the refs in atlas_service (IMF ref
-    ~L447), source_imf, source_datareader and fama_french consumers.
-  - Bundled JSON (`backend/backend/data/damodaran_erp_2026.json`, `doing_business.json`, `sector_multiples.json`, cb_meetings) gets
-    the file's own retrieved date or "bundled with the app".
-  - Overlaps the A2 files (discount_rates, valuation_engine, routers/valuation.py), so run it after A2 is committed.
-- **DESK-01-V:** see P3-37.
-- **Gate:**
-  1. spec-verifier (sonnet) on `git diff f14442c..HEAD` + the rows + decisions.
-  2. Docker rebuild + recreate.
-  3. Container pytest, then tsc.
-  4. Live checks, one at a time:
-     - `/api/policy/tracker`: rateType, ECB ≈ 2.5 DFR.
-     - `/api/sovereign/default-prob`: score/rank.
-     - `/api/mergers`: news shape.
-     - `/api/dashboard/breadth`: membership block.
-     - Screener stale-row count: 0 only after the startup warm runs `prune_non_members`.
-     - One ticker for IV30/DDM.
-     - Pages return 200.
-  5. Playwright, delegated.
-  6. Docs: rows → "✅ … RESOLVED (Phase 64)", Recently Fixed entries, one CHANGELOG line.
-  7. Commit + push; report table; ask before any PR.
-
-## Reproduction notes worth keeping
-- Two scout verdicts were wrong; both findings were confirmed:
-  - DDM double growth: valuation_engine.py `_model_ddm`, forward dividendRate × (1+g).
-  - Garman-Klass had no overnight term.
-- BIS WS_CBPOL: XM is the deposit facility rate since 18 Sep 2024 and US is the target-range midpoint. Daily series are current.
-- Live screener had 9 stale rows (INSM, ZS, CAG, AVB, EA, EQR, BLDR, TAP, TTD).
+## Open / next
+- **DESK-01-V:** `run.py` logging fix committed (test_run_frozen_log.py; a simulated frozen run writes uvicorn lines). Still to do: run the
+  REBUILT frozen exe with a scratch `ECONOSIFT_DATA_DIR` and confirm `backend.log` gets "Uvicorn running on". The rebuild
+  (`desktop\build-windows.ps1`) was still running at session end; check `target/release/binaries/econosift-backend/econosift-backend.exe`
+  has a 2026-10-08 timestamp, then:
+  - start it from a scratch folder with `ECONOSIFT_DATA_DIR` set;
+  - wait for `GET http://127.0.0.1:8000/api/health` = 200;
+  - stop it;
+  - grep `backend.log`.
+  Never start it from the repo root, and never install over the owner's installed app.
+- **New issues:**
+  - P2-43: DDM blows up when g is capped at ke − 0.5 pp (KO 424 vs ~86).
+  - P2-44: the Central Banks tab and FX carry are still on MRO/OECD.
+  - P3-38: flaky timing test.
+  - P3-39: breadth membership note not shown.
+  - P3-40: AltGr `[` / `]`, no shortcut hint.
+  - P3-41: Dividends `$` axis; `macro_service.data_provenance` dead code.
+- **Uncommitted, intentionally:**
+  - `desktop/src-tauri/Cargo.toml`: line endings rewritten by the build.
+  - `frontend/tsconfig.tsbuildinfo` and `AGENTS.md`: pre-existing.
