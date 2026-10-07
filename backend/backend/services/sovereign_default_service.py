@@ -163,11 +163,12 @@ def _score_rows(raw: list[tuple[str, str, float]]) -> list[dict]:
     """
     rows = []
     for iso3, name, model_output in raw:
-        score = round(100.0 * model_output, 1)
-        # Determine signal based on score bands
-        if score < TL_GREEN:
+        raw_score = 100.0 * model_output
+        score = round(raw_score, 1)
+        # Signal from the unrounded score, so 4.96 stays green (bands unchanged from the 0-1 model output)
+        if raw_score < TL_GREEN:
             signal = "green"
-        elif score < TL_RED:
+        elif raw_score < TL_RED:
             signal = "yellow"
         else:
             signal = "red"

@@ -65,13 +65,20 @@ def test_score_rows_rounding():
     """Test score rounding to 1 decimal place."""
     raw = [
         ("TST", "Test", 0.1234),
-        ("TST2", "Test2", 0.1265),
+        ("TST2", "Test2", 0.1268),
     ]
     result = _score_rows(raw)
     # 0.1234 * 100 = 12.34 -> 12.3
-    # 0.1265 * 100 = 12.65 -> 12.7
-    assert result[0]["score"] == 12.7 or result[0]["score"] == 12.3
-    assert result[1]["score"] == 12.7 or result[1]["score"] == 12.3
+    # 0.1268 * 100 = 12.68 -> 12.7
+    assert [r["score"] for r in result] == [12.7, 12.3]  # sorted desc: 12.68 -> 12.7, 12.34 -> 12.3
+
+
+def test_signal_uses_the_unrounded_score():
+    """4.96 rounds to a displayed 5.0 but is below the 5 band, so it stays green."""
+    result = _score_rows([("AAA", "A", 0.0496), ("BBB", "B", 0.05)])
+    by = {r["iso3"]: r for r in result}
+    assert by["AAA"]["score"] == 5.0 and by["AAA"]["signal"] == "green"
+    assert by["BBB"]["signal"] == "yellow"
 
 
 def test_score_rows_signal_thresholds():
