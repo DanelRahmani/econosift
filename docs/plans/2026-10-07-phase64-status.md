@@ -45,7 +45,7 @@ The rows carry their owner decisions; none is marked RESOLVED yet (that happens 
     this item).
   - Verify: `cd backend && python -m pytest tests/ -q -p no:warnings -k "valuation or dcf or analyst or fundamentals or discount or technicals or dividend or yfinance"`,
     then tsc and `npx playwright test tests/e2e/currency-symbol.spec.ts tests/e2e/percent-format.spec.ts`.
-- **P2-27 merger news** (packet-executor, haiku; backend only).
+- **P2-27 merger news** (packet-executor, haiku; backend only). **Backend DONE after the checkpoint (agent reports 7/7 tests in test_ma_service.py), not yet reviewed; uncommitted on purpose: it changes the response shape, so commit it together with the page rewrite.**
   - ma_service returns `{asOf, source, news:[{date|null, headline, related[], sector|null, source, url}], monthlyCount, sectorCount}`.
     No acquirer/target/value, and no "today" stand-in date. Test: backend/tests/test_ma_service.py.
   - **The orchestrator must then rewrite** `frontend/app/mergers/page.tsx` + `MADeal`/`MAData` in types.ts to the new shape: title "Merger
