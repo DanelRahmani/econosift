@@ -57,7 +57,8 @@ test("number keys switch Macro tabs", async ({ page }) => {
 });
 
 test("[ and ] step Macro tabs past the ninth, clamped at the ends (P2-42)", async ({ page }) => {
-  // Macro has 16 tabs; keys 1–9 stop at "business" (9th). From it, ] reaches commodities (10th) and fx (11th).
+  // Macro has 14 tabs; keys 1–9 stop at "business" (9th). From it, ] reaches commodities (10th) and fx (11th).
+  // Each step waits for the URL: a key pressed before the page re-renders steps from the old tab.
   await page.goto("/macro?tab=business", { waitUntil: "domcontentloaded" });
   await pressUntil(page, "]", async () => {
     await expect(page).toHaveURL(/tab=commodities/, { timeout: 1_000 });
@@ -65,16 +66,17 @@ test("[ and ] step Macro tabs past the ninth, clamped at the ends (P2-42)", asyn
   await page.keyboard.press("]");
   await expect(page).toHaveURL(/tab=fx/);
   await page.keyboard.press("[");
+  await expect(page).toHaveURL(/tab=commodities/);
   await page.keyboard.press("[");
   await expect(page).toHaveURL(/tab=business/);
 
-  // The last tab clamps: ] on "sovereign" (16th) stays there.
-  await page.goto("/macro?tab=sovereign", { waitUntil: "domcontentloaded" });
+  // The last tab clamps: ] on "sentiment" (14th) stays there.
+  await page.goto("/macro?tab=sentiment", { waitUntil: "domcontentloaded" });
   await pressUntil(page, "[", async () => {
-    await expect(page).toHaveURL(/tab=policy/, { timeout: 1_000 });
+    await expect(page).toHaveURL(/tab=financial/, { timeout: 1_000 });
   });
   await page.keyboard.press("]");
-  await expect(page).toHaveURL(/tab=sovereign/);
+  await expect(page).toHaveURL(/tab=sentiment/);
   await page.keyboard.press("]");
-  await expect(page).toHaveURL(/tab=sovereign/);
+  await expect(page).toHaveURL(/tab=sentiment/);
 });
