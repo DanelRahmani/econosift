@@ -293,7 +293,7 @@ function CorporatePageInner() {
 
 export default function CorporatePage() {
   return (
-    <Suspense fallback={<div className="p-8 text-muted">Loading…</div>}>
+    <Suspense fallback={<div className="p-8 text-text-muted">Loading…</div>}>
       <CorporatePageInner />
     </Suspense>
   );

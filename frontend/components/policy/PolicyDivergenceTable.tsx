@@ -21,7 +21,7 @@ export function PolicyDivergenceTable({ entries }: Props) {
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-border text-muted text-left">
+          <tr className="border-b border-border text-text-muted text-left">
             <th className="pb-2 pr-4">Central Bank</th>
             <th className="pb-2 pr-4 text-right">Current Rate</th>
             <th className="pb-2 pr-4 text-right">3M Change</th>

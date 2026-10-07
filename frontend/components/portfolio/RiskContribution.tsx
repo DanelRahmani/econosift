@@ -50,23 +50,23 @@ export function RiskContribution({ data, loading }: Props) {
           layout="vertical"
           margin={{ top: 4, right: 24, bottom: 0, left: 8 }}
         >
-          <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="var(--color-border)" />
+          <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="rgb(var(--border))" />
           <XAxis
             type="number"
             tickFormatter={(v) => `${v.toFixed(0)}%`}
-            tick={{ fontSize: 11, fill: "var(--color-text-muted)" }}
+            tick={{ fontSize: 11, fill: "rgb(var(--text-muted))" }}
           />
           <YAxis
             type="category"
             dataKey="ticker"
-            tick={{ fontSize: 11, fill: "var(--color-text-muted)", fontFamily: "monospace" }}
+            tick={{ fontSize: 11, fill: "rgb(var(--text-muted))", fontFamily: "monospace" }}
             width={52}
           />
           <Tooltip
             formatter={(v: number) => [`${v.toFixed(2)}%`, "Variance Contribution"]}
             contentStyle={{
-              backgroundColor: "var(--color-surface-alt)",
-              border: "1px solid var(--color-border)",
+              backgroundColor: "rgb(var(--surface-alt))",
+              border: "1px solid rgb(var(--border))",
               borderRadius: 8,
               fontSize: 12,
             }}

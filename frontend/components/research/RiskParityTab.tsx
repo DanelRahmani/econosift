@@ -17,8 +17,8 @@ const PERIODS = ["1y", "3y", "5y"] as const;
 const COLORS = ["#6366f1", "#f59e0b", "#10b981", "#ef4444", "#3b82f6", "#a855f7", "#ec4899", "#14b8a6"];
 
 const tooltipStyle = {
-  backgroundColor: "var(--color-surface-alt)",
-  border: "1px solid var(--color-border)",
+  backgroundColor: "rgb(var(--surface-alt))",
+  border: "1px solid rgb(var(--border))",
   borderRadius: 8,
   fontSize: 12,
 };
@@ -139,9 +139,9 @@ export function RiskParityTab() {
             : (
             <ResponsiveContainer width="100%" height={Math.max(200, weightRows.length * 44)}>
               <BarChart data={weightRows} layout="vertical" margin={{ left: 8, right: 24 }}>
-                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="var(--color-border)" />
-                <XAxis type="number" tickFormatter={(v) => `${v.toFixed(0)}%`} tick={{ fontSize: 11, fill: "var(--color-text-muted)" }} />
-                <YAxis type="category" dataKey="ticker" width={80} tick={{ fontSize: 11, fill: "var(--color-text-muted)", fontFamily: "monospace" }} />
+                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="rgb(var(--border))" />
+                <XAxis type="number" tickFormatter={(v) => `${v.toFixed(0)}%`} tick={{ fontSize: 11, fill: "rgb(var(--text-muted))" }} />
+                <YAxis type="category" dataKey="ticker" width={80} tick={{ fontSize: 11, fill: "rgb(var(--text-muted))", fontFamily: "monospace" }} />
                 <Tooltip formatter={(v: number) => [`${v.toFixed(1)}%`, "Weight"]} contentStyle={tooltipStyle} />
                 <Bar dataKey="value" radius={[0, 4, 4, 0]}>
                   {weightRows.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
@@ -158,9 +158,9 @@ export function RiskParityTab() {
             : (
             <ResponsiveContainer width="100%" height={Math.max(200, rcRows.length * 44)}>
               <BarChart data={rcRows} layout="vertical" margin={{ left: 8, right: 24 }}>
-                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="var(--color-border)" />
-                <XAxis type="number" tickFormatter={(v) => `${v.toFixed(0)}%`} tick={{ fontSize: 11, fill: "var(--color-text-muted)" }} />
-                <YAxis type="category" dataKey="ticker" width={80} tick={{ fontSize: 11, fill: "var(--color-text-muted)", fontFamily: "monospace" }} />
+                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="rgb(var(--border))" />
+                <XAxis type="number" tickFormatter={(v) => `${v.toFixed(0)}%`} tick={{ fontSize: 11, fill: "rgb(var(--text-muted))" }} />
+                <YAxis type="category" dataKey="ticker" width={80} tick={{ fontSize: 11, fill: "rgb(var(--text-muted))", fontFamily: "monospace" }} />
                 <Tooltip formatter={(v: number) => [`${v.toFixed(1)}%`, "Risk Contribution"]} contentStyle={tooltipStyle} />
                 <Bar dataKey="value" radius={[0, 4, 4, 0]}>
                   {rcRows.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
@@ -192,9 +192,9 @@ export function RiskParityTab() {
           <>
             <ResponsiveContainer width="100%" height={300}>
               <LineChart data={backtest.series} margin={{ left: 8, right: 16 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-                <XAxis dataKey="date" tick={{ fontSize: 10, fill: "var(--color-text-muted)" }} minTickGap={48} />
-                <YAxis tick={{ fontSize: 11, fill: "var(--color-text-muted)" }} domain={["auto", "auto"]} />
+                <CartesianGrid strokeDasharray="3 3" stroke="rgb(var(--border))" />
+                <XAxis dataKey="date" tick={{ fontSize: 10, fill: "rgb(var(--text-muted))" }} minTickGap={48} />
+                <YAxis tick={{ fontSize: 11, fill: "rgb(var(--text-muted))" }} domain={["auto", "auto"]} />
                 <Tooltip contentStyle={tooltipStyle} />
                 <Legend wrapperStyle={{ fontSize: 12 }} />
                 <Line type="monotone" dataKey="strategy" name="Risk Parity" stroke="#6366f1" dot={false} strokeWidth={2} />

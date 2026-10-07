@@ -71,7 +71,7 @@ export function CorrelationHeatmap({ data, loading }: Props) {
                       className="w-16 h-10 text-center rounded cursor-default transition-opacity"
                       style={{
                         backgroundColor: v !== null ? corrColor(v) : undefined,
-                        outline: isHovered ? "2px solid var(--color-accent)" : undefined,
+                        outline: isHovered ? "2px solid rgb(var(--primary))" : undefined,
                       }}
                       onMouseEnter={() => v !== null && setHover({ r: ri, c: ci, v })}
                       onMouseLeave={() => setHover(null)}

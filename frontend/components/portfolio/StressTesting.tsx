@@ -44,23 +44,23 @@ function ScenarioCard({ scenario }: { scenario: StressScenario }) {
       {pts.length > 2 && (
         <ResponsiveContainer width="100%" height={120}>
           <LineChart data={pts} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
+            <CartesianGrid strokeDasharray="3 3" stroke="rgb(var(--border))" />
             <XAxis
               dataKey="date"
               tickFormatter={(d) => d.slice(2, 7)}
-              tick={{ fontSize: 9, fill: "var(--color-text-muted)" }}
+              tick={{ fontSize: 9, fill: "rgb(var(--text-muted))" }}
               interval="preserveStartEnd"
             />
             <YAxis
               tickFormatter={(v) => `${v.toFixed(0)}%`}
-              tick={{ fontSize: 9, fill: "var(--color-text-muted)" }}
+              tick={{ fontSize: 9, fill: "rgb(var(--text-muted))" }}
               width={36}
             />
             <Tooltip
               formatter={(v: number) => [`${v.toFixed(2)}%`, "Return"]}
               contentStyle={{
-                backgroundColor: "var(--color-surface-alt)",
-                border: "1px solid var(--color-border)",
+                backgroundColor: "rgb(var(--surface-alt))",
+                border: "1px solid rgb(var(--border))",
                 borderRadius: 8,
                 fontSize: 11,
               }}

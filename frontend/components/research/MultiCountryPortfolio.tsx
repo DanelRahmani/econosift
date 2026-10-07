@@ -154,7 +154,7 @@ export function MultiCountryPortfolio() {
               <div className="h-64">
                 <ResponsiveContainer>
                   <LineChart data={data.series}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgb(var(--border))" />
                     <XAxis dataKey="date" tick={{ fontSize: 10 }} />
                     <YAxis domain={["auto", "auto"]} tick={{ fontSize: 10 }} />
                     <Tooltip />

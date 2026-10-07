@@ -28,8 +28,8 @@ const SIGNALS = [
 type Signal = (typeof SIGNALS)[number]["key"];
 
 const tooltipStyle = {
-  backgroundColor: "var(--color-surface-alt)",
-  border: "1px solid var(--color-border)",
+  backgroundColor: "rgb(var(--surface-alt))",
+  border: "1px solid rgb(var(--border))",
   borderRadius: 8,
   fontSize: 12,
 };
@@ -147,9 +147,9 @@ export function MomentumTab() {
             </h3>
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={deciles} margin={{ left: 8, right: 16 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-                <XAxis dataKey="decile" tick={{ fontSize: 11, fill: "var(--color-text-muted)" }} />
-                <YAxis tickFormatter={(v) => `${v.toFixed(0)}%`} tick={{ fontSize: 11, fill: "var(--color-text-muted)" }} />
+                <CartesianGrid strokeDasharray="3 3" stroke="rgb(var(--border))" />
+                <XAxis dataKey="decile" tick={{ fontSize: 11, fill: "rgb(var(--text-muted))" }} />
+                <YAxis tickFormatter={(v) => `${v.toFixed(0)}%`} tick={{ fontSize: 11, fill: "rgb(var(--text-muted))" }} />
                 <Tooltip formatter={(v: number) => [`${v.toFixed(1)}%`, "Avg Prior Return"]} contentStyle={tooltipStyle} />
                 <Bar dataKey="value" radius={[4, 4, 0, 0]}>
                   {deciles.map((d, i) => <Cell key={i} fill={d.value >= 0 ? "#10b981" : "#ef4444"} />)}

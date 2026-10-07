@@ -30,7 +30,7 @@ export function CurrencyCrisisPanel() {
     api.stabilityCurrencyCrisis().then(setData).catch(() => setError(true)).finally(() => setLoading(false));
   }, [refreshNonce]);
 
-  if (loading) return <div className="py-8 text-center text-muted">Loading crisis early warning data…</div>;
+  if (loading) return <div className="py-8 text-center text-text-muted">Loading crisis early warning data…</div>;
   if (error || !data) return <div className="py-8 text-center text-red-400">Failed to load data.</div>;
 
   const { summary, countries, methodology, source } = data;

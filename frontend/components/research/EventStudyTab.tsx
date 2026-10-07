@@ -20,8 +20,8 @@ const EVENT_TYPES = [
 type EventType = (typeof EVENT_TYPES)[number]["key"];
 
 const tooltipStyle = {
-  backgroundColor: "var(--color-surface-alt)",
-  border: "1px solid var(--color-border)",
+  backgroundColor: "rgb(var(--surface-alt))",
+  border: "1px solid rgb(var(--border))",
   borderRadius: 8,
   fontSize: 12,
 };
@@ -139,12 +139,12 @@ export function EventStudyTab() {
             ) : (
               <ResponsiveContainer width="100%" height={280}>
                 <LineChart data={carPathRows} margin={{ left: 8, right: 16 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-                  <XAxis dataKey="day" tick={{ fontSize: 11, fill: "var(--color-text-muted)" }} />
-                  <YAxis tickFormatter={(v) => `${v.toFixed(1)}%`} tick={{ fontSize: 11, fill: "var(--color-text-muted)" }} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgb(var(--border))" />
+                  <XAxis dataKey="day" tick={{ fontSize: 11, fill: "rgb(var(--text-muted))" }} />
+                  <YAxis tickFormatter={(v) => `${v.toFixed(1)}%`} tick={{ fontSize: 11, fill: "rgb(var(--text-muted))" }} />
                   <Tooltip formatter={(v: number) => [`${v.toFixed(2)}%`, "Avg CAR"]} labelFormatter={(d) => `Day ${d}`} contentStyle={tooltipStyle} />
-                  <ReferenceLine x={0} stroke="var(--color-text-muted)" strokeDasharray="3 3" />
-                  <ReferenceLine y={0} stroke="var(--color-text-muted)" strokeDasharray="3 3" />
+                  <ReferenceLine x={0} stroke="rgb(var(--text-muted))" strokeDasharray="3 3" />
+                  <ReferenceLine y={0} stroke="rgb(var(--text-muted))" strokeDasharray="3 3" />
                   <Line type="monotone" dataKey="avgCar" stroke="#6366f1" dot={false} strokeWidth={2} />
                 </LineChart>
               </ResponsiveContainer>

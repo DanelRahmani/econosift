@@ -312,24 +312,24 @@ export function EconLabTab() {
                   <XAxis
                     dataKey="x"
                     name="Fitted"
-                    tick={{ fill: "var(--color-text-secondary)", fontSize: 11 }}
-                    label={{ value: "Fitted", position: "insideBottom", offset: -5, fill: "var(--color-text-secondary)", fontSize: 11 }}
+                    tick={{ fill: "rgb(var(--text-secondary))", fontSize: 11 }}
+                    label={{ value: "Fitted", position: "insideBottom", offset: -5, fill: "rgb(var(--text-secondary))", fontSize: 11 }}
                   />
                   <YAxis
                     dataKey="y"
                     name="Residual"
-                    tick={{ fill: "var(--color-text-secondary)", fontSize: 11 }}
-                    label={{ value: "Residual", angle: -90, position: "insideLeft", fill: "var(--color-text-secondary)", fontSize: 11 }}
+                    tick={{ fill: "rgb(var(--text-secondary))", fontSize: 11 }}
+                    label={{ value: "Residual", angle: -90, position: "insideLeft", fill: "rgb(var(--text-secondary))", fontSize: 11 }}
                   />
                   <Tooltip
                     cursor={{ strokeDasharray: "3 3" }}
-                    contentStyle={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", fontSize: 12 }}
+                    contentStyle={{ background: "rgb(var(--surface))", border: "1px solid rgb(var(--border))", fontSize: 12 }}
                     formatter={(value: number) => value.toFixed(4)}
                   />
-                  <ReferenceLine y={0} stroke="var(--color-accent)" strokeDasharray="4 4" />
+                  <ReferenceLine y={0} stroke="rgb(var(--primary))" strokeDasharray="4 4" />
                   <Scatter
                     data={scatterData}
-                    fill="var(--color-accent)"
+                    fill="rgb(var(--primary))"
                     fillOpacity={0.6}
                     r={3}
                   />

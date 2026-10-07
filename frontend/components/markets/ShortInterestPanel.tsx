@@ -78,7 +78,7 @@ export function ShortInterestPanel() {
         <Card className="p-4">
           <div className="text-xs text-text-secondary">Avg Short Float</div>
           <div className="text-2xl font-bold mt-1">
-            {items.length > 0
+            {items.some(i => i.shortFloat != null)
               ? (items.reduce((s, i) => s + (i.shortFloat ?? 0), 0) / items.filter(i => i.shortFloat != null).length).toFixed(1) + "%"
               : "—"}
           </div>

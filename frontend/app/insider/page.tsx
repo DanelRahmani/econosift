@@ -104,7 +104,7 @@ function InsiderPageInner() {
                   <YAxis type="category" dataKey="sector" tick={{ fontSize: 11 }} width={105} interval={0} />
                   <Tooltip
                     formatter={(v: number, name: string) => [v.toFixed(3), name]}
-                    contentStyle={{ backgroundColor: "var(--color-surface-alt)", border: "1px solid var(--color-border)", borderRadius: 8, fontSize: 12 }}
+                    contentStyle={{ backgroundColor: "rgb(var(--surface-alt))", border: "1px solid rgb(var(--border))", borderRadius: 8, fontSize: 12 }}
                   />
                   <Bar dataKey="netBuyRatio" radius={[0, 4, 4, 0]}>
                     {data.sectorSentiment.map((s) => (
@@ -203,7 +203,7 @@ function InsiderPageInner() {
 
 export default function InsiderPage() {
   return (
-    <Suspense fallback={<div className="p-8 text-muted">Loading…</div>}>
+    <Suspense fallback={<div className="p-8 text-text-muted">Loading…</div>}>
       <InsiderPageInner />
     </Suspense>
   );

@@ -60,25 +60,25 @@ export function PerformanceChart({ data }: Props) {
       <h3 className="font-semibold text-sm mb-3">Cumulative Return</h3>
       <ResponsiveContainer width="100%" height={300}>
         <LineChart data={pts} margin={{ top: 4, right: 16, bottom: 0, left: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
+          <CartesianGrid strokeDasharray="3 3" stroke="rgb(var(--border))" />
           <XAxis
             dataKey="date"
             tickFormatter={formatDate}
-            tick={{ fontSize: 11, fill: "var(--color-text-muted)" }}
+            tick={{ fontSize: 11, fill: "rgb(var(--text-muted))" }}
             interval="preserveStartEnd"
             minTickGap={60}
           />
           <YAxis
             tickFormatter={(v) => `${v.toFixed(0)}%`}
-            tick={{ fontSize: 11, fill: "var(--color-text-muted)" }}
+            tick={{ fontSize: 11, fill: "rgb(var(--text-muted))" }}
             width={52}
           />
           <Tooltip
             formatter={(value: number, name: string) => [formatPct(value), name]}
             labelFormatter={(label: string) => `Date: ${label}`}
             contentStyle={{
-              backgroundColor: "var(--color-surface-alt)",
-              border: "1px solid var(--color-border)",
+              backgroundColor: "rgb(var(--surface-alt))",
+              border: "1px solid rgb(var(--border))",
               borderRadius: 8,
               fontSize: 12,
             }}
@@ -88,7 +88,7 @@ export function PerformanceChart({ data }: Props) {
             type="monotone"
             dataKey="portfolio"
             name="Portfolio"
-            stroke="var(--color-accent)"
+            stroke="rgb(var(--primary))"
             dot={false}
             strokeWidth={2}
             connectNulls

@@ -75,7 +75,7 @@ function ResearchPageInner() {
 
 export default function ResearchPage() {
   return (
-    <Suspense fallback={<div className="p-8 text-muted">Loading…</div>}>
+    <Suspense fallback={<div className="p-8 text-text-muted">Loading…</div>}>
       <ResearchPageInner />
     </Suspense>
   );

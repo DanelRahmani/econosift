@@ -27,7 +27,7 @@ const TABS = YIELD_TABS;
 function KpiCard({ label, value, badge, prov, ctx }: { label: string; value: string; badge?: string; prov?: string; ctx?: string }) {
   return (
     <div className="bg-surface rounded-lg p-4 border border-border" data-prov={prov} data-prov-ctx={ctx}>
-      <div className="text-xs text-muted mb-1">{label}</div>
+      <div className="text-xs text-text-muted mb-1">{label}</div>
       <div className="text-xl font-semibold">{value}</div>
       {badge && (
         <span className="text-xs mt-1 px-2 py-0.5 rounded-full bg-red-500/20 text-red-400">{badge}</span>
@@ -48,7 +48,7 @@ function USRatesDetailTab() {
   }, [refreshNonce]);
 
   if (loading) return <PageSkeleton text="Loading rates data…" />;
-  if (!data) return <div className="text-muted text-sm py-8 text-center">Rates data unavailable.</div>;
+  if (!data) return <div className="text-text-muted text-sm py-8 text-center">Rates data unavailable.</div>;
 
   // Neutral grid colour readable in both light & dark themes
   const GRID = "rgba(128,128,128,0.18)";
@@ -222,7 +222,7 @@ function USRatesDetailTab() {
 function GlobalYieldsTab({ data: countries }: { data: GlobalYieldCountry[] }) {
   const GRID = "rgba(128,128,128,0.18)";
   if (!countries || countries.length === 0) {
-    return <div className="text-muted text-sm py-8 text-center">No global yield data available.</div>;
+    return <div className="text-text-muted text-sm py-8 text-center">No global yield data available.</div>;
   }
 
   // Summary KPIs
@@ -331,7 +331,7 @@ function YieldPageInner() {
   });
   const scope = useSourceScope(provOf(data));
 
-  if (isLoading) return <div className="p-8 text-muted">Loading yield curve data…</div>;
+  if (isLoading) return <div className="p-8 text-text-muted">Loading yield curve data…</div>;
   if (error || !data) return <div className="p-8 text-red-400">Failed to load yield data.</div>;
 
   const { us_curve, foreign_10y, real_yields, breakevens, term_premium, global_yields } = data;
@@ -366,7 +366,7 @@ function YieldPageInner() {
 
       {tab === "US Curve" && (
         <div className="bg-surface rounded-lg p-4 border border-border">
-          <h2 className="text-sm font-medium mb-4 text-muted">US Treasury Spot Curve</h2>
+          <h2 className="text-sm font-medium mb-4 text-text-muted">US Treasury Spot Curve</h2>
           <ResponsiveContainer width="100%" height={280}>
             <LineChart data={us_curve.points.filter(p => p.yield !== null)}>
               <XAxis dataKey="tenor" tick={{ fontSize: 11 }} />
@@ -380,7 +380,7 @@ function YieldPageInner() {
 
       {tab === "Foreign Spreads" && (
         <div className="bg-surface rounded-lg p-4 border border-border">
-          <h2 className="text-sm font-medium mb-4 text-muted">10Y Sovereign Spread vs US Treasury</h2>
+          <h2 className="text-sm font-medium mb-4 text-text-muted">10Y Sovereign Spread vs US Treasury</h2>
           <MultiCountryYieldChart data={foreign_10y} />
         </div>
       )}
@@ -389,7 +389,7 @@ function YieldPageInner() {
 
       {tab === "Real & Breakeven" && (
         <div className="bg-surface rounded-lg p-4 border border-border">
-          <h2 className="text-sm font-medium mb-4 text-muted">TIPS Real Yields by Tenor</h2>
+          <h2 className="text-sm font-medium mb-4 text-text-muted">TIPS Real Yields by Tenor</h2>
           <ResponsiveContainer width="100%" height={280}>
             <BarChart data={real_yields.filter(p => p.yield !== null)}>
               <XAxis dataKey="tenor" tick={{ fontSize: 11 }} />
@@ -408,7 +408,7 @@ function YieldPageInner() {
           {/* 5y5y forward breakeven — the FOMC's preferred anchor measure */}
           {(fwdBreakeven?.history?.length ?? 0) > 0 && (
             <div className="mt-6" data-prov="forward_breakeven_5y5y">
-              <h2 className="text-sm font-medium mb-1 text-muted">5y5y Forward Breakeven Inflation</h2>
+              <h2 className="text-sm font-medium mb-1 text-text-muted">5y5y Forward Breakeven Inflation</h2>
               <p className="text-xs text-text-secondary mb-3">
                 Inflation compensation priced for the five years starting five years out.
                 Because it strips near-term energy passthrough, it is the anchor measure the
@@ -450,7 +450,7 @@ function PolicyTrackerTab() {
   });
   const scope = useSourceScope(provOf(data));
 
-  if (isLoading) return <div className="p-8 text-muted">Loading policy data…</div>;
+  if (isLoading) return <div className="p-8 text-text-muted">Loading policy data…</div>;
   if (error || !data) return <div className="p-8 text-red-400">Failed to load policy data.</div>;
 
   const { divergence, carry_differentials } = data;
@@ -491,12 +491,12 @@ function PolicyTrackerTab() {
       </div>
 
       <UiCard className="p-4">
-        <h2 className="text-sm font-medium mb-4 text-muted">Policy Rate Divergence — All Central Banks</h2>
+        <h2 className="text-sm font-medium mb-4 text-text-muted">Policy Rate Divergence — All Central Banks</h2>
         <PolicyDivergenceTable entries={divergence} />
       </UiCard>
 
       <UiCard className="p-4">
-        <h2 className="text-sm font-medium mb-3 text-muted">G10 Carry Differentials vs USD</h2>
+        <h2 className="text-sm font-medium mb-3 text-text-muted">G10 Carry Differentials vs USD</h2>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
           {Object.entries(carry_differentials).map(([pair, val]) => (
             <div key={pair} className="flex justify-between px-3 py-2 rounded bg-background border border-border/50" data-prov={`carry_differentials.${pair}`} data-prov-ctx={pair}>
@@ -520,7 +520,7 @@ function SovereignRiskTab() {
   });
   const scope = useSourceScope(provOf(data));
 
-  if (isLoading) return <div className="p-8 text-muted">Loading sovereign risk data…</div>;
+  if (isLoading) return <div className="p-8 text-text-muted">Loading sovereign risk data…</div>;
   if (error || !data) return <div className="p-8 text-red-400">Failed to load sovereign data.</div>;
 
   const { countries, top_risk, bottom_risk } = data;
@@ -561,7 +561,7 @@ function SovereignRiskTab() {
       </div>
 
       <UiCard className="p-4">
-        <h2 className="text-sm font-medium mb-4 text-muted">All Countries — Sovereign Risk</h2>
+        <h2 className="text-sm font-medium mb-4 text-text-muted">All Countries — Sovereign Risk</h2>
         <SovereignSpreadTable countries={countries} />
       </UiCard>
     </div>
@@ -576,7 +576,7 @@ function DefaultRiskTab() {
   });
   const scope = useSourceScope(provOf(data));
 
-  if (isLoading) return <div className="p-8 text-muted">Computing sovereign risk scores…</div>;
+  if (isLoading) return <div className="p-8 text-text-muted">Computing sovereign risk scores…</div>;
   if (error || !data) return <div className="p-8 text-red-400">Failed to load default model.</div>;
   if (data.error) return <div className="p-8 text-amber-400">{data.error}</div>;
 
@@ -595,7 +595,7 @@ function DefaultRiskTab() {
 
       {model && (
         <UiCard className="p-4" data-prov="model">
-          <h2 className="text-sm font-medium mb-3 text-muted">Model Summary · {model.nObs} observations</h2>
+          <h2 className="text-sm font-medium mb-3 text-text-muted">Model Summary · {model.nObs} observations</h2>
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
@@ -624,7 +624,7 @@ function DefaultRiskTab() {
       )}
 
       <UiCard className="p-4">
-        <h2 className="text-sm font-medium mb-1 text-muted">Relative Default Risk · sorted by score</h2>
+        <h2 className="text-sm font-medium mb-1 text-text-muted">Relative Default Risk · sorted by score</h2>
         <p className="text-xs text-text-muted mb-3">
           Score 0–100 from a weakly calibrated logistic model (few post-2000 default episodes in its training set).
           Read it as a ranking, not a default probability.
@@ -665,7 +665,7 @@ function DefaultRiskTab() {
 
 export default function YieldPage() {
   return (
-    <Suspense fallback={<div className="p-8 text-muted">Loading…</div>}>
+    <Suspense fallback={<div className="p-8 text-text-muted">Loading…</div>}>
       <YieldPageInner />
     </Suspense>
   );

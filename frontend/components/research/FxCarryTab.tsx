@@ -12,8 +12,8 @@ import { provOf } from "@/lib/provenance";
 import { useRefreshNonce } from "@/lib/refresh";
 
 const tooltipStyle = {
-  backgroundColor: "var(--color-surface-alt)",
-  border: "1px solid var(--color-border)",
+  backgroundColor: "rgb(var(--surface-alt))",
+  border: "1px solid rgb(var(--border))",
   borderRadius: 8,
   fontSize: 12,
 };
@@ -139,9 +139,9 @@ export function FxCarryTab() {
             </div>
             <ResponsiveContainer width="100%" height={300}>
               <LineChart data={backtest.series} margin={{ left: 8, right: 16 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-                <XAxis dataKey="date" tick={{ fontSize: 10, fill: "var(--color-text-muted)" }} minTickGap={48} />
-                <YAxis tick={{ fontSize: 11, fill: "var(--color-text-muted)" }} domain={["auto", "auto"]} />
+                <CartesianGrid strokeDasharray="3 3" stroke="rgb(var(--border))" />
+                <XAxis dataKey="date" tick={{ fontSize: 10, fill: "rgb(var(--text-muted))" }} minTickGap={48} />
+                <YAxis tick={{ fontSize: 11, fill: "rgb(var(--text-muted))" }} domain={["auto", "auto"]} />
                 <Tooltip contentStyle={tooltipStyle} />
                 <Legend wrapperStyle={{ fontSize: 12 }} />
                 <Line type="monotone" dataKey="strategy" name="Carry Basket" stroke="#10b981" dot={false} strokeWidth={2} />

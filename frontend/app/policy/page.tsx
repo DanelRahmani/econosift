@@ -16,9 +16,9 @@ import { useKeyboardShortcuts, tabKeys } from "@/lib/useKeyboardShortcuts";
 function KpiCard({ label, value, sub, prov }: { label: string; value: string; sub?: string; prov?: string }) {
   return (
     <div className="bg-surface rounded-lg p-4 border border-border" data-prov={prov}>
-      <div className="text-xs text-muted mb-1">{label}</div>
+      <div className="text-xs text-text-muted mb-1">{label}</div>
       <div className="text-xl font-semibold">{value}</div>
-      {sub && <div className="text-xs text-muted mt-1">{sub}</div>}
+      {sub && <div className="text-xs text-text-muted mt-1">{sub}</div>}
     </div>
   );
 }
@@ -40,7 +40,7 @@ function PolicyTrackerTab() {
   });
   const scope = useSourceScope(provOf(data));
 
-  if (isLoading) return <div className="p-8 text-muted">Loading policy data…</div>;
+  if (isLoading) return <div className="p-8 text-text-muted">Loading policy data…</div>;
   if (error || !data) return <div className="p-8 text-red-400">Failed to load policy data.</div>;
 
   const { divergence, carry_differentials } = data;
@@ -81,12 +81,12 @@ function PolicyTrackerTab() {
       </div>
 
       <div className="bg-surface rounded-lg p-4 border border-border">
-        <h2 className="text-sm font-medium mb-4 text-muted">Policy Rate Divergence — All Central Banks</h2>
+        <h2 className="text-sm font-medium mb-4 text-text-muted">Policy Rate Divergence — All Central Banks</h2>
         <PolicyDivergenceTable entries={divergence} />
       </div>
 
       <div className="bg-surface rounded-lg p-4 border border-border">
-        <h2 className="text-sm font-medium mb-3 text-muted">G10 Carry Differentials vs USD</h2>
+        <h2 className="text-sm font-medium mb-3 text-text-muted">G10 Carry Differentials vs USD</h2>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
           {Object.entries(carry_differentials).map(([pair, val]) => (
             <div key={pair} className="flex justify-between px-3 py-2 rounded bg-background border border-border/50" data-prov={`carry_differentials.${pair}`} data-prov-ctx={pair}>
@@ -110,7 +110,7 @@ function DefaultRiskTab() {
   });
   const scope = useSourceScope(provOf(data));
 
-  if (isLoading) return <div className="p-8 text-muted">Computing sovereign risk scores…</div>;
+  if (isLoading) return <div className="p-8 text-text-muted">Computing sovereign risk scores…</div>;
   if (error || !data) return <div className="p-8 text-red-400">Failed to load default model.</div>;
   if (data.error) return <div className="p-8 text-amber-400">{data.error}</div>;
 
@@ -151,30 +151,30 @@ function DefaultRiskTab() {
       {/* Model Summary */}
       {model && (
         <div className="bg-surface rounded-lg p-4 border border-border" data-prov="model">
-          <h2 className="text-sm font-medium mb-3 text-muted">Model Summary</h2>
+          <h2 className="text-sm font-medium mb-3 text-text-muted">Model Summary</h2>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
             <div>
-              <div className="text-xs text-muted">Pseudo R²</div>
+              <div className="text-xs text-text-muted">Pseudo R²</div>
               <div className="text-lg font-mono">{model.pseudoR2?.toFixed(3) ?? "—"}</div>
             </div>
             <div>
-              <div className="text-xs text-muted">Observations</div>
+              <div className="text-xs text-text-muted">Observations</div>
               <div className="text-lg font-mono">{model.nObs}</div>
             </div>
             <div>
-              <div className="text-xs text-muted">Converged</div>
+              <div className="text-xs text-text-muted">Converged</div>
               <div className={`text-lg ${model.converged ? "text-green-400" : "text-red-400"}`}>
                 {model.converged ? "Yes" : "No"}
               </div>
             </div>
             <div>
-              <div className="text-xs text-muted">Source</div>
-              <div className="text-xs font-mono mt-1 text-muted">{data.source}</div>
+              <div className="text-xs text-text-muted">Source</div>
+              <div className="text-xs font-mono mt-1 text-text-muted">{data.source}</div>
             </div>
           </div>
 
           {/* Coefficients Table */}
-          <h3 className="text-xs font-medium text-muted mb-2">Coefficients (Logistic Regression)</h3>
+          <h3 className="text-xs font-medium text-text-muted mb-2">Coefficients (Logistic Regression)</h3>
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
@@ -205,7 +205,7 @@ function DefaultRiskTab() {
 
       {/* Country risk score table */}
       <div className="bg-surface rounded-lg p-4 border border-border">
-        <h2 className="text-sm font-medium mb-1 text-muted">
+        <h2 className="text-sm font-medium mb-1 text-text-muted">
           Relative Default Risk (sorted by score)
         </h2>
         <p className="text-xs text-text-muted mb-3">
@@ -256,7 +256,7 @@ function SovereignRiskTab() {
   });
   const scope = useSourceScope(provOf(data));
 
-  if (isLoading) return <div className="p-8 text-muted">Loading sovereign risk data…</div>;
+  if (isLoading) return <div className="p-8 text-text-muted">Loading sovereign risk data…</div>;
   if (error || !data) return <div className="p-8 text-red-400">Failed to load sovereign data.</div>;
 
   const { countries, top_risk, bottom_risk } = data;
@@ -297,7 +297,7 @@ function SovereignRiskTab() {
       </div>
 
       <div className="bg-surface rounded-lg p-4 border border-border">
-        <h2 className="text-sm font-medium mb-4 text-muted">All Countries — Sovereign Risk</h2>
+        <h2 className="text-sm font-medium mb-4 text-text-muted">All Countries — Sovereign Risk</h2>
         <SovereignSpreadTable countries={countries} />
       </div>
     </div>
@@ -333,7 +333,7 @@ function PolicyPageInner() {
 
 export default function PolicyPage() {
   return (
-    <Suspense fallback={<div className="p-8 text-muted">Loading…</div>}>
+    <Suspense fallback={<div className="p-8 text-text-muted">Loading…</div>}>
       <PolicyPageInner />
     </Suspense>
   );

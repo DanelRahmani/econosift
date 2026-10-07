@@ -53,26 +53,26 @@ export function RollingMetrics({ holdings, period }: Props) {
         <p className="text-xs text-text-muted font-medium mb-2">{label}</p>
         <ResponsiveContainer width="100%" height={140}>
           <LineChart data={thin(pts)} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
+            <CartesianGrid strokeDasharray="3 3" stroke="rgb(var(--border))" />
             <XAxis
               dataKey="date"
               tickFormatter={(d) => d.slice(0, 7)}
-              tick={{ fontSize: 10, fill: "var(--color-text-muted)" }}
+              tick={{ fontSize: 10, fill: "rgb(var(--text-muted))" }}
               interval="preserveStartEnd"
               minTickGap={60}
             />
             <YAxis
               dataKey="value"
               tickFormatter={formatter}
-              tick={{ fontSize: 10, fill: "var(--color-text-muted)" }}
+              tick={{ fontSize: 10, fill: "rgb(var(--text-muted))" }}
               width={44}
             />
             <Tooltip
               formatter={(v: number) => [formatter(v), label]}
               labelFormatter={(l) => `Date: ${l}`}
               contentStyle={{
-                backgroundColor: "var(--color-surface-alt)",
-                border: "1px solid var(--color-border)",
+                backgroundColor: "rgb(var(--surface-alt))",
+                border: "1px solid rgb(var(--border))",
                 borderRadius: 8,
                 fontSize: 11,
               }}
@@ -118,7 +118,7 @@ export function RollingMetrics({ holdings, period }: Props) {
 
       {!loading && data && (
         <div className="space-y-3">
-          {miniChart(data.sharpe, "Rolling Sharpe", "var(--color-accent)", (v) => v.toFixed(2), "sharpe")}
+          {miniChart(data.sharpe, "Rolling Sharpe", "rgb(var(--primary))", (v) => v.toFixed(2), "sharpe")}
           {miniChart(data.volatility, "Rolling Volatility (ann.)", "#f59e0b", (v) => `${(v * 100).toFixed(1)}%`, "volatility")}
           {miniChart(data.beta, "Rolling Beta", "#6366f1", (v) => v.toFixed(2), "beta")}
         </div>
