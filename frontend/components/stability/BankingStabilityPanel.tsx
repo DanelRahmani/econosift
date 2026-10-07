@@ -93,16 +93,16 @@ export function BankingStabilityPanel() {
         </Card>
       )}
 
-      {/* Capital Adequacy + Z-Score Grid */}
+      {/* Capital-to-assets + Z-Score Grid */}
       <div className="grid md:grid-cols-2 gap-4">
         {countries.length > 0 && (
-          <Card className="p-4" data-prov={`countries.${countries[0].iso2}.kpis.capitalAdequacy`} data-prov-ctx="Bank capital to assets, all countries (source shown for the first country; period varies)">
-            <h3 className="font-semibold mb-1">Bank Capital to Assets Ratio (%)</h3>
+          <Card className="p-4" data-prov={`countries.${countries[0].iso2}.kpis.capitalToAssets`} data-prov-ctx="Bank capital to assets, all countries (source shown for the first country; period varies)">
+            <h3 className="font-semibold mb-1">Bank capital to assets (%)</h3>
             <p className="text-xs text-text-secondary mb-3">Green &gt;8% · Yellow 6–8% · Red &lt;6%</p>
             <ResponsiveContainer width="100%" height={Math.max(280, countries.length * 22)}>
               <BarChart
-                data={countries.filter(c => c.kpis.capitalAdequacy != null).map(c => ({
-                  name: c.name, value: c.kpis.capitalAdequacy ?? 0,
+                data={countries.filter(c => c.kpis.capitalToAssets != null).map(c => ({
+                  name: c.name, value: c.kpis.capitalToAssets ?? 0,
                 }))}
                 layout="vertical" margin={{ left: 100, right: 40 }}
               >

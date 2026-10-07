@@ -4,7 +4,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from datetime import date, datetime
+from datetime import datetime
 
 import pandas as pd
 
@@ -161,18 +161,21 @@ def _fetch_recession_dates_sync() -> list[dict]:
         periods: list[dict] = []
         in_recession = False
         rec_start: str | None = None
+        last_date: str | None = None
         for idx, val in s.items():
             v = int(val) if not pd.isna(val) else 0
             d = str(idx.date()) if hasattr(idx, "date") else str(idx)[:10]
+            last_date = d
             if v == 1 and not in_recession:
                 in_recession = True
                 rec_start = d
             elif v == 0 and in_recession:
                 in_recession = False
                 periods.append({"start": rec_start, "end": d})
-        # If still in recession at end of data
+        # Still in recession at the end of the data: end at the last observed
+        # recession month, not today's date (which is not an observation).
         if in_recession and rec_start:
-            periods.append({"start": rec_start, "end": str(date.today())})
+            periods.append({"start": rec_start, "end": last_date, "ongoing": True})
         return periods
     except Exception as exc:
         log.warning("fetch_recession_dates error: %s", exc)

@@ -228,6 +228,18 @@ def get_sector_fundamentals() -> list[dict]:
     return results
 
 
+def _phase_confidence(phase_scores: dict[str, float], implied_phase: str) -> int | None:
+    """Winning phase's share of the total positive phase score, as a percent.
+
+    None when no phase scores above zero. (The winner's score over the highest
+    score is always 100, so it carried no information.)
+    """
+    total = sum(max(s, 0.0) for s in phase_scores.values())
+    if total <= 0:
+        return None
+    return round(max(phase_scores[implied_phase], 0.0) / total * 100)
+
+
 @cached("sector_rotation")
 def get_sector_rotation() -> dict:
     returns_data = get_sector_returns()
@@ -254,9 +266,8 @@ def get_sector_rotation() -> dict:
                 score += positional_weight * (n - rank + 1)
         phase_scores[phase] = score
 
-    max_score = max(phase_scores.values()) if phase_scores else 1.0
     implied_phase = max(phase_scores, key=lambda p: phase_scores[p]) if phase_scores else "Mid"
-    confidence = round((phase_scores[implied_phase] / max_score) * 100) if max_score > 0 else 0
+    confidence = _phase_confidence(phase_scores, implied_phase) if phase_scores else None
 
     # Cross-validate with macro regime
     regime_quadrant: str | None = None
@@ -309,9 +320,11 @@ def _rotation_provenance() -> dict:
             "for each phase (Early, Mid, Late, Recession) score = Σ over its four hard-coded leader sectors of "
             "(4 − position) × (11 − rank + 1), rank = 3-month vs-SPY rank; the highest-scoring phase wins",
             [ranks], title="Implied cycle phase"),
-        "confidence": pv.derived("winning phase score / highest phase score × 100", ["phase"],
+        "confidence": pv.derived("100 × winning phase score / sum of the positive phase scores, rounded; "
+                                 "null when no phase scores above zero", ["phase"],
                                  title="Phase confidence",
-                                 note="The winner is the highest score, so this is 100 whenever any phase scores."),
+                                 note="The winning phase's share of the total score across the four phases, "
+                                      "not a probability."),
         "regimeQuadrant": pv.derived(
             "US macro quadrant: real GDP growth (year over year) vs 2.0% and CPI inflation (year over year) vs 2.5%",
             [pv.fred("GDPC1", "Real gross domestic product", frequency="quarterly"),

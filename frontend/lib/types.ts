@@ -980,7 +980,7 @@ export interface EmploymentData {
     indProd: MacroTimeSeries[];
     capUtil: MacroTimeSeries[];
   };
-  recessionPeriods: { start: string; end: string }[];
+  recessionPeriods: { start: string; end: string; ongoing?: boolean }[];
 }
 
 // Housing
@@ -998,7 +998,7 @@ export interface HousingData {
     mortgageRate: MacroTimeSeries[];
     existingHomeSales: MacroTimeSeries[];
   };
-  recessionPeriods: { start: string; end: string }[];
+  recessionPeriods: { start: string; end: string; ongoing?: boolean }[];
 }
 
 // BIS Global Housing (Phase 25)
@@ -1164,7 +1164,7 @@ export interface RecessionProbabilityData {
     sahm: MacroTimeSeries[];
     smoothedProb: MacroTimeSeries[];
   };
-  recessions?: { start: string; end: string }[];
+  recessions?: { start: string; end: string; ongoing?: boolean }[];
   model?: { alpha: number | null; beta: number | null; nObs: number; note?: string };
 }
 
@@ -1800,7 +1800,8 @@ export interface SectorBubble {
 }
 export interface SectorRotationResponse {
   phase: "Early" | "Mid" | "Late" | "Recession";
-  confidence: number;
+  /** Winning phase's share of the positive phase score (%); null when no phase scores. */
+  confidence: number | null;
   regimePhase: string | null;
   regimeQuadrant: string | null;
   sectors: SectorBubble[];
@@ -2518,6 +2519,8 @@ export interface GlobalYieldCountry {
   spread_vs_jp: number | null;
   real_yield: number | null;
   inflation: number | null;
+  /** CPI observation behind `inflation`: "monthly YYYY-MM" (BIS) or "annual YYYY" (World Bank). */
+  cpiBasis?: string | null;
 }
 export interface YieldCurvesData {
   us_curve: {

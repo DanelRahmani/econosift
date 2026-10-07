@@ -254,7 +254,7 @@ function GlobalYieldsTab({ data: countries }: { data: GlobalYieldCountry[] }) {
       <UiCard className="p-4 overflow-x-auto">
         <h3 className="font-semibold mb-3">Global 10Y Government Bond Yields &amp; Spreads</h3>
         <p className="text-xs text-text-secondary mb-4">
-          Real yield = nominal 10Y − latest CPI inflation (World Bank). Sorted by nominal yield.
+          Real yield = nominal 10Y − latest CPI inflation (monthly BIS year-on-year when available, otherwise the World Bank annual average; hover a CPI cell for the observation used). Sorted by nominal yield.
         </p>
         <table className="w-full text-sm">
           <thead>
@@ -278,7 +278,7 @@ function GlobalYieldsTab({ data: countries }: { data: GlobalYieldCountry[] }) {
                 <td data-prov={`global_yields.${c.iso2}.real_yield`} className={`py-2 px-2 text-right font-mono ${(c.real_yield ?? 0) < -1 ? "text-red-400" : (c.real_yield ?? 0) > 2 ? "text-green-400" : ""}`}>
                   {fmtPct(c.real_yield)}
                 </td>
-                <td data-prov={`global_yields.${c.iso2}.inflation`} className="py-2 px-2 text-right font-mono text-text-secondary">{fmtPct(c.inflation)}</td>
+                <td data-prov={`global_yields.${c.iso2}.inflation`} title={c.cpiBasis ? `CPI: ${c.cpiBasis}` : undefined} className="py-2 px-2 text-right font-mono text-text-secondary">{fmtPct(c.inflation)}</td>
                 <td data-prov={`global_yields.${c.iso2}.spread_vs_us`} className={`py-2 px-2 text-right font-mono ${(c.spread_vs_us ?? 0) > 3 ? "text-red-400" : ""}`}>
                   {fmt(c.spread_vs_us)}
                 </td>

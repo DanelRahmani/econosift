@@ -171,12 +171,23 @@ def _provenance(data: dict, cpi_map: dict) -> dict:
         prov[row] = pv.fred(sid, f"{info['name']} 10-year government bond yield (OECD)", units="percent",
                             frequency="monthly", observed=obs, flags=flags,
                             note="OECD monthly average; history holds the last 60 monthly values.")
-        prov[f"{row}.inflation"] = pv.ref(
-            "worldbank", atlas_service._WB_CODES["inflation"], "Inflation, consumer prices (annual %)",
-            units="% per year", frequency="annual",
-            note="Latest annual value within the last three calendar years; the year is not returned per country.")
+        cpi_obs = cpi_map.get(iso2)
+        basis = cpi_obs["basis"] if cpi_obs else None
+        if basis and basis.startswith("monthly"):
+            prov[f"{row}.inflation"] = pv.ref(
+                "bis", "WS_LONG_CPI", "Consumer prices, year-on-year change", units="% per year",
+                frequency="monthly", observed=basis.split(" ", 1)[1],
+                note=f"Basis: {basis} (latest monthly year-on-year print).")
+        else:
+            prov[f"{row}.inflation"] = pv.ref(
+                "worldbank", atlas_service._WB_CODES["inflation"], "Inflation, consumer prices (annual %)",
+                units="% per year", frequency="annual",
+                observed=basis.split(" ", 1)[1] if basis else None,
+                note=(f"Basis: {basis} (World Bank annual average; no newer monthly CPI was available)."
+                      if basis else "No CPI inflation observation available."))
         prov[f"{row}.real_yield"] = pv.derived(
-            "10y nominal yield - latest annual CPI inflation (ex-post, backward-looking; "
+            "10y nominal yield - latest CPI year-on-year inflation (monthly BIS when available, else World Bank "
+            "annual; the observation used is in cpiBasis; ex-post, backward-looking; "
             "not a market TIPS real yield)", [row, f"{row}.inflation"],
             title=f"{info['name']} ex-post real 10y yield")
         for other, label in (("us", "DGS10"), ("de", "German 10y yield"), ("jp", "Japanese 10y yield")):
@@ -191,22 +202,52 @@ async def _fetch_series() -> dict:
     return await mes.fetch_fred_series(_ALL_SERIES, start=_START)
 
 
-async def _get_cpi_map() -> dict[str, float | None]:
-    """Fetch latest annual CPI inflation for all yield countries via World Bank.
-    Returns {iso2: latest_inflation_pct or None}."""
+def _fetch_monthly_cpi_sync() -> dict[str, tuple[str, float]]:
+    """Latest monthly CPI year-on-year (BIS WS_LONG_CPI, as source_bis.cpi_yoy) for
+    every yield country from ONE download: {iso2: ("YYYY-MM", yoy_pct)}."""
+    from ..sources import source_bis
+    df = source_bis._fetch_bis_zip("cpi")
+    if df is None:
+        return {}
+    col_measure = next(c for c in df.columns if "MEASURE" in c.upper())
+    df = df[df[col_measure].str.startswith("771:", na=False)]
+    parsed = source_bis._parse_bis_flat(df, freq="M")
+    parsed = parsed[parsed["iso2"].isin(list(_FOREIGN))]
+    out: dict[str, tuple[str, float]] = {}
+    for iso2, grp in parsed.groupby("iso2"):
+        last = grp.iloc[-1]  # sorted by period
+        out[str(iso2)] = (str(last["period"]), float(last["value"]))
+    return out
+
+
+async def _fetch_monthly_cpi() -> dict[str, tuple[str, float]]:
+    try:
+        return await asyncio.to_thread(_fetch_monthly_cpi_sync)
+    except Exception:
+        log.warning("Failed to fetch monthly BIS CPI for real yields", exc_info=True)
+        return {}
+
+
+async def _get_cpi_map() -> dict[str, dict | None]:
+    """Latest CPI inflation per yield country: the latest monthly year-on-year (BIS)
+    when it is at least as recent as the World Bank annual value, else the annual value.
+    Returns {iso2: {"value": pct, "basis": "monthly YYYY-MM" | "annual YYYY"} or None}."""
     try:
         cur_year = datetime.now().year
         wb_inf = await atlas_service._wb_timeline("inflation", cur_year - 3, cur_year - 1)
     except Exception:
         log.warning("Failed to fetch WB CPI for real yields", exc_info=True)
-        return {}
-    cpi_map: dict[str, float | None] = {}
+        wb_inf = {}
+    monthly = await _fetch_monthly_cpi()
+    cpi_map: dict[str, dict | None] = {}
     for iso2 in _FOREIGN:
-        iso3 = _iso2_to_iso3(iso2)
-        year_map = wb_inf.get(iso3, {})
-        if year_map:
-            latest_yr = max(year_map)
-            cpi_map[iso2] = round(float(year_map[latest_yr]), 2)
+        year_map = wb_inf.get(_iso2_to_iso3(iso2), {})
+        annual_yr = max(year_map) if year_map else None
+        m = monthly.get(iso2)
+        if m and (annual_yr is None or int(m[0][:4]) >= annual_yr):
+            cpi_map[iso2] = {"value": round(float(m[1]), 2), "basis": f"monthly {m[0]}"}
+        elif annual_yr is not None:
+            cpi_map[iso2] = {"value": round(float(year_map[annual_yr]), 2), "basis": f"annual {annual_yr}"}
         else:
             cpi_map[iso2] = None
     return cpi_map
@@ -291,7 +332,8 @@ async def get_yield_curves() -> dict:
         fred_sid = info["fred"]
         series = data.get(fred_sid, [])
         nominal = _latest(series)
-        cpi = cpi_map.get(iso2)
+        cpi_obs = cpi_map.get(iso2)
+        cpi = cpi_obs["value"] if cpi_obs else None
         real = round(nominal - cpi, 2) if nominal is not None and cpi is not None else None
         spread_us = round(nominal - dgs10, 2) if nominal is not None and dgs10 is not None else None
         spread_de = round(nominal - de_yield, 2) if nominal is not None and de_yield is not None else None
@@ -302,10 +344,10 @@ async def get_yield_curves() -> dict:
             "iso2": iso2, "name": info["name"],
             # Monthly OECD average vs the daily US yield: dated so the lag is visible.
             "yieldAsOf": history_vals[-1]["date"][:10] if history_vals else None,
-            # Ex-post: nominal minus the latest *annual* CPI (backward-looking),
-            # not a market (TIPS-style) real yield.
-            "yield_10y": nominal, "real_yield": real, "realYieldBasis": "ex-post (nominal − latest annual CPI)",
-            "inflation": cpi,
+            # Ex-post: nominal minus the latest CPI year-on-year (backward-looking),
+            # not a market (TIPS-style) real yield. cpiBasis names the observation used.
+            "yield_10y": nominal, "real_yield": real, "realYieldBasis": "ex-post (nominal − latest CPI inflation)",
+            "inflation": cpi, "cpiBasis": cpi_obs["basis"] if cpi_obs else None,
             "spread_vs_us": spread_us, "spread_vs_de": spread_de, "spread_vs_jp": spread_jp,
             "history": history,
         })

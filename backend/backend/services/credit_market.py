@@ -45,6 +45,12 @@ def _last_obs(series: list[dict]) -> str | None:
     return None
 
 
+def _splice_date(ted: list[dict]) -> str | None:
+    """Last date with a TEDRATE observation: the funding-spread series switches
+    to SOFR - DTB3 after it."""
+    return _last_obs(ted)
+
+
 def _provenance(data: dict) -> dict:
     """Source map for the credit pulse (see provenance.py)."""
     obs = {sid: _last_obs(data.get(sid, [])) for sid in _SERIES}
@@ -60,6 +66,8 @@ def _provenance(data: dict) -> dict:
                                              observed=obs[sid])
     both = [d for d in (obs["SOFR"], obs["DTB3"]) if d]
     older = min(both) if len(both) == 2 else None
+    splice_date = _splice_date(data.get("TEDRATE", []))
+    splice = f"TEDRATE to {splice_date}" if splice_date else "TEDRATE (no observations)"
     prov["current.funding_spread"] = pv.derived(
         "SOFR - DTB3 (secured overnight financing rate minus 3-month T-bill secondary-market rate), "
         "latest value of each", [pv.fred("SOFR", "Secured Overnight Financing Rate", units="percent",
@@ -68,7 +76,7 @@ def _provenance(data: dict) -> dict:
                                          units="percent", frequency="daily", observed=obs["DTB3"])],
         title="Funding spread", observed=older)
     prov["history.funding_spread"] = pv.derived(
-        "TEDRATE where it exists (to Jan 2022), otherwise SOFR - DTB3 on dates where both exist. "
+        f"{splice}, then SOFR − DTB3 on later dates where both exist. "
         "The two definitions differ, so the series is spliced, not continuous.",
         [pv.fred("TEDRATE", "TED spread (3-month LIBOR minus 3-month T-bill)", units="percent",
                  frequency="daily", observed=obs["TEDRATE"], flags=["stale"],
@@ -136,6 +144,7 @@ async def get_credit_pulse() -> dict:
             "bbb_spread": [p for p in bbb if p.get("value") is not None],
             "funding_spread": fund_hist,
         },
+        "fundingSpreadSplice": _splice_date(ted),
         "signals": {
             "ig_oas": _signal(ig_cur, 0.8, _IG_WIDE),
             "hy_oas": _signal(hy_cur, 3.0, _HY_STRESS),

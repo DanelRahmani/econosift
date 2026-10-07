@@ -775,8 +775,8 @@ async def housing(country: str = Query("US", description="ISO2 country code (FRE
         prov["recessionPeriods"] = pv.fred(
             "USREC", _FRED_META["USREC"][0], units="0/1 indicator", frequency="monthly",
             transform="runs of months flagged 1 become {start, end} periods",
-            note=("The end of a recession still in progress is shown as the day the request was served."
-                  if recessions[-1].get("end") == str(date.today()) else None))
+            note=("The end of a recession still in progress is its last month flagged 1 in USREC."
+                  if recessions[-1].get("ongoing") else None))
     return pv.attach(result, prov)
 
 
@@ -1349,7 +1349,7 @@ async def financial_conditions(country: str = Query("US", description="ISO2 coun
         for p in fed_bs_raw if p.get("value") is not None
     ]
     # BUSLOANS is in billions USD → convert to trillions
-    ci_raw = data.get("BUSLOANS", data.get("TOTCI", []))
+    ci_raw = data.get("BUSLOANS", [])
     ci_loans = [
         {"date": p["date"], "value": round(p["value"] / 1_000, 4)}
         for p in ci_raw if p.get("value") is not None
