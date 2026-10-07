@@ -99,3 +99,20 @@ def test_clear_all_called_for_three_caches_only_when_rows_deleted(db, monkeypatc
     _patch_members(monkeypatch, {"dow": ["AAPL"], "ndx": ["MSFT"], "sp500": ["AAPL"]})
     assert screener_service.prune_non_members() == 2
     assert sorted(calls) == ["sector_fundamentals", "snowflake_batch", "snowflake_full"]
+
+
+def test_refresh_universe_prunes_after_writing(db, monkeypatch):
+    """A rebuild through refresh_universe (the path a long-running container uses)
+    prunes too, not only the startup warm (spec review of P2-41)."""
+    import pandas as pd
+
+    _patch_members(monkeypatch, {"dow": ["AAPL"], "ndx": ["MSFT"], "sp500": ["AAPL", "MSFT"]})
+    _record_clear_all(monkeypatch)
+    yfs = screener_service.yfs
+    monkeypatch.setattr(yfs, "get_close_frame", lambda syms, period: pd.DataFrame())
+    monkeypatch.setattr(yfs, "get_volume_frame", lambda syms, period: pd.DataFrame())
+    monkeypatch.setattr(yfs, "get_info", lambda sym: {"info": {}, "financials": {}, "balance_sheet": {}, "cashflow": {}})
+
+    screener_service.refresh_universe("dow")
+    # ZS and INSM are in no tracked index, so the rebuild removed them.
+    assert _symbols() == {"AAPL", "MSFT"}

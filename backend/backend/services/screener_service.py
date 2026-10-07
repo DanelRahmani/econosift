@@ -765,6 +765,12 @@ def refresh_universe(index: str) -> int:
 
         screener_cache.upsert_rows(rows_to_upsert)
         screener_cache.upsert_shares(shares_to_upsert)
+        # Every rebuild prunes symbols that left all tracked indices (P2-41), not
+        # only the startup warm: a long-running container refreshes via this path.
+        try:
+            prune_non_members()
+        except Exception:
+            logger.warning("screener: prune_non_members failed", exc_info=True)
         return len(rows_to_upsert)
 
     except Exception:
