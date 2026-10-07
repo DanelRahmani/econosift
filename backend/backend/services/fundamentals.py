@@ -447,14 +447,17 @@ def _gnp_price_index_cached() -> float | None:
     return float(pts[-1]["value"]) / (sum(base) / len(base)) * 100.0
 
 
-def _statements_to_usd(bundle: dict) -> tuple[float | None, str]:
-    """(USD per statement-currency unit, that currency); the rate is None when no FX rate exists."""
+def _statements_to_usd(bundle: dict) -> tuple[float | None, str | None]:
+    """(USD per statement-currency unit, that currency); the rate is None when no FX rate exists
+    or no currency is known (then the currency is None too: it is never assumed to be USD)."""
     info = bundle.get("info") or {}
     fx = bundle.get("_fx") or {}  # a bundle already converted by dcf_engine.to_price_currency
     # When the conversion's FX lookup failed (rate None) the statements are still in the source currency.
     ccy = (fx.get("to") if fx.get("rate") is not None else fx.get("from"))         or info.get("financialCurrency") or info.get("currency")
-    if not ccy or ccy == "USD":
-        return 1.0, ccy or "USD"
+    if not ccy:
+        return None, None
+    if ccy == "USD":
+        return 1.0, "USD"
     from .dcf_engine import _fx_rate
     return _fx_rate(ccy, "USD"), ccy
 
@@ -508,6 +511,9 @@ def ohlson_o(bundle: dict) -> dict:
     if price_index is None or total_assets <= 0:
         return {"oScore": None, "probDefault": None}
     to_usd, ccy = _statements_to_usd(bundle)
+    if ccy is None:
+        return {"oScore": None, "probDefault": None,
+                "reason": "Yahoo reported no quote currency, so total assets cannot be expressed in US dollars"}
     if to_usd is None:
         return {"oScore": None, "probDefault": None,
                 "reason": f"No {ccy}/USD exchange rate available to express total assets in US dollars"}

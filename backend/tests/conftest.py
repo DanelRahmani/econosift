@@ -56,3 +56,12 @@ def _offline_gnp_price_index(monkeypatch):
     """
     from backend.services import fundamentals
     monkeypatch.setattr(fundamentals, "_gnp_price_index", lambda: 660.0)
+
+
+@pytest.fixture(autouse=True)
+def _offline_technicals_currency(request, monkeypatch):
+    """get_technicals reads the quote currency from Yahoo; the technicals indicator
+    tests don't test it, so keep them offline (test_valuation_p64 covers it)."""
+    if request.module.__name__.split(".")[-1].startswith("test_technicals"):
+        from backend.services import technicals_service
+        monkeypatch.setattr(technicals_service, "_quote_currency", lambda ticker: None)

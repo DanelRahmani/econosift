@@ -213,6 +213,15 @@ def _fib_levels(swing_high: float, swing_low: float, direction: str = "upswing")
     return levels
 
 
+def _quote_currency(ticker: str) -> str | None:
+    """Yahoo quote currency from the cached quote helper; None when unknown (never assumed USD)."""
+    from . import yfinance_service as yfs
+    try:
+        return (yfs.get_quote(ticker) or {}).get("currency") or None
+    except Exception:
+        return None
+
+
 @cached("technicals")
 def get_technicals(ticker: str, period: str = "1y") -> dict:
     """Fetch OHLCV and compute full technical indicator suite.
@@ -532,6 +541,7 @@ def get_technicals(ticker: str, period: str = "1y") -> dict:
 
     return pv.attach({
         "ticker": ticker,
+        "currency": _quote_currency(ticker),
         "period": period,
         "asOf": str(df.index[-1].date()),
         "summary": {
@@ -653,7 +663,7 @@ def _append_rsi_manual(df: pd.DataFrame) -> None:
 
 def _empty_response(ticker: str, period: str) -> dict:
     return {
-        "ticker": ticker, "period": period, "asOf": None,
+        "ticker": ticker, "currency": None, "period": period, "asOf": None,
         "summary": {"trend": "N/A", "rsi": None, "macdSignal": "N/A",
                     "volumeVs20d": None, "week52Position": None,
                     "week52High": None, "week52Low": None, "bbSqueeze": False},

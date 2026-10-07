@@ -29,7 +29,7 @@ export function EconoSiftGauge({
 }: {
   composite: CompositeFairValue;
   spotPrice: number | null;
-  currency: string;
+  currency: string | null;
 }) {
   const { theme } = useTheme();
   const sym = currencySymbol(currency);

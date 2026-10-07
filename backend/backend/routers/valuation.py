@@ -45,12 +45,13 @@ def _kpis(info: dict, bundle: dict | None = None) -> dict:
         "bookValue": mm["values"]["bookValue"],
         "evToFcf": mm["values"]["evToFcf"],
         "fcfYield": mm["values"]["fcfYield"],
-        "unavailable": {k: v for k, v in mm["unavailable"].items() if k in ("evToFcf", "fcfYield", "bookValue")},
+        "unavailable": {**{k: v for k, v in mm["unavailable"].items() if k in ("evToFcf", "fcfYield", "bookValue")},
+                        **({} if g("currency") else {"currency": "Yahoo reported no quote currency"})},
         "shortPercentOfFloat": g("shortPercentOfFloat"),
         "shortRatio": g("shortRatio"),
         "sector": g("sector"),
         "industry": g("industry"),
-        "currency": g("currency") or "USD",
+        "currency": g("currency") or None,
     }
 
 
@@ -118,7 +119,8 @@ async def capm_dcf(
             "trailingPE": info.get("trailingPE"),
             "spotPrice": spot,
             "dcfTarget": target,
-            "currency": info.get("currency") or "USD",
+            "currency": info.get("currency") or None,
+            **({} if info.get("currency") else {"unavailable": {"currency": "Yahoo reported no quote currency"}}),
             "signal": _signal(spot, target, expected_return),
         })
 
@@ -298,7 +300,7 @@ def _kpi_provenance(sym: str, kpis: dict, beta_injected: bool, cross_currency: b
     prov["kpis.forwardEps"] = y("forwardEps", note=eps_note)
     prov["kpis.dividendYield"] = y("dividendYield", units="percent (0.98 = 0.98%)")
     prov["kpis.averageVolume"] = y("averageVolume (else averageDailyVolume10Day)", units="shares")
-    prov["kpis.currency"] = y("currency (USD if missing)")
+    prov["kpis.currency"] = y("currency")
     fx_note = ("Statements are reported in a different currency from the price, so free cash flow, debt and "
                "cash are converted to the price currency first and EV = market cap + debt − cash."
                if cross_currency else None)

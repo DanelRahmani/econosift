@@ -175,7 +175,7 @@ class _Ctx:
                         self.shares, implied, ratio,
                     )
                     self.shares = implied
-        self.currency: str = self.info.get("currency") or "USD"
+        self.currency: str | None = self.info.get("currency") or None  # unknown stays None; wacc() explains why
         self.ticker: str = bundle.get("ticker") or ""
         self.sector: str | None = self.info.get("sector")
 
@@ -298,7 +298,7 @@ def _model_ddm(ctx: _Ctx) -> dict:
     if g < 0 or ke <= g:
         return _locked_model(NAME, f"Growth ({g:.4f}) ≥ cost of equity ({ke:.4f}) — Gordon Growth undefined")
 
-    d1 = div_rate * (1.0 + g)
+    d1 = div_rate  # Yahoo's dividendRate is the forward annual dividend: already D1, not D0
     value = d1 / (ke - g)
 
     return _ok_model(NAME, value, {
@@ -912,7 +912,7 @@ def provenance(bundle: dict, result: dict, beta: float | None, root: str = "valu
                           note="Static snapshot bundled with the app: median of Damodaran's US industry multiples "
                                "mapped to sectors.")
     formulas = {
-        "DDM (Gordon Growth)": ("D1 / (ke − g), D1 = dividendRate × (1 + g), g = (1 − payout ratio) × ROE (ROE capped at 25%), "
+        "DDM (Gordon Growth)": ("D1 / (ke − g), D1 = dividendRate (Yahoo's forward annual rate), g = (1 − payout ratio) × ROE (ROE capped at 25%), "
                                 "capped at the risk-free rate and at ke − 0.5pp; earnings growth is not used",
                                 [y("dividendRate"), ke, y("returnOnEquity"), y("payoutRatio"),
                                  k("wacc", "riskFree")]),

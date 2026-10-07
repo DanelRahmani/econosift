@@ -126,7 +126,7 @@ class TestKoreaMapping:
 
     def test_samsung_wacc_uses_korean_erp_and_tax(self, dr, static_erp, monkeypatch):
         monkeypatch.setattr(dr, "_risk_free_rate_live", lambda: 0.04)
-        bundle = {"info": {"exchange": "KSC", "marketCap": 1_000.0, "totalDebt": 0}}
+        bundle = {"info": {"exchange": "KSC", "marketCap": 1_000.0, "totalDebt": 0, "currency": "USD"}}  # currency is no longer assumed (P2-34); USD keeps the stubbed rf
         w = dr.wacc(bundle, beta=1.0)
         # Korea: ERP 4.869 % (the US is 4.46 %), statutory tax 26.4 % (US fallback was 21 %)
         assert w["country"] == "Korea"

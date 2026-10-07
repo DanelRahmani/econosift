@@ -13,7 +13,7 @@ export interface Quote {
   symbol: string;
   price: number | null;
   changePercent: number | null;
-  currency: string;
+  currency: string | null;
   name: string;
 }
 
@@ -48,7 +48,7 @@ export interface Valuation {
   trailingPE: number | null;
   spotPrice: number | null;
   dcfTarget: number | null;
-  currency: string;
+  currency: string | null;
   signal: "BUY" | "OVERVALUED" | "FAIR VALUE" | "INCOMPLETE";
 }
 
@@ -143,7 +143,7 @@ export interface DcfSensitivity {
 }
 export interface DcfResponse {
   ticker: string;
-  currency: string;
+  currency: string | null;
   spotPrice: number | null;
   intrinsicValue: number | null;
   upsidePct: number | null;
@@ -244,7 +244,7 @@ export interface CompositeFairValue {
 }
 export interface ValuationCore {
   ticker: string;
-  currency: string;
+  currency: string | null;
   spotPrice: number | null;
   wacc: WaccInfo;
   models: ValModel[];
@@ -269,7 +269,7 @@ export interface Fundamentals {
 }
 export interface AnalystData {
   ticker: string;
-  currency: string;
+  currency: string | null;
   price: number | null;
   priceTarget: {
     meanPrice: number | null; highPrice: number | null; lowPrice: number | null;
@@ -303,7 +303,7 @@ export interface ValuationKpis {
   shortRatio: number | null;
   sector: string | null;
   industry: string | null;
-  currency: string;
+  currency: string | null;
   /** Null KPIs that could not be computed honestly (e.g. no FX rate for an ADR), with the reason. */
   unavailable?: Record<string, string>;
 }
@@ -2042,6 +2042,8 @@ export interface PriceOHLCV {
 
 export interface TechnicalsResponse {
   ticker: string;
+  /** Quote currency reported by Yahoo; null when it reported none (never assumed USD). */
+  currency?: string | null;
   period: string;
   asOf: string | null;
   summary: TechnicalSummary;

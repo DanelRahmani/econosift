@@ -227,6 +227,7 @@ export function ValuationKpiPanel({ kpis, wacc, fundamentals }: Props) {
     const r = naReasonOf(key, v);
     return r ? [[label, r] as [string, string]] : [];
   });
+  if (!kpis.currency && kpis.unavailable?.currency) unavailableNotes.push(["Currency", kpis.unavailable.currency]);
 
   // ── 52-week range string ──────────────────────────────────────────────────
   const rangeStr =

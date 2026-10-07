@@ -48,7 +48,7 @@ def _make_bundle(
     operating_cf: float | None = 16_000,
 ) -> dict:
     """Construct a synthetic yfinance-style bundle."""
-    info: dict = {}
+    info: dict = {"currency": "USD"}  # an unknown quote currency is no longer assumed to be USD (P2-34)
     if effectiveTaxRate is not None:
         info["effectiveTaxRate"] = effectiveTaxRate
     if totalDebt is not None:

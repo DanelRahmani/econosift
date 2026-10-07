@@ -246,7 +246,7 @@ def get_quote(ticker: str) -> dict:
         info = {}
     price = _safe(info, "last_price") or _safe(info, "lastPrice")
     prev = _safe(info, "previous_close") or _safe(info, "previousClose")
-    currency = _safe(info, "currency") or "USD"
+    currency = _safe(info, "currency") or None  # unknown stays None; never assumed USD
 
     # Change % = last daily bar vs the one before (the Treemap's 1d rule), not fast_info.previous_close, which
     # Yahoo gets wrong (AAPL +0.85 % vs +1.10 %). Market open: the last bar is today's live bar, so the quote is
