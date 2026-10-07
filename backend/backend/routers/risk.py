@@ -53,7 +53,7 @@ _EXTENDED_FORMULAS = {
     "annReturn": ("mean daily log return × 252", ["prices.{s}"]),
     "annVolatility": ("sample std of daily log returns × √252", ["prices.{s}"]),
     "maxDrawdown": ("worst (adjusted close ÷ running peak − 1) over the whole period", ["prices.{s}"]),
-    "calmar": ("annReturn ÷ |maxDrawdown|", ["prices.{s}"]),
+    "calmar": ("CAGR from the first and last adjusted close ((last ÷ first)^(252 ÷ sessions) − 1) ÷ |maxDrawdown|", ["prices.{s}"]),
     "omega": ("mean(max(r − rf/252, 0)) ÷ mean(max(rf/252 − r, 0)) of daily log returns", ["prices.{s}", "riskFree"]),
     "beta": ("cov(daily log return, benchmark daily log return) ÷ var(benchmark), on shared dates",
              ["prices.{s}", "prices.{b}"]),

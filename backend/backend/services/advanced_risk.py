@@ -155,10 +155,11 @@ def extended_metrics(
     dd = (prices - cummax) / cummax
     max_dd = float(dd.min()) if len(dd) else None
 
-    # Calmar ratio
+    # Calmar ratio: CAGR from the price path (not the log-mean x 252) over |max drawdown|
     calmar = None
-    if max_dd and max_dd != 0:
-        calmar = ann_ret / abs(max_dd)
+    if max_dd and max_dd != 0 and len(prices) >= 2 and prices.iloc[0] > 0 and prices.iloc[-1] > 0:
+        cagr = (prices.iloc[-1] / prices.iloc[0]) ** (TRADING_DAYS / (len(prices) - 1)) - 1
+        calmar = cagr / abs(max_dd)
 
     # Omega ratio: E[max(r-rf,0)] / E[max(rf-r,0)]
     rf_d = _rf_daily(rf_annual)

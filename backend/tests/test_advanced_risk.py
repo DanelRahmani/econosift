@@ -249,3 +249,20 @@ def test_monte_carlo_var_scales_with_confidence():
     if not out or out.get("var95") is None:
         pytest.skip("monte_carlo_var unavailable")
     assert out["var99"] <= out["var95"]
+
+
+def test_calmar_uses_cagr_over_max_drawdown():
+    # 505 prices = 504 returns = 2 years. Path: 100 -> 125, then down to 100
+    # (max drawdown = 100/125 - 1 = -20%), then up to 121.
+    # CAGR = 1.21 ** (252/504) - 1 = 0.10; Calmar = 0.10 / 0.20 = 0.5.
+    up1 = np.linspace(100.0, 125.0, 150)
+    down = np.linspace(125.0, 100.0, 150)[1:]
+    up2 = np.linspace(100.0, 121.0, 505 - len(up1) - len(down) + 1)[1:]
+    prices = pd.Series(np.concatenate([up1, down, up2]),
+                       index=pd.bdate_range("2020-01-01", periods=505))
+    assert len(prices) == 505
+    assert prices.iloc[-1] == pytest.approx(121.0)
+    returns = np.log(prices).diff().dropna()
+    out = ar.extended_metrics(returns, None, 0.0, prices)
+    assert out["maxDrawdown"] == pytest.approx(-0.20, rel=1e-9)
+    assert out["calmar"] == pytest.approx(0.5, rel=1e-9)

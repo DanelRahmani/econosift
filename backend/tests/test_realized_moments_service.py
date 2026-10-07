@@ -166,16 +166,22 @@ class TestGKFormula:
     def test_known_value(self):
         """Hand-computed Garman-Klass for a single row."""
         from backend.services.realized_moments_service import _gk_variance, _GK_K
-        H, L, O, C = 110.0, 90.0, 100.0, 105.0
-        expected = 0.5 * math.log(H / L) ** 2 - _GK_K * math.log(C / O) ** 2
+        # day1 O100 H102 L99 C101 (no prior close -> NaN)
+        # day2 O103 H105 L102 C104: overnight ln(O2/C1)^2 + GK range term
         df = pd.DataFrame(
-            {"Open": [O], "High": [H], "Low": [L], "Close": [C]},
-            index=pd.DatetimeIndex(["2024-01-02"]),
+            {"Open": [100.0, 103.0], "High": [102.0, 105.0],
+             "Low": [99.0, 102.0], "Close": [101.0, 104.0]},
+            index=pd.DatetimeIndex(["2024-01-02", "2024-01-03"]),
+        )
+        expected = (
+            math.log(103.0 / 101.0) ** 2
+            + 0.5 * math.log(105.0 / 102.0) ** 2
+            - _GK_K * math.log(104.0 / 103.0) ** 2
         )
         result = _gk_variance(df)
-        assert abs(float(result.iloc[0]) - expected) < 1e-9, (
-            f"GK mismatch: got {float(result.iloc[0])}, expected {expected}"
-        )
+        assert math.isnan(float(result.iloc[0]))
+        assert float(result.iloc[1]) == pytest.approx(expected, rel=1e-12)
+        assert float(result.iloc[1]) == pytest.approx(0.00076857, abs=1e-7)
 
 
 # ---------------------------------------------------------------------------

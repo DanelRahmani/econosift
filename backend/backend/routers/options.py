@@ -235,6 +235,7 @@ async def monte_carlo_options(
     expiry: str = Query(..., description="Expiry date YYYY-MM-DD"),
     opt_type: str = Query(default="call", description="'call' or 'put'"),
     sims: int = Query(default=10_000, description="Number of GBM simulations (max 50,000)"),
+    seed: int | None = Query(default=None, description="Optional RNG seed for a reproducible run"),
 ):
     """GBM Monte Carlo options pricing (10,000–50,000 paths).
 
@@ -283,6 +284,7 @@ async def monte_carlo_options(
                 sigma,
                 opt_type.lower(),
                 min(int(sims), 50_000),
+                seed,
             )
             result.update({
                 "ticker": ticker.upper(),
