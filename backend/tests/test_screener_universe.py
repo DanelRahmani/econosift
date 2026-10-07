@@ -444,3 +444,33 @@ def test_refresh_endpoint(client, monkeypatch):
     assert resp.status_code == 200
     data = resp.json()
     assert data["started"] is True
+
+
+def test_universe_provenance_is_dated_by_the_snapshot(client, monkeypatch):
+    # P1-20: the Navbar's "Data as of" reads provenance fetchedAt. The universe
+    # is a stored snapshot, so its fetchedAt is the snapshot time (asOf), not
+    # the time of the request.
+    from backend.services import screener_service
+    monkeypatch.setattr(screener_service, "query", lambda **kw: {
+        "index": "dow", "results": [{"ticker": "AAPL"}], "count": 1,
+        "asOf": "2026-10-02T09:47:14.485149+00:00", "stale": False})
+    resp = client.get("/api/screener/universe?index=dow")
+    assert resp.json()["provenance"]["*"]["fetchedAt"] == "2026-10-02T09:47:14Z"
+
+
+def test_screener_roic_uses_the_wacc_tax_rate(monkeypatch):
+    # A tax benefit (provision -50 on pretax 100) made the old effective rate
+    # -50%, so NOPAT = 100 × 1.5 = 150 and ROIC = 150 / (400 + 100) = 0.30.
+    # Like Markets (P3-21) the rate now comes from discount_rates.tax_rate_for:
+    # no usable effectiveTaxRate, no country entry -> 21%, NOPAT = 79,
+    # ROIC = 79 / 500 = 0.158.
+    from backend.services import discount_rates, screener_service
+    monkeypatch.setattr(discount_rates, "load_erp", lambda: {"countries": {}})
+    monkeypatch.setattr(screener_service.yfs, "get_info", lambda sym: {
+        "info": {"country": "United States"},
+        "financials": {"EBIT": 100.0, "Tax Provision": -50.0, "Pretax Income": 100.0},
+        "balance_sheet": {"Stockholders Equity": 400.0, "Total Debt": 100.0},
+        "cashflow": {},
+    })
+    row = screener_service._fetch_ticker_fundamentals("TEST")
+    assert row["roic"] == pytest.approx(0.158)

@@ -20,6 +20,7 @@ import {
   Scatter,
   ZAxis,
 } from "recharts";
+import { useRefreshNonce } from "@/lib/refresh";
 
 const GRID = "rgba(255,255,255,0.08)";
 
@@ -56,6 +57,7 @@ export function LeadingIndicators() {
   const [baseYear, setBaseYear] = useState(2020);
   const scope = useSourceScope(provOf(data));
 
+  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
   useEffect(() => {
     setLoading(true);
     api
@@ -63,7 +65,7 @@ export function LeadingIndicators() {
       .then(setData)
       .catch(() => setError(true))
       .finally(() => setLoading(false));
-  }, [baseYear]);
+  }, [baseYear, refreshNonce]);
 
   if (loading) {
     return (

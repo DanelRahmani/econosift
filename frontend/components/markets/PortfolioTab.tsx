@@ -9,6 +9,7 @@ import type { PortfolioResponse } from "@/lib/types";
 import { Card, Skeleton, chartTooltipStyle, chartPalette } from "@/components/ui";
 import { useTheme } from "@/components/ThemeProvider";
 import { fmtNum, fmtPctFromFraction } from "@/lib/format";
+import { useRefreshNonce } from "@/lib/refresh";
 
 export function PortfolioTab({ tickers, period }: { tickers: string[]; period: string }) {
   const { theme } = useTheme();
@@ -32,6 +33,7 @@ export function PortfolioTab({ tickers, period }: { tickers: string[]; period: s
     [weights, tickers],
   );
 
+  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
   useEffect(() => {
     if (!tickers.length) { setData(null); return; }
     const holdings = tickers.map((t) => ({ ticker: t, weight: weights[t] || 0 }));
@@ -47,7 +49,7 @@ export function PortfolioTab({ tickers, period }: { tickers: string[]; period: s
       }
     }, 500);
     return () => clearTimeout(id);
-  }, [tickers, weights, period]);
+  }, [tickers, weights, period, refreshNonce]);
 
   if (!tickers.length) {
     return <Card><div className="text-text-muted text-sm">Add tickers to build a portfolio.</div></Card>;

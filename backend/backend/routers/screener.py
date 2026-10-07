@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import json
 import threading
+from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, Query
 
 from .. import provenance as pv
@@ -206,13 +207,20 @@ async def get_universe(
         limit=limit,
     )
     stale = bool(result.get("stale")) if isinstance(result, dict) else False
-    return pv.attach(result, {
-        "*": pv.derived(
-            f"fundamentals, prices and technical indicators for each {index} member, filtered and sorted",
-            [pv.ref("yahoo", None, "Quote snapshot, statements and daily prices of each member",
-                    observed=result.get("asOf") if isinstance(result, dict) else None,
-                    flags=("stale",) if stale else (),
-                    note="Served from the overnight screener cache; refreshed in the background when stale."),
-             pv.ref("wikipedia", None, f"Current {index} constituents")],
-            title="Screener universe"),
-    })
+    as_of = result.get("asOf") if isinstance(result, dict) else None
+    ref = pv.derived(
+        f"fundamentals, prices and technical indicators for each {index} member, filtered and sorted",
+        [pv.ref("yahoo", None, "Quote snapshot, statements and daily prices of each member",
+                observed=as_of,
+                flags=("stale",) if stale else (),
+                note="Served from the overnight screener cache; refreshed in the background when stale."),
+         pv.ref("wikipedia", None, f"Current {index} constituents")],
+        title="Screener universe")
+    if as_of:
+        # A stored snapshot: fetched when it was built, not at request time.
+        try:
+            built = datetime.fromisoformat(as_of).astimezone(timezone.utc)
+            ref["fetchedAt"] = built.strftime("%Y-%m-%dT%H:%M:%SZ")
+        except ValueError:
+            pass
+    return pv.attach(result, {"*": ref})

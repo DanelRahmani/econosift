@@ -15,6 +15,7 @@ import {
   CartesianGrid,
   ReferenceLine,
 } from "recharts";
+import { useRefreshNonce } from "@/lib/refresh";
 
 function fmt(v: number | null | undefined, decimals = 2, suffix = ""): string {
   return v != null ? `${v.toFixed(decimals)}${suffix}` : "—";
@@ -37,13 +38,14 @@ export function CurveNoiseTab() {
   const pal = chartPalette("dark");
   const scope = useSourceScope(provOf(data));
 
+  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
   useEffect(() => {
     api
       .yieldNoise()
       .then(setData)
       .catch(() => setData({ error: "unavailable" }))
       .finally(() => setLoading(false));
-  }, []);
+  }, [refreshNonce]);
 
   const chart = useMemo(() => {
     const src = full ? data?.history ?? [] : data?.recent ?? [];

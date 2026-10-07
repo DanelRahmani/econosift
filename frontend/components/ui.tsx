@@ -182,8 +182,8 @@ export function TabButton({
     <button
       onClick={onClick}
       data-active={active}
-      className={`px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
-        active ? "border-accent text-accent" : "border-transparent text-text-secondary hover:text-text-primary"
+      className={`relative px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 border-transparent transition-colors duration-200 after:absolute after:inset-x-3 after:-bottom-0.5 after:h-0.5 after:rounded-full after:bg-accent-light after:shadow-[0_0_12px_rgb(var(--primary-light)/0.8)] after:transition-transform after:duration-300 after:ease-[cubic-bezier(0.22,1,0.36,1)] ${
+        active ? "text-text-primary after:scale-x-100" : "text-text-secondary hover:text-text-primary after:scale-x-0 hover:after:scale-x-50 hover:after:opacity-40"
       } ${className}`}
     >
       {children}
@@ -208,8 +208,10 @@ export function ToggleChip({
     <button
       onClick={onClick}
       title={title}
-      className={`px-2 py-0.5 rounded text-xs font-mono transition-colors border ${
-        active ? "bg-accent/20 text-accent border-accent/40" : "text-text-muted border-border hover:text-text-primary"
+      className={`px-2 py-0.5 rounded-md text-xs font-mono transition-all duration-200 border ${
+        active
+          ? "bg-accent-light/15 text-accent-light border-accent-light/40 shadow-[0_0_14px_-4px_rgb(var(--primary-light)/0.6)]"
+          : "text-text-muted border-border hover:text-text-primary hover:border-text-muted/40"
       } ${className}`}
     >
       {children}
@@ -248,7 +250,7 @@ export function EmptyState({ title, description }: { title: string; description?
 
 export function ChartSkeleton({ height = "h-80" }: { height?: string }) {
   return (
-    <div className={`${height} w-full animate-pulse bg-surface-alt rounded-xl`} />
+    <div className={`${height} w-full skeleton rounded-xl`} />
   );
 }
 
@@ -256,7 +258,7 @@ export function ChartSkeleton({ height = "h-80" }: { height?: string }) {
 // from the active theme rather than relying on CSS variables in SVG.
 export function chartPalette(theme: "light" | "dark") {
   return theme === "dark"
-    ? { grid: "#2a2a30", axis: "#aeaeba", tooltipBg: "#1a1a1e", tooltipBorder: "#2F8F83", tooltipText: "#f2f2f7" }
+    ? { grid: "#24242a", axis: "#aeaeba", tooltipBg: "#131317", tooltipBorder: "#2F8F83", tooltipText: "#f4f4f7" }
     : { grid: "#e4e4ea", axis: "#8c8c96", tooltipBg: "#ffffff", tooltipBorder: "#142A43", tooltipText: "#0f0f14" };
 }
 
@@ -266,8 +268,9 @@ export function chartTooltipStyle(theme: "light" | "dark" = "dark") {
     contentStyle: {
       backgroundColor: p.tooltipBg,
       border: `1px solid ${p.tooltipBorder}`,
-      borderRadius: "8px",
+      borderRadius: "10px",
       color: p.tooltipText,
+      boxShadow: "0 12px 32px -12px rgb(0 0 0 / 0.45)",
     },
     labelStyle: { color: p.axis },
   };

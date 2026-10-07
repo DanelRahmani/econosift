@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import { RegimeOverlay } from "./RegimeOverlay";
 import { ScrollableTabBar, PageSkeleton, TabButton } from "@/components/ui";
 import { MACRO_TABS } from "@/lib/pageTabs";
+import { useKeyboardShortcuts, tabKeys } from "@/lib/useKeyboardShortcuts";
 
 const TABS = MACRO_TABS;
 
@@ -96,6 +97,7 @@ function MacroTabShellInner() {
     params.set("tab", id);
     router.push(`${pathname}?${params.toString()}`, { scroll: false });
   };
+  useKeyboardShortcuts({ onTabSwitch: tabKeys(TABS, (t) => setTab(t.id)) }); // P2-07
 
   return (
     <div>

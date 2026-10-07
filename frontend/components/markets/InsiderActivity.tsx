@@ -5,6 +5,7 @@ import type { Form4Response, InsiderTransaction } from "@/lib/types";
 import { Card } from "@/components/ui";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
+import { useRefreshNonce } from "@/lib/refresh";
 
 function fmt(v: number | null): string {
   if (v == null) return "—";
@@ -39,6 +40,7 @@ export function InsiderActivity({ ticker }: { ticker: string }) {
   const [error, setError] = useState<string | null>(null);
   const scope = useSourceScope(provOf(data));
 
+  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
   useEffect(() => {
     if (!ticker) return;
     setLoading(true);
@@ -51,7 +53,7 @@ export function InsiderActivity({ ticker }: { ticker: string }) {
       })
       .catch(() => setError("Failed to load insider transactions"))
       .finally(() => setLoading(false));
-  }, [ticker]);
+  }, [ticker, refreshNonce]);
 
   return (
     <Card className="p-4" {...scope} data-prov-ctx={ticker}>

@@ -10,6 +10,7 @@ import { api } from "@/lib/api";
 import type { MomentumResponse, MomentumRank } from "@/lib/types";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
+import { useRefreshNonce } from "@/lib/refresh";
 
 const UNIVERSES = [
   { key: "dow", label: "Dow 30" },
@@ -79,11 +80,12 @@ export function MomentumTab() {
   }, []);
 
   // Dow is cheap → auto-load. NDX/S&P 500 are throttle-prone → require the button.
+  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
   useEffect(() => {
     if (universe === "dow") fetchData("dow", signal);
     else setData(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [universe, signal]);
+  }, [universe, signal, refreshNonce]);
 
   const needsRun = universe !== "dow" && loadedKey !== `${universe}:${signal}`;
 

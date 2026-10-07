@@ -20,6 +20,7 @@ import { useTheme } from "@/components/ThemeProvider";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
 import { fmtPct } from "@/lib/format";
+import { useRefreshNonce } from "@/lib/refresh";
 
 // ─── colour maps ────────────────────────────────────────────────────────────
 
@@ -105,6 +106,7 @@ export function RegimeClock({
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // ── fetch on country change ──
+  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
@@ -135,7 +137,7 @@ export function RegimeClock({
       });
 
     return () => { cancelled = true; };
-  }, [country]);
+  }, [country, refreshNonce]);
 
   // ── play / pause logic ──
   const validPoints = (data?.series ?? []).filter(

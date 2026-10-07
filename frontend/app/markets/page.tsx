@@ -30,6 +30,8 @@ import type {
   TreemapResponse, SectorReturnsResponse,
   SectorFundamentalsResponse, SectorRotationResponse, SectorDrillResponse,
 } from "@/lib/types";
+import { useRefreshNonce } from "@/lib/refresh";
+import { useKeyboardShortcuts, tabKeys, periodKeys } from "@/lib/useKeyboardShortcuts";
 
 const ValuationTab = lazy(() =>
   import("@/components/markets/ValuationTab").then((m) => ({ default: m.ValuationTab }))
@@ -87,10 +89,13 @@ function MarketsPageInner() {
   const secKpiScope = useSourceScope(provOf(secReturns));
   const secChartScope = useSourceScope(provOf(secReturns));
   const secRotationScope = useSourceScope(provOf(secRotation));
+  const secFundScope = useSourceScope(provOf(secFundamentals));
   const [selectedSector, setSelectedSector] = useState<string | null>(null);
   const [drillData, setDrillData] = useState<SectorDrillResponse | null>(null);
+  const drillScope = useSourceScope(provOf(drillData));
   const [drillLoading, setDrillLoading] = useState(false);
 
+  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
   useEffect(() => {
     if (tab !== "Sectors") return;
     let alive = true;
@@ -100,7 +105,7 @@ function MarketsPageInner() {
       .catch(() => {})
       .finally(() => { if (alive) setSecLoading(false); });
     return () => { alive = false; };
-  }, [tab]);
+  }, [tab, refreshNonce]);
 
   useEffect(() => {
     if (!selectedSector) { setDrillData(null); return; }
@@ -111,11 +116,22 @@ function MarketsPageInner() {
       .catch(() => { if (alive) setDrillData(null); })
       .finally(() => { if (alive) setDrillLoading(false); });
     return () => { alive = false; };
-  }, [selectedSector]);
+  }, [selectedSector, refreshNonce]);
 
   // Treemap state
   const [tmIndex, setTmIndex] = useState<"sp500" | "ndx" | "dow">("sp500");
   const [tmPeriod, setTmPeriod] = useState<string>("1d");
+  // P2-07: 1–9 pick a tab; ←/→ step the period control the active tab shows.
+  useKeyboardShortcuts({
+    onTabSwitch: tabKeys(TABS, (t) => setUrlState({ tab: t })),
+    ...(tab === "Sectors"
+      ? periodKeys(SEC_PERIODS, secPeriod, setSecPeriod)
+      : tab === "Treemap"
+        ? periodKeys(SEC_PERIODS as readonly string[], tmPeriod, setTmPeriod)
+        : tab === "Overview" || tab === "Technicals" || tab === "Valuation"
+          ? periodKeys(PERIODS, period, (p) => setUrlState({ p }))
+          : {}),
+  });
   const [tmData, setTmData] = useState<TreemapResponse | null>(null);
   const [tmLoading, setTmLoading] = useState(false);
   const tmScope = useSourceScope(provOf(tmData));
@@ -129,7 +145,7 @@ function MarketsPageInner() {
       .catch(() => {})
       .finally(() => { if (alive) setTmLoading(false); });
     return () => { alive = false; };
-  }, [tab, tmIndex, tmPeriod]);
+  }, [tab, tmIndex, tmPeriod, refreshNonce]);
 
   // Redirect old deprecated tabs
   useEffect(() => {
@@ -439,11 +455,11 @@ function MarketsPageInner() {
                   onSectorClick={(s) => setSelectedSector(s === selectedSector ? null : s)} /> : null}
           </Card>
           {/* Fundamentals */}
-          <Card>
+          <Card {...secFundScope}>
             <h3 className="text-sm font-semibold text-text-secondary mb-4">Sector ETF Fundamentals</h3>
             {secLoading || !secFundamentals ? (
               <ChartSkeleton height="h-48" />
-            ) : <SectorFundamentalsTable data={secFundamentals} />}
+            ) : <SectorFundamentalsTable data={secFundamentals.sectors ?? []} />}
           </Card>
           {/* Rotation clock */}
           <Card {...secRotationScope}>
@@ -457,8 +473,8 @@ function MarketsPageInner() {
           </Card>
           {/* Industry drill-down */}
           {selectedSector && (
-            <Card>
-              <SectorIndustryDrillDown sector={selectedSector} data={drillData} loading={drillLoading} />
+            <Card {...drillScope}>
+              <SectorIndustryDrillDown sector={selectedSector} data={drillData?.industries ?? null} loading={drillLoading} />
             </Card>
           )}
         </div>

@@ -18,6 +18,7 @@ import {
   AreaChart,
   Area,
 } from "recharts";
+import { useRefreshNonce } from "@/lib/refresh";
 
 const GRID = "rgba(255,255,255,0.08)";
 
@@ -71,13 +72,14 @@ export function CommoditiesTab() {
   const [error, setError] = useState(false);
   const scope = useSourceScope(provOf(data));
 
+  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
   useEffect(() => {
     api
       .macroCommodities()
       .then(setData)
       .catch(() => setError(true))
       .finally(() => setLoading(false));
-  }, []);
+  }, [refreshNonce]);
 
   if (loading) {
     return (

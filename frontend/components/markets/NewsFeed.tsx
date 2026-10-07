@@ -6,6 +6,7 @@ import type { NewsItem, Sentiment } from "@/lib/types";
 import { Card, Skeleton } from "@/components/ui";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf, type Provenance } from "@/lib/provenance";
+import { useRefreshNonce } from "@/lib/refresh";
 
 const SENTIMENT_STYLE: Record<Sentiment, { dot: string; label: string; text: string }> = {
   positive: { dot: "bg-success", label: "Positive", text: "text-success" },
@@ -26,6 +27,7 @@ export function NewsFeed({ tickers }: { tickers: string[] }) {
     if (!tickers.includes(active)) setActive(tickers[0]);
   }, [tickers, active]);
 
+  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
   useEffect(() => {
     if (!active) { setItems([]); setProv(undefined); return; }
     let live = true;
@@ -35,7 +37,7 @@ export function NewsFeed({ tickers }: { tickers: string[] }) {
       .catch(() => { if (live) { setItems([]); setProv(undefined); } })
       .finally(() => live && setLoading(false));
     return () => { live = false; };
-  }, [active]);
+  }, [active, refreshNonce]);
 
   if (!tickers.length) return null;
 

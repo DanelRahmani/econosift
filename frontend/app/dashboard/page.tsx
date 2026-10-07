@@ -17,6 +17,7 @@ import { api } from "@/lib/api";
  * regime / session status → global indices → yield curve + top movers → sector
  * performance. All panels are compute tier 🟢 (run on load) and independently
  * cached, so a slow source degrades gracefully without blocking the page.
+ * The Navbar's Refresh re-fetches every panel past the cache (P1-20).
  */
 export default function DashboardPage() {
   return (

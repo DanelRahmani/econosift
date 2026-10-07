@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import type { HousingData, GlobalHousingData } from "@/lib/types";
 import { Card } from "@/components/ui";
-import { shortCountryName } from "@/lib/format";
+import { shortCountryName, categoryBarHeight } from "@/lib/format";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
 import {
@@ -20,6 +20,7 @@ import {
   Bar,
   Cell,
 } from "recharts";
+import { useRefreshNonce } from "@/lib/refresh";
 
 const GRID = "rgba(255,255,255,0.08)";
 const RECESSION_FILL = "rgba(120,120,120,0.18)";
@@ -55,6 +56,7 @@ export function HousingTab() {
   const scope = useSourceScope(provOf(data));
   const globalScope = useSourceScope(provOf(globalHousing));
 
+  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
   useEffect(() => {
     api
       .macroHousing()
@@ -62,7 +64,7 @@ export function HousingTab() {
       .catch(() => setError(true))
       .finally(() => setLoading(false));
     api.macroHousingGlobal().then(setGlobalHousing).catch(() => {});
-  }, []);
+  }, [refreshNonce]);
 
   if (loading) {
     return (
@@ -256,7 +258,7 @@ export function HousingTab() {
           <p className="text-xs text-text-secondary mb-3">
             BIS residential property prices, inflation-adjusted. YoY% change shown.
           </p>
-          <ResponsiveContainer width="100%" height={320}>
+          <ResponsiveContainer width="100%" height={categoryBarHeight(globalHousing.countries.filter((c) => c.yoyChange != null).length)}>
             <BarChart
               data={globalHousing.countries.filter((c) => c.yoyChange != null).map((c) => ({
                 name: c.name,

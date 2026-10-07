@@ -10,6 +10,7 @@ import { TabButton } from "@/components/ui";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
 import { POLICY_TABS } from "@/lib/pageTabs";
+import { useKeyboardShortcuts, tabKeys } from "@/lib/useKeyboardShortcuts";
 
 // ─── Shared KPI card ────────────────────────────────────────────────
 function KpiCard({ label, value, sub, prov }: { label: string; value: string; sub?: string; prov?: string }) {
@@ -303,6 +304,7 @@ function SovereignRiskTab() {
 function PolicyPageInner() {
   const [urlState, setUrlState] = useUrlState({ tab: "policy" });
   const tab = resolveTab(urlState.tab);
+  useKeyboardShortcuts({ onTabSwitch: tabKeys(TABS, (t) => setUrlState({ tab: t.id })) }); // P2-07
 
   return (
     <div className="p-6 space-y-6">

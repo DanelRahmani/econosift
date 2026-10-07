@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import { useRefreshNonce } from "@/lib/refresh";
 import type { SectorsResponse } from "@/lib/types";
 import { Card, Skeleton } from "@/components/ui";
 import { useSourceScope } from "@/components/provenance/SourceScope";
@@ -24,6 +25,7 @@ export function SectorHeatmap() {
   const [loading, setLoading] = useState(false);
   const scope = useSourceScope(provOf(data));
 
+  const refreshNonce = useRefreshNonce(); // re-fetch on the page's Refresh (P1-20)
   useEffect(() => {
     let active = true;
     setLoading(true);
@@ -32,7 +34,7 @@ export function SectorHeatmap() {
       .catch(() => active && setData(null))
       .finally(() => active && setLoading(false));
     return () => { active = false; };
-  }, [period]);
+  }, [period, refreshNonce]);
 
   return (
     <Card {...scope}>

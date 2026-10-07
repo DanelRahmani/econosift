@@ -42,6 +42,7 @@ Rules for writing refs:
 from __future__ import annotations
 
 import logging
+import os
 from datetime import datetime, timezone
 
 from . import cache
@@ -95,12 +96,33 @@ FLAGS = frozenset({
 })
 
 
+def stamp(when: datetime | float) -> str:
+    """A ``fetchedAt`` value: UTC ISO-8601 from a datetime (naive = UTC) or a Unix epoch."""
+    if not isinstance(when, datetime):
+        when = datetime.fromtimestamp(when, timezone.utc)
+    elif when.tzinfo is None:
+        when = when.replace(tzinfo=timezone.utc)
+    return when.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def file_time(path) -> str | None:
+    """``fetchedAt`` for data served from a stored file: when it was written."""
+    try:
+        return stamp(os.path.getmtime(path))
+    except OSError:
+        return None
+
+
 def _fetched_at() -> str:
     """UTC time the data read in this request was fetched: the oldest cache
-    entry used, or now if everything was fetched live."""
+    entry used, or now if everything was fetched live.
+
+    Data served from a stored snapshot outside ``@cached`` (a file, a DB row)
+    must set ``fetchedAt`` on its refs itself, from :func:`file_time` or the
+    snapshot's build time; this fallback would date it to the request.
+    """
     ts = cache.oldest_fetch()
-    when = datetime.fromtimestamp(ts, timezone.utc) if ts else datetime.now(timezone.utc)
-    return when.strftime("%Y-%m-%dT%H:%M:%SZ")
+    return stamp(ts if ts else datetime.now(timezone.utc))
 
 
 def attach(result, prov: dict):

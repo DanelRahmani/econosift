@@ -33,7 +33,7 @@ function nil(v: number | null | undefined): boolean {
 /** Format a decimal percentage field (e.g. 0.005 → "0.50%"). */
 function fmtDecPct(v: number | null | undefined, digits = 2): string {
   if (nil(v)) return DASH;
-  return fmtPct((v as number) * 100, digits);
+  return fmtPctFromFraction(v as number, digits);
 }
 
 /** Format a WACC-style decimal field already in fraction form. */
@@ -200,9 +200,9 @@ function formatDupontValue(key: string, v: number | null): string {
   const n = v as number;
   // Margin / burden / multiplier fields — detect by key suffix
   if (key.toLowerCase().includes("margin") || key.toLowerCase().includes("burden")) {
-    return fmtPct(n * 100);
+    return fmtPctFromFraction(n);
   }
-  if (key === "roe") return fmtPct(n * 100);
+  if (key === "roe") return fmtPctFromFraction(n);
   // Turnover and multiplier — plain ratio
   return fmtNum(n, 2) + "×";
 }
@@ -362,12 +362,12 @@ export function ValuationKpiPanel({ kpis, wacc, fundamentals }: Props) {
               />
               <Row
                 label="Wt. Equity"
-                value={nil(wacc.weightEquity) ? DASH : fmtPct((wacc.weightEquity as number) * 100)}
+                value={nil(wacc.weightEquity) ? DASH : fmtPctFromFraction(wacc.weightEquity as number)}
                 prov="valuation.wacc.weightEquity"
               />
               <Row
                 label="Wt. Debt"
-                value={nil(wacc.weightDebt) ? DASH : fmtPct((wacc.weightDebt as number) * 100)}
+                value={nil(wacc.weightDebt) ? DASH : fmtPctFromFraction(wacc.weightDebt as number)}
                 prov="valuation.wacc.weightDebt"
               />
               <Row

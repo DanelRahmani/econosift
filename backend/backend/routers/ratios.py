@@ -47,7 +47,8 @@ async def ratios(ticker: str, period: str = "1y", risk_free: float | None = None
         "profitability": payload["profitability"],
         "valuation": payload["valuation"],
         "unavailable": payload["unavailable"],
-    }, {**ratio_provenance(sym, bundle), **risk_provenance(sym, bench, frame, period, risk_free, rf_source)})
+        "basis": payload["basis"],
+    },{**ratio_provenance(sym, bundle), **risk_provenance(sym, bench, frame, period, risk_free, rf_source)})
 
 
 def stmt_date(bundle: dict, name: str) -> str | None:
@@ -66,10 +67,10 @@ _RATIO_FORMULAS = {
     "liquidity.cashRatio": ("cash and equivalents / current liabilities", "b"),
     "liquidity.operatingCFRatio": ("operating cash flow / current liabilities", "bc"),
     "leverage.debtToEquity": ("total debt / stockholders' equity; if the balance sheet has no total debt, "
-                              "Yahoo's own debtToEquity from the info snapshot is used instead", "bq"),
+                              "Yahoo's own debtToEquity from the info snapshot (a percent, ÷ 100) is used instead", "bq"),
     "leverage.debtToAssets": ("total debt / total assets", "bq"),
     "leverage.interestCoverage": ("operating income (EBIT if missing) / |interest expense|", "i"),
-    "leverage.netDebtEbitda": ("(total debt − cash) / EBITDA (statement EBITDA, else info ebitda)", "ibq"),
+    "leverage.netDebtEbitda": ("(total debt − (cash + short-term investments)) / EBITDA (statement EBITDA, else info ebitda)", "ibq"),
     "efficiency.assetTurnover": ("total revenue / total assets (year-end assets)", "ib"),
     "efficiency.inventoryTurnover": ("cost of revenue / inventory", "ib"),
     "efficiency.receivablesTurnover": ("total revenue / accounts receivable", "ib"),
@@ -79,7 +80,7 @@ _RATIO_FORMULAS = {
     "profitability.netMargin": ("net income / total revenue", "i"),
     "profitability.ebitdaMargin": ("EBITDA (statement, else info ebitda) / total revenue", "iq"),
     "profitability.roa": ("net income / total assets (year-end)", "ib"),
-    "profitability.roe": ("net income / stockholders' equity (year-end)", "ib"),
+    "profitability.roe": ("net income / stockholders' equity (fiscal-year basis, year-end equity; not TTM)", "ib"),
     "profitability.fcfMargin": ("statement free cash flow / total revenue; if the cash-flow statement has none, "
                                 "Yahoo's trailing-12-month freeCashflow / totalRevenue", "icq"),
     "zScore": ("Altman Z = 1.2·(current assets − current liabilities)/TA + 1.4·retained earnings/TA + 3.3·EBIT/TA "

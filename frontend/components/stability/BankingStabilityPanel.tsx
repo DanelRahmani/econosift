@@ -10,6 +10,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Cell, ReferenceLine,
 } from "recharts";
+import { useRefreshNonce } from "@/lib/refresh";
 
 const GRID = "rgba(255,255,255,0.08)";
 
@@ -26,9 +27,10 @@ export function BankingStabilityPanel() {
   const [error, setError] = useState(false);
   const scope = useSourceScope(provOf(data));
 
+  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
   useEffect(() => {
     api.stabilityBanking().then(setData).catch(() => setError(true)).finally(() => setLoading(false));
-  }, []);
+  }, [refreshNonce]);
 
   if (loading) return <div className="py-8 text-center text-muted">Loading banking stability data…</div>;
   if (error || !data) return <div className="py-8 text-center text-red-400">Failed to load data.</div>;

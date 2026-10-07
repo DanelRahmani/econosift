@@ -150,8 +150,18 @@ def _extract_error(resp: httpx.Response) -> str:
         return resp.text[:200]
 
 
-def build_company_prompt(ticker: str) -> str:
+def build_company_prompt(tickers: str | list[str]) -> str:
     """Task for a company summary; the figures come from APP DATA."""
+    if isinstance(tickers, list) and len(tickers) > 1:
+        names = ", ".join(tickers)
+        return (
+            f"Give a concise comparative analyst summary of these separate companies: {names}. "
+            f"APP DATA lists each ticker's own figures under \"tickers\"; quote each company's numbers only "
+            f"from its own entry and never combine them into one entity. For each company cover today's "
+            f"price move, valuation (fair-value composite, model range, P/E), financial health, analyst "
+            f"targets and notable news, then compare them. Format: 2-3 sentence headline, then 4-8 bullet points."
+        )
+    ticker = tickers[0] if isinstance(tickers, list) else tickers
     return (
         f"Give a concise analyst summary for {ticker}. "
         f"Cover: today's price move, valuation (the fair-value composite and model range, P/E), "

@@ -16,6 +16,7 @@ import yfinance as yf
 from .. import provenance as pv
 from ..cache import cached
 from . import constituents
+from . import dcf_engine
 
 logger = logging.getLogger(__name__)
 
@@ -101,8 +102,12 @@ def _safe_div(a: float | None, b: float | None) -> float | None:
 # Z = 1.2*X1 + 1.4*X2 + 3.3*X3 + 0.6*X4 + 1.0*X5
 # ---------------------------------------------------------------------------
 
-def _altman_z(fin, bs, info: dict) -> dict:
-    """Compute Altman Z-Score and its 5 components."""
+def _altman_z(fin, bs, info: dict, fx_rate: float | None = 1.0) -> dict:
+    """Compute Altman Z-Score and its 5 components.
+
+    ``fx_rate`` turns statement currency into the price currency (ADRs: TWD -> USD), so x4 does not
+    divide a USD market cap by TWD liabilities (P2-38); None (FX unavailable) leaves x4 and Z null.
+    """
     # Balance sheet items
     total_assets = _latest_val(bs, "Total Assets")
     total_liabilities = _latest_val(bs, "Total Liabilities Net Minority Interest")
@@ -126,7 +131,8 @@ def _altman_z(fin, bs, info: dict) -> dict:
     x1 = _safe_div(working_capital, total_assets)
     x2 = _safe_div(retained_earnings, total_assets)
     x3 = _safe_div(ebit, total_assets)
-    x4 = _safe_div(market_cap, total_liabilities)
+    x4 = (_safe_div(market_cap, total_liabilities * fx_rate)
+          if fx_rate is not None and total_liabilities is not None else None)
     x5 = _safe_div(revenue, total_assets)
 
     z = None
@@ -161,13 +167,15 @@ def _altman_z(fin, bs, info: dict) -> dict:
 # Piotroski F-Score (9-point fundamental strength)
 # ---------------------------------------------------------------------------
 
-def _piotroski(fin, bs, cf, fin_q=None, bs_q=None, cf_q=None) -> dict:
+def _piotroski(fin, bs, cf, fin_q=None, bs_q=None, cf_q=None, is_bank: bool = False) -> dict:
     """Compute Piotroski F-Score with all 9 criteria.
 
     Parameters
     ----------
     fin, bs, cf : Annual financial statement DataFrames
     fin_q, bs_q, cf_q : Quarterly DataFrames (fallback if annual only has 1 column)
+    is_bank : current ratio, gross margin and asset turnover do not describe a
+        lender, so those three are not scored (P3-33)
     """
     net_income = _latest_val(fin, "Net Income")
     total_assets = _latest_val(bs, "Total Assets")
@@ -274,6 +282,14 @@ def _piotroski(fin, bs, cf, fin_q=None, bs_q=None, cf_q=None) -> dict:
     if c9:
         score += 1
 
+    reasons: dict[str, str] = {}
+    if is_bank:
+        for key in ("increasingCurrentRatio", "increasingGrossMargin", "increasingAssetTurnover"):
+            if criteria[key]:
+                score -= 1
+            criteria[key] = None
+            reasons[key] = "not meaningful for a bank (no current ratio, gross margin or asset turnover)"
+
     # A criterion without a prior-year comparison is not scored (None) —
     # previously it counted as a pass, inflating thin-data firms by up to +6
     # (audit C-14). The interpretation bands scale with what was scored.
@@ -284,6 +300,7 @@ def _piotroski(fin, bs, cf, fin_q=None, bs_q=None, cf_q=None) -> dict:
         "maxScore": max_score,
         "interpretation": ("Strong" if frac >= 7 / 9 else ("Average" if frac >= 4 / 9 else "Weak")) if max_score else "Insufficient data",
         "criteria": criteria,
+        "reasons": reasons,
     }
 
 
@@ -491,12 +508,16 @@ def get_corporate_health(ticker: str) -> dict:
         industry = info.get("industry", "")
         is_financial = sector in ("Financial Services", "Financial") or "Bank" in industry or "Insurance" in industry
 
-        z_data = _altman_z(fin, bs, info)
+        fx = dcf_engine.to_price_currency({"info": info})["_fx"]
+        z_data = _altman_z(fin, bs, info, fx_rate=fx["rate"])
+        if fx["rate"] is None:
+            z_data["note"] = (f"Statements are in {fx['from']} and the price in {fx['to']}; no exchange rate is "
+                              "available, so market value / liabilities (and Z) cannot be computed.")
         z_data["isFinancial"] = is_financial
         if is_financial:
             z_data["note"] = "Altman Z-Score is not applicable to financial firms. Use with caution."
 
-        piotroski_data = _piotroski(fin, bs, cf, fin_q, bs_q, cf_q)
+        piotroski_data = _piotroski(fin, bs, cf, fin_q, bs_q, cf_q, is_bank=dcf_engine.is_bank(info))
 
         beneish_data = _beneish(fin, bs, cf, fin_q, bs_q, cf_q)
         # Fiscal year end of the latest annual statements the scores use.
@@ -535,7 +556,8 @@ def _health_provenance(ticker: str, fy_end: str | None, quarterly_fallback: bool
         "piotroski": pv.derived(
             "one point per criterion met: ROA > 0, OCF > 0, ΔROA > 0, OCF > net income, Δleverage < 0, "
             "Δcurrent ratio > 0, no new shares, Δgross margin > 0, Δasset turnover > 0; criteria "
-            "without a prior year are not scored (maxScore shrinks)",
+            "without a prior year are not scored (maxScore shrinks); for banks the current ratio, gross "
+            "margin and asset turnover are not scored",
             [statements], title="Piotroski F-Score", observed=fy_end),
         "beneish": pv.derived(
             "M = −4.84 + 0.920·DSRI + 0.528·GMI + 0.404·AQI + 0.892·SGI + 0.115·DEPI − 0.172·SGAI "

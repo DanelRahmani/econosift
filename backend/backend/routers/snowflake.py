@@ -1,11 +1,27 @@
 """Snowflake Composite Score router — Phase 9."""
 from __future__ import annotations
 
+from datetime import datetime
+
 from fastapi import APIRouter, HTTPException, Query
 
-from ..services import snowflake_service
+from .. import provenance as pv
+from ..services import screener_cache, snowflake_service
 
 router = APIRouter(prefix="/api/snowflake", tags=["snowflake"])
+
+
+def _oldest_row_time(symbols: list[str]) -> str | None:
+    """Build time of the stored screener rows behind a batch (oldest ``updated_at``), as ``fetchedAt``."""
+    if not symbols:
+        return None
+    try:
+        marks = ", ".join("?" * len(symbols))
+        row = screener_cache._get_conn().execute(
+            f"SELECT MIN(updated_at) FROM fundamentals WHERE symbol IN ({marks})", symbols).fetchone()
+        return pv.stamp(datetime.fromisoformat(row[0])) if row and row[0] else None
+    except Exception:
+        return None
 
 
 @router.get("")
@@ -32,6 +48,29 @@ async def get_snowflake_batch(
     # Stable cache key: sorted, joined
     tickers_key = ",".join(sorted(set(ticker_list)))
     try:
-        return snowflake_service.compute_snowflake_batch(tickers_key)
+        scores = snowflake_service.compute_snowflake_batch(tickers_key)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
+    peers = pv.ref("econosift", "screener_cache", "Screener universe cache: Yahoo fundamentals for the Dow 30, "
+                   "Nasdaq-100 and S&P 500, refreshed nightly",
+                   note="Only tickers present in the cache are scored; no live Yahoo call is made.")
+    ref = pv.derived(
+        "five 0-10 axis scores (value, growth, performance, health, dividend) from the screener cache, mostly "
+        "percentile ranks against sector peers (share of peers with a strictly lower value x 10); a lighter "
+        "calculation than /api/snowflake, using fewer components per axis", [peers], title="Snowflake scores")
+    prov: dict = {"*": ref}
+    prov["overallScore"] = pv.derived("mean of the available axis scores, equally weighted", [ref],
+                                      title="Overall score")
+    prov["axisScores"] = pv.derived(
+            "value: weighted percentile ranks as in /api/snowflake; growth: revenue growth 35%, EPS growth 35%, "
+            "trailing - forward P/E 30%; performance: ROE 40%, gross margin 30%, net margin 30%; health: Altman Z, "
+            "ROIC, current ratio (capped at 4) and inverted debt-to-equity, 25% each; dividend: yield percentile "
+            "among dividend-paying peers, 0 for non-payers", [peers], title="Axis scores")
+    for t in scores:  # per-ticker keys alias the shared refs instead of repeating them
+        prov[f"scores.{t}.overallScore"] = "overallScore"
+        prov[f"scores.{t}.scores"] = "axisScores"
+    # A stored snapshot: fetched when it was built, not at request time.
+    built = _oldest_row_time(list(scores))
+    if built:
+        ref["fetchedAt"] = built
+    return pv.attach({"scores": scores}, prov)

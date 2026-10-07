@@ -238,6 +238,15 @@ def _price_currency_multiples(bundle: dict, yahoo: dict) -> dict:
             "fcfYield": v["fcfYield"], "psRatio": v["psRatio"]}
 
 
+def _tax_rate(info: dict) -> float:
+    """ROIC tax rate, the same one the WACC and the Markets ROIC use: Yahoo's
+    effective rate when plausible, else the country statutory rate (Damodaran),
+    else 21 %. Provision / pretax income is unbounded (a tax benefit gave a
+    negative rate and an inflated ROIC)."""
+    from .discount_rates import detect_country, tax_rate_for
+    return tax_rate_for(info, detect_country(info))
+
+
 def _fetch_ticker_fundamentals(sym: str) -> dict:
     """Fetch full info bundle for one ticker and return a partial screener row.
 
@@ -266,16 +275,15 @@ def _fetch_ticker_fundamentals(sym: str) -> dict:
         shares = _i("sharesOutstanding")
 
         # ROIC = NOPAT / Invested Capital  (best-effort from statements)
-        # NOPAT ≈ EBIT * (1 - tax_rate); Invested Capital ≈ Total Equity + Total Debt
+        # NOPAT ≈ EBIT * (1 - tax_rate), tax rate as the WACC's (_tax_rate);
+        # Invested Capital ≈ Total Equity + Total Debt
         roic: float | None = None
         try:
             ebit = _g(fin, "EBIT", "Operating Income")
-            tax_prov = _g(fin, "Tax Provision")
-            pretax_inc = _g(fin, "Pretax Income")
             equity = _g(bs, "Stockholders Equity", "Common Stock Equity") or _i("totalStockholderEquity")
             total_debt = _g(bs, "Total Debt") or _i("totalDebt")
             if ebit and equity and total_debt is not None:
-                tax_rate = (tax_prov / pretax_inc) if (tax_prov and pretax_inc and pretax_inc != 0) else 0.21
+                tax_rate = _tax_rate(info)
                 nopat = ebit * (1 - tax_rate)
                 inv_cap = equity + total_debt
                 if inv_cap and inv_cap != 0:
@@ -645,15 +653,11 @@ def refresh_universe(index: str) -> int:
             roic: float | None = None
             try:
                 ebit = _g(fin, "EBIT", "Operating Income")
-                tax_prov = _g(fin, "Tax Provision")
-                pretax_inc = _g(fin, "Pretax Income")
                 equity = (_g(bs, "Stockholders Equity", "Common Stock Equity")
                           or _i("totalStockholderEquity"))
                 total_debt = _g(bs, "Total Debt") or _i("totalDebt")
                 if ebit is not None and equity is not None and total_debt is not None:
-                    tax_rate = (tax_prov / pretax_inc
-                                if (tax_prov and pretax_inc and pretax_inc != 0)
-                                else 0.21)
+                    tax_rate = _tax_rate(info)
                     nopat = ebit * (1 - tax_rate)
                     inv_cap = equity + total_debt
                     if inv_cap and inv_cap != 0:

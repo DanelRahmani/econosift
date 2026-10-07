@@ -4,6 +4,8 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell, ResponsiveContainer,
 } from "recharts";
 import type { RiskContribData } from "@/lib/types";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 
 const COLORS = [
   "#6366f1", "#f59e0b", "#10b981", "#ef4444", "#3b82f6",
@@ -16,6 +18,8 @@ interface Props {
 }
 
 export function RiskContribution({ data, loading }: Props) {
+  const scope = useSourceScope(provOf(data));
+  const rows = data?.holdings ?? [];
   if (loading) {
     return (
       <div className="rounded-xl border border-border bg-surface p-4 animate-pulse">
@@ -25,7 +29,7 @@ export function RiskContribution({ data, loading }: Props) {
     );
   }
 
-  if (!data || data.length === 0) {
+  if (rows.length === 0) {
     return (
       <div className="rounded-xl border border-border bg-surface p-4 text-sm text-text-muted">
         Risk contribution data not available.
@@ -33,12 +37,12 @@ export function RiskContribution({ data, loading }: Props) {
     );
   }
 
-  const pts = data
+  const pts = rows
     .filter((c) => c.pctContrib !== null)
     .map((c) => ({ ticker: c.ticker, value: (c.pctContrib ?? 0) * 100 }));
 
   return (
-    <div className="rounded-xl border border-border bg-surface p-4">
+    <div className="rounded-xl border border-border bg-surface p-4" {...scope}>
       <h3 className="font-semibold text-sm mb-3">Variance Contribution (%)</h3>
       <ResponsiveContainer width="100%" height={Math.max(180, pts.length * 36)}>
         <BarChart

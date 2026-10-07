@@ -2,12 +2,14 @@
 
 import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
+import { useValuationFull } from "@/lib/useValuationFull";
 import type { CountryRate, DcfResponse, DcfSensitivity, ValuationFullResponse } from "@/lib/types";
 import { Card, Skeleton } from "@/components/ui";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
-import { fmtNum, fmtPct, fmtPrice, fmtLarge, currencySymbol } from "@/lib/format";
+import { fmtNum, fmtPrice, fmtLarge, currencySymbol, fmtPctFromFraction } from "@/lib/format";
 import { NaReason } from "@/components/markets/NaReason";
+import { useRefreshNonce } from "@/lib/refresh";
 
 // ── Slider config ──────────────────────────────────────────────────────────
 interface Params {
@@ -119,33 +121,38 @@ export function DcfPanel({ tickers, sharedWacc = null }: { tickers: string[]; pe
     }
   }
 
-  // Seed the sliders with the backend's own DCF assumptions whenever the ticker changes.
+  // The Valuation tab's own /valuation/full result (one shared query, P3-34), so the panel's
+  // defaults always match the model grid's DCF, also when a degraded bundle is replaced (P2-39).
+  const full = useValuationFull(selectedTicker);
+
   useEffect(() => {
-    if (!selectedTicker) return;
-    let alive = true;
     setSelectedCountry("");
     setData(null); // the previous ticker's result must not stay on screen while this one loads
-    api
-      .valuationFull(selectedTicker)
-      .then((r) => {
-        if (!alive) return;
-        const d = defaultsFromFull(r);
-        setDefaults(d);
-        setDefaultsFromBackend(true);
-        setParams(sharedWaccRef.current != null ? { ...d, wacc: sharedWaccRef.current } : d);
-        setSeededFor(selectedTicker);
-      })
-      .catch(() => {
-        if (!alive) return;
-        setDefaults(FALLBACK_PARAMS);
-        setDefaultsFromBackend(false);
-        setParams(sharedWaccRef.current != null ? { ...FALLBACK_PARAMS, wacc: sharedWaccRef.current } : FALLBACK_PARAMS);
-        setSeededFor(selectedTicker);
-      });
-    return () => {
-      alive = false;
-    };
   }, [selectedTicker]);
+
+  // Seed the sliders with the backend's own DCF assumptions once per ticker. A provisional seed (fallback
+  // after a failed request, or a degraded bundle) is replaced once by the full result; later refetches
+  // never reset the user's sliders.
+  const seed = useRef<{ ticker: string; provisional: boolean }>({ ticker: "", provisional: true });
+  useEffect(() => {
+    if (!selectedTicker) return;
+    const fresh = seed.current.ticker !== selectedTicker;
+    if (full.data) {
+      if (!fresh && !(seed.current.provisional && !full.data.degraded)) return;
+      const d = defaultsFromFull(full.data);
+      seed.current = { ticker: selectedTicker, provisional: !!full.data.degraded };
+      setDefaults(d);
+      setDefaultsFromBackend(true);
+      setParams(sharedWaccRef.current != null ? { ...d, wacc: sharedWaccRef.current } : d);
+      setSeededFor(selectedTicker);
+    } else if (fresh && full.failureCount > 0) {
+      seed.current = { ticker: selectedTicker, provisional: true };
+      setDefaults(FALLBACK_PARAMS);
+      setDefaultsFromBackend(false);
+      setParams(sharedWaccRef.current != null ? { ...FALLBACK_PARAMS, wacc: sharedWaccRef.current } : FALLBACK_PARAMS);
+      setSeededFor(selectedTicker);
+    }
+  }, [selectedTicker, full.data, full.failureCount]);
 
   // When the shared cost-of-equity override changes in the parent, apply it; clearing it
   // restores the ticker's own default WACC.
@@ -161,6 +168,7 @@ export function DcfPanel({ tickers, sharedWacc = null }: { tickers: string[]; pe
   }, [tickers, selectedTicker]);
 
   // Debounced fetch – 500ms after any change (mirrors ValuationTab pattern)
+  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
   useEffect(() => {
     if (!selectedTicker || seededFor !== selectedTicker) return;
     const t = setTimeout(async () => {
@@ -182,7 +190,7 @@ export function DcfPanel({ tickers, sharedWacc = null }: { tickers: string[]; pe
       }
     }, 500);
     return () => clearTimeout(t);
-  }, [selectedTicker, seededFor, params]);
+  }, [selectedTicker, seededFor, params, refreshNonce]);
 
   // ── Early states ──────────────────────────────────────────────────────────
   if (!tickers.length) {
@@ -241,7 +249,7 @@ export function DcfPanel({ tickers, sharedWacc = null }: { tickers: string[]; pe
                 <span className="font-mono">
                   {s.isInt
                     ? String(Math.round(params[s.key]))
-                    : fmtPct(params[s.key] * 100)}
+                    : fmtPctFromFraction(params[s.key])}
                 </span>
               </div>
               <input
@@ -342,12 +350,12 @@ export function DcfPanel({ tickers, sharedWacc = null }: { tickers: string[]; pe
           />
           <KpiTile
             label="Upside"
-            value={upside !== null ? fmtPct(upside * 100) : "n/a"}
+            value={upside !== null ? fmtPctFromFraction(upside) : "n/a"}
             valueClass={upside !== null ? upsideColor : "text-text-muted"}
             prov="upsidePct"
           />
           <KpiTile
-            label="TTM FCF"
+            label={`${data.inputs.fcfPeriod ?? "TTM"} FCF`}
             value={data.inputs.ttmFcf !== null ? fmtLarge(data.inputs.ttmFcf) : "—"}
             valueClass="text-text-primary"
             prov="inputs.ttmFcf"
@@ -396,16 +404,16 @@ export function DcfPanel({ tickers, sharedWacc = null }: { tickers: string[]; pe
                     >
                       <td className="py-2 font-medium text-text-primary">{s.scenario}</td>
                       <td className="py-2 text-right font-mono text-text-secondary">
-                        {fmtPct(s.fcfGrowth * 100)}
+                        {fmtPctFromFraction(s.fcfGrowth)}
                       </td>
                       <td className="py-2 text-right font-mono text-text-secondary">
-                        {fmtPct(s.wacc * 100)}
+                        {fmtPctFromFraction(s.wacc)}
                       </td>
                       <td className="py-2 text-right font-mono text-text-primary">
                         {s.intrinsicValue !== null ? fmtPrice(s.intrinsicValue, sym) : <NaReason />}
                       </td>
                       <td className={`py-2 text-right font-mono ${uColor}`}>
-                        {s.upsidePct !== null ? fmtPct(s.upsidePct * 100) : <NaReason />}
+                        {s.upsidePct !== null ? fmtPctFromFraction(s.upsidePct) : <NaReason />}
                       </td>
                     </tr>
                   );
@@ -435,7 +443,7 @@ export function DcfPanel({ tickers, sharedWacc = null }: { tickers: string[]; pe
               {/* WACC header row */}
               {sensitivity.waccAxis.map((w) => (
                 <div key={w} className="px-1 py-1 font-mono text-text-muted text-center">
-                  {fmtPct(w * 100, 1)}
+                  {fmtPctFromFraction(w, 1)}
                 </div>
               ))}
 
@@ -444,7 +452,7 @@ export function DcfPanel({ tickers, sharedWacc = null }: { tickers: string[]; pe
                 <>
                   {/* Row label */}
                   <div key={`label-${g}`} className="px-1 py-1 font-mono text-text-muted text-right self-center">
-                    {fmtPct(g * 100, 1)}
+                    {fmtPctFromFraction(g, 1)}
                   </div>
 
                   {/* Cells */}
@@ -458,7 +466,7 @@ export function DcfPanel({ tickers, sharedWacc = null }: { tickers: string[]; pe
                         style={{ backgroundColor: bg }}
                         title={
                           cellVal !== null
-                            ? `FCF ${fmtPct(g * 100, 1)}, WACC ${fmtPct(w * 100, 1)} → ${fmtPrice(cellVal, sym)}`
+                            ? `FCF ${fmtPctFromFraction(g, 1)}, WACC ${fmtPctFromFraction(w, 1)} → ${fmtPrice(cellVal, sym)}`
                             : "n/a"
                         }
                       >

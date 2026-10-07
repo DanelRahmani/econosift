@@ -6,12 +6,15 @@ import threading
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
-from fastapi import Depends, FastAPI, Response
+from fastapi import Depends, FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 
 from . import cache
 
 STALE_HEADER = "X-Data-Stale"
+# Sent by a page's Refresh button (P1-20): this GET recomputes the cached data
+# it reads instead of serving it (see cache.set_refresh).
+REFRESH_HEADER = "X-Cache-Refresh"
 
 from .middleware import DeduplicationMiddleware
 from .routers import (
@@ -41,7 +44,7 @@ async def lifespan(app: FastAPI):
         scheduler.shutdown(wait=False)
 
 
-async def _start_fetch_log(response: Response) -> None:
+async def _start_fetch_log(request: Request, response: Response) -> None:
     # Must be async: it runs in the request's own task, so the log it opens is
     # the one the endpoint and its threads report cache reads to.
     def on_stale(fetched_at: float) -> None:
@@ -53,6 +56,7 @@ async def _start_fetch_log(response: Response) -> None:
             response.headers[STALE_HEADER] = stamp
 
     cache.start_fetch_log(on_stale)
+    cache.set_refresh(request.method == "GET" and request.headers.get(REFRESH_HEADER) == "1")
 
 
 app = FastAPI(title="EconoSift API", version="1.0.0", lifespan=lifespan,

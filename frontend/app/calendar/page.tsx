@@ -14,6 +14,7 @@ import {
   type ImpactFilter,
   type TzDisplay,
 } from "@/components/calendar/CalendarFilters";
+import { useRefreshNonce } from "@/lib/refresh";
 
 // ─────────────────────────────────────────────
 // Constants
@@ -141,6 +142,7 @@ function CalendarPageInner() {
   const [filters, setFilters] = useState<CalendarFilterState>(defaultFilters);
 
   // ── Fetch ─────────────────────────────────
+  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
   useEffect(() => {
     let alive = true;
     setLoading(true);
@@ -164,7 +166,7 @@ function CalendarPageInner() {
     return () => {
       alive = false;
     };
-  }, [index, monday]);
+  }, [index, monday, refreshNonce]);
 
   // ── Derived: merge + derive countries ─────
   const allEvents = useMemo<CalendarEvent[]>(() => {
@@ -291,6 +293,12 @@ function CalendarPageInner() {
             onCountryChange={handleCountryChange}
             onTzChange={handleTzChange}
           />
+
+          {data?.cbScheduleEnds && (
+            <p className="text-[11px] text-text-muted">
+              Central-bank meetings are listed through {data.cbScheduleEnds} (each bank&apos;s published schedule).
+            </p>
+          )}
 
           {/* API key notices */}
           {data && (!data.sources.finnhub || !data.sources.fred) && (

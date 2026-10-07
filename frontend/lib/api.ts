@@ -15,15 +15,15 @@ import type {
   RollingMetricsResponse, ExtendedRiskResponse, CorrelationResponse,
   GarchResult, HurstResult, OUResponse, CointegrationResult,
   MonteCarloResult, StressTestResponse,
-  OptionsKPIs, OptionsChain, IVTermPoint, IVSmilePoint, OIProfile, MCOptionsResult,
+  OptionsKPIs, OptionsChain, OptionsExpiriesResponse, IVTermStructureResponse, IVSmileResponse, OIProfile, MCOptionsResult,
   RatesData, InflationData, EmploymentData, HousingData, CommoditiesData,
   FxHeatmapData, FxPppData, LeadingData, FinancialConditionsData, CotData,
-  Holders13FResponse, Form4Response,
+  Holders13FResponse, Load13FPreviousResponse, Form4Response,
   SnowflakeResponse, SnowflakeBatchResponse,
   SectorReturnsResponse, SectorFundamentalsResponse, SectorRotationResponse, SectorDrillResponse,
   Holding,
   PortfolioAnalysis, CorrelationData, RiskContribData, CAPMData, RollingData,
-  KellyData, FFData, FrontierData, MCData, BLData, StressScenario,
+  KellyData, FFData, FrontierData, MCData, BLData, StressData,
   TechnicalsResponse,
   AtlasIndicator, AtlasRegion, AtlasTimelineResponse, AtlasSnapshotResponse,
   RiskParityWeights, RiskParityBacktest, CarryTable, CarryBacktest, MomentumResponse,
@@ -51,13 +51,28 @@ import type {
 } from "./types";
 
 import { noteResponse, STALE_HEADER } from "./staleData";
+import { REFRESH_HEADER, requestDone, requestStarted } from "./refresh";
 
 // Relative by default (Docker/web hit /api via nginx); the Tauri desktop build
 // sets NEXT_PUBLIC_API_URL=http://localhost:8000 in .env.production.
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
 async function get<T>(path: string): Promise<T> {
-  const res = await fetch(`${API_BASE}/api${path}`, { cache: "no-store" });
+  const refreshing = requestStarted();
+  let data: unknown;
+  try {
+    data = await getJson(path, refreshing);
+    return data as T;
+  } finally {
+    requestDone(refreshing, data);
+  }
+}
+
+async function getJson(path: string, refreshing: boolean): Promise<unknown> {
+  const res = await fetch(`${API_BASE}/api${path}`, {
+    cache: "no-store",
+    headers: refreshing ? { [REFRESH_HEADER]: "1" } : undefined,
+  });
   if (!res.ok) {
     // Surface the server's reason (FastAPI `detail`) so a page can say *why*
     // data is missing instead of a bare status code.
@@ -66,7 +81,7 @@ async function get<T>(path: string): Promise<T> {
   }
   const data = await res.json();
   noteResponse(path, res.headers.get(STALE_HEADER), data);
-  return data as T;
+  return data;
 }
 
 async function post<T>(path: string, body: unknown): Promise<T> {
@@ -313,7 +328,7 @@ export const api = {
 
   // --- Phase 7: Options & IV Module ---
   optionsExpiries: (ticker: string) =>
-    get<string[]>(`/options/expiries?ticker=${encodeURIComponent(ticker)}`),
+    get<OptionsExpiriesResponse>(`/options/expiries?ticker=${encodeURIComponent(ticker)}`),
 
   optionsKPIs: (ticker: string) =>
     get<OptionsKPIs>(`/options/ivmetrics?ticker=${encodeURIComponent(ticker)}`),
@@ -322,10 +337,10 @@ export const api = {
     get<OptionsChain>(`/options/chain?ticker=${encodeURIComponent(ticker)}&expiry=${encodeURIComponent(expiry)}`),
 
   optionsTermStructure: (ticker: string) =>
-    get<IVTermPoint[]>(`/options/termstructure?ticker=${encodeURIComponent(ticker)}`),
+    get<IVTermStructureResponse>(`/options/termstructure?ticker=${encodeURIComponent(ticker)}`),
 
   optionsSmile: (ticker: string, expiry: string) =>
-    get<IVSmilePoint[]>(`/options/smile?ticker=${encodeURIComponent(ticker)}&expiry=${encodeURIComponent(expiry)}`),
+    get<IVSmileResponse>(`/options/smile?ticker=${encodeURIComponent(ticker)}&expiry=${encodeURIComponent(expiry)}`),
 
   optionsOIProfile: (ticker: string, expiry: string) =>
     get<OIProfile>(`/options/oiprofile?ticker=${encodeURIComponent(ticker)}&expiry=${encodeURIComponent(expiry)}`),
@@ -394,6 +409,9 @@ export const api = {
   market13f: (ticker: string) =>
     get<Holders13FResponse>(`/market/13f?ticker=${encodeURIComponent(ticker)}`),
 
+  /** 🟡 Download the previous quarter's 13F data set (~100 MB) for the QoQ change. */
+  market13fLoadPrevious: () => post<Load13FPreviousResponse>("/market/13f/previous", {}),
+
   marketForm4: (ticker: string) =>
     get<Form4Response>(`/market/form4?ticker=${encodeURIComponent(ticker)}`),
 
@@ -456,7 +474,7 @@ export const api = {
   portfolioBL: (holdings: Holding[], views: { ticker: string; expectedReturn: number }[], period: string): Promise<BLData> =>
     post("/portfolio/blacklitterman", { holdings, views, period }),
 
-  portfolioStress: (holdings: Holding[], period: string): Promise<StressScenario[]> =>
+  portfolioStress: (holdings: Holding[], period: string): Promise<StressData> =>
     post("/portfolio/stress", { holdings, period }),
 
   fetchTechnicals: (ticker: string, period = "1y"): Promise<TechnicalsResponse> =>

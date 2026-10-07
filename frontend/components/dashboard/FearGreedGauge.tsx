@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { AreaChart, Area, ResponsiveContainer, YAxis, Tooltip } from "recharts";
 import { api } from "@/lib/api";
+import { useRefreshNonce } from "@/lib/refresh";
 import type { FearGreedResponse } from "@/lib/types";
 import { Card, Skeleton, chartTooltipStyle, chartPalette, SemiGauge } from "@/components/ui";
 import { useTheme } from "@/components/ThemeProvider";
@@ -21,6 +22,7 @@ export function FearGreedGauge() {
   const [loading, setLoading] = useState(true);
   const scope = useSourceScope(provOf(data));
 
+  const refreshNonce = useRefreshNonce(); // re-fetch on the page's Refresh (P1-20)
   useEffect(() => {
     let alive = true;
     api.fearGreed()
@@ -28,7 +30,7 @@ export function FearGreedGauge() {
       .catch(() => alive && setData(null))
       .finally(() => alive && setLoading(false));
     return () => { alive = false; };
-  }, []);
+  }, [refreshNonce]);
 
   if (loading && !data) return <Skeleton className="h-72" />;
   if (!data || data.index === null)

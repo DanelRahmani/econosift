@@ -176,9 +176,9 @@ def analyst_data(ticker: str) -> dict:
                     eps_act = _clean(row[act_col])
                     surp = _clean(row[surp_col]) if surp_col else None
 
-                    # Compute surprise if missing but both estimates available
+                    # Compute surprise (percent) if missing but both estimates available
                     if surp is None and eps_est is not None and eps_act is not None and eps_est != 0:
-                        surp = _clean((eps_act - eps_est) / abs(eps_est))
+                        surp = _clean((eps_act - eps_est) / abs(eps_est) * 100.0)  # percent, like Yahoo's Surprise(%)
 
                     earning_surprises.append({
                         "date": dt_str,

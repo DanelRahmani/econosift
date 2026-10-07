@@ -19,6 +19,7 @@ import {
   ReferenceLine,
   ReferenceArea,
 } from "recharts";
+import { useRefreshNonce } from "@/lib/refresh";
 
 function fmtNum(v: number | null | undefined, decimals = 1, suffix = ""): string {
   return v != null ? `${v.toFixed(decimals)}${suffix}` : "—";
@@ -40,13 +41,14 @@ export function RecessionProbability() {
   // Use dark as default since chartPalette dark values work reasonably in both themes
   const pal = chartPalette("dark");
 
+  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
   useEffect(() => {
     api
       .macroRecessionProbability()
       .then(setData)
       .catch(() => setData({}))
       .finally(() => setLoading(false));
-  }, []);
+  }, [refreshNonce]);
 
   const kpis = data?.kpis;
   const recessions = data?.recessions ?? [];

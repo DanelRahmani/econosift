@@ -4,6 +4,7 @@ import { api } from "@/lib/api";
 import type { MacroRegimeData } from "@/lib/types";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
+import { useRefreshNonce } from "@/lib/refresh";
 
 const QUADRANT_STYLES: Record<number, string> = {
   1: "bg-green-500/20 border-green-500/50 text-green-500 dark:text-green-400",
@@ -19,9 +20,10 @@ export function RegimeOverlay() {
   const [data, setData] = useState<MacroRegimeData | null>(null);
   const scope = useSourceScope(provOf(data));
 
+  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
   useEffect(() => {
     api.macroRegime().then(setData).catch(console.error);
-  }, []);
+  }, [refreshNonce]);
 
   if (!data) return null;
 

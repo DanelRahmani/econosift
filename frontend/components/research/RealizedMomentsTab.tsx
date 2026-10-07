@@ -11,6 +11,7 @@ import { api } from "@/lib/api";
 import type { MomentsResponse, MomentsCrossSection } from "@/lib/types";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
+import { useRefreshNonce } from "@/lib/refresh";
 
 const PERIODS = ["1y", "2y", "3y", "5y"] as const;
 type Period = (typeof PERIODS)[number];
@@ -69,10 +70,11 @@ export function RealizedMomentsTab() {
   }, []);
 
   // Auto-load moments on mount and when ticker/period changes (🟢)
+  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
   useEffect(() => {
     loadMoments(ticker, period);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [period]);  // only period change auto-triggers; ticker requires Enter/blur
+  }, [period, refreshNonce]);  // only period change auto-triggers; ticker requires Enter/blur
 
   const runCrossSection = () => {
     setXsLoading(true);

@@ -10,6 +10,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Cell, ReferenceLine,
 } from "recharts";
+import { useRefreshNonce } from "@/lib/refresh";
 
 const GRID = "rgba(255,255,255,0.08)";
 
@@ -40,9 +41,10 @@ export function InequalityTab() {
   const [error, setError] = useState(false);
   const scope = useSourceScope(provOf(data));
 
+  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
   useEffect(() => {
     api.macroInequality().then(setData).catch(() => setError(true)).finally(() => setLoading(false));
-  }, []);
+  }, [refreshNonce]);
 
   if (loading) {
     return <div className="space-y-4">{Array.from({ length: 4 }).map((_, i) => (

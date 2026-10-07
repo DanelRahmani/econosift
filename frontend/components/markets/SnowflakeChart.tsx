@@ -11,6 +11,7 @@ import { Card, Skeleton, chartPalette } from "@/components/ui";
 import { useTheme } from "@/components/ThemeProvider";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
+import { useRefreshNonce } from "@/lib/refresh";
 
 // Axis display names and which Markets tab to navigate to on click
 const AXES = [
@@ -44,6 +45,7 @@ export function SnowflakeChart({ ticker, onAxisClick, compact = false }: Props) 
   const [error, setError] = useState<string | null>(null);
   const scope = useSourceScope(provOf(data));
 
+  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
   useEffect(() => {
     if (!ticker) return;
     setLoading(true);
@@ -52,7 +54,7 @@ export function SnowflakeChart({ ticker, onAxisClick, compact = false }: Props) 
       .then(setData)
       .catch(() => setError("Failed to load Snowflake score"))
       .finally(() => setLoading(false));
-  }, [ticker]);
+  }, [ticker, refreshNonce]);
 
   if (loading) {
     return (

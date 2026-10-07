@@ -7,6 +7,7 @@ import { Card } from "@/components/ui";
 import { SourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
 import { fmtPct, fmtPrice, currencySymbol } from "@/lib/format";
+import { useRefreshNonce } from "@/lib/refresh";
 
 const STORAGE_KEY = "econosift-watchlist";
 const LEGACY_STORAGE_KEY = "axiom-watchlist";
@@ -77,6 +78,7 @@ export function Watchlist({ onSelect }: Props) {
   }
 
   const tickersKey = tickers.join(",");
+  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
   useEffect(() => {
     if (!tickers.length) return;
     let active = true;
@@ -90,7 +92,7 @@ export function Watchlist({ onSelect }: Props) {
     });
     return () => { active = false; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tickersKey]);
+  }, [tickersKey, refreshNonce]);
 
   function add() {
     const sym = input.trim().toUpperCase();

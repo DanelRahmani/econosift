@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { api } from "@/lib/api";
 import type { Holding, KellyData } from "@/lib/types";
+import { useSourceScope } from "@/components/provenance/SourceScope";
+import { provOf } from "@/lib/provenance";
 
 interface Props {
   holdings: Holding[];
@@ -13,6 +15,7 @@ export function KellyTable({ holdings, period }: Props) {
   const [data, setData] = useState<KellyData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const scope = useSourceScope(provOf(data));
 
   async function calculate() {
     setLoading(true);
@@ -28,7 +31,7 @@ export function KellyTable({ holdings, period }: Props) {
   }
 
   return (
-    <div className="rounded-xl border border-border bg-surface p-4 space-y-3">
+    <div className="rounded-xl border border-border bg-surface p-4 space-y-3" {...scope}>
       <div className="flex items-center justify-between">
         <h3 className="font-semibold text-sm">Kelly Criterion</h3>
         <button
@@ -42,7 +45,7 @@ export function KellyTable({ holdings, period }: Props) {
 
       {error && <p className="text-sm text-red-500">{error}</p>}
 
-      {data && data.length > 0 && (
+      {data && data.holdings?.length > 0 && (
         <>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -55,7 +58,7 @@ export function KellyTable({ holdings, period }: Props) {
                 </tr>
               </thead>
               <tbody>
-                {data.map((r) => {
+                {data.holdings.map((r) => {
                   const kelly = r.kellyFraction !== null ? Math.min(r.kellyFraction * 100, 100) : null;
                   return (
                     <tr key={r.ticker} className="border-b border-border/50">

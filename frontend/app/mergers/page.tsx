@@ -9,6 +9,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Cell,
 } from "recharts";
+import { useRefreshNonce } from "@/lib/refresh";
 
 const GRID = "rgba(255,255,255,0.08)";
 
@@ -18,9 +19,10 @@ export default function MergersPage() {
   const [error, setError] = useState(false);
   const scope = useSourceScope(provOf(data));
 
+  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
   useEffect(() => {
     api.mergers().then(setData).catch(() => setError(true)).finally(() => setLoading(false));
-  }, []);
+  }, [refreshNonce]);
 
   if (loading) {
     return (

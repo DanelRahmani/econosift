@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react";
 import type { AiSummaryResponse } from "@/lib/types";
 import { Card } from "@/components/ui";
+import { SimpleMarkdown } from "@/components/SimpleMarkdown";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
 
@@ -305,10 +306,7 @@ export function AiSummaryPanel({ summaryType, title, options, searchPlaceholder,
               </span>
             )}
           </div>
-          {/* Summary text — preserve line breaks */}
-          <div className="text-sm text-text-secondary whitespace-pre-line leading-relaxed">
-            {result.summary_text}
-          </div>
+          <SimpleMarkdown text={result.summary_text} className="text-sm text-text-secondary leading-relaxed" />
           <Grounding result={result} />
           {/* Regenerate button */}
           <button

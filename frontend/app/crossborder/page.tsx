@@ -5,6 +5,7 @@ import type { CrossborderData, FactbookCountry } from "@/lib/types";
 import { Card, PageSkeleton } from "@/components/ui";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
+import { useRefreshNonce } from "@/lib/refresh";
 
 function fmtUsd(v: number): string {
   if (v >= 1e12) return `$${(v / 1e12).toFixed(1)}T`;
@@ -20,12 +21,13 @@ export default function CrossborderPage() {
   const [error, setError] = useState(false);
   const scope = useSourceScope(provOf(data));
 
+  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
   useEffect(() => {
     Promise.all([api.crossborderClaims(), api.factbookCountries()])
       .then(([d, c]) => { setData(d); setCountries(c); })
       .catch(() => setError(true))
       .finally(() => setLoading(false));
-  }, []);
+  }, [refreshNonce]);
 
   // Build lookup: iso3 → {flag, name} and iso2 → {flag, name}
   const flagMap = useMemo(() => {

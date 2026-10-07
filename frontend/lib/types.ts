@@ -151,6 +151,7 @@ export interface DcfResponse {
   reason?: string;
   inputs: {
     ttmFcf: number | null;
+    fcfPeriod?: string;
     shares: number | null;
     netDebt: number | null;
     fcfGrowth: number;
@@ -312,6 +313,9 @@ export interface ValuationFullResponse {
   valuation: ValuationCore;
   fundamentals: Fundamentals;
   analyst: AnalystData;
+  /** Yahoo answered with partial company data; the UI re-requests until it is complete (P2-39). */
+  degraded?: boolean;
+  degradedReason?: string | null;
 }
 export interface FactorResponse {
   ticker: string;
@@ -589,6 +593,8 @@ export interface CalendarResponse {
   dividends: CalendarEvent[];
   ipos: CalendarEvent[];
   sources: { finnhub: boolean; fred: boolean; cbMeetings: boolean };
+  /** Last date for which every central bank's meetings are listed (P1-15). */
+  cbScheduleEnds?: string | null;
 }
 
 // --- Phase 5: Screener Overhaul ---
@@ -856,6 +862,21 @@ export interface IVSmilePoint {
   moneyness: number;
   callIV: number | null;
   putIV: number | null;
+}
+
+// Wrapped in objects (P2-32) so each response carries its own provenance map.
+export interface OptionsExpiriesResponse {
+  ticker: string;
+  expiries: string[];
+}
+export interface IVTermStructureResponse {
+  ticker: string;
+  points: IVTermPoint[];
+}
+export interface IVSmileResponse {
+  ticker: string;
+  expiry: string;
+  points: IVSmilePoint[];
 }
 
 export interface OIProfile {
@@ -1651,6 +1672,20 @@ export interface Holders13FResponse {
   filers?: number | null;      // 13F filers reporting a position
   totalShares?: number | null; // shares held across all of them
   error?: string | null;
+  /** Whether the previous quarter is stored for the QoQ change (P2-37). */
+  change?: {
+    available: boolean;
+    previousAsOf: string | null;
+    previousDataset: string;
+    reason: string | null;
+    canLoad: boolean;
+    loading: boolean;
+  };
+}
+export interface Load13FPreviousResponse {
+  started: boolean;
+  window: string | null;
+  error: string | null;
 }
 export interface InsiderTransaction {
   insiderName: string;
@@ -1709,9 +1744,11 @@ export interface SnowflakeResponse {
   axisDetails: Record<string, SnowflakeAxisDetail>;
 }
 export interface SnowflakeBatchResponse {
-  [ticker: string]: {
-    overallScore: number | null;
-    scores: SnowflakeScores;
+  scores: {
+    [ticker: string]: {
+      overallScore: number | null;
+      scores: SnowflakeScores;
+    };
   };
 }
 
@@ -1748,7 +1785,9 @@ export interface SectorFundamentals {
   return6m: number | null;
   return1y: number | null;
 }
-export type SectorFundamentalsResponse = SectorFundamentals[];
+export interface SectorFundamentalsResponse {
+  sectors: SectorFundamentals[];
+}
 export interface SectorBubble {
   ticker: string;
   sector: string;
@@ -1768,7 +1807,10 @@ export interface IndustryGroup {
   industry: string;
   stocks: Array<{ symbol: string; name: string; change1d: number | null }>;
 }
-export type SectorDrillResponse = IndustryGroup[];
+export interface SectorDrillResponse {
+  sector: string;
+  industries: IndustryGroup[];
+}
 
 // --- Phase 11: Portfolio Analytics ---
 export interface Holding {
@@ -1811,7 +1853,10 @@ export interface RiskContribItem {
   marginalContrib: number | null;
   pctContrib: number | null;
 }
-export type RiskContribData = RiskContribItem[];
+export interface RiskContribData {
+  holdings: RiskContribItem[];
+  error?: string;
+}
 
 export interface CAPMData {
   alpha: number | null;         // daily alpha
@@ -1835,14 +1880,17 @@ export interface RollingData {
   beta: DateValuePoint[];
 }
 
-// Kelly returns a list (one per holding)
+// Kelly returns one row per holding
 export interface KellyRow {
   ticker: string;
   annReturn: number | null;
   annVolatility: number | null;
   kellyFraction: number | null;
 }
-export type KellyData = KellyRow[];
+export interface KellyData {
+  holdings: KellyRow[];
+  error?: string;
+}
 
 export interface FFFactorRow {
   /** Factor name as the backend emits it (e.g. "MktRF", "SMB", "HML"). */
@@ -1901,7 +1949,7 @@ export interface BLData {
   error?: string;
 }
 
-// Stress test returns a list of scenario objects
+// Stress test returns one object per scenario
 export interface StressScenario {
   scenario: string;
   label: string;
@@ -1913,7 +1961,10 @@ export interface StressScenario {
   benchmark: DateValuePoint[];
   error?: string;
 }
-export type StressData = StressScenario[];
+export interface StressData {
+  scenarios: StressScenario[];
+  error?: string;
+}
 
 // --- Phase 12 Technicals ---
 export interface TechnicalSummary {
@@ -2002,6 +2053,8 @@ export interface TechnicalsResponse {
   cmf: SubChartPoint[];
   atr: SubChartPoint[];
   fibLevels: FibLevel[];
+  fibDirection?: "upswing" | "downswing" | null;
+  fibSwing?: { high: number; low: number; direction: string; highDate: string; lowDate: string } | null;
   pivotPoints: Record<'daily' | 'weekly' | 'monthly', PivotSet>;
 }
 
@@ -2084,6 +2137,8 @@ export interface HealthResponse {
     totalMisses: number;
     overallHitRate: number | null;
     ttlSeconds: number;
+    /** Cached entries from before an upgrade added sources (P2-33). */
+    provenanceGaps?: { total: number; byName: Record<string, number> };
   };
   config: { fredApiKey: boolean; finnhubApiKey: boolean; geminiApiKey: boolean };
   database: DbHealth;
@@ -2428,6 +2483,8 @@ export interface CentralBanksData {
   }>;
   current: Record<string, CbCurrent>;
   balance_sheet: Array<{ date: string; value: number }>;
+  /** Last date for which every bank's meetings are listed (P1-15). */
+  schedule_ends?: string | null;
 }
 
 // ── Phase 18A ──────────────────────────────────────────────────

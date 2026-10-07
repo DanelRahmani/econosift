@@ -7,6 +7,7 @@ import { ThemeProvider, themeInitScript } from "@/components/ThemeProvider";
 import { Providers } from "@/components/providers";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { SourceMenu } from "@/components/provenance/SourceMenu";
+import { Spotlight } from "@/components/Spotlight";
 
 export const metadata: Metadata = {
   title: "EconoSift",
@@ -30,6 +31,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <Footer />
             <MobileNav />
             <SourceMenu />
+            <Spotlight />
           </ThemeProvider>
         </Providers>
       </body>

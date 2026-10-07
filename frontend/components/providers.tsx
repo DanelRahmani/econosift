@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from '@/lib/queryClient';
 import { LearningProvider } from '@/lib/learningContext';
+import { RefreshProvider } from '@/lib/refresh';
 
 // Relative by default (Docker/web hit /api via nginx); the Tauri desktop build
 // sets NEXT_PUBLIC_API_URL=http://localhost:8000 in .env.production.
@@ -64,7 +65,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <LearningProvider>
-        <BackendGate>{children}</BackendGate>
+        <RefreshProvider>
+          <BackendGate>{children}</BackendGate>
+        </RefreshProvider>
       </LearningProvider>
     </QueryClientProvider>
   );

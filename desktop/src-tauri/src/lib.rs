@@ -10,6 +10,56 @@ use tauri_plugin_dialog::DialogExt;
 /// Holds the spawned backend child process so it can be killed on app exit.
 struct BackendProcess(Mutex<Option<CommandChild>>);
 
+/// DESK-02: put the backend in a Job Object that kills its processes when the job's
+/// last handle closes. The handle is deliberately never closed, so Windows closes it
+/// when econosift.exe exits by any route (normal quit, crash, `Stop-Process -Force`,
+/// Task Manager "End task") and the backend dies with it. Processes the backend starts
+/// later join the job automatically.
+#[cfg(windows)]
+fn kill_backend_with_app(pid: u32) -> Result<(), String> {
+    use windows_sys::Win32::Foundation::{CloseHandle, FALSE};
+    use windows_sys::Win32::System::JobObjects::{
+        AssignProcessToJobObject, CreateJobObjectW, JobObjectExtendedLimitInformation,
+        SetInformationJobObject, JOBOBJECT_EXTENDED_LIMIT_INFORMATION, JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
+    };
+    use windows_sys::Win32::System::Threading::{OpenProcess, PROCESS_SET_QUOTA, PROCESS_TERMINATE};
+
+    unsafe {
+        let job = CreateJobObjectW(std::ptr::null(), std::ptr::null());
+        if job.is_null() {
+            return Err(format!("CreateJobObjectW failed: {}", std::io::Error::last_os_error()));
+        }
+        let mut info: JOBOBJECT_EXTENDED_LIMIT_INFORMATION = std::mem::zeroed();
+        info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+        let set = SetInformationJobObject(
+            job,
+            JobObjectExtendedLimitInformation,
+            &info as *const _ as *const core::ffi::c_void,
+            std::mem::size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>() as u32,
+        );
+        if set == 0 {
+            let err = std::io::Error::last_os_error();
+            CloseHandle(job);
+            return Err(format!("SetInformationJobObject failed: {err}"));
+        }
+        let process = OpenProcess(PROCESS_SET_QUOTA | PROCESS_TERMINATE, FALSE, pid);
+        if process.is_null() {
+            let err = std::io::Error::last_os_error();
+            CloseHandle(job);
+            return Err(format!("OpenProcess({pid}) failed: {err}"));
+        }
+        let assigned = AssignProcessToJobObject(job, process);
+        let err = std::io::Error::last_os_error();
+        CloseHandle(process);
+        if assigned == 0 {
+            CloseHandle(job);
+            return Err(format!("AssignProcessToJobObject failed: {err}"));
+        }
+        // `job` is intentionally leaked; see above.
+    }
+    Ok(())
+}
+
 /// Resolve the OS-standard app data directory.
 fn app_data_dir() -> std::path::PathBuf {
     let base = dirs::data_dir().unwrap_or_else(|| std::path::PathBuf::from("."));
@@ -89,6 +139,12 @@ pub fn run() {
                 .spawn()
                 .expect("Failed to spawn backend process");
 
+            #[cfg(windows)]
+            if let Err(e) = kill_backend_with_app(child.pid()) {
+                // Not fatal: a normal quit still kills the child below.
+                eprintln!("Backend not tied to the app's lifetime: {e}");
+            }
+
             // Stash the child so it can be killed on exit — dropping a
             // CommandChild does NOT terminate the underlying OS process, which
             // is why econosift-backend.exe used to keep running after the app closed.
@@ -123,9 +179,7 @@ pub fn run() {
         .expect("error while building EconoSift")
         .run(|app_handle, event| {
             // Kill the spawned backend on normal app exit (window close / quit).
-            // Force-killing econosift.exe itself still orphans the backend —
-            // that requires OS-level process-group/job-object handling, which is
-            // a separate, larger fix (see ACTIVE_ISSUES.md DESK-02).
+            // On Windows a force-kill is covered by the Job Object (DESK-02).
             if let tauri::RunEvent::ExitRequested { .. } = event {
                 if let Some(state) = app_handle.try_state::<BackendProcess>() {
                     if let Some(child) = state.0.lock().unwrap().take() {

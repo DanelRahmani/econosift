@@ -18,6 +18,7 @@ import {
   ResponsiveContainer,
   ReferenceLine,
 } from "recharts";
+import { useRefreshNonce } from "@/lib/refresh";
 
 const GRID = "rgba(255,255,255,0.08)";
 
@@ -57,13 +58,14 @@ export function InflationTab() {
   const [error, setError] = useState(false);
   const scope = useSourceScope(provOf(data));
 
+  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
   useEffect(() => {
     api
       .macroInflation()
       .then(setData)
       .catch(() => setError(true))
       .finally(() => setLoading(false));
-  }, []);
+  }, [refreshNonce]);
 
   if (loading) {
     return <PageSkeleton text="Loading inflation data…" />;

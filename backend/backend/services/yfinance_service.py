@@ -307,12 +307,19 @@ def _info_failed(bundle: dict) -> bool:
         info.get(k) for k in ("sector", "industry", "totalRevenue"))
 
 
+_INFO_RETRY_DELAYS = (0.0, 0.0, 3.0)  # seconds before each Ticker.info attempt
+
+
 @cached("yf_info", skip_if=_info_failed)
 def get_info(ticker: str) -> dict:
     """Full .info dict plus financial statements for ratio analysis."""
     t = yf.Ticker(ticker)
     out: dict = {"ticker": ticker, "info": {}}
-    for _ in range(2):  # one retry: Yahoo intermittently fails info calls under load
+    # Yahoo intermittently fails info calls, or answers with the quote half only, under load: retry at
+    # once, then once more after a pause (P2-39: two quick tries were often both quote-only).
+    for delay in _INFO_RETRY_DELAYS:
+        if delay:
+            time.sleep(delay)
         try:
             out["info"] = t.get_info() or {}
         except Exception:
@@ -372,6 +379,8 @@ def get_info(ticker: str) -> dict:
         fcf = cf_dict.get("Free Cash Flow")
         if fcf is not None:
             info["freeCashflow"] = fcf
+            # The annual statement, not a trailing figure: label it (P3-26).
+            info["_fcfPeriod"] = f"FY{pd.Timestamp(cf_df.columns[0]).year}" if cf_df is not None else "annual"
 
     # operatingCashflow: from cashflow statement dict
     if "operatingCashflow" not in info or info["operatingCashflow"] is None:

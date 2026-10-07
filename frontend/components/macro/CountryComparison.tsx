@@ -7,6 +7,7 @@ import { Card, Skeleton } from "@/components/ui";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
 import { fmtNum, fmtLarge } from "@/lib/format";
+import { useRefreshNonce } from "@/lib/refresh";
 
 const LABELS: Record<string, string> = {
   gdp_growth: "GDP Growth",
@@ -50,6 +51,7 @@ export function CountryComparison({ selected, countries }: { selected: string[];
   const key = cols.join(",");
   const scope = useSourceScope(provOf(data));
 
+  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
   useEffect(() => {
     if (!cols.length) { setData(null); return; }
     let live = true;
@@ -59,7 +61,7 @@ export function CountryComparison({ selected, countries }: { selected: string[];
       .catch(() => live && setData(null))
       .finally(() => live && setLoading(false));
     return () => { live = false; };
-  }, [key]);
+  }, [key, refreshNonce]);
 
   const nameOf = (iso: string) => countries.find((c) => c.iso2 === iso)?.name ?? iso;
 

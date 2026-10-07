@@ -5,62 +5,196 @@
 @tailwind utilities;
 
 /* EconoSift brand palette. Values are RGB triplets so
-   Tailwind opacity modifiers work. .dark overrides switch the whole theme. */
+   Tailwind opacity modifiers work. .dark overrides switch the whole theme.
+   --primary / --primary-light are also set by the Admin theme maker. */
 :root {
-  --background: 255 255 255;
+  --background: 249 249 251;
   --foreground: 15 15 20;
-  --surface: 248 248 251;
-  --surface-alt: 241 241 245;
-  --border: 228 228 234;
+  --surface: 255 255 255;
+  --surface-alt: 243 243 247;
+  --border: 226 226 233;
   --text-secondary: 60 60 70;
-  --text-muted: 140 140 150;
+  --text-muted: 132 132 144;
   --primary: 20 42 67;         /* #142A43 deep navy */
   --primary-light: 47 143 131; /* #2F8F83 muted teal */
   --success: 22 163 74;
   --warning: 217 154 54;         /* #D99A36 restrained amber */
   --danger: 220 38 38;
+  /* Depth: the hairline highlight on a card's top edge, shadow strength,
+     the backdrop grid and the accent glow behind the page. */
+  --highlight: 255 255 255;
+  --highlight-a: 0.9;
+  --shadow-a: 0.08;
+  --grid-a: 0.045;
+  --glow-a: 0.10;
   color-scheme: light;
 }
 
 .dark {
-  --background: 12 12 14;        /* greyish-black */
-  --foreground: 242 242 247;     /* near-white */
-  --surface: 22 22 26;           /* dark card */
-  --surface-alt: 30 30 35;       /* layered surface */
-  --border: 38 38 44;            /* neutral dark border */
+  --background: 9 9 11;          /* zinc-950 */
+  --foreground: 244 244 247;     /* near-white */
+  --surface: 19 19 23;           /* card */
+  --surface-alt: 28 28 33;       /* layered surface */
+  --border: 40 40 47;            /* hairline */
   --text-secondary: 174 174 186; /* light grey secondary */
-  --text-muted: 120 120 132;
+  --text-muted: 118 118 130;
   --primary: 47 143 131;         /* #2F8F83 muted teal */
   --primary-light: 84 174 161;
   --success: 34 197 94;
   --warning: 217 154 54;         /* #D99A36 restrained amber */
   --danger: 239 68 68;
+  --highlight: 255 255 255;
+  --highlight-a: 0.05;
+  --shadow-a: 0.55;
+  --grid-a: 0.04;
+  --glow-a: 0.16;
   color-scheme: dark;
+}
+
+/* Animatable custom properties: a card's cursor spotlight fades in/out. */
+@property --spot {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
 }
 
 body {
   @apply bg-background text-text-primary font-sans antialiased;
+  font-feature-settings: "cv11", "ss01";
+  /* Accent glow behind the top of every page. */
+  background-image: radial-gradient(ellipse 70% 45% at 50% -12%, rgb(var(--primary-light) / var(--glow-a)), transparent 70%);
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+}
+
+/* Faint grid backdrop, fading out from the top. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    linear-gradient(to right, rgb(var(--foreground) / var(--grid-a)) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(var(--foreground) / var(--grid-a)) 1px, transparent 1px);
+  background-size: 44px 44px;
+  -webkit-mask-image: radial-gradient(ellipse 80% 55% at 50% 0%, #000 25%, transparent 75%);
+  mask-image: radial-gradient(ellipse 80% 55% at 50% 0%, #000 25%, transparent 75%);
+}
+
+::selection {
+  background: rgb(var(--primary-light) / 0.3);
 }
 
 h1, h2, h3, .font-display {
   font-family: var(--font-outfit, "Outfit"), "Inter", system-ui, sans-serif;
 }
 
+/* Page titles: tight tracking and a soft vertical fade. */
+main h1 {
+  letter-spacing: -0.025em;
+  background-image: linear-gradient(180deg, rgb(var(--foreground)) 35%, rgb(var(--foreground) / 0.62));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.font-mono, .tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Thin themed scrollbars. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(var(--border)) transparent;
+}
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-thumb {
+  background: rgb(var(--border));
+  border-radius: 9999px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+*::-webkit-scrollbar-thumb:hover { background-color: rgb(var(--text-muted)); }
+
+:focus-visible {
+  outline: 2px solid rgb(var(--primary-light) / 0.7);
+  outline-offset: 2px;
+}
+
 @layer components {
+  /* Card: hairline border, top-edge highlight, soft depth, and a spotlight
+     that follows the cursor (--mx/--my set by <Spotlight />). */
   .card {
-    @apply rounded-xl bg-surface border border-border p-6 shadow-lg transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md;
+    @apply rounded-2xl border border-border p-6;
+    background-color: rgb(var(--surface));
+    background-image: radial-gradient(
+      520px circle at var(--mx, 50%) var(--my, 0%),
+      rgb(var(--primary-light) / calc(0.075 * var(--spot))),
+      transparent 65%
+    );
+    box-shadow:
+      inset 0 1px 0 0 rgb(var(--highlight) / var(--highlight-a)),
+      0 1px 2px 0 rgb(0 0 0 / calc(var(--shadow-a) * 0.35)),
+      0 12px 32px -18px rgb(0 0 0 / var(--shadow-a));
+    transition: border-color 0.3s ease, box-shadow 0.3s ease, --spot 0.35s ease;
+  }
+  .card:hover {
+    --spot: 1;
+    border-color: rgb(var(--primary-light) / 0.32);
   }
   .btn {
-    @apply rounded-lg bg-accent hover:bg-accent-light text-white px-4 py-2 font-medium transition-colors active:scale-95;
+    @apply relative overflow-hidden rounded-lg px-4 py-2 font-medium text-white active:scale-[0.97];
+    background-image: linear-gradient(135deg, rgb(var(--primary-light)), rgb(var(--primary)));
+    box-shadow: inset 0 1px 0 0 rgb(255 255 255 / 0.18), 0 6px 20px -8px rgb(var(--primary-light) / 0.6);
+    transition: transform 0.15s ease, box-shadow 0.25s ease, filter 0.25s ease;
+  }
+  .btn:hover {
+    filter: brightness(1.08);
+    box-shadow: inset 0 1px 0 0 rgb(255 255 255 / 0.22), 0 8px 28px -8px rgb(var(--primary-light) / 0.75);
+  }
+  /* Shine sweep on hover. */
+  .btn::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(110deg, transparent 35%, rgb(255 255 255 / 0.28) 50%, transparent 65%);
+    transform: translateX(-120%);
+    transition: transform 0.7s ease;
+    pointer-events: none;
+  }
+  .btn:hover::after {
+    transform: translateX(120%);
+  }
+  .btn:disabled {
+    @apply opacity-50 cursor-not-allowed;
+    filter: none;
   }
   .input {
-    @apply bg-surface border border-border rounded-lg px-3 py-2 text-text-primary focus:border-accent focus:outline-none;
+    @apply bg-surface border border-border rounded-lg px-3 py-2 text-text-primary focus:outline-none;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+  .input:focus {
+    border-color: rgb(var(--primary-light) / 0.7);
+    box-shadow: 0 0 0 3px rgb(var(--primary-light) / 0.18);
   }
   .chip {
     @apply rounded-full bg-surface-alt border border-border px-3 py-1 text-sm font-mono flex items-center gap-2;
   }
+  /* Shimmer instead of a pulse. */
   .skeleton {
-    @apply animate-pulse bg-surface-alt rounded;
+    @apply rounded;
+    background-color: rgb(var(--surface-alt));
+    background-image: linear-gradient(
+      100deg,
+      transparent 20%,
+      rgb(var(--foreground) / 0.05) 45%,
+      rgb(var(--foreground) / 0.08) 50%,
+      rgb(var(--foreground) / 0.05) 55%,
+      transparent 80%
+    );
+    background-size: 220% 100%;
+    animation: shimmer 1.6s ease-in-out infinite;
   }
   .no-scrollbar {
     -ms-overflow-style: none;
@@ -71,6 +205,70 @@ h1, h2, h3, .font-display {
   }
   .btn-press {
     @apply active:scale-95 transition-transform;
+  }
+  /* Route enter: each top-level section of a page fades up, staggered. */
+  .page-enter > * > * {
+    animation: fade-up 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  .page-enter > * > *:nth-child(2) { animation-delay: 0.05s; }
+  .page-enter > * > *:nth-child(3) { animation-delay: 0.1s; }
+  .page-enter > * > *:nth-child(4) { animation-delay: 0.15s; }
+  .page-enter > * > *:nth-child(5) { animation-delay: 0.2s; }
+  .page-enter > * > *:nth-child(n + 6) { animation-delay: 0.25s; }
+}
+
+@keyframes shimmer {
+  from { background-position: 120% 0; }
+  to { background-position: -120% 0; }
+}
+
+/* Ends on transform: none so a finished section creates no containing block
+   (fixed/sticky children keep working). */
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes pop-in {
+  from { opacity: 0; transform: translateY(-4px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Tables inside cards: row hover and quieter headers. :where() keeps the
+   specificity at zero, so a row's own highlight classes still win. */
+:where(.card table tbody tr) {
+  transition: background-color 0.15s ease;
+}
+:where(.card table tbody tr:hover) {
+  background-color: rgb(var(--foreground) / 0.035);
+}
+:where(.card table thead th) {
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+
+/* Hand-rolled active pills/segments (bg-accent + text-white) get the same
+   glow as the Navbar pill; zero specificity, so explicit shadows win. */
+:where(.bg-accent.text-white) {
+  box-shadow: 0 4px 16px -6px rgb(var(--primary-light) / 0.7), inset 0 1px 0 rgb(255 255 255 / 0.14);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
 
@@ -127,6 +325,12 @@ h1, h2, h3, .font-display {
   /* Page breaks between major tab sections */
   .space-y-6 > * + * {
     break-before: auto;
+  }
+
+  /* Page titles print as plain black text, not the screen gradient */
+  main h1 {
+    background: none !important;
+    -webkit-text-fill-color: #000000 !important;
   }
 
   /* Prevent orphaned section headers */

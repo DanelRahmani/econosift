@@ -18,6 +18,13 @@ async def holders_13f(ticker: str = Query(..., description="Ticker symbol, e.g. 
     return await thirteenf_service.get_13f_holders(ticker.upper())
 
 
+@router.post("/13f/previous")
+async def load_previous_13f():
+    """🟡 Download and reduce the previous quarter's 13F data set (~100 MB), on request only,
+    so holders show their quarter-on-quarter change (P2-37)."""
+    return await asyncio.to_thread(thirteenf_service.load_previous)
+
+
 @router.get("/form4")
 async def form4_insiders(ticker: str = Query(..., description="Ticker symbol, e.g. AAPL")):
     """Recent Form 4 insider buy/sell transactions (last 90 days)."""

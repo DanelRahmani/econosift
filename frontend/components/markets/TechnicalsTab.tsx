@@ -13,6 +13,7 @@ import { api } from "@/lib/api";
 import type {
   TechnicalsResponse, BollingerPoint, IchimokuPoint, FibLevel, PivotSet,
 } from "@/lib/types";
+import { useRefreshNonce } from "@/lib/refresh";
 
 const PERIODS = ["1mo", "3mo", "6mo", "1y", "2y"] as const;
 type Period = (typeof PERIODS)[number];
@@ -145,6 +146,7 @@ export function TechnicalsTab({ ticker }: { ticker: string }) {
   const [showSubCharts, setShowSubCharts] = useState(true);
   const scope = useSourceScope(provOf(data));
 
+  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
   useEffect(() => {
     if (!ticker) return;
     setLoading(true);
@@ -154,7 +156,7 @@ export function TechnicalsTab({ ticker }: { ticker: string }) {
       .then(setData)
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-  }, [ticker, period]);
+  }, [ticker, period, refreshNonce]);
 
   function toggleOverlay(o: Overlay) {
     setActiveOverlays((prev) => {
@@ -194,6 +196,13 @@ export function TechnicalsTab({ ticker }: { ticker: string }) {
     }
     return entry;
   });
+  // Forward cloud: the 26 projected Senkou bars dated after the last price (P3-29)
+  if (activeOverlays.has("ichimoku") && prices.length > 0) {
+    const lastDate = prices[prices.length - 1].date;
+    for (const ic of ichimoku) {
+      if (ic.date > lastDate) chartData.push({ date: ic.date, senkouA: ic.senkouA, senkouB: ic.senkouB });
+    }
+  }
 
   // Determine YAxis domain from price + overlays for clean display
   const allPriceVals = chartData.flatMap((d) => {
@@ -479,7 +488,10 @@ export function TechnicalsTab({ ticker }: { ticker: string }) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {fibLevels.length > 0 && (
           <Card className="p-4" data-prov="fibLevels">
-            <p className="text-sm font-semibold text-text-primary mb-3">Fibonacci Retracement (6M swing)</p>
+            <p className="text-sm font-semibold text-text-primary mb-3">
+              Fibonacci Retracement (6M {data.fibDirection ?? "swing"}
+              {data.fibSwing ? `, ${data.fibSwing.direction === "downswing" ? "high → low" : "low → high"}` : ""})
+            </p>
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-xs text-text-muted border-b border-border">

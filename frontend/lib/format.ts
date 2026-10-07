@@ -70,6 +70,12 @@ export function shortCountryName(name: string): string {
   return COUNTRY_ABBREV[name] ?? name;
 }
 
+/** Height of a vertical (category) bar chart: 24 px per row above a 300 px floor, so
+ *  Recharts has room for every label (pair it with `interval={0}` on the YAxis; P2-16). */
+export function categoryBarHeight(rows: number, min = 300, perRow = 24): number {
+  return Math.max(min, rows * perRow);
+}
+
 export const CURRENCY_SYMBOLS: Record<string, string> = {
   USD: "$", EUR: "€", GBP: "£", JPY: "¥", CNY: "¥",
   CHF: "Fr", CAD: "C$", AUD: "A$", INR: "₹", KRW: "₩",

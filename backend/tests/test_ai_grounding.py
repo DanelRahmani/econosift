@@ -218,3 +218,55 @@ def test_migration_adds_grounding_column(tmp_path, monkeypatch):
     database._add_missing_columns()  # idempotent
     cols = {c["name"] for c in sqlalchemy.inspect(eng).get_columns("ai_summary")}
     assert "grounding" in cols
+
+
+def test_company_summary_for_several_tickers_fetches_each_one(gemini, monkeypatch):
+    # Markets sends the selected pills as "MSFT,aapl". Treated as one symbol,
+    # Yahoo resolved the first ticker and the summary described a fictional
+    # "combined entity" with AAPL's price. Each ticker gets its own figures.
+    from backend.routers import ai as ai_router
+    from backend.routers import valuation as valuation_router
+    from backend.services import yfinance_service as yfs
+    client = gemini(_ok())
+    saved = {}
+    monkeypatch.setattr(ai_router, "_save", lambda *a: saved.update(args=a))
+    monkeypatch.setattr(ai_router, "_cached_lookup", lambda *a: None)
+    prices = {"AAPL": 330.32, "MSFT": 517.53}
+    asked = []
+
+    def quote(sym):
+        asked.append(sym)
+        return {"price": prices[sym], "changePercent": 1.0}
+
+    async def full(sym):
+        return {}
+    monkeypatch.setattr(yfs, "get_quote", quote)
+    monkeypatch.setattr(valuation_router, "full", full)
+
+    out = asyncio.run(ai_router.ai_company(ai_router.CompanyRequest(ticker="MSFT, aapl")))
+    assert sorted(asked) == ["AAPL", "MSFT"]
+    assert out["context_key"] == "AAPL,MSFT" and saved["args"][1] == "AAPL,MSFT"
+    sent = json.dumps(client.payloads[0])
+    assert "330.32" in sent and "517.53" in sent
+    assert "AAPL" in saved["args"][3] and "MSFT" in saved["args"][3] and "each" in saved["args"][3]
+
+
+def test_old_combined_multi_ticker_summary_is_not_served_from_cache(gemini, monkeypatch):
+    from backend.routers import ai as ai_router
+    from backend.routers import valuation as valuation_router
+    from backend.services import yfinance_service as yfs
+    gemini(_ok("Fresh."))
+    monkeypatch.setattr(ai_router, "_save", lambda *a: None)
+
+    class Old:  # built before the fix: one "quote" section for the joined string
+        summary_text, model_used, created_at = "The combined entity...", "gemini-2.5-flash", ai_router._utcnow()
+        grounding = json.dumps({"grounding": {}, "appData": {"asOf": "2026-10-01", "sections": ["quote", "valuation"],
+                                                             "unavailable": {}}})
+    monkeypatch.setattr(ai_router, "_cached_lookup", lambda *a: Old)
+    monkeypatch.setattr(yfs, "get_quote", lambda s: {"price": 1.0})
+
+    async def full(sym):
+        return {}
+    monkeypatch.setattr(valuation_router, "full", full)
+    out = asyncio.run(ai_router.ai_company(ai_router.CompanyRequest(ticker="AAPL,MSFT")))
+    assert out["cached"] is False and out["summary_text"] == "Fresh."

@@ -9,6 +9,7 @@ import { useTheme } from "@/components/ThemeProvider";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
 import { fmtNum, fmtPct } from "@/lib/format";
+import { useRefreshNonce } from "@/lib/refresh";
 
 const BASES = ["USD", "EUR", "GBP", "JPY", "CHF", "AUD", "CAD"] as const;
 
@@ -80,6 +81,7 @@ export function FxRatesPanel() {
   const { theme } = useTheme();
   const scope = useSourceScope(provOf(data));
 
+  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
   useEffect(() => {
     let active = true;
     setLoading(true);
@@ -101,7 +103,7 @@ export function FxRatesPanel() {
     return () => {
       active = false;
     };
-  }, [base]);
+  }, [base, refreshNonce]);
 
   // Headline KPI pairs: filter to target currencies, skip base==quote
   const kpiPairs = useMemo(() => {

@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import { useValuationFull } from "@/lib/useValuationFull";
 import type { ValuationFullResponse, FactorResponse } from "@/lib/types";
 import { Card, Skeleton } from "@/components/ui";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
-import { fmtNum, fmtPct } from "@/lib/format";
+import { fmtNum, fmtPctFromFraction } from "@/lib/format";
 import { ValuationKpiPanel } from "@/components/markets/ValuationKpiPanel";
 import { ValuationModelsGrid } from "@/components/markets/ValuationModelsGrid";
 import { EconoSiftGauge } from "@/components/markets/EconoSiftGauge";
@@ -27,9 +28,9 @@ export function ValuationEngine({
   onNavigateTab?: (tab: string) => void;
 }) {
   const [active, setActive] = useState<string>(tickers[0] ?? "");
-  const [data, setData] = useState<ValuationFullResponse | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(false);
+  const full = useValuationFull(active);
+  const data: ValuationFullResponse | null = full.data ?? null;
+  const loading = full.isLoading;
   const scope = useSourceScope(provOf(data));
 
   // Keep the active ticker valid as the ticker list changes.
@@ -37,21 +38,6 @@ export function ValuationEngine({
     if (!tickers.length) return;
     if (!tickers.includes(active)) setActive(tickers[0]);
   }, [tickers, active]);
-
-  useEffect(() => {
-    if (!active) return;
-    let alive = true;
-    setLoading(true);
-    setError(false);
-    api
-      .valuationFull(active)
-      .then((r) => alive && setData(r))
-      .catch(() => alive && (setError(true), setData(null)))
-      .finally(() => alive && setLoading(false));
-    return () => {
-      alive = false;
-    };
-  }, [active]);
 
   if (!tickers.length) return null;
 
@@ -77,12 +63,17 @@ export function ValuationEngine({
           <Skeleton className="h-40" />
           <Skeleton className="h-64" />
         </div>
-      ) : error || !data ? (
+      ) : !data ? (
         <Card>
           <div className="text-text-muted">Valuation data unavailable for {active}.</div>
         </Card>
       ) : (
         <div className="space-y-6">
+          {data.degraded && (
+            <div role="status" className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-text-secondary">
+              {full.refreshing ? "Partial data, refreshing… " : "Partial data. "}{data.degradedReason}
+            </div>
+          )}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
               <h3 className="text-sm font-semibold mb-3 text-text-secondary">EconoSift Composite Fair Value</h3>
@@ -182,7 +173,7 @@ function FamaFrench({ ticker }: { ticker: string }) {
             ))}
           </div>
           <div className="flex flex-wrap gap-4 text-xs text-text-muted">
-            <span data-prov="alpha">Alpha (ann.): <span className="font-mono text-text-primary">{data.alpha != null ? fmtPct(data.alpha * 100) : "—"}</span></span>
+            <span data-prov="alpha">Alpha (ann.): <span className="font-mono text-text-primary">{data.alpha != null ? fmtPctFromFraction(data.alpha) : "—"}</span></span>
             <span data-prov="rSquared">R²: <span className="font-mono text-text-primary">{fmtNum(data.rSquared, 3)}</span></span>
             <span>n: <span className="font-mono text-text-primary">{data.nObs ?? "—"}</span></span>
           </div>

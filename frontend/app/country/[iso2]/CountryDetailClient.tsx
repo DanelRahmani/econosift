@@ -7,6 +7,7 @@ import type { FactbookProfile, FactbookCountry } from "@/lib/types";
 import { Card, PageSkeleton } from "@/components/ui";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
+import { useRefreshNonce } from "@/lib/refresh";
 
 function CollapsibleSection({ title, fields, defaultOpen = false }: {
   title: string; fields: { label: string; value: string }[]; defaultOpen?: boolean;
@@ -58,11 +59,12 @@ export default function CountryDetailClient({ iso2 }: { iso2: string }) {
   const scope = useSourceScope(provOf(profile));
 
   useEffect(() => { api.factbookCountries().then(setCountries).catch(() => {}); }, []);
+  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
   useEffect(() => {
     if (!iso2) return;
     setLoading(true); setError(false);
     api.factbookCountry(iso2).then(setProfile).catch(() => setError(true)).finally(() => setLoading(false));
-  }, [iso2]);
+  }, [iso2, refreshNonce]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();

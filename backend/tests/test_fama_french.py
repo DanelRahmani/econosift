@@ -238,14 +238,16 @@ class TestFF3FactorRegression:
 
         assert result["alpha"] == pytest.approx(result["alphaDaily"] * 252, rel=1e-6)
 
-    def test_as_of_is_today(self, monkeypatch, patch_ff3):
+    def test_as_of_is_last_factor_date(self, monkeypatch, patch_ff3):
+        """P3-24: asOf is the last date the regression used (the fixture's last
+        business day), not today (which fails on weekends)."""
         import yfinance as yf
         import backend.services.fama_french as ff_mod
 
         monkeypatch.setattr(yf, "download", _make_yf_download_patch(patch_ff3, _TRUE_BETAS_3F))
         result = ff_mod.factor_regression("FAKE", model="3", period="2y")
 
-        assert result["asOf"] == date.today().isoformat()
+        assert result["asOf"] == patch_ff3.index.max().date().isoformat()
 
 
 # ---------------------------------------------------------------------------
@@ -338,7 +340,8 @@ class TestFactorDataUnavailable:
         monkeypatch.setattr(ff_mod, "load_ff_factors", lambda model="3": None)
         result = ff_mod.factor_regression("MSFT", model="3")
 
-        assert result["asOf"] == date.today().isoformat()
+        # no factor data was used, so there is no honest as-of date
+        assert "asOf" in result and result["asOf"] is None
 
     def test_no_raise_when_factors_empty_df(self, monkeypatch):
         import backend.services.fama_french as ff_mod

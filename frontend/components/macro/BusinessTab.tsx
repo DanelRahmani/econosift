@@ -5,11 +5,12 @@ import type { BusinessData } from "@/lib/types";
 import { Card } from "@/components/ui";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
-import { shortCountryName } from "@/lib/format";
+import { shortCountryName, categoryBarHeight } from "@/lib/format";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Cell, ReferenceLine, LineChart, Line,
 } from "recharts";
+import { useRefreshNonce } from "@/lib/refresh";
 
 const GRID = "rgba(255,255,255,0.08)";
 
@@ -42,9 +43,10 @@ export function BusinessTab() {
   const [error, setError] = useState(false);
   const scope = useSourceScope(provOf(data));
 
+  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
   useEffect(() => {
     api.macroBusiness().then(setData).catch(() => setError(true)).finally(() => setLoading(false));
-  }, []);
+  }, [refreshNonce]);
 
   if (loading) {
     return <div className="space-y-4">{Array.from({ length: 4 }).map((_, i) => (
@@ -86,7 +88,7 @@ export function BusinessTab() {
           <p className="text-xs text-text-secondary mb-3">
             Green &gt;5 · Yellow 2–5 · Red &lt;2
           </p>
-          <ResponsiveContainer width="100%" height={380}>
+          <ResponsiveContainer width="100%" height={categoryBarHeight(countries.filter((c) => c.kpis.newBusinessDensity != null).length)}>
             <BarChart
               data={countries.filter((c) => c.kpis.newBusinessDensity != null).map((c) => ({ name: c.name, value: c.kpis.newBusinessDensity, sig: c.kpis.newBusinessDensitySignal }))}
               layout="vertical" margin={{ left: 80, right: 40 }}
@@ -115,7 +117,7 @@ export function BusinessTab() {
           <p className="text-xs text-text-secondary mb-3">
             Green &lt;5 days · Yellow 5–20 days · Red &gt;20 days
           </p>
-          <ResponsiveContainer width="100%" height={380}>
+          <ResponsiveContainer width="100%" height={categoryBarHeight(countries.filter((c) => c.kpis.startupTime != null).length)}>
             <BarChart
               data={countries.filter((c) => c.kpis.startupTime != null).map((c) => ({ name: c.name, value: c.kpis.startupTime, sig: c.kpis.startupTimeSignal }))}
               layout="vertical" margin={{ left: 80, right: 40 }}

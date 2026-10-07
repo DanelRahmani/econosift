@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import { useRefreshNonce } from "@/lib/refresh";
 import type { MoversResponse, MoverRow } from "@/lib/types";
 import { Card, Skeleton } from "@/components/ui";
 import { useSourceScope } from "@/components/provenance/SourceScope";
@@ -24,6 +25,7 @@ export function TopMovers({ index = "sp500" }: { index?: string }) {
   const [tab, setTab] = useState<TabKey>("gainers");
   const scope = useSourceScope(provOf(data));
 
+  const refreshNonce = useRefreshNonce(); // re-fetch on the page's Refresh (P1-20)
   useEffect(() => {
     let alive = true;
     setLoading(true);
@@ -32,7 +34,7 @@ export function TopMovers({ index = "sp500" }: { index?: string }) {
       .catch(() => alive && setData(null))
       .finally(() => alive && setLoading(false));
     return () => { alive = false; };
-  }, [index]);
+  }, [index, refreshNonce]);
 
   if (loading && !data) return <Skeleton className="h-80" />;
   if (!data) return <Card><div className="text-text-muted text-sm">Movers unavailable.</div></Card>;

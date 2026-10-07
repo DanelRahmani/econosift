@@ -109,6 +109,18 @@ export default function AdminPage() {
         </div>
       </div>
 
+      {/* P2-33: entries cached before an upgrade added sources serve without them until they expire */}
+      {(data?.cache.provenanceGaps?.total ?? 0) > 0 && (
+        <p role="status" className="text-sm text-warning bg-warning/10 border border-warning/30 rounded-lg px-3 py-2">
+          {data!.cache.provenanceGaps!.total.toLocaleString()} cached{" "}
+          {data!.cache.provenanceGaps!.total === 1 ? "entry was" : "entries were"} stored before this version
+          and {data!.cache.provenanceGaps!.total === 1 ? "has" : "have"} no source annotations
+          (right-click → Source shows &ldquo;not annotated&rdquo;). Use <strong>Clear cache &amp; re-warm</strong> to
+          refetch {data!.cache.provenanceGaps!.total === 1 ? "it" : "them"}, or wait up to{" "}
+          {Math.round(data!.cache.ttlSeconds / 60)} min for {data!.cache.provenanceGaps!.total === 1 ? "it" : "them"} to expire.
+        </p>
+      )}
+
       {/* Prefetch progress */}
       {pf && (pfRunning || pf.done > 0) && (
         <Card>

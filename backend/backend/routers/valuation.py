@@ -265,12 +265,21 @@ async def full(ticker: str):
     prov.update(valuation_engine.provenance(bundle, valuation, beta, "valuation"))
     prov.update(fundamentals_svc.provenance(bundle, "fundamentals"))
     prov.update(analyst_service.provenance(analyst, "analyst"))
+    # A bundle Yahoo answered only in part is never cached (get_info's skip_if), so asking again soon
+    # gets the full one; the UI says so and re-requests (P2-39).
+    degraded = yfs._info_failed(bundle)
+    no_price = not (info.get("currentPrice") or info.get("regularMarketPrice"))
     return pv.attach({
         "ticker": sym,
         "kpis": kpis,
         "valuation": valuation,
         "fundamentals": fundamentals,
         "analyst": analyst,
+        "degraded": degraded,
+        "degradedReason": (None if not degraded else
+                           "Yahoo returned no price for this ticker; the models cannot run." if no_price else
+                           "Yahoo returned partial company data (no sector, industry or revenue); models that "
+                           "need it may be off or locked."),
     }, prov)
 
 

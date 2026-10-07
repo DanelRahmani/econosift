@@ -19,6 +19,7 @@ from pathlib import Path
 import pandas as pd
 import requests
 
+from .. import provenance as pv
 from . import sec_datasets
 from .bulk_data_service import DATA_DIR as _BULK_DIR
 
@@ -97,6 +98,11 @@ def _stored(quarter: str) -> tuple[pd.DataFrame, str] | None:
     if not meta.exists():
         return None
     return pd.read_parquet(_DIR / f"trades_{quarter}.parquet"), json.loads(meta.read_text())["url"]
+
+
+def built_at(quarter: str) -> str | None:
+    """When the stored data set of ``quarter`` was written (its meta file marks it complete)."""
+    return pv.file_time(_DIR / f"meta_{quarter}.json")
 
 
 def load_latest() -> tuple[str, pd.DataFrame, str] | None:

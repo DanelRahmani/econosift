@@ -20,6 +20,7 @@ import {
   CartesianGrid,
   ReferenceLine,
 } from "recharts";
+import { useRefreshNonce } from "@/lib/refresh";
 
 function fmt(v: number | null | undefined, decimals = 2, suffix = ""): string {
   return v != null ? `${v.toFixed(decimals)}${suffix}` : "—";
@@ -62,13 +63,14 @@ export function CreditConditions() {
   const scope = useSourceScope(provOf(data));
   const pal = chartPalette("dark");
 
+  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
   useEffect(() => {
     api
       .macroCreditConditions()
       .then(setData)
       .catch(() => setData({ error: "unavailable" }))
       .finally(() => setLoading(false));
-  }, []);
+  }, [refreshNonce]);
 
   const kpis = data?.kpis;
   const signals = data?.signals;

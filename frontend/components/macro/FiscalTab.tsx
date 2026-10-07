@@ -5,11 +5,12 @@ import type { FiscalData } from "@/lib/types";
 import { Card } from "@/components/ui";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
-import { shortCountryName } from "@/lib/format";
+import { shortCountryName, categoryBarHeight } from "@/lib/format";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Cell, ReferenceLine,
 } from "recharts";
+import { useRefreshNonce } from "@/lib/refresh";
 
 const GRID = "rgba(255,255,255,0.08)";
 
@@ -40,9 +41,10 @@ export function FiscalTab() {
   const [error, setError] = useState(false);
   const scope = useSourceScope(provOf(data));
 
+  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
   useEffect(() => {
     api.macroFiscal().then(setData).catch(() => setError(true)).finally(() => setLoading(false));
-  }, []);
+  }, [refreshNonce]);
 
   if (loading) {
     return <div className="space-y-4">{Array.from({ length: 4 }).map((_, i) => (
@@ -80,7 +82,7 @@ export function FiscalTab() {
           <p className="text-xs text-text-secondary mb-3">
             Green &lt;60% · Yellow 60–90% · Red &gt;90%
           </p>
-          <ResponsiveContainer width="100%" height={380}>
+          <ResponsiveContainer width="100%" height={categoryBarHeight(countries.filter((c) => c.kpis.debtGdp != null).length)}>
             <BarChart
               data={countries.filter((c) => c.kpis.debtGdp != null).map((c) => ({ name: c.name, value: c.kpis.debtGdp, sig: c.kpis.debtGdpSignal }))}
               layout="vertical" margin={{ left: 80, right: 40 }}
@@ -109,7 +111,7 @@ export function FiscalTab() {
           <p className="text-xs text-text-secondary mb-3">
             Green &gt;-3% · Yellow -3% to -6% · Red &lt;-6%. Positive = surplus.
           </p>
-          <ResponsiveContainer width="100%" height={380}>
+          <ResponsiveContainer width="100%" height={categoryBarHeight(countries.filter((c) => c.kpis.fiscalBalance != null).length)}>
             <BarChart
               data={countries.filter((c) => c.kpis.fiscalBalance != null).map((c) => ({ name: c.name, value: c.kpis.fiscalBalance, sig: c.kpis.fiscalBalanceSignal }))}
               layout="vertical" margin={{ left: 80, right: 40 }}
@@ -139,7 +141,7 @@ export function FiscalTab() {
           <p className="text-xs text-text-secondary mb-3">
             Green &gt;25% · Yellow 15–25% · Red &lt;15%
           </p>
-          <ResponsiveContainer width="100%" height={380}>
+          <ResponsiveContainer width="100%" height={categoryBarHeight(countries.filter((c) => c.kpis.taxRevenue != null).length)}>
             <BarChart
               data={countries.filter((c) => c.kpis.taxRevenue != null).map((c) => ({ name: c.name, value: c.kpis.taxRevenue, sig: c.kpis.taxRevenueSignal }))}
               layout="vertical" margin={{ left: 80, right: 40 }}

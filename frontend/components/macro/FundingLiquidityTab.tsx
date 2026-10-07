@@ -8,6 +8,7 @@ import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
 import { legendProv } from "./legendProv";
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, Legend, CartesianGrid } from "recharts";
+import { useRefreshNonce } from "@/lib/refresh";
 
 function LiqKpi({ label, value, unit = "$tn", sub, color, prov }: {
   label: string; value: number | null | undefined; unit?: string; sub?: string; color?: string; prov?: string;
@@ -32,10 +33,11 @@ export function FundingLiquidityTab() {
   // Use dark as default since chartPalette dark values work reasonably in both themes
   const pal = chartPalette("dark");
 
+  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
   useEffect(() => {
     api.macroFunding().then(setData).catch(console.error).finally(() => setLoading(false));
     api.macroNetLiquidity().then(setNetLiq).catch(() => {});
-  }, []);
+  }, [refreshNonce]);
 
   // Merge net liquidity + SPX by date for the dual-axis overlay
   const overlay = useMemo(() => {
