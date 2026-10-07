@@ -21,6 +21,7 @@ percent units consistently, so preset comparisons use percent thresholds
 """
 from __future__ import annotations
 
+import logging
 import math
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -36,10 +37,13 @@ try:
 except ImportError:
     _HAS_TA = False
 
+from .. import cache as _cache
 from . import constituents as _constituents
 from . import yfinance_service as yfs
 from . import screener_cache
 from .metrics import altman_z, market_multiples
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Per-index refresh lock (prevents concurrent double-refresh of same index)
@@ -825,6 +829,27 @@ def query(
 # Startup warm
 # ---------------------------------------------------------------------------
 
+def prune_non_members() -> int:
+    """Delete cached rows for symbols that are in no tracked index.
+
+    Pruning is by membership, never by age: a member whose fetch merely failed
+    keeps its (old) row.  If any index's constituent fetch comes back empty the
+    union would be partial, so nothing is pruned.  Returns rows deleted.
+    """
+    keep: set[str] = set()
+    for index in ("dow", "ndx", "sp500"):
+        symbols = {m["symbol"] for m in _constituents.get_constituents(index)}
+        if not symbols:
+            return 0
+        keep |= symbols
+    deleted = screener_cache.prune_except(keep)
+    if deleted > 0:
+        for name in ("snowflake_batch", "snowflake_full", "sector_fundamentals"):
+            _cache.clear_all(name)
+        logger.info("screener: pruned %d non-member rows", deleted)
+    return deleted
+
+
 def warm_all() -> None:
     """Warm all three index caches sequentially (called at container start).
 
@@ -838,3 +863,7 @@ def warm_all() -> None:
                 refresh_universe(index)
         except Exception:
             pass
+    try:
+        prune_non_members()
+    except Exception:
+        logger.warning("screener: prune_non_members failed", exc_info=True)

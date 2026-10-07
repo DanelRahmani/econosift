@@ -49,7 +49,7 @@
 | ✅ P2-38 | **Other pages still mix statement and price currency for ADRs** | Phase 53 review | RESOLVED (Phase 58): Altman x4 and dividend FCF payout convert through `dcf_engine.to_price_currency`'s FX; no rate → null with a note. |
 | ✅ P2-39 | **Yahoo throttles the profile/financials half of `Ticker.info` under load** | Phase 53 | RESOLVED (Phase 58): `get_info` adds a third attempt after 3 s; `/valuation/full` returns `degraded` + `degradedReason`, the Valuation tab shows "Partial data, refreshing…" and re-requests every 15 s (≤8 times) until the full bundle lands. |
 | ✅ P2-40 | **Google Search grounding not yet seen working live** | Phase 56 | RESOLVED (Phase 58): AAPL summary regenerated on gemini-2.5-flash with search: 7 sources, 2 queries and Google's suggestion chips render in the panel. |
-| P2-41 | **Stale screener rows still served** | Phase 63 | Symbols that left the index (e.g. ZS, last updated 2026-06-26) stay in the screener cache and appear in the sector drill and snowflake batch; their date now (honestly) drags "Data as of" back. Prune or flag rows the nightly rebuild no longer refreshes. |
+| P2-41 | **Stale screener rows still served** | Phase 63 | Symbols that left the index (e.g. ZS, last updated 2026-06-26) stay in the screener cache and appear in the sector drill and snowflake batch; their date now (honestly) drags "Data as of" back. Prune or flag rows the nightly rebuild no longer refreshes. **Owner decision (2026-10-07):** "(a) Prune non-members — Nightly rebuild deletes rows for symbols in no tracked index (S&P 500/NDX/Dow). A member whose fetch merely failed is kept." |
 | P2-42 | **Number keys reach only the first 9 tabs** | Phase 63 (P2-07) | Macro has 16 tabs and Yield 10; keys 1–9 cover the first nine. |
 
 ---
