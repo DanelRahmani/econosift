@@ -39,7 +39,7 @@ Phase 64 is done and pushed to `DEV`. No PR yet: the owner opens `DEV` → `main
 - **Live checks:** one endpoint/ticker at a time; all pages 200.
 
 ## Open / next
-- **DESK-01-V: RESOLVED 2026-10-08.** The rebuilt frozen exe, started with a scratch `ECONOSIFT_DATA_DIR`, writes "Uvicorn running on http://127.0.0.1:8000" (and the other startup lines) to `backend.log`; the working folder stays empty. The last installer build's NSIS packaging step (makensis) exited 4. The backend and app exe built fine, so this is not a code issue; rerun `desktopuild-windows.ps1` when an installer is needed (close any open Explorer window on the bundle folder).
+- **DESK-01-V: RESOLVED 2026-10-08.** The rebuilt frozen exe, started with a scratch `ECONOSIFT_DATA_DIR`, writes "Uvicorn running on http://127.0.0.1:8000" (and the other startup lines) to `backend.log`; the working folder stays empty. The last installer build's NSIS packaging step (makensis) exited 4. The backend and app exe built fine, so this is not a code issue; rerun `desktop\build-windows.ps1` when an installer is needed (close any open Explorer window on the bundle folder).
 - **New issues:**
   - P2-43: DDM blows up when g is capped at ke − 0.5 pp (KO 424 vs ~86).
   - P2-44: the Central Banks tab and FX carry are still on MRO/OECD.
