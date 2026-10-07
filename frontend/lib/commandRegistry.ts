@@ -36,7 +36,7 @@ const PAGES: { href: string; label: string; keywords: string }[] = [
   { href: "/corporate", label: "Corporate Health", keywords: "altman piotroski beneish z-score" },
   { href: "/dividends", label: "Dividends", keywords: "yield aristocrats payout ddm" },
   { href: "/insider", label: "Insider Trading", keywords: "form 4 buy sell cluster" },
-  { href: "/mergers", label: "Mergers & Acquisitions", keywords: "m&a deals premiums" },
+  { href: "/mergers", label: "Merger News", keywords: "m&a mergers acquisitions news" },
   { href: "/stability", label: "Stability", keywords: "currency crisis banking early warning npl" },
   { href: "/crossborder", label: "Cross-Border", keywords: "bis banking debt securities" },
   { href: "/country", label: "Countries", keywords: "country profiles factbook" },

@@ -43,7 +43,7 @@ const moreGroups: NavGroup[] = [
       { href: "/corporate", label: "Corporate Health" },
       { href: "/dividends", label: "Dividends" },
       { href: "/insider", label: "Insider Trading" },
-      { href: "/mergers", label: "Mergers & Acquisitions" },
+      { href: "/mergers", label: "Merger News" },
     ],
   },
   {

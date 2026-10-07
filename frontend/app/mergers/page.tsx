@@ -5,14 +5,19 @@ import type { MAData } from "@/lib/types";
 import { Card } from "@/components/ui";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
+import { CHART_COLORS } from "@/lib/format";
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, Cell,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
 import { useRefreshNonce } from "@/lib/refresh";
 
-const GRID = "rgba(255,255,255,0.08)";
+const GRID = "rgb(var(--border))";
 
+/**
+ * Merger news (P2-27): Finnhub's merger-category news articles, shown as news.
+ * Nothing here is a parsed deal — no acquirer, target or value is inferred; the
+ * only tickers shown are the ones Finnhub tagged the article with.
+ */
 export default function MergersPage() {
   const [data, setData] = useState<MAData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -27,7 +32,7 @@ export default function MergersPage() {
   if (loading) {
     return (
       <div className="max-w-6xl mx-auto space-y-6 p-6">
-        <h1 className="text-2xl font-bold">M&A Tracker</h1>
+        <h1 className="text-2xl font-bold">Merger News</h1>
         <div className="space-y-4">{Array.from({ length: 3 }).map((_, i) => (
           <div key={i} className="h-32 animate-pulse bg-surface-alt rounded" />
         ))}</div>
@@ -38,40 +43,42 @@ export default function MergersPage() {
   if (error || !data) {
     return (
       <div className="max-w-6xl mx-auto p-6">
-        <h1 className="text-2xl font-bold mb-4">M&A Tracker</h1>
+        <h1 className="text-2xl font-bold mb-4">Merger News</h1>
         <div className="text-text-secondary text-sm py-8 text-center">
-          M&A data unavailable — Finnhub API may be rate-limited or key not configured.
+          Merger news unavailable — Finnhub API may be rate-limited or key not configured.
         </div>
       </div>
     );
   }
 
-  const { deals, monthlyVolume, sectorHeatmap } = data;
-  const totalDeals = deals.length;
-  const totalValue = deals.reduce((s, d) => s + (d.value ?? 0), 0);
-  const sectorsWithDeals = sectorHeatmap.length;
+  const { news, monthlyCount, sectorCount } = data;
+  const tagged = news.filter((n) => n.related.length > 0).length;
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 p-6" {...scope}>
-      <h1 className="text-2xl font-bold">M&A Tracker</h1>
+      <div>
+        <h1 className="text-2xl font-bold">Merger News</h1>
+        <p className="text-sm text-text-secondary mt-1">
+          Merger-category news articles from Finnhub. These are news items, not a deal database: no acquirer,
+          target or deal value is inferred from the text.
+        </p>
+      </div>
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <Card className="p-4" data-prov="deals">
-          <div className="text-xs text-text-secondary">Announced Deals</div>
-          <div className="text-2xl font-bold mt-1">{totalDeals}</div>
-          <div className="text-xs text-text-secondary mt-0.5">Last 90 days</div>
+        <Card className="p-4" data-prov="news">
+          <div className="text-xs text-text-secondary">News Items</div>
+          <div className="text-2xl font-bold mt-1">{news.length}</div>
+          <div className="text-xs text-text-secondary mt-0.5">Latest from Finnhub</div>
         </Card>
-        <Card className="p-4" data-prov="deals">
-          <div className="text-xs text-text-secondary">Total Deal Value</div>
-          <div className="text-2xl font-bold mt-1">
-            {totalValue > 0 ? `$${(totalValue / 1000).toFixed(1)}B` : "—"}
-          </div>
-          <div className="text-xs text-text-secondary mt-0.5">Estimated</div>
+        <Card className="p-4" data-prov="news">
+          <div className="text-xs text-text-secondary">Ticker-tagged</div>
+          <div className="text-2xl font-bold mt-1">{tagged}</div>
+          <div className="text-xs text-text-secondary mt-0.5">Items Finnhub tagged with a ticker</div>
         </Card>
-        <Card className="p-4" data-prov="sectorHeatmap">
-          <div className="text-xs text-text-secondary">Active Sectors</div>
-          <div className="text-2xl font-bold mt-1">{sectorsWithDeals}</div>
+        <Card className="p-4" data-prov="sectorCount">
+          <div className="text-xs text-text-secondary">Sectors Mentioned</div>
+          <div className="text-2xl font-bold mt-1">{sectorCount.length}</div>
         </Card>
         <Card className="p-4">
           <div className="text-xs text-text-secondary">Source</div>
@@ -79,35 +86,35 @@ export default function MergersPage() {
         </Card>
       </div>
 
-      {/* Deal Table */}
-      {deals.length > 0 && (
-        <Card className="p-4 overflow-x-auto" data-prov="deals">
-          <h3 className="font-semibold mb-3">Recent M&A Deals</h3>
+      {/* News table */}
+      {news.length > 0 && (
+        <Card className="p-4 overflow-x-auto" data-prov="news">
+          <h3 className="font-semibold mb-3">Latest Merger News</h3>
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border text-text-secondary text-xs">
                 <th className="py-2 text-left">Date</th>
                 <th className="py-2 text-left">Headline</th>
-                <th className="py-2 text-right">Value (est.)</th>
+                <th className="py-2 text-left">Tagged tickers</th>
                 <th className="py-2 text-right">Sector</th>
+                <th className="py-2 text-right">Source</th>
               </tr>
             </thead>
             <tbody>
-              {deals.slice(0, 20).map((d, i) => (
-                <tr key={i} className="border-b border-border/50" data-prov-ctx={d.headline}>
-                  <td className="py-2 text-text-secondary font-mono text-xs">{d.date}</td>
+              {news.slice(0, 30).map((n, i) => (
+                <tr key={i} className="border-b border-border/50" data-prov-ctx={n.headline}>
+                  <td className="py-2 text-text-secondary font-mono text-xs">{n.date ?? "—"}</td>
                   <td className="py-2 max-w-md truncate">
-                    {d.url ? (
-                      <a href={d.url} target="_blank" rel="noopener noreferrer"
+                    {n.url ? (
+                      <a href={n.url} target="_blank" rel="noopener noreferrer"
                         className="hover:text-accent transition-colors">
-                        {d.headline}
+                        {n.headline}
                       </a>
-                    ) : d.headline}
+                    ) : n.headline}
                   </td>
-                  <td className="py-2 text-right font-mono">
-                    {d.value ? `$${(d.value >= 1000 ? (d.value / 1000).toFixed(1) + 'B' : d.value.toFixed(0) + 'M')}` : "—"}
-                  </td>
-                  <td className="py-2 text-right text-text-secondary">{d.sector}</td>
+                  <td className="py-2 font-mono text-xs">{n.related.length ? n.related.join(", ") : "—"}</td>
+                  <td className="py-2 text-right text-text-secondary">{n.sector ?? "—"}</td>
+                  <td className="py-2 text-right text-text-secondary text-xs">{n.source}</td>
                 </tr>
               ))}
             </tbody>
@@ -115,49 +122,44 @@ export default function MergersPage() {
         </Card>
       )}
 
-      {/* Monthly Volume Chart */}
-      {monthlyVolume.length > 0 && (
-        <Card className="p-4" data-prov="monthlyVolume">
-          <h3 className="font-semibold mb-1">Monthly Deal Volume</h3>
+      {/* Monthly count */}
+      {monthlyCount.length > 0 && (
+        <Card className="p-4" data-prov="monthlyCount">
+          <h3 className="font-semibold mb-1">Merger News per Month</h3>
           <ResponsiveContainer width="100%" height={250}>
-            <BarChart data={monthlyVolume} margin={{ left: 10, right: 30 }}>
+            <BarChart data={monthlyCount} margin={{ left: 10, right: 30 }}>
               <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
               <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-              <YAxis tick={{ fontSize: 11 }} />
+              <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
               <Tooltip />
-              <Bar dataKey="count" fill="#3b82f6" radius={[4, 4, 0, 0]} name="Deals" />
+              <Bar dataKey="count" fill={CHART_COLORS[0]} radius={[4, 4, 0, 0]} name="News items" />
             </BarChart>
           </ResponsiveContainer>
         </Card>
       )}
 
-      {/* Sector Heatmap */}
-      {sectorHeatmap.length > 0 && (
-        <Card className="p-4" data-prov="sectorHeatmap">
-          <h3 className="font-semibold mb-1">M&A Activity by Sector</h3>
-          <p className="text-xs text-text-secondary mb-3">Deal count by sector (last 90 days).</p>
+      {/* Sector count */}
+      {sectorCount.length > 0 && (
+        <Card className="p-4" data-prov="sectorCount">
+          <h3 className="font-semibold mb-1">Merger News by Sector</h3>
+          <p className="text-xs text-text-secondary mb-3">
+            Sector of a ticker Finnhub tagged the article with; untagged items are not counted.
+          </p>
           <ResponsiveContainer width="100%" height={300}>
-            <BarChart
-              data={sectorHeatmap.map((s) => ({ name: s.sector, value: s.dealCount }))}
-              layout="vertical" margin={{ left: 100, right: 40 }}
-            >
+            <BarChart data={sectorCount} layout="vertical" margin={{ left: 100, right: 40 }}>
               <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
-              <XAxis type="number" tick={{ fontSize: 11 }} />
-              <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={90} />
-              <Tooltip formatter={(v: number) => [v, "Deals"]} />
-              <Bar dataKey="value" radius={[0, 4, 4, 0]}>
-                {sectorHeatmap.map((s) => (
-                  <Cell key={s.sector} fill="#3b82f6" fillOpacity={0.8} />
-                ))}
-              </Bar>
+              <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
+              <YAxis type="category" dataKey="sector" tick={{ fontSize: 11 }} width={90} />
+              <Tooltip formatter={(v: number) => [v, "News items"]} />
+              <Bar dataKey="count" fill={CHART_COLORS[0]} fillOpacity={0.8} radius={[0, 4, 4, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </Card>
       )}
 
-      {deals.length === 0 && (
+      {news.length === 0 && (
         <div className="text-text-secondary text-sm py-8 text-center">
-          No M&A deals found in the last 90 days. This may be due to Finnhub API rate limits or no recent merger news.
+          No merger news returned. This may be due to Finnhub API rate limits or no recent merger news.
         </div>
       )}
     </div>

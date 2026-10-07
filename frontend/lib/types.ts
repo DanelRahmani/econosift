@@ -1611,33 +1611,22 @@ export interface SovereignDefaultData {
   error?: string;
 }
 
-// M&A Tracker (Phase 30)
-export interface MADeal {
-  date: string;
+// Merger news (Phase 30; P2-27: news items, not parsed deals)
+export interface MANewsItem {
+  date: string | null;
   headline: string;
-  acquirer: string;
-  target: string;
-  value: number | null;
-  sector: string;
+  /** Tickers Finnhub tagged the article with (not a guessed acquirer/target). */
+  related: string[];
+  sector: string | null;
   source: string;
   url: string;
-}
-export interface MAMonthlyVolume {
-  month: string;
-  count: number;
-  totalValue: number | null;
-}
-export interface MASectorHeatmap {
-  sector: string;
-  dealCount: number;
-  avgValue: number | null;
 }
 export interface MAData {
   asOf: string | null;
   source: string;
-  deals: MADeal[];
-  monthlyVolume: MAMonthlyVolume[];
-  sectorHeatmap: MASectorHeatmap[];
+  news: MANewsItem[];
+  monthlyCount: { month: string; count: number }[];
+  sectorCount: { sector: string; count: number }[];
 }
 
 // COT Positioning
