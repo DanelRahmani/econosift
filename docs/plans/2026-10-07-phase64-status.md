@@ -35,7 +35,7 @@ The packet specs the agents ran were in the session scratchpad `packets/` folder
 The rows carry their owner decisions; none is marked RESOLVED yet (that happens at the gate).
 
 ## In flight / uncommitted at checkpoint (review before committing; never commit blind)
-- **P2-34 A2 rest** (packet-executor, sonnet; resumed once after an interruption).
+- **P2-34 A2 rest** (packet-executor, sonnet; resumed once after an interruption). **DONE after checkpoint 2 (agent: its pytest -k run, tsc and 5 Playwright static tests green), not yet reviewed.** Its follow-ups: (1) widen `currency` fields in types.ts that can now be null (e.g. ValuationKpis.currency ~L306) to `string | null`; (2) the new technicals currency test reaches the network via get_quote: stub it; (3) the static `$${` scan is scoped to components/markets; `app/dividends/page.tsx:171` hard-codes `$` on a per-share axis (follow-up); (4) existing tests adapted: test_valuation_audit_m02_m03_m05 (DDM values), test_fundamentals (`currency: USD` in the bundle), test_discount_rates_m09_m11 (same).
   - Scope: DDM uses Yahoo's forward `dividendRate` as D1 (no second growth); an unknown quote currency → null + reason, never USD;
     `technicals_service` returns `currency`; TechnicalsTab uses `currencySymbol(data.currency)`; `currencySymbol(undefined)` → "".
   - Files: valuation_engine, dcf_engine, analyst_service, fundamentals, discount_rates, yfinance_service, technicals_service,
