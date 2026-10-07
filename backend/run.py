@@ -54,6 +54,12 @@ if _frozen or sys.stdout is None or sys.stderr is None:
         sys.stdout = _log
     if _frozen or sys.stderr is None:
         sys.stderr = _log
+    # uvicorn.run(log_config=None) below installs no handlers, so without this its
+    # INFO lines ("Uvicorn running on ...") were dropped and backend.log stayed
+    # empty (DESK-01-V). Route every logger, uvicorn's included, to the log file.
+    import logging
+    logging.basicConfig(level=logging.INFO, stream=sys.stderr,
+                        format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
 import uvicorn
 
