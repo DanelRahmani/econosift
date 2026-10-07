@@ -150,3 +150,23 @@ def test_internals_use_the_masked_series(monkeypatch):
     internals = bs.breadth_internals("sp500")
     assert internals["asOf"] == D5
     assert "membership" in internals
+
+
+def test_highs_lows_series_counts_members_only():
+    """Fear & Greed reads this series: a non-member at a 52-week high is not counted (P2-35 review)."""
+    import pandas as pd
+    from backend.services.breadth_service import _highs_lows_series
+
+    idx = pd.bdate_range("2026-01-01", periods=40)
+    # A and B both rise every day, so each sets a new 52-week high on every session from day 30 on.
+    high = pd.DataFrame({"A": range(1, 41), "B": range(101, 141)}, index=idx, dtype=float)
+    low = high - 0.5
+    close = high - 0.25
+    member = pd.DataFrame(True, index=idx, columns=["A", "B"])
+    member.loc[idx[-1], "B"] = False          # B left the index on the last session
+
+    unmasked = _highs_lows_series(high, low, close)
+    masked = _highs_lows_series(high, low, close, member)
+    assert unmasked["highs"].iloc[-1] == 2    # both at a new high
+    assert masked["highs"].iloc[-1] == 1      # only A, a member that session
+    assert masked["highs"].iloc[-2] == 2      # B still counted while a member
