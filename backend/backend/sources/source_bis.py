@@ -188,19 +188,33 @@ def _parse_policy_rates(df: pd.DataFrame, iso2_list: list[str]) -> dict[str, dic
     """
     col_area = next(c for c in df.columns if "REF_AREA" in c)
     col_comp = next((c for c in df.columns if "COMPILATION" in c), None)
+    # Cut the ~730k-row file down to the requested areas once: parsing the
+    # whole frame per country took ~2 minutes and timed the tracker out.
+    keep_cols = [c for c in df.columns
+                 if any(k in c for k in ("REF_AREA", "FREQ", "TIME_PERIOD", "OBS_VALUE", "COMPILATION"))]
+    area = df[col_area].astype(str).str[:2]
+    df = df.loc[area.isin(set(iso2_list)), keep_cols]
+    area = area[df.index]
+    # Three years cover the 3m/12m changes and the staleness check; older daily
+    # history only bloats the cached payload.
+    since = (pd.Timestamp.today() - pd.DateOffset(years=3)).strftime("%Y-%m-%d")
     result: dict[str, dict] = {}
     for iso2 in iso2_list:
+        own = df[area == iso2]
         for freq in ("D", "M"):
-            parsed = _parse_bis_flat(df, iso2_filter=iso2, freq=freq)
+            parsed = _parse_bis_flat(own, iso2_filter=iso2, freq=freq)
             if parsed.empty:
                 continue
             points = [
-                {"date": p if len(p) == 10 else f"{p}-01", "value": round(float(v), 4)}
-                for p, v in zip(parsed["period"], parsed["value"])
+                {"date": d, "value": round(float(v), 4)}
+                for d, v in ((p if len(p) == 10 else f"{p}-01", v) for p, v in zip(parsed["period"], parsed["value"]))
+                if d >= since
             ]
+            if not points:
+                continue
             compilation = None
             if col_comp:
-                notes = df.loc[df[col_area].str.startswith(f"{iso2}:", na=False), col_comp].dropna()
+                notes = own[col_comp].dropna()
                 compilation = str(notes.iloc[0]) if len(notes) else None
             result[iso2] = {"points": points, "compilation": compilation}
             break

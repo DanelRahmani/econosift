@@ -159,3 +159,22 @@ def test_parse_policy_rates_daily_preferred_over_monthly():
     assert out["US"]["points"] == [{"date": "2026-07-01", "value": 3.5},
                                    {"date": "2026-08-01", "value": 3.625}]
     assert "GB" not in out
+
+
+def test_parse_policy_rates_keeps_three_years_and_requested_areas_only():
+    """Speed fix: only the requested areas are parsed and points older than 3 years are dropped."""
+    import pandas as pd
+    from backend.sources.source_bis import _parse_policy_rates
+
+    old = (pd.Timestamp.today() - pd.DateOffset(years=4)).strftime("%Y-%m-%d")
+    recent = (pd.Timestamp.today() - pd.DateOffset(days=10)).strftime("%Y-%m-%d")
+    df = pd.DataFrame({
+        "FREQ:Frequency": ["D: Daily"] * 3,
+        "REF_AREA:Reference area": ["JP: Japan", "JP: Japan", "BR: Brazil"],
+        "TIME_PERIOD:Time period or range": [old, recent, recent],
+        "OBS_VALUE:Observation Value": [0.1, 1.25, 15.0],
+        "COMPILATION:Compilation": ["BOJ note", "BOJ note", "BCB note"],
+    })
+    out = _parse_policy_rates(df, ["JP"])
+    assert set(out) == {"JP"}
+    assert out["JP"]["points"] == [{"date": recent, "value": 1.25}]
