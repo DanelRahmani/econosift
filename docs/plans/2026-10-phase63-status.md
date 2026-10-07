@@ -40,3 +40,12 @@ over `3a967f1..HEAD`, then continue with items 6–9.
   oldest row. "Data as of" should probably use the oldest row everywhere.
 - `/ai/history` lists past summaries with `fetchedAt` set to the request time. Each item carries its own
   `created_at`, so it was left unchanged.
+
+## Update 2026-10-07 (second session)
+
+All nine items are implemented and committed: P2-16, P2-07, P2-37 and DESK-02 were added in this session.
+
+- **Gate done:** spec-verifier review, with its two PARTIAL findings fixed (World Bank bulk files now date `fetchedAt`; snowflake batch uses its oldest row; `load_previous` reports honestly). Docker rebuild; container pytest passes in full **without** the `DATABASE_URL` override (pinned DB at `/tmp/econosift_pytest.db`; live cache grew 84 → 116). P2-18 confirmed: after the rebuild a normal load revalidated the HTML and matched the new scripts. Playwright: 32/33, and the 13F spec passes after fixing its locator and a real `▼ -5K` display bug.
+- **DESK-02:** verified on a local release build. Force-kill before the fix: 1 orphaned backend. After: 0, port 8000 closed. A normal close still exits.
+- **Still to do:** after the background backend rebuild, live-check the snowflake `fetchedAt` and regime endpoint. Mark rows resolved in `ACTIVE_ISSUES.md` (plus Recently Fixed rows) and add the CHANGELOG line. Then ask the owner about the PR.
+- **New issues:** stale screener rows (e.g. ZS, last updated 2026-06-26) still appear in the sector drill. IMF/Fama-French bulk data in the source waterfall is still dated by the cache time. Macro has 16 tabs, but keys 1–9 reach only the first 9. A local `cargo build` uses a stale backend copy in `target/release/binaries` (Sep 29) that ignores `ECONOSIFT_DATA_DIR`.
