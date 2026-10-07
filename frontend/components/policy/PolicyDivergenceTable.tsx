@@ -23,6 +23,7 @@ export function PolicyDivergenceTable({ entries }: Props) {
         <thead>
           <tr className="border-b border-border text-text-muted text-left">
             <th className="pb-2 pr-4">Central Bank</th>
+            <th className="pb-2 pr-4">Rate</th>
             <th className="pb-2 pr-4 text-right">Current Rate</th>
             <th className="pb-2 pr-4 text-right">3M Change</th>
             <th className="pb-2 pr-4 text-right">12M Change</th>
@@ -33,6 +34,9 @@ export function PolicyDivergenceTable({ entries }: Props) {
           {entries.map((e) => (
             <tr key={e.cb} className="border-b border-border/50 hover:bg-surface/50" data-prov={`divergence.${e.cb}`} data-prov-ctx={e.cb}>
               <td className="py-2 pr-4 font-medium">{e.cb}</td>
+              <td className="py-2 pr-4 text-text-muted text-xs">
+                {e.rateType}{e.rateSource === "proxy" ? " · proxy" : ""}
+              </td>
               <td className="py-2 pr-4 text-right">{fmt(e.current_rate)}</td>
               <td data-prov={`divergence.${e.cb}.change_3m`} className={`py-2 pr-4 text-right ${(e.change_3m ?? 0) >= 0 ? "text-red-400" : "text-green-400"}`}>
                 {fmtChange(e.change_3m)}

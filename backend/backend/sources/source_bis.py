@@ -83,7 +83,7 @@ def _parse_bis_flat(df: pd.DataFrame, iso2_filter: str | None = None,
     ----------
     df : DataFrame from BIS flat CSV
     iso2_filter : if set, only return rows for this ISO2 code
-    freq : 'A' for annual, 'Q' for quarterly, 'M' for monthly
+    freq : 'A' for annual, 'Q' for quarterly, 'M' for monthly, 'D' for daily
     """
     # Some BIS datasets use REF_AREA, others use BORROWERS_CTY for country
     col_area = next((c for c in df.columns if "REF_AREA" in c), None)
@@ -101,7 +101,7 @@ def _parse_bis_flat(df: pd.DataFrame, iso2_filter: str | None = None,
 
     # Frequency filter
     if col_freq and freq:
-        freq_prefix = {"A": "A:", "Q": "Q:", "M": "M:"}[freq]
+        freq_prefix = {"A": "A:", "Q": "Q:", "M": "M:", "D": "D:"}[freq]
         df = df[df[col_freq].str.startswith(freq_prefix, na=False)]
 
     # Parse value
@@ -114,9 +114,9 @@ def _parse_bis_flat(df: pd.DataFrame, iso2_filter: str | None = None,
         df["year"] = pd.to_numeric(time_val, errors="coerce")
         df = df[df["year"].notna()]
         df["year"] = df["year"].astype(int)
-    elif freq in ("Q", "M"):
-        # Formats: 2024-Q4 (quarterly), 2024-03 (monthly)
-        parts = time_val.astype(str).str.extract(r"^(\d{4})-(?:Q\d|\d{2})$")
+    elif freq in ("Q", "M", "D"):
+        # Formats: 2024-Q4 (quarterly), 2024-03 (monthly), 2024-03-15 (daily)
+        parts = time_val.astype(str).str.extract(r"^(\d{4})-(?:Q\d|\d{2}(?:-\d{2})?)$")
         df["year"] = pd.to_numeric(parts[0], errors="coerce")
         df = df[df["year"].notna()]
         df["year"] = df["year"].astype(int)
@@ -177,6 +177,51 @@ async def get_cpi(iso2: str = "US", freq: str = "A") -> list[dict]:
     Returns list of {date, value} dicts where value is YoY % change.
     """
     return await asyncio.to_thread(cpi_yoy, iso2, freq)
+
+
+def _parse_policy_rates(df: pd.DataFrame, iso2_list: list[str]) -> dict[str, dict]:
+    """Per-country official policy-rate history from the BIS WS_CBPOL flat file.
+
+    Uses the daily series when a country has one, else the monthly one (monthly
+    periods are dated the 1st). Returns ``{iso2: {"points": [{date, value}],
+    "compilation": str | None}}``; countries without data are omitted.
+    """
+    col_area = next(c for c in df.columns if "REF_AREA" in c)
+    col_comp = next((c for c in df.columns if "COMPILATION" in c), None)
+    result: dict[str, dict] = {}
+    for iso2 in iso2_list:
+        for freq in ("D", "M"):
+            parsed = _parse_bis_flat(df, iso2_filter=iso2, freq=freq)
+            if parsed.empty:
+                continue
+            points = [
+                {"date": p if len(p) == 10 else f"{p}-01", "value": round(float(v), 4)}
+                for p, v in zip(parsed["period"], parsed["value"])
+            ]
+            compilation = None
+            if col_comp:
+                notes = df.loc[df[col_area].str.startswith(f"{iso2}:", na=False), col_comp].dropna()
+                compilation = str(notes.iloc[0]) if len(notes) else None
+            result[iso2] = {"points": points, "compilation": compilation}
+            break
+    return result
+
+
+@async_cached("bis_policy_rates")
+async def get_policy_rates_bulk(iso2_tuple: tuple[str, ...]) -> dict[str, dict]:
+    """Official central-bank policy rates for several countries from one BIS download.
+
+    Returns ``{iso2: {"points": [{date, value}], "compilation": str | None}}``
+    (daily series where available, else monthly); ``{}`` if BIS is unreachable.
+    """
+    try:
+        df = await asyncio.to_thread(_fetch_bis_zip, "policy")
+        if df is None or df.empty:
+            return {}
+        return await asyncio.to_thread(_parse_policy_rates, df, list(iso2_tuple))
+    except Exception as exc:
+        logger.warning("BIS policy rates bulk query failed: %s", exc)
+        return {}
 
 
 @async_cached("bis_policy")

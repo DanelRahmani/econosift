@@ -2545,6 +2545,12 @@ export interface PolicyDivergenceEntry {
   change_12m: number | null;
   stance: "tightening" | "easing" | "on_hold" | "unknown";
   divergence_rank: number;
+  /** What the rate is, e.g. "deposit facility rate"; proxies say so. */
+  rateType: string;
+  /** "bis" = official policy rate (BIS); "proxy" = FRED/OECD fallback. */
+  rateSource: "bis" | "proxy";
+  asOf?: string | null;
+  stale?: boolean;
 }
 export interface PolicyTrackerData {
   divergence: PolicyDivergenceEntry[];

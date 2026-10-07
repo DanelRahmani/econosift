@@ -4,20 +4,38 @@ Phase 18A Task 3.
 """
 from __future__ import annotations
 
+import asyncio
+import re
 from datetime import datetime, timedelta, timezone
 
 from .. import provenance as pv
 from ..cache import async_cached
+from ..sources import source_bis
 from . import macro_expansion_service as mes
 
 _CB_CONFIG: dict[str, tuple[str, ...]] = {
     "Fed": ("FEDFUNDS",),
-    "ECB": ("ECBMRRFR", "IRSTCI01EZM156N"),
+    "ECB": ("ECBDFR", "IRSTCI01EZM156N"),
     "BoE": ("IRSTCI01GBM156N", "IR3TIB01GBM156N"),
     "BoJ": ("IRSTCI01JPM156N", "IR3TIB01JPM156N"),
     "BoC": ("IRSTCI01CAM156N", "IR3TIB01CAM156N"),
     "RBA": ("IRSTCI01AUM156N", "IR3TIB01AUM156N"),
     "SNB": ("IRSTCI01CHM156N", "IR3TIB01CHM156N"),
+}
+
+# BIS reference area of each bank's policy rate (WS_CBPOL) and what that rate is.
+# BIS is the primary source; the FRED/OECD candidates above are the labelled fallback.
+_BIS_AREA: dict[str, str] = {
+    "Fed": "US", "ECB": "XM", "BoE": "GB", "BoJ": "JP", "BoC": "CA", "RBA": "AU", "SNB": "CH",
+}
+_BIS_RATE_TYPE: dict[str, str] = {
+    "Fed": "target-range midpoint",
+    "ECB": "deposit facility rate",
+    "BoE": "Bank Rate",
+    "BoJ": "overnight call-rate target",
+    "BoC": "overnight rate target",
+    "RBA": "cash rate target",
+    "SNB": "SNB policy rate",
 }
 
 # De-duplicated flat tuple of all series IDs
@@ -115,8 +133,21 @@ def _stance(change_12m: float | None) -> str:
 # Series that are the bank's own policy rate; the rest are OECD money-market rates.
 _POLICY_RATE_SERIES = {
     "FEDFUNDS": ("Effective federal funds rate", "monthly"),
-    "ECBMRRFR": ("ECB main refinancing operations rate", "daily"),
+    "ECBDFR": ("ECB deposit facility rate", "daily"),
 }
+
+
+def _proxy_rate_type(sid: str | None) -> str:
+    """What a FRED/OECD fallback series actually is, for the table's Rate column."""
+    if sid == "FEDFUNDS":
+        return "effective fed funds (proxy)"
+    if sid == "ECBDFR":
+        return "deposit facility rate (FRED)"
+    if sid and sid.startswith("IRSTCI"):
+        return "money-market proxy (OECD)"
+    if sid and sid.startswith("IR3TIB"):
+        return "3-month interbank proxy (OECD)"
+    return "unavailable"
 
 
 def _picked_sid(data: dict, candidates: tuple[str, ...]) -> str | None:
@@ -130,26 +161,44 @@ def _picked_sid(data: dict, candidates: tuple[str, ...]) -> str | None:
     return best_sid
 
 
-def _provenance(data: dict, divergence: list[dict], pairs: list[tuple]) -> dict:
+def _bis_note(compilation: str | None) -> str | None:
+    """First clause of the BIS compilation note (which rate BIS reports)."""
+    if not compilation:
+        return None
+    return re.split(r"[;.]\s|\n", compilation.strip())[0][:200]
+
+
+def _provenance(data: dict, divergence: list[dict], pairs: list[tuple], bis: dict | None = None) -> dict:
     """Source map for the policy tracker (see provenance.py)."""
+    bis = bis or {}
     prov: dict = {
-        "*": pv.ref("fred", None, "Central-bank policy / short-term interest rates", units="percent"),
+        "*": pv.ref("bis", "WS_CBPOL",
+                    "Central-bank policy rates (BIS; FRED/OECD only as a labelled fallback)",
+                    units="percent"),
     }
     for d in divergence:
         cb = d["cb"]
-        sid = _picked_sid(data, _CB_CONFIG[cb])
         row = f"divergence.{cb}"
+        if d.get("rateSource") == "bis":
+            flags = ["stale"] if d.get("stale") else []
+            prov[row] = pv.ref("bis", "WS_CBPOL", f"{cb}: {d['rateType']}", units="percent",
+                               observed=d.get("asOf"), flags=flags,
+                               note=_bis_note((bis.get(_BIS_AREA[cb]) or {}).get("compilation")))
+            sid = None
+        else:
+            sid = _picked_sid(data, _CB_CONFIG[cb])
         if sid:
+            fallback = "fallback: BIS had no current value"
             if sid in _POLICY_RATE_SERIES:
                 title, freq = _POLICY_RATE_SERIES[sid]
-                flags, note = [], None
+                flags, note = [], fallback
             else:
                 title = ("OECD immediate (call money/interbank) rate" if sid.startswith("IRSTCI")
                          else "OECD 3-month interbank rate")
                 freq = "monthly"
                 flags = ["proxy"]
                 note = (f"This is the OECD money-market rate for {cb}'s market, not the announced "
-                        f"policy rate, and can differ from it.")
+                        f"policy rate, and can differ from it. {fallback}.")
             if d.get("stale"):
                 flags.append("stale")
             prov[row] = pv.fred(sid, f"{cb}: {title}", units="percent", frequency=freq,
@@ -179,13 +228,29 @@ async def _fetch_cb_series() -> dict:
 @async_cached("policy_tracker")
 async def get_policy_tracker() -> dict:
     """Return CB divergence table + carry differentials."""
-    data = await _fetch_cb_series()
+    data, bis = await asyncio.gather(
+        _fetch_cb_series(),
+        source_bis.get_policy_rates_bulk(tuple(_BIS_AREA.values())),
+    )
 
     divergence: list[dict] = []
     rates: dict[str, float | None] = {}
 
     for cb_name, candidates in _CB_CONFIG.items():
-        pts = _pick_series(data, candidates)
+        bis_pts = [p for p in (bis.get(_BIS_AREA[cb_name]) or {}).get("points", [])
+                   if p.get("value") is not None]
+        proxy_pts = _pick_series(data, candidates)
+        # Official BIS rate first; the proxy only when BIS has nothing current.
+        if bis_pts and not _is_stale(bis_pts):
+            pts, source = bis_pts, "bis"
+        elif proxy_pts and not _is_stale(proxy_pts):
+            pts, source = proxy_pts, "proxy"
+        elif bis_pts:
+            pts, source = bis_pts, "bis"
+        else:
+            pts, source = proxy_pts, "proxy"
+        rate_type = (_BIS_RATE_TYPE[cb_name] if source == "bis"
+                     else _proxy_rate_type(_picked_sid(data, candidates)))
         cur = _latest(pts)
         r3m = _rate_n_months_ago(pts, 3)
         r12m = _rate_n_months_ago(pts, 12)
@@ -197,6 +262,8 @@ async def get_policy_tracker() -> dict:
         divergence.append(
             {
                 "cb": cb_name,
+                "rateSource": source,
+                "rateType": rate_type,
                 "current_rate": cur,
                 "change_3m": ch3,
                 "change_12m": ch12,
@@ -226,4 +293,4 @@ async def get_policy_tracker() -> dict:
         carry[pair] = round(b - q, 4) if b is not None and q is not None else None
 
     return pv.attach({"divergence": divergence, "carry_differentials": carry},
-                     _provenance(data, divergence, pairs))
+                     _provenance(data, divergence, pairs, bis))
