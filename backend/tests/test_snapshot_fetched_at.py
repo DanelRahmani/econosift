@@ -45,6 +45,7 @@ def test_13f_holders_are_dated_by_the_data_set_build(tmp_path, monkeypatch):
     meta.write_text(json.dumps({**json.loads(meta.read_text()), "builtAt": JULY_15_NOON_ISO}))
     monkeypatch.setattr(tf, "_cusips_for", lambda t: [AAPL])
     monkeypatch.setattr(tf, "_latest_window", lambda: None)   # no newer data set published
+    monkeypatch.setattr(tf, "_shares_outstanding", lambda t: None)
 
     out = tf._holders_sync("AAPL")
 

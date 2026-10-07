@@ -1672,6 +1672,20 @@ export interface Holders13FResponse {
   filers?: number | null;      // 13F filers reporting a position
   totalShares?: number | null; // shares held across all of them
   error?: string | null;
+  /** Whether the previous quarter is stored for the QoQ change (P2-37). */
+  change?: {
+    available: boolean;
+    previousAsOf: string | null;
+    previousDataset: string;
+    reason: string | null;
+    canLoad: boolean;
+    loading: boolean;
+  };
+}
+export interface Load13FPreviousResponse {
+  started: boolean;
+  window: string | null;
+  error: string | null;
 }
 export interface InsiderTransaction {
   insiderName: string;

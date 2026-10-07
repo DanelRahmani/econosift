@@ -154,3 +154,139 @@ def test_latest_window_finds_files_at_the_new_sec_location(monkeypatch):
     assert out == {"window": "01jun2026-31aug2026",
                    "url": "https://new.example/form-13f-data-sets/01jun2026-31aug2026_form13f.zip"}
     assert seen == ["form-13f-data-sets/01jun2026-31aug2026_form13f.zip"]
+
+
+# ---------------------------------------------------------------------------
+# P2-37: quarter-on-quarter change and % of shares outstanding
+# ---------------------------------------------------------------------------
+
+CUR = "01mar2026-31may2026"   # quarter ending 2026-03-31 (the `dataset` fixture)
+PREV = "01dec2025-28feb2026"  # quarter ending 2025-12-31
+
+# Previous quarter: Fund One held 12,000 AAPL, Fund Two 25,000; Fund Five held none.
+PREV_SUBMISSION = [
+    SUBMISSION[0],
+    ("B-1", "10-FEB-2026", "13F-HR", "0000000001", "31-DEC-2025"),
+    ("B-2", "11-FEB-2026", "13F-HR", "0000000002", "31-DEC-2025"),
+]
+PREV_COVERPAGE = [
+    COVERPAGE[0],
+    ("B-1", "31-DEC-2025", "", "", "", "Fund One LP"),
+    ("B-2", "31-DEC-2025", "", "", "", "Fund Two LLC"),
+]
+PREV_INFOTABLE = [
+    INFOTABLE[0],
+    ("B-1", "1", "APPLE INC", "COM", AAPL, "", "2400000", "12000", "SH", "", "SOLE"),
+    ("B-2", "2", "APPLE INC", "COM", AAPL, "", "5000000", "25000", "SH", "", "SOLE"),
+]
+
+
+@pytest.fixture
+def prev_dataset(tmp_path):
+    path = tmp_path / f"{PREV}_form13f.zip"
+    with zipfile.ZipFile(path, "w") as z:
+        z.writestr("SUBMISSION.tsv", _tsv(PREV_SUBMISSION))
+        z.writestr("COVERPAGE.tsv", _tsv(PREV_COVERPAGE))
+        z.writestr("INFOTABLE.tsv", _tsv(PREV_INFOTABLE))
+    return path
+
+
+def test_previous_window_steps_back_one_filing_quarter():
+    assert tf.previous_window(CUR) == PREV
+    assert tf.previous_window("01dec2027-29feb2028") == "01sep2027-30nov2027"
+
+
+def test_the_two_newest_data_sets_are_kept(dataset, prev_dataset, tmp_path, monkeypatch):
+    store = tmp_path / "13f"
+    monkeypatch.setattr(tf, "_DIR", store)
+    tf.write_reduced(CUR, *tf.reduce_dataset(dataset))
+    tf.write_reduced(PREV, *tf.reduce_dataset(prev_dataset))   # older, built on request: keeps CUR
+    assert {p.name for p in store.glob("meta_*.json")} == {f"meta_{CUR}.json", f"meta_{PREV}.json"}
+    assert tf._latest_meta()["window"] == CUR
+
+    tf.write_reduced("01jun2026-31aug2026", *tf.reduce_dataset(dataset))  # a newer quarter: PREV drops out
+    assert {p.name for p in store.glob("meta_*.json")} == {
+        f"meta_{CUR}.json", "meta_01jun2026-31aug2026.json"}
+
+
+def test_lookup_computes_qoq_change_and_pct_of_shares_outstanding(dataset, prev_dataset, tmp_path, monkeypatch):
+    monkeypatch.setattr(tf, "_DIR", tmp_path / "13f")
+    tf.write_reduced(PREV, *tf.reduce_dataset(prev_dataset))
+    tf.write_reduced(CUR, *tf.reduce_dataset(dataset))
+    monkeypatch.setattr(tf, "_cusips_for", lambda ticker: [AAPL])
+
+    out = tf.lookup("AAPL", shares_outstanding=1_000_000)
+
+    rows = {h["name"]: h for h in out["holders"]}
+    # Fund Two: 20,000 now vs 25,000 → −5,000, −5,000 / 25,000 = −20 %; 20,000 / 1,000,000 = 2 % of shares
+    assert (rows["Fund Two LLC"]["changeShares"], rows["Fund Two LLC"]["changePct"]) == (-5000, -20.0)
+    assert rows["Fund Two LLC"]["pctFloat"] == 2.0
+    # Fund One: 16,000 vs 12,000 → +4,000, +33.33 %; 1.6 % of shares
+    assert (rows["Fund One LP"]["changeShares"], rows["Fund One LP"]["changePct"]) == (4000, 33.33)
+    assert rows["Fund One LP"]["pctFloat"] == 1.6
+    # Fund Five: absent from a complete previous list (2 filers ≤ top 25) → a new position
+    assert (rows["Fund Five"]["changeShares"], rows["Fund Five"]["changePct"]) == (4000, None)
+    assert out["change"] == {"available": True, "previousAsOf": "2025-12-31", "previousDataset": PREV,
+                             "reason": None, "canLoad": False, "loading": False}
+
+
+def test_lookup_without_the_previous_quarter_offers_to_load_it(dataset, tmp_path, monkeypatch):
+    monkeypatch.setattr(tf, "_DIR", tmp_path / "13f")
+    tf.write_reduced(CUR, *tf.reduce_dataset(dataset))
+    monkeypatch.setattr(tf, "_cusips_for", lambda ticker: [AAPL])
+
+    out = tf.lookup("AAPL", shares_outstanding=None)
+
+    assert all(h["changeShares"] is None and h["pctFloat"] is None for h in out["holders"])
+    assert out["change"]["available"] is False and out["change"]["canLoad"] is True
+    assert out["change"]["previousDataset"] == PREV
+    assert "previous quarter" in out["change"]["reason"]
+
+
+def test_holder_outside_a_truncated_previous_list_has_no_change(dataset, prev_dataset, tmp_path, monkeypatch):
+    monkeypatch.setattr(tf, "_DIR", tmp_path / "13f")
+    holders, totals, period = tf.reduce_dataset(prev_dataset)
+    totals.loc[totals["cusip"] == AAPL, "filers"] = 40   # the stored previous list is the top 25 of 40
+    tf.write_reduced(PREV, holders, totals, period)
+    tf.write_reduced(CUR, *tf.reduce_dataset(dataset))
+    monkeypatch.setattr(tf, "_cusips_for", lambda ticker: [AAPL])
+
+    rows = {h["name"]: h for h in tf.lookup("AAPL")["holders"]}
+
+    assert (rows["Fund Five"]["changeShares"], rows["Fund Five"]["changePct"]) == (None, None)
+    assert rows["Fund Two LLC"]["changeShares"] == -5000
+
+
+def test_loading_the_previous_quarter_starts_its_build(dataset, tmp_path, monkeypatch):
+    monkeypatch.setattr(tf, "_DIR", tmp_path / "13f")
+    tf.write_reduced(CUR, *tf.reduce_dataset(dataset))
+    monkeypatch.setattr(tf, "_user_agent", lambda: "Test Person test@example.com")
+    monkeypatch.setattr(tf.sec_datasets, "find", lambda path, ua: "https://sec.example/" + path)
+    started = []
+    monkeypatch.setattr(tf, "_start_build", lambda window, url: started.append((window, url)))
+
+    out = tf.load_previous()
+
+    assert started == [(PREV, f"https://sec.example/form-13f-data-sets/{PREV}_form13f.zip")]
+    assert out == {"started": True, "window": PREV, "error": None}
+
+
+def test_holders_response_sources_the_new_columns(dataset, prev_dataset, tmp_path, monkeypatch, client):
+    monkeypatch.setattr(tf, "_DIR", tmp_path / "13f")
+    tf.write_reduced(PREV, *tf.reduce_dataset(prev_dataset))
+    tf.write_reduced(CUR, *tf.reduce_dataset(dataset))
+    monkeypatch.setattr(tf, "_cusips_for", lambda ticker: [AAPL])
+    monkeypatch.setattr(tf, "_latest_window", lambda: None)
+    monkeypatch.setattr(tf, "_shares_outstanding", lambda t: 1_000_000)
+
+    out = client.get("/api/market/13f?ticker=AAPL").json()
+
+    assert out["holders"][0]["pctFloat"] == 2.0            # Fund Two: 20,000 / 1,000,000
+    prov = out["provenance"]
+    assert {r["provider"] for r in prov["pctFloat"]["inputs"]} == {"sec_edgar", "yahoo"}
+    assert prov["change"]["inputs"][1]["observed"] == "2025-12-31"
+
+
+def test_previous_quarter_route_starts_the_download(monkeypatch, client):
+    monkeypatch.setattr(tf, "load_previous", lambda: {"started": True, "window": PREV, "error": None})
+    assert client.post("/api/market/13f/previous").json() == {"started": True, "window": PREV, "error": None}

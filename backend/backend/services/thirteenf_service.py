@@ -21,13 +21,14 @@ import logging
 import threading
 import time
 import zipfile
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 import pandas as pd
 import requests
 
 from .. import provenance as pv
+from .. import cache
 from ..cache import async_cached, cached
 from . import sec_datasets
 from .bulk_data_service import DATA_DIR as _BULK_DIR
@@ -59,6 +60,11 @@ def window_names(today: date, count: int = 4) -> list[str]:
                 out.append(f"01{_mon(sm)}{sy}-{end.day:02d}{_mon(m)}{y}")
         y, m = (y, m - 1) if m > 1 else (y - 1, 12)
     return out
+
+
+def previous_window(window: str) -> str:
+    """The filing window one quarter before ``window``."""
+    return window_names(_window_end(window) + timedelta(days=1), count=2)[1]
 
 
 def _mon(m: int) -> str:
@@ -164,7 +170,8 @@ def _fix_thousands(pos: pd.DataFrame) -> pd.DataFrame:
 
 
 def write_reduced(window: str, holders: pd.DataFrame, totals: pd.DataFrame, period: str, url: str = "") -> None:
-    """Store a reduced data set and remove older ones."""
+    """Store a reduced data set and keep only the two newest: the newest serves lookups,
+    the one before it gives the quarter-on-quarter change (P2-37)."""
     _DIR.mkdir(parents=True, exist_ok=True)
     holders.to_parquet(_DIR / f"holders_{window}.parquet", index=False)
     totals.to_parquet(_DIR / f"totals_{window}.parquet", index=False)
@@ -172,9 +179,17 @@ def write_reduced(window: str, holders: pd.DataFrame, totals: pd.DataFrame, peri
             "builtAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}
     # Meta last: its presence marks the data set as complete.
     (_DIR / f"meta_{window}.json").write_text(json.dumps(meta))
+    keep = sorted((p.stem[len("meta_"):] for p in _DIR.glob("meta_*.json")), key=_window_end)[-2:]
     for p in _DIR.iterdir():
-        if window not in p.name:
+        if not any(w in p.name for w in keep):
             p.unlink(missing_ok=True)
+
+
+def _meta(window: str) -> dict | None:
+    """Meta of the stored data set of ``window``, or None if absent or built by older code."""
+    path = _DIR / f"meta_{window}.json"
+    meta = json.loads(path.read_text()) if path.exists() else None
+    return meta if meta and meta.get("format") == _FORMAT else None
 
 
 def _latest_meta() -> dict | None:
@@ -201,15 +216,54 @@ def _cusips_for(ticker: str) -> list[str]:
     return [str(c).upper() for c in df.loc[df["Ticker"].isin(_ticker_keys(ticker)), "Cusip"]]
 
 
-def lookup(ticker: str) -> dict | None:
+def _change_state(window: str) -> tuple[dict, dict | None]:
+    """``(change, previous meta)``: whether the previous quarter is stored for the QoQ change."""
+    name = previous_window(window)
+    prev = _meta(name)
+    loading = _build_state["window"] == name
+    return {"available": prev is not None, "previousAsOf": prev["period"] if prev else None,
+            "previousDataset": name,
+            "reason": None if prev else (f"The previous quarter's 13F data set ({name}, a ~100 MB download) "
+                                         "has not been loaded."),
+            "canLoad": prev is None and not loading, "loading": loading}, prev
+
+
+def _changes(holders: pd.DataFrame, cusip: str, prev: dict) -> dict:
+    """cik -> (change in shares, change %) against the previous quarter's data set.
+
+    A manager absent from a complete previous list (all filers stored) opened a
+    new position: the change is its whole holding, with no %. One absent from a
+    list cut at the top ``_TOP_N`` may simply have ranked lower: no change.
+    """
+    w = prev["window"]
+    totals = pd.read_parquet(_DIR / f"totals_{w}.parquet", filters=[("cusip", "==", cusip)])
+    before = pd.read_parquet(_DIR / f"holders_{w}.parquet", filters=[("cusip", "==", cusip)])
+    complete = totals.empty or int(totals["filers"].iloc[0]) <= _TOP_N
+    had = dict(zip(before["cik"], before["shares"]))
+    out = {}
+    for r in holders.itertuples():
+        if r.cik in had:
+            diff = int(r.shares) - int(had[r.cik])
+            out[r.cik] = (diff, round(diff / had[r.cik] * 100, 2) if had[r.cik] else None)
+        elif complete:
+            out[r.cik] = (int(r.shares), None)
+        else:
+            out[r.cik] = (None, None)
+    return out
+
+
+def lookup(ticker: str, shares_outstanding: float | None = None) -> dict | None:
     """Top holders of ``ticker`` from the newest reduced data set, or None if
-    none has been built yet."""
+    none has been built yet. ``shares_outstanding`` gives each holder's % of
+    shares; the previous quarter's data set, when stored, its QoQ change."""
     meta = _latest_meta()
     if meta is None:
         return None
     window = meta["window"]
+    change, prev = _change_state(window)
     out = {"ticker": ticker, "asOf": meta["period"], "reportingLag": _LAG, "holders": [],
-           "filers": None, "totalShares": None, "cusip": None, "dataset": window, "error": None}
+           "filers": None, "totalShares": None, "cusip": None, "dataset": window, "error": None,
+           "change": change}
     cusips = _cusips_for(ticker)
     totals = pd.read_parquet(_DIR / f"totals_{window}.parquet", filters=[("cusip", "in", cusips)]) if cusips else None
     if totals is None or totals.empty:
@@ -219,11 +273,37 @@ def lookup(ticker: str) -> dict | None:
     top = totals.sort_values("filers", ascending=False).iloc[0]
     holders = pd.read_parquet(_DIR / f"holders_{window}.parquet", filters=[("cusip", "==", top["cusip"])])
     holders = holders.sort_values("rank").head(_SHOW)
+    changes = _changes(holders, top["cusip"], prev) if prev else {}
     out.update(cusip=top["cusip"], filers=int(top["filers"]), totalShares=int(top["shares"]), holders=[
         {"name": r.manager, "shares": int(r.shares), "value": int(r.value),
-         "pctFloat": None, "changeShares": None, "changePct": None}
+         "pctFloat": round(int(r.shares) / shares_outstanding * 100, 2) if shares_outstanding else None,
+         "changeShares": changes.get(r.cik, (None, None))[0], "changePct": changes.get(r.cik, (None, None))[1]}
         for r in holders.itertuples()])
     return out
+
+
+def load_previous() -> dict:
+    """Start building the previous quarter's data set (a ~100 MB download), on request
+    only, so lookups can show the quarter-on-quarter change."""
+    meta = _latest_meta()
+    if meta is None:
+        return {"started": False, "window": None, "error": "No 13F data set has been built yet."}
+    name = previous_window(meta["window"])
+    if _meta(name):
+        return {"started": False, "window": name, "error": None}  # already stored
+    ua = _user_agent()
+    if not ua:
+        return {"started": False, "window": name,
+                "error": "SEC EDGAR identity not configured — set EDGAR_IDENTITY to enable 13F data"}
+    try:
+        url = sec_datasets.find(f"form-13f-data-sets/{name}_form13f.zip", ua)
+    except requests.RequestException as exc:
+        return {"started": False, "window": name, "error": f"SEC data set probe failed: {exc}"}
+    if not url:
+        return {"started": False, "window": name, "error": f"The SEC data set {name} was not found."}
+    _start_build(name, url)
+    cache.clear_all("13f")  # so the next lookup reports the download in progress
+    return {"started": True, "window": name, "error": None}
 
 
 # ---------------------------------------------------------------------------
@@ -272,6 +352,7 @@ def _build(window: str, url: str) -> None:
         zpath.unlink(missing_ok=True)
         _build_state["window"] = None
         _build_lock.release()
+        cache.clear_all("13f")  # cached lookups said "preparing" or lacked this quarter
 
 
 def _start_build(window: str, url: str) -> None:
@@ -298,7 +379,8 @@ def _holders_sync(ticker: str) -> dict:
                                       "institutional holders appear in a minute or two."}
         return {**empty, "error": "Could not load the SEC 13F data set"
                                   + (f": {_build_state['error']}" if _build_state["error"] else ".")}
-    out = lookup(ticker)
+    shares_out = _shares_outstanding(ticker)
+    out = lookup(ticker, shares_out)
     if out["error"]:
         return out
     ref = pv.ref(
@@ -308,11 +390,37 @@ def _holders_sync(ticker: str) -> dict:
              f"{have['period']}, filed up to 45 days later. Share positions only (options and principal "
              f"amounts excluded); a restated report replaces the original and new-holdings amendments are "
              f"added. Filings whose values imply ~1/1000 of other filers' prices are read as reported in "
-             f"thousands and multiplied by 1,000. Top {_SHOW} of {out['filers']} filers by shares (CUSIP {out['cusip']}). % float and "
-             f"quarter-on-quarter change are not computed.")
+             f"thousands and multiplied by 1,000. Top {_SHOW} of {out['filers']} filers by shares (CUSIP {out['cusip']}).")
     # A stored data set: fetched when it was built, not at request time (P3-35).
     ref["fetchedAt"] = have["builtAt"]
-    return pv.attach(out, {"*": ref})
+    prov: dict = {"*": ref}
+    yahoo = pv.yahoo(ticker, "sharesOutstanding (Ticker.info)", units="shares")
+    prov["pctFloat"] = pv.derived(
+        "13F shares held ÷ shares outstanding × 100", [ref, yahoo], title="% of shares outstanding",
+        note="Shares outstanding is Yahoo's current count, not the quarter-end one, and covers the listed "
+             "class only; for ADRs Yahoo may count ordinary shares rather than ADSs. Float is not used.")
+    prev = _meta(out["change"]["previousDataset"])
+    if prev:
+        before = pv.ref("sec_edgar", None, f"Form 13F data set, filings {prev['window']}", url=prev["url"],
+                        units="shares", frequency="quarterly", observed=prev["period"])
+        before["fetchedAt"] = prev["builtAt"]
+        prov["change"] = pv.derived(
+            "shares this quarter − shares the same manager (CIK) reported for the previous quarter; "
+            "% = change ÷ previous shares × 100", [ref, before], title="Quarter-on-quarter change",
+            note=f"A manager absent from the previous quarter's list is a new position (no %) when that list "
+                 f"holds every filer; when it was cut at the top {_TOP_N}, no change is shown.")
+    return pv.attach(out, prov)
+
+
+def _shares_outstanding(ticker: str) -> float | None:
+    """``sharesOutstanding`` from the cached Yahoo info, or None."""
+    try:
+        from . import yfinance_service as yfs
+        value = (yfs.get_info(ticker).get("info") or {}).get("sharesOutstanding")
+        return float(value) if value else None
+    except Exception as exc:
+        log.warning("13F: shares outstanding unavailable for %s: %s", ticker, exc)
+        return None
 
 
 @async_cached("13f")

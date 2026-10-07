@@ -18,7 +18,7 @@ import type {
   OptionsKPIs, OptionsChain, OptionsExpiriesResponse, IVTermStructureResponse, IVSmileResponse, OIProfile, MCOptionsResult,
   RatesData, InflationData, EmploymentData, HousingData, CommoditiesData,
   FxHeatmapData, FxPppData, LeadingData, FinancialConditionsData, CotData,
-  Holders13FResponse, Form4Response,
+  Holders13FResponse, Load13FPreviousResponse, Form4Response,
   SnowflakeResponse, SnowflakeBatchResponse,
   SectorReturnsResponse, SectorFundamentalsResponse, SectorRotationResponse, SectorDrillResponse,
   Holding,
@@ -408,6 +408,9 @@ export const api = {
 
   market13f: (ticker: string) =>
     get<Holders13FResponse>(`/market/13f?ticker=${encodeURIComponent(ticker)}`),
+
+  /** 🟡 Download the previous quarter's 13F data set (~100 MB) for the QoQ change. */
+  market13fLoadPrevious: () => post<Load13FPreviousResponse>("/market/13f/previous", {}),
 
   marketForm4: (ticker: string) =>
     get<Form4Response>(`/market/form4?ticker=${encodeURIComponent(ticker)}`),
