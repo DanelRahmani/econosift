@@ -67,8 +67,8 @@ export function BreadthBar({ index = "sp500" }: { index?: string }) {
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        <Kpi prov="newHighs" label="New Highs" value={data.newHighs ?? "—"} tone="up" />
-        <Kpi prov="newLows" label="New Lows" value={data.newLows ?? "—"} tone="down" />
+        <Kpi prov="newHighs" label={<span title={HILO_DEF}>New Highs</span>} value={data.newHighs ?? "—"} tone="up" />
+        <Kpi prov="newLows" label={<span title={HILO_DEF}>New Lows</span>} value={data.newLows ?? "—"} tone="down" />
         <Kpi prov="pctAboveSma50" label="% > SMA50" value={pct(data.pctAboveSma50)} tone={tone(data.pctAboveSma50)} />
         <Kpi prov="pctAboveSma200" label="% > SMA200" value={pct(data.pctAboveSma200)} tone={tone(data.pctAboveSma200)} />
         <Kpi
@@ -99,6 +99,9 @@ export function BreadthBar({ index = "sp500" }: { index?: string }) {
     </div>
   );
 }
+
+/** P2-26: how the app counts new 52-week highs/lows (differs from some published counts). */
+const HILO_DEF = "Index members on that session whose intraday high (low) equals or exceeds (falls below) the highest high (lowest low) of the trailing 252 sessions, prices as traded; ties count; a member needs 30+ sessions of history. Published counts use other windows, universes and close-vs-intraday rules, so they can differ.";
 
 function Kpi({ label, value, tone, prov }: { label: React.ReactNode; value: string | number; tone?: "up" | "down" | "flat"; prov?: string }) {
   const color = tone === "up" ? "text-success" : tone === "down" ? "text-danger" : "text-text-primary";

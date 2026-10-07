@@ -2674,7 +2674,7 @@ export const TERMS: WikiTerm[] = [
     term: "New Highs / New Lows",
     category: "dashboard",
     definition:
-      "New highs and new lows track the number of stocks hitting 52-week highs or 52-week lows on a given day. The ratio of new highs to new lows is a powerful trend confirmation tool. In a healthy bull market, new highs consistently outnumber new lows. When new lows start expanding while the index is still near highs, it signals internal deterioration.",
+      "New highs and new lows track the number of stocks hitting 52-week highs or 52-week lows on a given day. The ratio of new highs to new lows is a powerful trend confirmation tool. In a healthy bull market, new highs consistently outnumber new lows. When new lows start expanding while the index is still near highs, it signals internal deterioration. How EconoSift counts them: S&P 500 members on that session (point-in-time membership) whose intraday high (low) reaches the highest high (lowest low) of the trailing 252 sessions, using prices as traded; a session that ties its 52-week extreme counts, and a member needs at least 30 sessions of history. Published counts use their own windows, universes and close-vs-intraday rules, so the numbers can differ from a newspaper or exchange figure.",
     related: ["market-breadth", "52-week-high-low", "advancing-declining"],
   },
   {
