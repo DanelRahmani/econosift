@@ -149,10 +149,26 @@ def test_snowflake_batch_wrapped(client, monkeypatch):
     scores = {"AAPL": {"overallScore": 6.1, "scores": {"value": 5.0, "growth": 7.0, "performance": 8.0,
                                                         "health": 6.0, "dividend": 4.5}}}
     monkeypatch.setattr(snowflake_service, "compute_snowflake_batch", lambda k: scores)
-    monkeypatch.setattr(screener_cache, "last_refresh", lambda syms: "2026-10-02T06:00:00+00:00")
+    monkeypatch.setattr(snowflake_router, "_oldest_row_time", lambda syms: "2026-10-02T06:00:00Z")
     body = client.get("/api/snowflake/batch", params={"tickers": "aapl"}).json()
     assert body["scores"] == scores
     star = _star(body)
     assert star["provider"] == "derived"
     assert star["fetchedAt"] == "2026-10-02T06:00:00Z"
     assert "scores.AAPL.overallScore" in body["provenance"]
+
+
+def test_snowflake_batch_is_dated_by_its_oldest_row(client, monkeypatch, tmp_path):
+    scores = {"AAPL": {"overallScore": 6.1, "scores": {}}, "MSFT": {"overallScore": 7.0, "scores": {}}}
+    monkeypatch.setattr(snowflake_service, "compute_snowflake_batch", lambda k: scores)
+    monkeypatch.setenv("SCREENER_DB_PATH", str(tmp_path / "sc.db"))
+    screener_cache.reset_connection()
+    try:
+        conn = screener_cache._get_conn()
+        conn.executemany("INSERT INTO fundamentals (symbol, updated_at) VALUES (?, ?)",
+                         [("AAPL", "2026-10-01T00:00:00+00:00"), ("MSFT", "2026-06-26T20:49:48+00:00")])
+        conn.commit()
+        body = client.get("/api/snowflake/batch", params={"tickers": "aapl,msft"}).json()
+    finally:
+        screener_cache.reset_connection()
+    assert _star(body)["fetchedAt"] == "2026-06-26T20:49:48Z"

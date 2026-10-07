@@ -302,6 +302,12 @@ def load_previous() -> dict:
     if not url:
         return {"started": False, "window": name, "error": f"The SEC data set {name} was not found."}
     _start_build(name, url)
+    if _build_state["window"] != name:  # _start_build did nothing: say why
+        if _build_state["window"]:
+            return {"started": False, "window": name,
+                    "error": "Another 13F download is already running; try again in a minute or two."}
+        return {"started": False, "window": name,
+                "error": f"The last 13F download failed ({_build_state['error']}); it can be retried after an hour."}
     cache.clear_all("13f")  # so the next lookup reports the download in progress
     return {"started": True, "window": name, "error": None}
 

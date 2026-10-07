@@ -1,7 +1,7 @@
 """Snowflake Composite Score router — Phase 9."""
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime
 
 from fastapi import APIRouter, HTTPException, Query
 
@@ -9,6 +9,19 @@ from .. import provenance as pv
 from ..services import screener_cache, snowflake_service
 
 router = APIRouter(prefix="/api/snowflake", tags=["snowflake"])
+
+
+def _oldest_row_time(symbols: list[str]) -> str | None:
+    """Build time of the stored screener rows behind a batch (oldest ``updated_at``), as ``fetchedAt``."""
+    if not symbols:
+        return None
+    try:
+        marks = ", ".join("?" * len(symbols))
+        row = screener_cache._get_conn().execute(
+            f"SELECT MIN(updated_at) FROM fundamentals WHERE symbol IN ({marks})", symbols).fetchone()
+        return pv.stamp(datetime.fromisoformat(row[0])) if row and row[0] else None
+    except Exception:
+        return None
 
 
 @router.get("")
@@ -57,9 +70,7 @@ async def get_snowflake_batch(
         prov[f"scores.{t}.overallScore"] = "overallScore"
         prov[f"scores.{t}.scores"] = "axisScores"
     # A stored snapshot: fetched when it was built, not at request time.
-    try:
-        built = datetime.fromisoformat(screener_cache.last_refresh(list(scores)) or "").astimezone(timezone.utc)
-        ref["fetchedAt"] = built.strftime("%Y-%m-%dT%H:%M:%SZ")
-    except (ValueError, TypeError):
-        pass
+    built = _oldest_row_time(list(scores))
+    if built:
+        ref["fetchedAt"] = built
     return pv.attach({"scores": scores}, prov)

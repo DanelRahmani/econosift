@@ -263,12 +263,61 @@ def test_loading_the_previous_quarter_starts_its_build(dataset, tmp_path, monkey
     monkeypatch.setattr(tf, "_user_agent", lambda: "Test Person test@example.com")
     monkeypatch.setattr(tf.sec_datasets, "find", lambda path, ua: "https://sec.example/" + path)
     started = []
-    monkeypatch.setattr(tf, "_start_build", lambda window, url: started.append((window, url)))
+
+    def fake_start(window, url):
+        started.append((window, url))
+        tf._build_state["window"] = window  # as the real _start_build does
+
+    monkeypatch.setattr(tf, "_start_build", fake_start)
+    monkeypatch.setitem(tf._build_state, "window", None)
+    monkeypatch.setitem(tf._build_state, "error", None)
 
     out = tf.load_previous()
 
     assert started == [(PREV, f"https://sec.example/form-13f-data-sets/{PREV}_form13f.zip")]
     assert out == {"started": True, "window": PREV, "error": None}
+
+
+def _previous_ready(dataset, tmp_path, monkeypatch):
+    monkeypatch.setattr(tf, "_DIR", tmp_path / "13f")
+    tf.write_reduced(CUR, *tf.reduce_dataset(dataset))
+    monkeypatch.setattr(tf, "_user_agent", lambda: "Test Person test@example.com")
+    monkeypatch.setattr(tf.sec_datasets, "find", lambda path, ua: "https://sec.example/" + path)
+    monkeypatch.setattr(tf.cache, "clear_all", lambda *a, **k: None)
+
+
+def test_loading_previous_while_another_build_runs_reports_not_started(dataset, tmp_path, monkeypatch):
+    _previous_ready(dataset, tmp_path, monkeypatch)
+    monkeypatch.setitem(tf._build_state, "window", "01jun2026-31aug2026")
+    monkeypatch.setitem(tf._build_state, "error", None)
+    monkeypatch.setattr(tf, "_start_build", lambda window, url: None)  # lock is held: does nothing
+
+    out = tf.load_previous()
+
+    assert out["started"] is False and out["window"] == PREV
+    assert "already running" in out["error"]
+
+
+def test_loading_previous_while_it_is_already_building_is_started(dataset, tmp_path, monkeypatch):
+    _previous_ready(dataset, tmp_path, monkeypatch)
+    monkeypatch.setitem(tf._build_state, "window", PREV)
+    monkeypatch.setitem(tf._build_state, "error", None)
+    monkeypatch.setattr(tf, "_start_build", lambda window, url: None)
+
+    assert tf.load_previous() == {"started": True, "window": PREV, "error": None}
+
+
+def test_loading_previous_after_a_recent_failure_reports_the_backoff(dataset, tmp_path, monkeypatch):
+    _previous_ready(dataset, tmp_path, monkeypatch)
+    monkeypatch.setitem(tf._build_state, "window", None)
+    monkeypatch.setitem(tf._build_state, "error", "connection reset")
+    monkeypatch.setitem(tf._build_state, "failed_at", tf.time.time())
+    monkeypatch.setattr(tf.threading, "Thread", lambda *a, **k: pytest.fail("must not start a download"))
+
+    out = tf.load_previous()
+
+    assert out["started"] is False and out["window"] == PREV
+    assert "connection reset" in out["error"] and "an hour" in out["error"]
 
 
 def test_holders_response_sources_the_new_columns(dataset, prev_dataset, tmp_path, monkeypatch, client):
