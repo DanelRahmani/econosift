@@ -111,6 +111,17 @@ jobs:
           docker compose up -d --wait --build
           docker compose ps
 
+      - name: Start the cold World Bank trade fetch
+        # /trade's exports are not in the bulk World Bank download, so on a fresh
+        # volume the page waits on a live pull for ~200 countries x 3 series,
+        # which alone can outlast the test's 90 s. A developer's stack serves it
+        # from its warm cache. Kick it off now, in the background, so it runs
+        # while dependencies and Chromium install; the test's own request joins
+        # the in-flight fetch (the cache locks per key) instead of starting cold.
+        # Nothing is faked: if the World Bank fails, the page still shows its
+        # unavailable state, which the test accepts.
+        run: nohup curl -s -o /dev/null --max-time 600 http://localhost/api/macro/trade > /dev/null 2>&1 &
+
       - name: Install dependencies
         working-directory: frontend
         run: npm ci
