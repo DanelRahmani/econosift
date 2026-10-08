@@ -127,13 +127,23 @@ jobs:
 
       - name: Backend logs on failure
         if: failure()
-        run: docker compose logs --tail=200 backend
+        # The whole run, not a tail: a request that hangs is logged (or not) long
+        # before the last test finishes. nginx's log shows whether the browser's
+        # request ever left the page (a 499 is a request the test gave up on).
+        run: |
+          docker compose logs --timestamps backend > stack-logs.txt
+          docker compose logs --timestamps nginx >> stack-logs.txt
+          tail -n 300 stack-logs.txt
 
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: playwright-report
-          path: frontend/playwright-report/
+          # The reporter is `list`, so there is no playwright-report/ — the
+          # retry traces and error contexts live in test-results/.
+          name: playwright-traces
+          path: |
+            frontend/test-results/
+            stack-logs.txt
           retention-days: 7
 
       - name: Tear down
