@@ -933,7 +933,7 @@ def provenance(bundle: dict, result: dict, beta: float | None, root: str = "valu
         prov[m_mult]["fetchedAt"] = sm_stamp
     formulas = {
         "DDM (Gordon Growth)": ("D1 / (ke − g), D1 = dividendRate (Yahoo's forward annual rate), g = (1 − payout ratio) × ROE (ROE capped at 25%), "
-                                "capped at the risk-free rate and at ke − 0.5pp; earnings growth is not used",
+                                "capped at the risk-free rate and at ke − 0.5pp; locked when ke − g < 2pp; earnings growth is not used",
                                 [y("dividendRate"), ke, y("returnOnEquity"), y("payoutRatio"),
                                  k("wacc", "riskFree")]),
         "Graham Formula": ("EPS × (8.5 + 2g) × 4.4 / Y, g = growth in percent (0-20), Y = Aaa corporate yield in percent",
