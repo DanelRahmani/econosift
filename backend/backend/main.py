@@ -1,8 +1,10 @@
 """EconoSift FastAPI application entrypoint."""
 from __future__ import annotations
 
+import asyncio
 import os
 import threading
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
@@ -26,9 +28,23 @@ from .routers import (
 )
 from .services import screener_service
 
+# Threads behind asyncio.to_thread. Python's default, min(32, cpu + 4), is sized
+# for CPU work, but nearly every call here waits on the network (yfinance, World
+# Bank, FRED) for seconds to minutes — and the cache reads its SQLite tier through
+# the same pool. On a 4-core host that was 8 threads: a handful of slow fetches
+# took them all and even cache hits stopped answering until they finished.
+IO_THREADS = 64
+
+
+def install_io_executor() -> None:
+    asyncio.get_running_loop().set_default_executor(
+        ThreadPoolExecutor(max_workers=IO_THREADS, thread_name_prefix="io")
+    )
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    install_io_executor()
     from .database import init_db
     from .services.jobs import start_scheduler
     from .services import errorlog
