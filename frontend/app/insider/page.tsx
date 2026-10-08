@@ -3,7 +3,7 @@
 import { Suspense, useState, useCallback } from "react";
 import { api } from "@/lib/api";
 import type { InsiderAggregateResponse } from "@/lib/types";
-import { Card, PageSkeleton } from "@/components/ui";
+import { Card, PageSkeleton, KpiStrip, KpiTile } from "@/components/ui";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Cell,
@@ -13,16 +13,6 @@ import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
 
 const GRID = "rgba(255,255,255,0.08)";
-
-function KpiCard({ label, value, sub, prov }: { label: string; value: string; sub?: string; prov?: string }) {
-  return (
-    <Card className="p-4" data-prov={prov}>
-      <div className="text-xs text-text-secondary">{label}</div>
-      <div className="text-2xl font-bold mt-1">{value}</div>
-      {sub && <div className="text-xs text-text-secondary mt-0.5">{sub}</div>}
-    </Card>
-  );
-}
 
 function InsiderPageInner() {
   const [data, setData] = useState<InsiderAggregateResponse | null>(null);
@@ -78,17 +68,17 @@ function InsiderPageInner() {
       {data && !loading && (
         <div className="space-y-6" {...scope}>
           {/* Summary KPIs */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <KpiCard label="Tickers with Data" value={`${data.tickersWithData}/${data.tickersChecked}`} />
-            <KpiCard
+          <KpiStrip>
+            <KpiTile label="Tickers with Data" value={`${data.tickersWithData}/${data.tickersChecked}`} />
+            <KpiTile
               prov="buySellRatio"
               label="Buy/Sell Ratio"
               value={data.buySellRatio != null ? data.buySellRatio.toFixed(2) : "—"}
               sub={data.buySellRatio != null && data.buySellRatio > 1 ? "More buys than sells" : "More sells than buys"}
             />
-            <KpiCard prov="valueRatio" label="Total Buy Value" value={`$${(data.totalBuyValue / 1e6).toFixed(0)}M`} />
-            <KpiCard prov="valueRatio" label="Total Sell Value" value={`$${(data.totalSellValue / 1e6).toFixed(0)}M`} />
-          </div>
+            <KpiTile prov="valueRatio" label="Total Buy Value" value={`$${(data.totalBuyValue / 1e6).toFixed(0)}M`} />
+            <KpiTile prov="valueRatio" label="Total Sell Value" value={`$${(data.totalSellValue / 1e6).toFixed(0)}M`} />
+          </KpiStrip>
 
           {/* Sector Sentiment */}
           {data.sectorSentiment.length > 0 && (

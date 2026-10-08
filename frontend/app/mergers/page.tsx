@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import type { MAData } from "@/lib/types";
-import { Card } from "@/components/ui";
+import { Card, KpiStrip, KpiTile } from "@/components/ui";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
 import { CHART_COLORS } from "@/lib/format";
@@ -65,26 +65,12 @@ export default function MergersPage() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <Card className="p-4" data-prov="news">
-          <div className="text-xs text-text-secondary">News Items</div>
-          <div className="text-2xl font-bold mt-1">{news.length}</div>
-          <div className="text-xs text-text-secondary mt-0.5">Latest from Finnhub</div>
-        </Card>
-        <Card className="p-4" data-prov="news">
-          <div className="text-xs text-text-secondary">Ticker-tagged</div>
-          <div className="text-2xl font-bold mt-1">{tagged}</div>
-          <div className="text-xs text-text-secondary mt-0.5">Items Finnhub tagged with a ticker</div>
-        </Card>
-        <Card className="p-4" data-prov="sectorCount">
-          <div className="text-xs text-text-secondary">Sectors Mentioned</div>
-          <div className="text-2xl font-bold mt-1">{sectorCount.length}</div>
-        </Card>
-        <Card className="p-4">
-          <div className="text-xs text-text-secondary">Source</div>
-          <div className="text-2xl font-bold mt-1 text-sm">{data.source}</div>
-        </Card>
-      </div>
+      <KpiStrip>
+        <KpiTile prov="news" label="News Items" value={news.length} sub="Latest from Finnhub" />
+        <KpiTile prov="news" label="Ticker-tagged" value={tagged} sub="Items Finnhub tagged with a ticker" />
+        <KpiTile prov="sectorCount" label="Sectors Mentioned" value={sectorCount.length} />
+        <KpiTile label="Source" value={data.source} />
+      </KpiStrip>
 
       {/* News table */}
       {news.length > 0 && (
