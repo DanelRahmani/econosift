@@ -35,7 +35,6 @@ const drawerGroups: DrawerGroup[] = [
     items: [
       { href: "/risk", label: "Risk" },
       { href: "/options", label: "Options" },
-      { href: "/scenario", label: "Scenario Lab" },
     ],
   },
   {
@@ -55,7 +54,6 @@ const drawerGroups: DrawerGroup[] = [
       { href: "/stability", label: "Stability" },
       { href: "/country", label: "Countries" },
       { href: "/yield", label: "Yield" },
-      { href: "/policy", label: "Policy & Sovereign" },
     ],
   },
   {

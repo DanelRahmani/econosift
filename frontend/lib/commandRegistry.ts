@@ -2,7 +2,7 @@
  * Static entries for the command palette (P1-18): every page and every deep-linkable sub-tab,
  * plus the fuzzy ranking shared with the live ticker and Wiki results.
  */
-import { MACRO_TABS, MARKETS_TABS, POLICY_TABS, PORTFOLIO_TABS, RESEARCH_TABS, YIELD_TABS } from "@/lib/pageTabs";
+import { MACRO_TABS, MARKETS_TABS, PORTFOLIO_TABS, RESEARCH_TABS, YIELD_TABS } from "@/lib/pageTabs";
 
 export type CommandGroup = "Pages" | "Tabs" | "Tickers" | "Wiki";
 
@@ -21,16 +21,14 @@ const PAGES: { href: string; label: string; keywords: string }[] = [
   { href: "/dashboard", label: "Dashboard", keywords: "home breadth fear greed movers indices" },
   { href: "/markets", label: "Markets", keywords: "stocks quote chart technicals valuation dcf ratios" },
   { href: "/screener", label: "Screener", keywords: "screen signals filter s&p 500 nasdaq dow" },
-  { href: "/portfolio", label: "Portfolio", keywords: "efficient frontier black-litterman monte carlo kelly fama-french" },
-  { href: "/scenario", label: "Scenario Lab", keywords: "stress test gfc covid shock" },
+  { href: "/portfolio", label: "Portfolio", keywords: "efficient frontier black-litterman monte carlo kelly fama-french scenario lab stress test gfc covid shock" },
   { href: "/research", label: "Research", keywords: "quant risk parity carry momentum backtest" },
   { href: "/macro", label: "Macro", keywords: "economy gdp inflation employment" },
   { href: "/atlas", label: "Atlas", keywords: "map world choropleth countries" },
   { href: "/risk", label: "Risk", keywords: "garch hurst cointegration var volatility" },
   { href: "/options", label: "Options", keywords: "greeks implied volatility iv smile black-scholes" },
   { href: "/calendar", label: "Calendar", keywords: "earnings economic releases dividends ipo central bank meetings" },
-  { href: "/yield", label: "Yield", keywords: "treasury curve tips breakeven term premium bonds" },
-  { href: "/policy", label: "Policy & Sovereign", keywords: "central banks carry divergence" },
+  { href: "/yield", label: "Yield", keywords: "treasury curve tips breakeven term premium bonds policy sovereign central banks carry divergence default" },
   { href: "/sovereign", label: "Sovereign Risk", keywords: "ratings default traffic light" },
   { href: "/trade", label: "Trade", keywords: "exports imports balance openness" },
   { href: "/corporate", label: "Corporate Health", keywords: "altman piotroski beneish z-score" },
@@ -64,7 +62,6 @@ export const STATIC_COMMANDS: CommandItem[] = [
   ...tabItems("Research", "/research", RESEARCH_TABS.map((t) => ({ value: t.key, label: t.label }))),
   ...tabItems("Portfolio", "/portfolio", byLabel(PORTFOLIO_TABS)),
   ...tabItems("Yield", "/yield", byLabel(YIELD_TABS)),
-  ...tabItems("Policy & Sovereign", "/policy", POLICY_TABS.map((t) => ({ value: t.id, label: t.label }))),
 ];
 
 /** True when every character of `needle` appears in `hay` in order. */

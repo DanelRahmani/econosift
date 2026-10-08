@@ -34,7 +34,6 @@ const moreGroups: NavGroup[] = [
     items: [
       { href: "/risk", label: "Risk" },
       { href: "/options", label: "Options" },
-      { href: "/scenario", label: "Scenario Lab" },
     ],
   },
   {
@@ -54,7 +53,6 @@ const moreGroups: NavGroup[] = [
       { href: "/stability", label: "Stability" },
       { href: "/country", label: "Countries" },
       { href: "/yield", label: "Yield" },
-      { href: "/policy", label: "Policy & Sovereign" },
     ],
   },
   {

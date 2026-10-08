@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 
 export default function SovereignRedirect() {
-  redirect("/policy");
+  redirect("/yield?tab=Sovereign Risk");
 }
 

@@ -29,7 +29,7 @@
 | ID | Issue | Source | Details |
 |----|-------|--------|---------|
 | ✅ P2-07 | **Keyboard shortcuts (remainder)** | `ISSUES.md` | RESOLVED (Phase 63): Number keys 1–9 pick the page's tabs and ←/→ step its period control on Markets, Options, Policy, Portfolio, Research, Risk, Screener, Stability, Yield and Macro, via `useKeyboardShortcuts` (binds only the handlers a page passes; ignores keys typed into a field or with a modifier). |
-| P2-10 | **Markets sub-tab redundancy** | CLAUDE.md (Phase 19/22) | Main nav items overlap with Markets page sub-tabs (cosmetic). Also tracked in `UX_Reshuffle.md`. |
+| P2-10 | **Markets sub-tab redundancy** | CLAUDE.md (Phase 19/22) | Main nav items overlap with Markets page sub-tabs (cosmetic). Also tracked in `UX_Reshuffle.md`. **Owner decision (2026-10-08):** remove the remaining nav duplicates "Policy & Sovereign" and "Scenario Lab" (the Markets sub-tab duplicates were already removed by the UX restructure). |
 | P2-15 | **Pattern Library** | CLAUDE.md (Phase 23) | No shared component library for KPI strips, tab bars, control bars. Every page hand-rolls these. **Owner decision (2026-10-08):** "(b) Scoped pass — a shared KpiStrip + ControlBar used on 2–3 pages only." |
 | ✅ P2-16 | **Bar chart Y-axis labels suppressed** | CLAUDE.md (Phase 25) | RESOLVED (Phase 63): `interval={0}` plus `categoryBarHeight` (24 px per row, 300 px floor) on the Trade, Business, Fiscal, Housing and Yield charts. |
 | ✅ P2-18 | **Browser refresh needed after redeploy** | CLAUDE.md (Phase 25) | RESOLVED (Phase 63): nginx sends `no-cache` for HTML/RSC and `public, max-age=31536000, immutable` for `/_next/static`. |
