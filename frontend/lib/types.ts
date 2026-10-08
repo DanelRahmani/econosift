@@ -348,6 +348,8 @@ export interface BreadthResponse {
   mcclellanSummation: number | null;
   cumulativeAdLine: { date: string; value: number }[];
   advDeclHistory: { date: string; adv: number; dec: number }[];
+  /** Point-in-time membership behind the counts (P2-35); `note` names any former members left out. */
+  membership?: { pointInTime: boolean; missingSymbols: number; note: string } | null;
 }
 
 export interface IndexRow {

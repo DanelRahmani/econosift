@@ -170,3 +170,14 @@ def test_highs_lows_series_counts_members_only():
     assert unmasked["highs"].iloc[-1] == 2    # both at a new high
     assert masked["highs"].iloc[-1] == 1      # only A, a member that session
     assert masked["highs"].iloc[-2] == 2      # B still counted while a member
+
+
+def test_fear_greed_breadth_signals_carry_the_membership_note():
+    """P3-39: the point-in-time residual reaches the Fear & Greed breadth signals' sources."""
+    from backend.services.feargreed_service import _provenance
+
+    note = "point-in-time S&P 500 members; 16 members have no Yahoo data (delisted or acquired) and left out"
+    prov = _provenance([{"key": "highLow", "asOf": "2026-10-06"}, {"key": "mcclellan", "asOf": "2026-10-06"}],
+                       {"pointInTime": True, "missingSymbols": 16, "note": note})
+    assert prov["signals.highLow"]["note"] == note
+    assert prov["signals.mcclellan"]["note"] == note

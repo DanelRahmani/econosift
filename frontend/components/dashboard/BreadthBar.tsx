@@ -97,6 +97,9 @@ export function BreadthBar({ index = "sp500" }: { index?: string }) {
         </div>
       </div>
       <p className="text-xs text-text-muted mt-2">New highs / lows: {HILO_DEF}</p>
+      {data.membership?.note && (
+        <p className="text-xs text-text-muted mt-1" data-prov="membership">Universe: {data.membership.note}.</p>
+      )}
     </div>
   );
 }

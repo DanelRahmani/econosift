@@ -243,10 +243,10 @@ def fear_greed() -> dict:
         "history": history,
         "historyExcludes": ["putCall"],
         "signalCount": len(avail),
-    }, _provenance(signals))
+    }, _provenance(signals, internals.get("membership")))
 
 
-def _provenance(signals: list[dict]) -> dict:
+def _provenance(signals: list[dict], membership: dict | None = None) -> dict:
     """Source of each signal (``signals.<key>``) and of the index built on them."""
     obs = {s["key"]: s.get("asOf") for s in signals}
     flags = {s["key"]: (("stale",) if s.get("stale") else ()) for s in signals}
@@ -258,7 +258,10 @@ def _provenance(signals: list[dict]) -> dict:
         pv.ref("yahoo", None, "Daily high/low/close of each S&P 500 member",
                units="price as traded", frequency="daily", observed=obs.get("highLow")),
         pv.ref("wikipedia", None, "Current S&P 500 constituents"),
+        pv.ref("wikipedia", None, "S&P 500 membership change log"),
     ]
+    # Breadth counts point-in-time members (P2-35); say which and what is missing (P3-39).
+    member_note = (membership or {}).get("note")
 
     def d(key: str, formula: str, inputs: list, title: str, **kw) -> dict:
         return pv.derived(formula, inputs, title=title, observed=obs.get(key), flags=flags.get(key, ()), **kw)
@@ -269,10 +272,10 @@ def _provenance(signals: list[dict]) -> dict:
             [yahoo("^GSPC", "S&P 500 index, daily close", "spMomentum")], "S&P 500 momentum"),
         "signals.highLow": d(
             "highLow", "new 52-week highs / (highs + lows) × 100 across S&P 500 members",
-            breadth_inputs, "New highs vs new lows"),
+            breadth_inputs, "New highs vs new lows", note=member_note),
         "signals.mcclellan": d(
             "mcclellan", "percentile rank (252 sessions) of the McClellan Summation Index",
-            breadth_inputs, "McClellan Summation"),
+            breadth_inputs, "McClellan Summation", note=member_note),
         "signals.putCall": d(
             "putCall",
             "100 − percentile rank of today's put/call open-interest ratio within its recorded history",
