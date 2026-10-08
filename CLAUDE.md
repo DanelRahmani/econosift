@@ -2,32 +2,32 @@
 
 ## What This App Does
 
-EconoSift is a self-hosted financial analytics platform built on FastAPI + Next.js 14, containerized via Docker Compose. It covers the full investment research stack across 25 pages:
+EconoSift is a self-hosted financial analytics platform built on FastAPI + Next.js 14, containerized via Docker Compose. It covers the full investment research stack across 21 pages:
 
-- **Dashboard** (`/dashboard`): Market breadth (advancing/declining, McClellan Oscillator, cumulative A-D line), global indices, Fear & Greed Index with sub-components, top movers. Beginner-mode walkthrough available.
+- **Dashboard** (`/dashboard`): Market breadth over point-in-time S&P 500 members (advancing/declining, McClellan Oscillator, cumulative A-D line, defined 52-week highs/lows), global indices, Fear & Greed Index with sub-components, top movers. Beginner-mode walkthrough available.
 - **Markets** (`/markets`): Price charts, technical indicators (MACD, Bollinger Bands, Ichimoku Cloud, Fibonacci, Pivot Points), risk metrics (VaR, Sharpe, Beta, GARCH), 8-model valuation engine + DCF with per-country discount rate selector + Snowflake composite score, financial ratios, options & IV analytics, news feed, 13F institutional holdings, Form 4 insider transactions. Sub-tabs: Overview, Technicals, Valuation, Ratios, News & Events, Sectors, Treemap
 - **Screener** (`/screener`): S&P 500 / Nasdaq 100 / Dow 30 universe, 20+ preset signals, overnight-warmed cache, 9 result tabs with sparkline gallery
-- **Portfolio** (`/portfolio`): Efficient frontier, Black-Litterman, Monte Carlo, Fama-French 3/5-factor attribution, Kelly criterion, risk contribution decomposition, stress testing, scenario lab, transaction log (buy/sell tracking with cost basis and realized P&L)
-- **Scenario Lab** (`/scenario`): Dedicated page for historical stress tests (GFC, COVID, dot-com, 2022 rates) and custom macro shock simulation. Reuses the backend scenario engine from Portfolio.
-- **Research** (`/research`): 9-tab quant hub — Risk Parity (ERC/inverse-vol), FX Carry (G10), Momentum (decile backtest), Realized Moments (GK variance, skew, cross-section), Cross-Asset Correlation (stocks/bonds/commodities/FX matrix), FX-Macro Link (commodity pair lead/lag), Multi-Country Portfolio (FX-adjusted returns), Sector DuPont, Econometric Lab (pooled OLS)
-- **Macro** (`/macro`): 16-tab hub — Overview, Inflation, Growth & Employment, Housing, Commodities, FX, Leading Indicators, Financial & Funding Conditions, Positioning, Country Risk, Central Banks, Econometric Lab, Fiscal, Labor, Energy & Climate, Inequality
+- **Portfolio** (`/portfolio`): Efficient frontier, Black-Litterman, Monte Carlo, Fama-French 3/5-factor attribution, Kelly criterion, risk contribution decomposition, stress testing, Scenario tab (historical stress tests: GFC, COVID, dot-com, 2022 rates; custom macro shocks), transaction log (buy/sell tracking with cost basis and realized P&L)
+- **Research** (`/research`): 9-tab quant hub — Risk Parity (ERC/inverse-vol), FX Carry (G10, BIS official policy rates), Momentum (decile backtest), Realized Moments (GK variance, skew, cross-section), Cross-Asset Correlation (stocks/bonds/commodities/FX matrix), FX-Macro Link (commodity pair lead/lag), Multi-Country Portfolio (FX-adjusted returns), Sector DuPont, Econometric Lab (pooled OLS)
+- **Macro** (`/macro`): 16-tab hub — Overview, Inflation, Growth & Employment, Housing, Commodities, FX, Leading Indicators, Financial & Funding Conditions, Positioning, Country Risk, Central Banks (BIS official policy rates, each row labelled with its rate type), Econometric Lab, Fiscal, Labor, Energy & Climate, Inequality
 - **Risk** (`/risk`): Rolling metrics (20D/60D/120D/252D), GARCH(1,1), Hurst exponent, OU mean-reversion, Engle-Granger cointegration, correlation matrix, historical stress scenarios
 - **Options** (`/options`): IV30, IV Rank/Percentile, Greeks (Δ/Γ/Θ/V/ρ), term structure, volatility smile, OI profile, max pain, Black-Scholes, CRR binomial tree, Monte Carlo
 - **Calendar** (`/calendar`): Economic releases, earnings with EPS surprise, ex-dividend dates, IPOs, central bank meetings
-- **Yield** (`/yield`): US Treasury spot curve, TIPS real yields, breakevens (incl. 5y5y forward), ACM term premium, Nelson-Siegel curve-fit noise, multi-country yield comparison
-- **Policy & Sovereign** (`/policy`, `/sovereign`): CB divergence score, G10 carry differentials, sovereign risk rankings, 6-KPI traffic-light
+- **Yield** (`/yield`): US Treasury spot curve, TIPS real yields, breakevens (incl. 5y5y forward), ACM term premium, Nelson-Siegel curve-fit noise, multi-country yield comparison, Policy Tracker (CB divergence score on BIS official rates, G10 carry differentials) and Sovereign Risk (risk score + rank, not a default probability, 6-KPI traffic-light) tabs
 - **Atlas** (`/atlas`): Choropleth world map of 6 macro indicators across ~200 countries (2000–2024), year-slider animation, regional blocs (G7/G20/Eurozone/EM), Top/Bottom-10 rankings
 - **Wiki** (`/wiki`): Searchable financial dictionary — 410+ terms across 26 categories, each with a detailed explanation. Category sidebar, debounced search, expandable term cards, related-term cross-linking
 - **Trade** (`/trade`): Exports/imports %GDP, trade balances, openness indices, BIS effective exchange rates
 - **Corporate Health** (`/corporate`): Altman Z-Score, Piotroski F-Score (9-point), Beneish M-Score, sector aggregate Z
-- **Dividends** (`/dividends`): Dividend yield, 5Y/10Y growth, payout ratio, aristocrats screener, DDM fair value
+- **Dividends** (`/dividends`): Dividend yield, 5Y/10Y growth, payout ratio, aristocrats screener, DDM fair value (locked when ke − g < 2 pp)
 - **Insider** (`/insider`): Aggregate insider buy/sell ratio, cluster detection (≥3 insiders in 30d), sector sentiment, smart money index
-- **Mergers** (`/mergers`): M&A deal tracking, deal values, acquisition premiums, sector activity heatmap
+- **Mergers** (`/mergers`): Merger News — Finnhub merger headlines with Finnhub's own ticker tags, monthly and sector counts (no parsed deal values)
 - **Stability** (`/stability`): Currency Crisis Early Warning System (KLR 1998), Banking Stability (NPL, capital adequacy, Z-scores, BIS credit gaps)
 - **Cross-Border** (`/crossborder`): BIS locational banking statistics, international debt securities, global financial interconnectedness
 - **Country Profiles** (`/country/{iso2}`): CIA World Factbook data per country — geography, demographics, economy
 - **AI Summaries** (on-request): AI-powered company analysis with clickable ticker pills (select any combination on Markets), macro summary with searchable 20-country pill selector on Macro Overview, and daily market briefing on Dashboard. Uses Google Gemini free-tier API (2048 max output tokens) with model selector, SQLite caching, and source attribution for all summaries.
 - **Admin** (`/admin`): Backend health dashboard, cache stats, API keys management (FRED/Finnhub/Gemini validation), "Clear cache & re-warm" recovery action, and an **Appearance** theme maker (custom Primary/Accent brand colours over the light/dark base themes)
+
+Retired routes: `/policy` → `/yield`, `/sovereign` → `/yield?tab=Sovereign Risk`, `/scenario` → `/portfolio?tab=Scenario` (redirect pages + `next.config.js` redirects). Keyboard: 1-9 pick a tab, `[` / `]` step tabs (AltGr layouts work), Ctrl+K command palette.
 
 No paid APIs required. Optional free FRED API key & FINNHUB API key for richer US data, and free Gemini API key for AI summaries.
 
@@ -48,9 +48,9 @@ No paid APIs required. Optional free FRED API key & FINNHUB API key for richer U
 
 ## Build History
 
-See [`CHANGELOG.md`](./CHANGELOG.md) for the full build history (Phases 0–35 ✅ COMPLETE).
+See [`CHANGELOG.md`](./CHANGELOG.md) for the full build history (Phases 0–64 ✅ COMPLETE; Phase 64 merged to `main` via PR #14 on 2026-10-08).
 
-The original `claude_plan.md` roadmap (Phases 0–12) is fully delivered, as is the Phase 13–24 expansion, the Phase 25–34 IDEA_LIST delivery, and Phase 35 AI summaries. All phases are shipped and verified in Docker. Future work should start a new phase plan (e.g. Phase 36+).
+The original `claude_plan.md` roadmap (Phases 0–12) is fully delivered, as is the Phase 13–24 expansion, the Phase 25–34 IDEA_LIST delivery, Phase 35 AI summaries, and the audit / open-issue Phases 36–64. All phases are shipped and verified in Docker. Future work should start a new phase plan (Phase 65+); per-phase prompts and status notes live in `docs/plans/`.
 
 > **After completing each phase, add a one-line entry to [`CHANGELOG.md`](./CHANGELOG.md)** with phase number, date, and concise description of what was shipped.
 
@@ -64,12 +64,14 @@ See the INFO folder for detailed file-by-file breakdowns of the backend and fron
 
 | File | Covers |
 |------|--------|
-| [`INFO/backend_structure.md`](./INFO/backend_structure.md) | All 33 routers, 78 services, 8 source adapters, database, tests |
-| [`INFO/frontend_structure.md`](./INFO/frontend_structure.md) | All 25 pages, 118 components, 8 lib files |
+| [`INFO/backend_structure.md`](./INFO/backend_structure.md) | Routers, services, source adapters, database, tests (counts may lag the code: 33 routers, 89 services today) |
+| [`INFO/frontend_structure.md`](./INFO/frontend_structure.md) | Pages, components, lib files (may lag the code) |
 
 Key architecture notes:
 - All external API calls are cached via `@cached` / `@async_cached` in `cache.py` (60-min TTL enforced on **both** tiers, cachetools TTLCache + SQLite HybridCache). Empty/failed results are **never** cached (`skip_if` guard, default = empty-container check), so a transient source failure can't poison the cache; `cache.clear_all()` flushes both tiers (exposed as `POST /admin/cache/clear`)
 - 🟡/🔴 endpoints in `risk.py` and `options.py` are intentionally uncached (compute-on-demand)
+- Policy rates: `sources/source_bis.py` `get_policy_rates_bulk()` (BIS WS_CBPOL, one bulk CSV, hourly in-process memo) feeds the Policy Tracker, Central Banks tab and FX carry; FRED/OECD proxies are only a labelled fallback (`rateSource` / `rateType` on every row).
+- Shared UI primitives in `frontend/components/ui.tsx`: `Card`, `KpiTile` / `KpiStrip` / `ControlBar` (use these for new KPI strips; Mergers, Insider, Corporate already do), `ScrollableTabBar`, `TabButton`, `ToggleChip`, `EmptyState`, `SemiGauge`. Colours are theme tokens only (`theme-tokens.spec.ts` enforces it).
 - Middleware: `middleware.py` (DeduplicationMiddleware stub)
 - Database: `database.py` (SQLAlchemy engine, SessionLocal), `db_models.py` (DailyPrice, DailyQuote, DailyMacro, DailyFX, CacheEntry, JobExecution)
 
@@ -86,7 +88,27 @@ Key architecture notes:
   so it does *not* keep stale code (the old "no-cache only" note was overcautious).
   Fall back to `--no-cache` only if a build behaves as if source is stale. If
   Docker errors, sound an **audible alert** (`[console]::beep(880,600)`) so the
-  user can fix the environment.
+  user can fix the environment. If Docker Desktop is not running, start it yourself
+  (`Start-Process "C:\Program Files\Docker\Docker\Docker Desktop.exe"`). After a change to a
+  response shape, clear the app cache (`curl -X POST http://localhost/api/admin/cache/clear`).
+  Gate commands: container pytest `MSYS_NO_PATHCONV=1 docker compose exec -T backend python -m
+  pytest -p no:warnings`; Playwright `cd frontend && PLAYWRIGHT_BASE_URL=http://localhost npx
+  playwright test` (the first run after a cache clear can time out on cold pages; rerun those).
+  Close down with `docker compose stop` (keeps the data volumes).
+- **CI:** the GitHub Actions "Playwright smoke" job has been flaky since ~Phase 58 (Wiki-term
+  palette, Trade exports chart, Risk arrow keys) while passing against local Docker; backend tests
+  and typecheck are the reliable CI signals until that is fixed.
+- **Desktop safety:** never start the desktop backend from the repo root (its CWD fallback opens
+  the live Docker `./data/axiomfinance.db`). Do not install over the owner's EconoSift desktop
+  install (`%APPDATA%\AxiomFinance`); verify a build with the frozen exe and a scratch
+  `ECONOSIFT_DATA_DIR`. Never trigger `build-desktop.yml` (gated release flow via `PRODUCTION`).
+- **Git LFS:** pushes need the repo-local `lfs.https://github.com/DanelRahmani/econosift.git/info/lfs.locksverify false`
+  (owner-approved, already set).
+- **Line endings:** many files are CRLF. Edit with the Edit tool, or Python with
+  `encoding="utf-8", newline=""` keeping the file's newline; never regex `sed`.
+  `desktop/src-tauri/Cargo.toml` (rewritten by the build), `frontend/tsconfig.tsbuildinfo` and
+  `AGENTS.md` are left uncommitted on purpose.
+- **Gemini quota:** don't spend the owner's Gemini free-tier quota in tests or checks.
 - **Env keys on this machine:** `FRED_API_KEY` **is set** (FRED release calendar +
   US FRED macro data work live). `FINNHUB_API_KEY` **is now set** (confirmed Phase 9
   session) → Finnhub calendar, earnings, and economic endpoints are live.
@@ -99,11 +121,14 @@ Key architecture notes:
   source failure, log + serve cached, then surface it.
 - **Branch workflow: develop on `DEV`, merge to `main` via pull request.**
   Commit + push to `DEV` after each phase (message focused on the "why"), then
-  open a PR `DEV` → `main` when the work is verified. Never push directly to
-  `main`.
+  open a PR `DEV` → `main` when the work is verified and the owner asks. Never push
+  directly to `main`; `main` → `PRODUCTION` promotion is the owner's call.
 - Optional: dispatch labelled sub-agents (Frontend/Backend/Math = sonnet,
   Data = haiku) for parallel work on disjoint file sets; the orchestrator wires
-  shared files (`main.py`, `api.ts`, `types.ts`, pages, routers).
+  shared files (`main.py`, `api.ts`, `types.ts`, pages, routers). Phase 64 used
+  self-contained work packets (task, verbatim issue row, owner decision, files, contract,
+  test-first, done-when command), one item per commit, then a fresh-context spec-verifier
+  review before the Docker gate. Verify sub-agent findings yourself before acting on them.
 
 ---
 
