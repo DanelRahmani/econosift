@@ -38,6 +38,8 @@ def _fresh_caches():
     from backend import cache as cache_mod
 
     cache_mod.clear_all()
+    from backend.sources import source_bis
+    source_bis._policy_memo = None  # the hourly BIS policy-rate memo is a cache too
     yield
 
 

@@ -178,3 +178,50 @@ def test_parse_policy_rates_keeps_three_years_and_requested_areas_only():
     out = _parse_policy_rates(df, ["JP"])
     assert set(out) == {"JP"}
     assert out["JP"]["points"] == [{"date": recent, "value": 1.25}]
+
+
+def test_parse_policy_rates_since_keeps_older_history():
+    """P2-44: Central Banks and carry ask for history back to their own start."""
+    import pandas as pd
+    from backend.sources.source_bis import _parse_policy_rates
+
+    recent = (pd.Timestamp.today() - pd.DateOffset(days=10)).strftime("%Y-%m-%d")
+    df = pd.DataFrame({
+        "FREQ:Frequency": ["D: Daily"] * 2,
+        "REF_AREA:Reference area": ["JP: Japan"] * 2,
+        "TIME_PERIOD:Time period or range": ["2005-06-15", recent],
+        "OBS_VALUE:Observation Value": [0.1, 1.25],
+        "COMPILATION:Compilation": ["BOJ note"] * 2,
+    })
+    assert [p["date"] for p in _parse_policy_rates(df, ["JP"])["JP"]["points"]] == [recent]
+    wide = _parse_policy_rates(df, ["JP"], since="2000-01-01")
+    assert [p["date"] for p in wide["JP"]["points"]] == ["2005-06-15", recent]
+
+
+def test_policy_rates_bulk_reuses_one_download_for_every_since(monkeypatch):
+    """Tracker, Central Banks and carry ask for different start dates; one download serves all (P2-44 review)."""
+    import asyncio
+    import pandas as pd
+    from backend.cache import clear_all
+    from backend.sources import source_bis
+
+    recent = (pd.Timestamp.today() - pd.DateOffset(days=10)).strftime("%Y-%m-%d")
+    older = "2010-06-01"
+    df = pd.DataFrame({
+        "FREQ:Frequency": ["D: Daily"] * 2,
+        "REF_AREA:Reference area": ["XM: Euro area"] * 2,
+        "TIME_PERIOD:Time period or range": [older, recent],
+        "OBS_VALUE:Observation Value": [1.0, 2.5],
+        "COMPILATION:Compilation": ["ECB note"] * 2,
+    })
+    calls = []
+    monkeypatch.setattr(source_bis, "_fetch_bis_zip", lambda key: calls.append(key) or df)
+    monkeypatch.setattr(source_bis, "_policy_memo", None)
+    clear_all("bis_policy_rates")
+
+    short = asyncio.run(source_bis.get_policy_rates_bulk(("XM",)))
+    long = asyncio.run(source_bis.get_policy_rates_bulk(("XM", "US"), since="2005-01-01"))
+    assert calls == ["policy"]                                   # one download
+    assert [p["date"] for p in short["XM"]["points"]] == [recent]  # default: last 3 years
+    assert [p["date"] for p in long["XM"]["points"]] == [older, recent]
+    assert "US" not in long                                       # no data -> omitted, never invented

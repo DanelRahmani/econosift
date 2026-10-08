@@ -27,7 +27,7 @@ def _make_fred_data() -> dict[str, pd.Series]:
 
     return {
         "FEDFUNDS":          _series(3.00),   # USD
-        "ECBMRRFR":          _series(2.50),   # EUR  carry = -0.50
+        "ECBDFR":            _series(2.50),   # EUR  carry = -0.50
         "IRSTCI01GBM156N":   _series(3.50),   # GBP  carry = +0.50
         "IRSTCI01AUM156N":   _series(4.35),   # AUD  carry = +1.35
         "IRSTCI01NZM156N":   _series(5.50),   # NZD  carry = +2.50  ← highest
@@ -55,6 +55,31 @@ def _make_fx_close(symbols: tuple[str, ...], period: str) -> pd.DataFrame:
 # ---------------------------------------------------------------------------
 # Patch helpers
 # ---------------------------------------------------------------------------
+
+def _bis_points(values: list[float]) -> dict:
+    """BIS-shaped policy-rate payload for one area: monthly points ending today."""
+    idx = pd.date_range(end=date.today(), periods=len(values), freq="MS")
+    return {"points": [{"date": str(d.date()), "value": v} for d, v in zip(idx, values)],
+            "compilation": "BIS compilation note"}
+
+
+def _patch_bis(monkeypatch, payload: dict) -> list:
+    """Replace the BIS bulk fetch with a canned payload; returns the recorded call args."""
+    from backend.sources import source_bis
+    calls: list = []
+
+    async def _fake_bulk(iso2_tuple, since=None):
+        calls.append((iso2_tuple, since))
+        return payload
+
+    monkeypatch.setattr(source_bis, "get_policy_rates_bulk", _fake_bulk)
+    return calls
+
+
+@pytest.fixture(autouse=True)
+def _no_bis_by_default(monkeypatch):
+    """Offline by default: BIS returns nothing, so the FRED fixtures drive the tests."""
+    _patch_bis(monkeypatch, {})
 
 def _patch_services(monkeypatch, *, fred_data: dict | None = None):
     """Monkeypatch rates_service._fetch_many_fred_sync and yfs.get_close_frame."""
@@ -392,3 +417,59 @@ def test_backtest_accrues_rate_differential_with_flat_fx(monkeypatch):
     assert result["metrics"]["cagr"] == pytest.approx(expected_cagr, rel=1e-3)
     assert result["legs"]["long"] == ["NZD", "AUD", "GBP"]
     assert result["legs"]["short"] == ["EUR", "CHF", "JPY"]
+
+
+# ---------------------------------------------------------------------------
+# P2-44: official BIS policy rates first, FRED/OECD proxies only as a labelled fallback
+# ---------------------------------------------------------------------------
+
+def test_carry_uses_bis_rates_with_row_labels(monkeypatch):
+    _patch_services(monkeypatch)
+    calls = _patch_bis(monkeypatch, {
+        "US": _bis_points([3.875] * 4),
+        "XM": _bis_points([2.75, 2.50, 2.50, 2.50]),
+        "NZ": _bis_points([2.50] * 4),
+    })
+    from backend.services.carry_service import get_carry_table
+
+    result = get_carry_table("3y")
+    rows = {r["ccy"]: r for r in result["rows"]}
+
+    assert result["usdRate"] == pytest.approx(3.875)
+    assert rows["EUR"]["foreignRate"] == pytest.approx(2.50)
+    assert rows["EUR"]["carry"] == pytest.approx(2.50 - 3.875)  # -1.375
+    assert rows["EUR"]["rateSource"] == "bis"
+    assert "deposit facility" in rows["EUR"]["rateType"]
+    assert rows["NZD"]["rateSource"] == "bis"
+    assert rows["NZD"]["rateType"] == "official cash rate"
+
+    # JPY is missing in BIS: the OECD proxy stands in, labelled as such
+    assert rows["JPY"]["rateSource"] == "proxy"
+    assert rows["JPY"]["foreignRate"] == pytest.approx(0.10)
+    assert "proxy" in rows["JPY"]["rateType"]
+
+    prov = result["provenance"]
+    assert prov["rows.EUR.foreignRate"]["provider"] == "bis"
+    assert prov["rows.EUR.foreignRate"]["series"] == "WS_CBPOL"
+    assert prov["rows.JPY.foreignRate"]["provider"] == "fred"
+    assert "fallback" in prov["rows.JPY.foreignRate"]["note"]
+    # the BIS history is requested from the same start as the FRED fetch
+    assert calls and calls[0][1] is not None
+    assert set(calls[0][0]) == {"US", "XM", "GB", "JP", "CA", "AU", "CH", "NZ"}
+
+
+def test_carry_history_series_comes_from_bis_points(monkeypatch):
+    _patch_services(monkeypatch)
+    _patch_bis(monkeypatch, {
+        "US": _bis_points([3.0, 3.25, 3.5]),
+        "XM": _bis_points([2.0, 2.25, 2.5]),
+    })
+    import backend.services.carry_service as cs
+
+    series, sources = cs._resolve_policy_rate_series("2020-01-01")
+
+    assert list(series["EUR"].values) == [2.0, 2.25, 2.5]
+    assert isinstance(series["EUR"].index, pd.DatetimeIndex)
+    assert sources["EUR"] == "WS_CBPOL"
+    assert sources["GBP"] == "IRSTCI01GBM156N"      # not in BIS: FRED proxy
+    assert "ECBMRRFR" not in cs._POLICY_RATE_SERIES["EUR"]

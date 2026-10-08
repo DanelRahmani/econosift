@@ -2202,7 +2202,9 @@ export interface CarryRow {
   carry: number | null;
   fxVol: number | null;
   volAdjCarry: number | null;
-  rateSource: string;
+  /** "bis" = official BIS policy rate; "proxy" = FRED/OECD fallback (P2-44). */
+  rateSource: "bis" | "proxy";
+  rateType?: string;
 }
 export interface CarryTable {
   asOf: string;
@@ -2470,6 +2472,12 @@ export interface CbCurrent {
   series: string;
   next_meeting: string | null;
   days_until: number | null;
+  /** "bis" = official BIS policy rate; "proxy" = FRED/OECD fallback (P2-44). */
+  rateSource?: "bis" | "proxy";
+  /** What the rate is, e.g. "deposit facility rate"; proxies say so. */
+  rateType?: string;
+  asOf?: string | null;
+  stale?: boolean;
 }
 export interface CentralBanksData {
   history: Array<{

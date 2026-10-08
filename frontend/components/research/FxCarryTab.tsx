@@ -18,6 +18,7 @@ const tooltipStyle = {
   fontSize: 12,
 };
 
+
 type SortKey = "carry" | "volAdjCarry" | "fxVol" | "foreignRate";
 
 function num(v: number | null, dp = 2, suffix = ""): string {
@@ -97,7 +98,9 @@ export function FxCarryTab() {
                 </tr>
               </thead>
               <tbody>
-                {rows.map((r) => (
+                {rows.map((row) => {
+                  const r = row;
+                  return (
                   <tr key={r.ccy} data-prov-ctx={r.pair} className="border-b border-border/50 hover:bg-surface-alt/50">
                     <td className="py-2 pr-3 font-mono font-semibold">{r.pair}</td>
                     <td data-prov={`rows.${r.ccy}.spot`} className="text-right py-2 px-3 font-mono text-text-secondary">{num(r.spot, 4)}</td>
@@ -105,9 +108,10 @@ export function FxCarryTab() {
                     <td data-prov={`rows.${r.ccy}.carry`} className={`text-right py-2 px-3 font-mono font-semibold ${carryColor(r)}`}>{num(r.carry, 2, "%")}</td>
                     <td data-prov={`rows.${r.ccy}.fxVol`} className="text-right py-2 px-3 font-mono text-text-secondary">{num(r.fxVol, 1, "%")}</td>
                     <td data-prov={`rows.${r.ccy}.volAdjCarry`} className="text-right py-2 px-3 font-mono">{num(r.volAdjCarry, 3)}</td>
-                    <td data-prov={`rows.${r.ccy}.foreignRate`} className="text-right py-2 pl-3 font-mono text-text-muted text-xs">{r.rateSource}</td>
+                    <td data-prov={`rows.${r.ccy}.foreignRate`} className="text-right py-2 pl-3 font-mono text-text-muted text-xs">{r.rateType ?? r.rateSource}{r.rateSource === "proxy" ? " · proxy" : ""}</td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

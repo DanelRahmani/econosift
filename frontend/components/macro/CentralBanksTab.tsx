@@ -5,7 +5,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from "recharts";
 import { api } from "@/lib/api";
-import type { CentralBanksData } from "@/lib/types";
+import type { CentralBanksData, CbCurrent } from "@/lib/types";
 import { chartPalette, chartTooltipStyle } from "@/components/ui";
 import { useTheme } from "@/components/ThemeProvider";
 import { useSourceScope } from "@/components/provenance/SourceScope";
@@ -23,6 +23,7 @@ const CB_COLORS: Record<string, string> = {
   SNB: "#ec4899",
 };
 const CB_NAMES = Object.keys(CB_COLORS);
+
 
 const CB_FULL_NAMES: Record<string, string> = {
   Fed: "US Federal Reserve",
@@ -104,7 +105,7 @@ export function CentralBanksTab() {
       {/* KPI strip */}
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
         {CB_NAMES.map(cb => {
-          const cur = data.current[cb];
+          const cur: CbCurrent | undefined = data.current[cb];
           if (!cur) return null;
           return (
             <div key={cb} className="card p-3" data-prov={`current.${cb}`} data-prov-ctx={`${CB_FULL_NAMES[cb]} policy rate`}>
@@ -119,6 +120,11 @@ export function CentralBanksTab() {
               <div className="text-lg font-semibold text-text-primary">
                 {cur.rate !== null ? `${cur.rate.toFixed(2)}%` : "—"}
               </div>
+              {cur.rateType && (
+                <div className="text-[10px] text-text-muted">
+                  {cur.rateType}{cur.rateSource === "proxy" ? " · proxy" : ""}
+                </div>
+              )}
               {cur.next_meeting && (
                 <div className="text-[10px] text-text-muted mt-1" data-prov={`current.${cb}.next_meeting`} data-prov-ctx={`${CB_FULL_NAMES[cb]} next meeting`}>
                   Next: {cur.next_meeting.slice(5)}{cur.days_until !== null ? ` (${cur.days_until}d)` : ""}
