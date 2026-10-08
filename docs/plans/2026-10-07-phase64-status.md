@@ -11,7 +11,7 @@ Phase 64 is done and pushed to `DEV`. No PR yet: the owner opens `DEV` → `main
 - P2-26 (a) document the definition.
 - P2-42 (b) `[` / `]`.
 - P2-34 unmounted components: (a) delete.
-- P2-10 / P2-15: (a) skipped; still open.
+- P2-10 / P2-15: first (a) skipped; on 2026-10-08 the owner chose to remove the Policy & Sovereign and Scenario Lab nav entries and a scoped KPI/control-bar pass.
 - Later decisions:
   - Disable the Git LFS lock verify for this repo (the push was blocked).
   - Do not install over the existing EconoSift desktop install; verify with the frozen exe instead.
@@ -40,13 +40,8 @@ Phase 64 is done and pushed to `DEV`. No PR yet: the owner opens `DEV` → `main
 
 ## Open / next
 - **DESK-01-V: RESOLVED 2026-10-08.** The rebuilt frozen exe, started with a scratch `ECONOSIFT_DATA_DIR`, writes "Uvicorn running on http://127.0.0.1:8000" (and the other startup lines) to `backend.log`; the working folder stays empty. The last installer build's NSIS packaging step (makensis) exited 4. The backend and app exe built fine, so this is not a code issue; rerun `desktop\build-windows.ps1` when an installer is needed (close any open Explorer window on the bundle folder).
-- **New issues:**
-  - P2-43: DDM blows up when g is capped at ke − 0.5 pp (KO 424 vs ~86).
-  - P2-44: the Central Banks tab and FX carry are still on MRO/OECD.
-  - P3-38: flaky timing test.
-  - P3-39: breadth membership note not shown.
-  - P3-40: AltGr `[` / `]`, no shortcut hint.
-  - P3-41: Dividends `$` axis; `macro_service.data_provenance` dead code.
+- **Follow-up batch (2026-10-08): all resolved.** P2-43 (DDM lock at ke − g < 2 pp; KO 424 → locked), P2-44 (Central Banks and carry on BIS), P3-38, P3-39, P3-40, P3-41, P2-10 and P2-15 (scoped). Gate: Docker rebuilt and recreated, cache cleared, container pytest green, live checks (KO DDM locked, all CB and carry rows `bis`, membership note, `/scenario` `/policy` `/sovereign` 308 to their tabs, pages 200), Playwright 46/48 on the first run after the cache clear, the 2 cold-cache timeouts (Trade labels, /yield smoke) pass on rerun.
+- **Still open by choice:** feature ideas P3-01/02/05/07/08/09/10/11 (on hold); P3-13/P3-14 (permanent limits); the rest of P2-15's pages.
 - **Uncommitted, intentionally:**
   - `desktop/src-tauri/Cargo.toml`: line endings rewritten by the build.
   - `frontend/tsconfig.tsbuildinfo` and `AGENTS.md`: pre-existing.
