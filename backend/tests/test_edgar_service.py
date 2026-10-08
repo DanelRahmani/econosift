@@ -126,4 +126,7 @@ def test_insider_aggregate_does_not_block_the_event_loop(monkeypatch):
             return done["/api/health"] - t0, done["/api/insider/aggregate"] - t0
 
     health_s, agg_s = asyncio.run(main())
-    assert health_s < 0.5 < agg_s
+    # Relative, not absolute (P3-38): a blocked loop would answer /health only after the 1 s
+    # aggregate, i.e. health_s >= agg_s. A busy container made the old "< 0.5 s" bound flaky (0.50-0.67 s).
+    assert agg_s > 0.9
+    assert health_s < agg_s - 0.3
