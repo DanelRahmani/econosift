@@ -191,6 +191,8 @@ def get_dividend_analysis(ticker: str) -> dict:
             "ticker": ticker,
             "name": name,
             "sector": sector or None,
+            # Dividends are per share in the quote currency; None when Yahoo reports none (P3-41).
+            "currency": info.get("currency") or None,
             "price": price,
             "dividendYield": div_yield,
             "latestAnnualDividend": latest_annual_div,

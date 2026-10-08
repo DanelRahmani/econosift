@@ -32,7 +32,7 @@ function sources(dir: string): string[] {
 // central-bank balance sheets (`$${v}T`) are genuinely USD-only series.
 test("no Markets tickFormatter hard-codes a $ price prefix", () => {
   const root = join(__dirname, "..", "..");
-  const offenders = [join("components", "markets")]
+  const offenders = [join("components", "markets"), join("app", "dividends")]  // dividends: P3-41
     .flatMap((d) => sources(join(root, d)))
     .filter((file) => /tickFormatter=\{[^}]*`\$\$\{/.test(readFileSync(file, "utf8")))
     .map((file) => file.slice(root.length + 1));

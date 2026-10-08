@@ -2343,6 +2343,8 @@ export interface DividendAnalysisResponse {
   ticker: string;
   name: string;
   sector: string | null;
+  /** Quote currency of the per-share amounts; null when unknown (never assumed USD). */
+  currency?: string | null;
   price: number | null;
   dividendYield: number | null;
   latestAnnualDividend: number | null;
