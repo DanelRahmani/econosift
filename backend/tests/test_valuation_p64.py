@@ -212,3 +212,30 @@ def test_technicals_currency_is_none_when_unknown(monkeypatch):
     monkeypatch.setattr(yfs, "get_quote", boom)
     assert ts.get_technicals.__wrapped__("XYZ", "1y")["currency"] is None
     assert ts._empty_response("XYZ", "1y")["currency"] is None
+
+
+# ---------------------------------------------------------------------------
+# P2-43: DDM locks when the cost of equity barely exceeds growth
+# ---------------------------------------------------------------------------
+
+def test_ddm_locks_when_ke_minus_g_is_under_two_points():
+    """KO-like case: ke 5.23 %, sustainable g 9.4 % capped at ke - 0.5 pp = 4.73 % -> 2.12 / 0.005 = 424 before."""
+    from backend.services import valuation_engine as ve
+
+    ctx = ve._Ctx(_bundle(dividendRate=2.12, returnOnEquity=0.25, payoutRatio=0.6246), 1.0, None)
+    ctx.ke = 0.0523
+    ctx.rf = 0.06                      # rf above ke, so the ke - 0.5 pp cap binds: g = 0.0473
+    ddm = ve._model_ddm(ctx)
+    assert ddm["locked"] is True and ddm["value"] is None
+    assert "too sensitive" in ddm["reason"]
+
+
+def test_ddm_still_values_with_a_two_point_spread():
+    from backend.services import valuation_engine as ve
+
+    ctx = ve._Ctx(_bundle(returnOnEquity=0.10, payoutRatio=0.5), 1.0, None)
+    ctx.ke = 0.07                      # g = 0.5 * 0.10 = 0.05 -> spread exactly 2 pp: still valued
+    ctx.rf = 0.06
+    ddm = ve._model_ddm(ctx)
+    assert ddm["locked"] is False
+    assert ddm["value"] == pytest.approx(2.0 / 0.02)               # 100.0

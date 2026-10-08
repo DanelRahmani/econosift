@@ -274,6 +274,10 @@ def _model_dcf(ctx: _Ctx) -> dict:
 # Model 2: DDM (Gordon Growth)
 # ---------------------------------------------------------------------------
 
+# Minimum cost-of-equity − growth spread for the Gordon model (P2-43).
+_DDM_MIN_SPREAD = 0.02
+
+
 def _model_ddm(ctx: _Ctx) -> dict:
     NAME = "DDM (Gordon Growth)"
     div_rate = _clean(ctx.info.get("dividendRate"))
@@ -298,6 +302,13 @@ def _model_ddm(ctx: _Ctx) -> dict:
     g = min(g_sustainable, cap)
     if g < 0 or ke <= g:
         return _locked_model(NAME, f"Growth ({g:.4f}) ≥ cost of equity ({ke:.4f}) — Gordon Growth undefined")
+
+    # P2-43: with the growth cap at ke − 0.5 pp, a low cost of equity left a spread so thin that D1 / (ke − g)
+    # exploded (KO: 2.12 / 0.005 = 424 against a ~86 price). Below a 2 pp spread the value is mostly noise in
+    # the inputs, so the model is locked (owner decision, 2026-10-08) and drops out of the composite.
+    if ke - g < _DDM_MIN_SPREAD:
+        return _locked_model(NAME, f"Cost of equity ({ke:.2%}) minus growth ({g:.2%}) is under "
+                                   f"{_DDM_MIN_SPREAD:.0%}: the Gordon value is too sensitive to be meaningful")
 
     d1 = div_rate  # Yahoo's dividendRate is the forward annual dividend: already D1, not D0
     value = d1 / (ke - g)
