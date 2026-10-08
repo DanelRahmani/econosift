@@ -27,7 +27,10 @@ export function useKeyboardShortcuts(handlers: ShortcutHandlers) {
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
-      if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey || isTyping(e.target)) return;
+      // AltGr (reported as Ctrl+Alt on Windows) is how many layouts type "[" and "]", so it is not a
+      // shortcut modifier here (P3-40); a real Ctrl, Alt or Meta chord is left alone.
+      const altGr = e.getModifierState?.("AltGraph") ?? false;
+      if (e.defaultPrevented || e.metaKey || (!altGr && (e.ctrlKey || e.altKey)) || isTyping(e.target)) return;
       const h = ref.current;
       if (e.key >= "1" && e.key <= "9" && h.onTabSwitch) {
         e.preventDefault();

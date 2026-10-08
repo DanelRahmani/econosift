@@ -80,3 +80,17 @@ test("[ and ] step Macro tabs past the ninth, clamped at the ends (P2-42)", asyn
   await page.keyboard.press("]");
   await expect(page).toHaveURL(/tab=sentiment/);
 });
+
+test("AltGr+] still steps the tab; the footer lists the shortcuts (P3-40)", async ({ page }) => {
+  await page.goto("/macro?tab=business", { waitUntil: "domcontentloaded" });
+  await expect(page.getByTestId("shortcut-hint")).toContainText("prev / next tab");
+  // AltGr arrives as Ctrl+Alt with the AltGraph modifier state; dispatch it directly.
+  await expect(async () => {
+    await page.evaluate(() => {
+      const ev = new KeyboardEvent("keydown", { key: "]", ctrlKey: true, altKey: true, bubbles: true });
+      Object.defineProperty(ev, "getModifierState", { value: (k: string) => k === "AltGraph" });
+      window.dispatchEvent(ev);
+    });
+    await expect(page).toHaveURL(/tab=commodities/, { timeout: 1_000 });
+  }).toPass({ timeout: 30_000 });
+});
