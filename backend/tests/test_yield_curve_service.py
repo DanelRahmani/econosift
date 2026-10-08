@@ -24,6 +24,13 @@ MOCK_DATA = {
 }
 
 
+@pytest.fixture(autouse=True)
+def _no_cpi_download():
+    """Keep these tests offline: the CPI map (World Bank + BIS zip) is not under test here."""
+    with patch("backend.services.yield_curve_service._get_cpi_map", new_callable=AsyncMock, return_value={}):
+        yield
+
+
 @pytest.mark.asyncio
 async def test_yield_curves_structure():
     with patch(

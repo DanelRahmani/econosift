@@ -23,6 +23,7 @@ from backend.services.options_engine import (
     crr_price,
     iv_backsolve,
     mc_option_price,
+    _interp_total_variance,
 )
 
 # Reference contract used throughout: at-the-money, 1y, 5% rates, 20% vol.
@@ -288,3 +289,24 @@ def test_merton_delta_matches_finite_difference():
     S, K, T, r, q, sig, h = 100.0, 100.0, 0.75, 0.03, 0.02, 0.3, 1e-4
     fd = (bs_price(S + h, K, T, r, sig, "call", q) - bs_price(S - h, K, T, r, sig, "call", q)) / (2 * h)
     assert bs_greeks(S, K, T, r, sig, "call", q)["delta"] == pytest.approx(fd, abs=1e-6)
+
+
+def test_mc_same_seed_is_reproducible_and_different_seeds_differ():
+    a = mc_option_price(S, K, T, R, SIGMA, "call", sims=5_000, seed=42)["price"]
+    b = mc_option_price(S, K, T, R, SIGMA, "call", sims=5_000, seed=42)["price"]
+    c = mc_option_price(S, K, T, R, SIGMA, "call", sims=5_000, seed=1)["price"]
+    d = mc_option_price(S, K, T, R, SIGMA, "call", sims=5_000, seed=2)["price"]
+    assert a == b
+    assert c != d
+
+
+# ── IV30 interpolation ───────────────────────────────────────────────────────
+
+def test_iv30_interpolates_in_total_variance_not_in_vol():
+    # sigma_b=0.20 @ 20 DTE, sigma_a=0.30 @ 40 DTE, target 30:
+    # w = 0.04*20 + (0.09*40 - 0.04*20) * (10/20) = 0.8 + 2.8*0.5 = 2.2
+    # sigma30 = sqrt(2.2 / 30) = 0.270801  (linear-in-vol would give 0.25)
+    iv30 = _interp_total_variance(0.20, 20, 0.30, 40, 30)
+    assert iv30 == pytest.approx(math.sqrt(2.2 / 30), rel=1e-12)
+    assert iv30 == pytest.approx(0.270801, abs=1e-6)
+    assert iv30 != pytest.approx(0.25, abs=1e-3)

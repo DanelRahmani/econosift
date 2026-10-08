@@ -83,6 +83,19 @@ def _spot(ticker: str) -> float | None:
 # Black-Scholes pricing & Greeks
 # ──────────────────────────────────────────────────────────────────────────────
 
+def _interp_total_variance(iv_b: float, t_b: float, iv_a: float, t_a: float, t: float) -> float:
+    """Interpolate an implied vol to horizon ``t`` in total variance (sigma^2 * t).
+
+    ``iv_b``/``t_b`` is the nearer expiry, ``iv_a``/``t_a`` the further one; all
+    times in the same unit (days). Returns sigma_t = sqrt(w_t / t) with
+    w_t = w_b + (w_a - w_b) * (t - t_b) / (t_a - t_b).
+    """
+    w_b = iv_b ** 2 * t_b
+    w_a = iv_a ** 2 * t_a
+    w_t = w_b + (w_a - w_b) * (t - t_b) / (t_a - t_b)
+    return math.sqrt(w_t / t)
+
+
 def bs_price(
     S: float,
     K: float,
@@ -469,7 +482,7 @@ def get_iv_metrics(ticker: str) -> dict:
             iv = _atm_iv_for_expiry(t, spot, exp)
             atm_ivs.append(iv)
 
-        # ── IV30: linear interpolation between expiries bracketing 30 DTE ──
+        # ── IV30: total-variance interpolation between expiries bracketing 30 DTE ──
         target_dte = 30
         below_idx = None  # largest DTE < 30
         above_idx = None  # smallest DTE > 30
@@ -497,9 +510,8 @@ def get_iv_metrics(ticker: str) -> dict:
             dte_a = dte_list[above_idx]
             dte_b = dte_list[below_idx]
             if iv_a is not None and iv_b is not None and dte_a != dte_b:
-                # Linear interpolation
-                weight = (target_dte - dte_b) / (dte_a - dte_b)
-                iv30 = iv_b + weight * (iv_a - iv_b)
+                # Interpolate total variance sigma^2 * t, not sigma itself
+                iv30 = _interp_total_variance(iv_b, dte_b, iv_a, dte_a, target_dte)
             elif iv_a is not None:
                 iv30 = iv_a
                 iv30_approx = True
@@ -888,6 +900,7 @@ def mc_option_price(
     sigma: float,
     opt_type: str,
     sims: int = 10_000,
+    seed: int | None = None,
 ) -> dict:
     """GBM Monte Carlo option pricing.
 
@@ -899,7 +912,7 @@ def mc_option_price(
     {price, std, var95, var99, distribution: [{bin, count}], bsPrice}
     """
     try:
-        rng = np.random.default_rng()
+        rng = np.random.default_rng(seed)
         Z = rng.standard_normal(sims)
         S_T = S * np.exp((r - 0.5 * sigma ** 2) * T + sigma * math.sqrt(T) * Z)
 

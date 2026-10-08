@@ -13,7 +13,7 @@ export interface Quote {
   symbol: string;
   price: number | null;
   changePercent: number | null;
-  currency: string;
+  currency: string | null;
   name: string;
 }
 
@@ -48,7 +48,7 @@ export interface Valuation {
   trailingPE: number | null;
   spotPrice: number | null;
   dcfTarget: number | null;
-  currency: string;
+  currency: string | null;
   signal: "BUY" | "OVERVALUED" | "FAIR VALUE" | "INCOMPLETE";
 }
 
@@ -143,7 +143,7 @@ export interface DcfSensitivity {
 }
 export interface DcfResponse {
   ticker: string;
-  currency: string;
+  currency: string | null;
   spotPrice: number | null;
   intrinsicValue: number | null;
   upsidePct: number | null;
@@ -244,7 +244,7 @@ export interface CompositeFairValue {
 }
 export interface ValuationCore {
   ticker: string;
-  currency: string;
+  currency: string | null;
   spotPrice: number | null;
   wacc: WaccInfo;
   models: ValModel[];
@@ -269,7 +269,7 @@ export interface Fundamentals {
 }
 export interface AnalystData {
   ticker: string;
-  currency: string;
+  currency: string | null;
   price: number | null;
   priceTarget: {
     meanPrice: number | null; highPrice: number | null; lowPrice: number | null;
@@ -303,7 +303,7 @@ export interface ValuationKpis {
   shortRatio: number | null;
   sector: string | null;
   industry: string | null;
-  currency: string;
+  currency: string | null;
   /** Null KPIs that could not be computed honestly (e.g. no FX rate for an ADR), with the reason. */
   unavailable?: Record<string, string>;
 }
@@ -348,6 +348,8 @@ export interface BreadthResponse {
   mcclellanSummation: number | null;
   cumulativeAdLine: { date: string; value: number }[];
   advDeclHistory: { date: string; adv: number; dec: number }[];
+  /** Point-in-time membership behind the counts (P2-35); `note` names any former members left out. */
+  membership?: { pointInTime: boolean; missingSymbols: number; note: string } | null;
 }
 
 export interface IndexRow {
@@ -980,7 +982,7 @@ export interface EmploymentData {
     indProd: MacroTimeSeries[];
     capUtil: MacroTimeSeries[];
   };
-  recessionPeriods: { start: string; end: string }[];
+  recessionPeriods: { start: string; end: string; ongoing?: boolean }[];
 }
 
 // Housing
@@ -998,7 +1000,7 @@ export interface HousingData {
     mortgageRate: MacroTimeSeries[];
     existingHomeSales: MacroTimeSeries[];
   };
-  recessionPeriods: { start: string; end: string }[];
+  recessionPeriods: { start: string; end: string; ongoing?: boolean }[];
 }
 
 // BIS Global Housing (Phase 25)
@@ -1164,7 +1166,7 @@ export interface RecessionProbabilityData {
     sahm: MacroTimeSeries[];
     smoothedProb: MacroTimeSeries[];
   };
-  recessions?: { start: string; end: string }[];
+  recessions?: { start: string; end: string; ongoing?: boolean }[];
   model?: { alpha: number | null; beta: number | null; nObs: number; note?: string };
 }
 
@@ -1597,8 +1599,10 @@ export interface SovereignDefaultModel {
 export interface SovereignDefaultCountry {
   iso3: string;
   name: string;
-  prob1y: number;
-  prob5y: number;
+  /** Relative risk score, 0-100 (100 x model output). Weakly calibrated: a ranking, not a probability. */
+  score: number;
+  /** 1 = highest score; ties share the lower rank. */
+  rank: number;
   signal: "green" | "yellow" | "red";
 }
 export interface SovereignDefaultData {
@@ -1609,33 +1613,22 @@ export interface SovereignDefaultData {
   error?: string;
 }
 
-// M&A Tracker (Phase 30)
-export interface MADeal {
-  date: string;
+// Merger news (Phase 30; P2-27: news items, not parsed deals)
+export interface MANewsItem {
+  date: string | null;
   headline: string;
-  acquirer: string;
-  target: string;
-  value: number | null;
-  sector: string;
+  /** Tickers Finnhub tagged the article with (not a guessed acquirer/target). */
+  related: string[];
+  sector: string | null;
   source: string;
   url: string;
-}
-export interface MAMonthlyVolume {
-  month: string;
-  count: number;
-  totalValue: number | null;
-}
-export interface MASectorHeatmap {
-  sector: string;
-  dealCount: number;
-  avgValue: number | null;
 }
 export interface MAData {
   asOf: string | null;
   source: string;
-  deals: MADeal[];
-  monthlyVolume: MAMonthlyVolume[];
-  sectorHeatmap: MASectorHeatmap[];
+  news: MANewsItem[];
+  monthlyCount: { month: string; count: number }[];
+  sectorCount: { sector: string; count: number }[];
 }
 
 // COT Positioning
@@ -1798,7 +1791,8 @@ export interface SectorBubble {
 }
 export interface SectorRotationResponse {
   phase: "Early" | "Mid" | "Late" | "Recession";
-  confidence: number;
+  /** Winning phase's share of the positive phase score (%); null when no phase scores. */
+  confidence: number | null;
   regimePhase: string | null;
   regimeQuadrant: string | null;
   sectors: SectorBubble[];
@@ -2039,6 +2033,8 @@ export interface PriceOHLCV {
 
 export interface TechnicalsResponse {
   ticker: string;
+  /** Quote currency reported by Yahoo; null when it reported none (never assumed USD). */
+  currency?: string | null;
   period: string;
   asOf: string | null;
   summary: TechnicalSummary;
@@ -2206,7 +2202,9 @@ export interface CarryRow {
   carry: number | null;
   fxVol: number | null;
   volAdjCarry: number | null;
-  rateSource: string;
+  /** "bis" = official BIS policy rate; "proxy" = FRED/OECD fallback (P2-44). */
+  rateSource: "bis" | "proxy";
+  rateType?: string;
 }
 export interface CarryTable {
   asOf: string;
@@ -2345,6 +2343,8 @@ export interface DividendAnalysisResponse {
   ticker: string;
   name: string;
   sector: string | null;
+  /** Quote currency of the per-share amounts; null when unknown (never assumed USD). */
+  currency?: string | null;
   price: number | null;
   dividendYield: number | null;
   latestAnnualDividend: number | null;
@@ -2474,6 +2474,12 @@ export interface CbCurrent {
   series: string;
   next_meeting: string | null;
   days_until: number | null;
+  /** "bis" = official BIS policy rate; "proxy" = FRED/OECD fallback (P2-44). */
+  rateSource?: "bis" | "proxy";
+  /** What the rate is, e.g. "deposit facility rate"; proxies say so. */
+  rateType?: string;
+  asOf?: string | null;
+  stale?: boolean;
 }
 export interface CentralBanksData {
   history: Array<{
@@ -2516,6 +2522,8 @@ export interface GlobalYieldCountry {
   spread_vs_jp: number | null;
   real_yield: number | null;
   inflation: number | null;
+  /** CPI observation behind `inflation`: "monthly YYYY-MM" (BIS) or "annual YYYY" (World Bank). */
+  cpiBasis?: string | null;
 }
 export interface YieldCurvesData {
   us_curve: {
@@ -2540,6 +2548,12 @@ export interface PolicyDivergenceEntry {
   change_12m: number | null;
   stance: "tightening" | "easing" | "on_hold" | "unknown";
   divergence_rank: number;
+  /** What the rate is, e.g. "deposit facility rate"; proxies say so. */
+  rateType: string;
+  /** "bis" = official policy rate (BIS); "proxy" = FRED/OECD fallback. */
+  rateSource: "bis" | "proxy";
+  asOf?: string | null;
+  stale?: boolean;
 }
 export interface PolicyTrackerData {
   divergence: PolicyDivergenceEntry[];

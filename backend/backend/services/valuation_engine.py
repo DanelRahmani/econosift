@@ -16,6 +16,7 @@ from typing import Any
 from .. import provenance as pv
 from .metrics import _clean
 from .discount_rates import (
+    bundled_as_of,
     wacc as compute_wacc,
     cost_of_equity,
     detect_country,
@@ -175,7 +176,7 @@ class _Ctx:
                         self.shares, implied, ratio,
                     )
                     self.shares = implied
-        self.currency: str = self.info.get("currency") or "USD"
+        self.currency: str | None = self.info.get("currency") or None  # unknown stays None; wacc() explains why
         self.ticker: str = bundle.get("ticker") or ""
         self.sector: str | None = self.info.get("sector")
 
@@ -273,6 +274,10 @@ def _model_dcf(ctx: _Ctx) -> dict:
 # Model 2: DDM (Gordon Growth)
 # ---------------------------------------------------------------------------
 
+# Minimum cost-of-equity − growth spread for the Gordon model (P2-43).
+_DDM_MIN_SPREAD = 0.02
+
+
 def _model_ddm(ctx: _Ctx) -> dict:
     NAME = "DDM (Gordon Growth)"
     div_rate = _clean(ctx.info.get("dividendRate"))
@@ -298,7 +303,14 @@ def _model_ddm(ctx: _Ctx) -> dict:
     if g < 0 or ke <= g:
         return _locked_model(NAME, f"Growth ({g:.4f}) ≥ cost of equity ({ke:.4f}) — Gordon Growth undefined")
 
-    d1 = div_rate * (1.0 + g)
+    # P2-43: with the growth cap at ke − 0.5 pp, a low cost of equity left a spread so thin that D1 / (ke − g)
+    # exploded (KO: 2.12 / 0.005 = 424 against a ~86 price). Below a 2 pp spread the value is mostly noise in
+    # the inputs, so the model is locked (owner decision, 2026-10-08) and drops out of the composite.
+    if ke - g < _DDM_MIN_SPREAD:
+        return _locked_model(NAME, f"Cost of equity ({ke:.2%}) minus growth ({g:.2%}) is under "
+                                   f"{_DDM_MIN_SPREAD:.0%}: the Gordon value is too sensitive to be meaningful")
+
+    d1 = div_rate  # Yahoo's dividendRate is the forward annual dividend: already D1, not D0
     value = d1 / (ke - g)
 
     return _ok_model(NAME, value, {
@@ -825,6 +837,10 @@ def provenance(bundle: dict, result: dict, beta: float | None, root: str = "valu
                          flags=("proxy",))
     else:
         erp_ref = pv.derived("hard-coded 5% equity risk premium", title="Equity risk premium", flags=("fallback",))
+    # A bundled snapshot is dated by its own asOf, not by this request.
+    erp_stamp = bundled_as_of(erp_data)
+    if erp_stamp and erp_ref["provider"] == "damodaran":
+        erp_ref["fetchedAt"] = erp_stamp
     prov[k("wacc", "erp")] = erp_ref
     prov[k("wacc", "country")] = pv.derived(
         "country of the listing: info.exchange code, else keywords in info.fullExchangeName, else info.country "
@@ -867,6 +883,8 @@ def provenance(bundle: dict, result: dict, beta: float | None, root: str = "valu
             "damodaran", "ctryprem", f"Statutory corporate tax rate, {country}", units="decimal",
             frequency="annual", observed=observed, url=erp_data.get("sourceUrl"),
             note="Used because Yahoo's effectiveTaxRate was missing or outside 0-60%.")
+        if erp_stamp:
+            prov[k("wacc", "taxRate")]["fetchedAt"] = erp_stamp
     else:
         prov[k("wacc", "taxRate")] = pv.derived("hard-coded 21% US statutory rate", title="Tax rate",
                                                 flags=("fallback",))
@@ -911,9 +929,11 @@ def provenance(bundle: dict, result: dict, beta: float | None, root: str = "valu
                           observed=sm.get("asOf"), url=sm.get("sourceUrl"),
                           note="Static snapshot bundled with the app: median of Damodaran's US industry multiples "
                                "mapped to sectors.")
+    if sm_stamp := bundled_as_of(sm):
+        prov[m_mult]["fetchedAt"] = sm_stamp
     formulas = {
-        "DDM (Gordon Growth)": ("D1 / (ke − g), D1 = dividendRate × (1 + g), g = (1 − payout ratio) × ROE (ROE capped at 25%), "
-                                "capped at the risk-free rate and at ke − 0.5pp; earnings growth is not used",
+        "DDM (Gordon Growth)": ("D1 / (ke − g), D1 = dividendRate (Yahoo's forward annual rate), g = (1 − payout ratio) × ROE (ROE capped at 25%), "
+                                "capped at the risk-free rate and at ke − 0.5pp; locked when ke − g < 2pp; earnings growth is not used",
                                 [y("dividendRate"), ke, y("returnOnEquity"), y("payoutRatio"),
                                  k("wacc", "riskFree")]),
         "Graham Formula": ("EPS × (8.5 + 2g) × 4.4 / Y, g = growth in percent (0-20), Y = Aaa corporate yield in percent",

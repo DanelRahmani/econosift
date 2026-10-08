@@ -338,14 +338,18 @@ def ipo_events(start: str, end: str) -> list[dict]:
     return out
 
 
-def _provenance() -> dict:
+def _provenance(meetings: list[dict] = ()) -> dict:
     """Source map for the calendar (see provenance.py). Events carry no per-row source,
-    so each category maps to the providers it is built from."""
+    so each category maps to the providers it is built from. ``meetings`` are the
+    central-bank rows in the requested range: the bundled ones date that ref."""
     no_key = None if FINNHUB_API_KEY else "No Finnhub API key is configured, so this feed is empty."
-    macro = [pv.ref("econosift", None, "Central-bank meeting dates (cb_meetings.json + SNB iCal feed)",
+    cb_ref = pv.ref("econosift", None, "Central-bank meeting dates (cb_meetings.json + SNB iCal feed)",
                     note="Curated from each bank's published schedule (every row records its source URL and "
                          "retrieval date); SNB dates come from the SNB's own iCal calendar when it is "
-                         "reachable. The list ends on cbScheduleEnds.")]
+                         "reachable. The list ends on cbScheduleEnds.")
+    if retrieved := cb_meetings.retrieved_time(meetings):
+        cb_ref["fetchedAt"] = retrieved
+    macro = [cb_ref]
     macro.append(pv.ref("finnhub", "/calendar/economic", "Finnhub economic calendar", note=no_key))
     return {
         "*": pv.derived("Merged from the macro, earnings, dividends and ipos feeds below, filtered to the "
@@ -365,6 +369,7 @@ def _provenance() -> dict:
 @cached("calendar")
 def calendar(index: str, start: str, end: str) -> dict:
     """Aggregate all four event streams into a single calendar response."""
+    meetings = _load_cb_meetings()
     return pv.attach({
         "index": index,
         "start": start,
@@ -378,5 +383,5 @@ def calendar(index: str, start: str, end: str) -> dict:
             "fred": bool(FRED_API_KEY),
             "cbMeetings": True,
         },
-        "cbScheduleEnds": cb_meetings.schedule_end(_load_cb_meetings()),
-    }, _provenance())
+        "cbScheduleEnds": cb_meetings.schedule_end(meetings),
+    }, _provenance([m for m in meetings if start <= m.get("date", "") <= end]))

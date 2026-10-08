@@ -219,6 +219,66 @@ export function ToggleChip({
   );
 }
 
+/**
+ * One KPI card: small label, big value, optional sub-line. Renders "—" for a
+ * null/undefined/empty value. `tone` colours the value with the theme success/danger
+ * token. `prov` / `ctx` become `data-prov` / `data-prov-ctx` so right-click → Source
+ * works on the tile. Group tiles in a `KpiStrip`.
+ */
+export function KpiTile({
+  label,
+  value,
+  sub,
+  tone = "neutral",
+  prov,
+  ctx,
+  title,
+}: {
+  label: ReactNode;
+  value: ReactNode;
+  sub?: ReactNode;
+  tone?: "up" | "down" | "neutral";
+  prov?: string;
+  ctx?: string;
+  title?: string;
+}) {
+  const toneClass = tone === "up" ? "text-success" : tone === "down" ? "text-danger" : "";
+  const empty = value === null || value === undefined || value === "";
+  return (
+    <Card className="p-4" data-prov={prov} data-prov-ctx={ctx} title={title}>
+      <div className="text-xs text-text-secondary">{label}</div>
+      <div className={`text-2xl font-bold mt-1 ${toneClass}`}>{empty ? "—" : value}</div>
+      {sub != null && sub !== "" && <div className="text-xs text-text-secondary mt-0.5">{sub}</div>}
+    </Card>
+  );
+}
+
+/**
+ * Responsive grid for a row of `KpiTile`s (2 columns on mobile, `cols` from the sm
+ * breakpoint up; default 4, allowed 3-6).
+ */
+export function KpiStrip({ children, cols = 4 }: { children: ReactNode; cols?: 3 | 4 | 5 | 6 }) {
+  const colClass = {
+    3: "sm:grid-cols-3",
+    4: "sm:grid-cols-4",
+    5: "sm:grid-cols-3 lg:grid-cols-5",
+    6: "sm:grid-cols-3 lg:grid-cols-6",
+  }[cols];
+  return <div className={`grid grid-cols-2 ${colClass} gap-3`}>{children}</div>;
+}
+
+/**
+ * The row that holds a page's controls (selects, toggle chips, buttons): wraps on
+ * narrow screens, items centred, with a bottom margin. Renders `role="toolbar"`.
+ */
+export function ControlBar({ children, className = "" }: { children: ReactNode; className?: string }) {
+  return (
+    <div role="toolbar" className={`flex flex-wrap items-center gap-2 mb-4 ${className}`}>
+      {children}
+    </div>
+  );
+}
+
 // ── Export PDF button ───────────────────────────────────────────────────────
 export function ExportPdfButton({ className = "" }: { className?: string }) {
   return (

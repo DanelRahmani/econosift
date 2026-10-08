@@ -308,6 +308,36 @@ def upsert_shares(shares: dict[str, float]) -> None:
         conn.commit()
 
 
+def prune_except(keep: set[str] | list[str]) -> int:
+    """Delete rows whose symbol is not in ``keep`` (fundamentals and shares).
+
+    Returns the number of ``fundamentals`` rows deleted.  An empty ``keep``
+    is refused (returns 0, deletes nothing) so a failed membership fetch can
+    never wipe the cache.
+    """
+    keep_syms = list(set(keep))
+    if not keep_syms:
+        return 0
+    conn = _get_conn()
+    with _lock:
+        conn.execute("CREATE TEMP TABLE IF NOT EXISTS _keep_symbols (symbol TEXT PRIMARY KEY)")
+        conn.execute("DELETE FROM _keep_symbols")
+        conn.executemany(
+            "INSERT OR IGNORE INTO _keep_symbols (symbol) VALUES (?)",
+            [(s,) for s in keep_syms],
+        )
+        cur = conn.execute(
+            "DELETE FROM fundamentals WHERE symbol NOT IN (SELECT symbol FROM _keep_symbols)"
+        )
+        deleted = cur.rowcount
+        conn.execute(
+            "DELETE FROM shares WHERE symbol NOT IN (SELECT symbol FROM _keep_symbols)"
+        )
+        conn.execute("DELETE FROM _keep_symbols")
+        conn.commit()
+    return deleted
+
+
 # ---------------------------------------------------------------------------
 # Public read functions
 # ---------------------------------------------------------------------------

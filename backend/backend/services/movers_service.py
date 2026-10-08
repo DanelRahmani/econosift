@@ -36,7 +36,11 @@ def top_movers(index: str = "sp500", limit: int = 10) -> dict:
     frames = breadth_service._ohlc_frames(index)
     if not frames or len(frames["close"]) < 2:
         return empty
-    close, high, low = frames["close"], frames["high"], frames["low"]
+    # Only symbols that are index members on the last session (the frames also
+    # carry former members for the point-in-time breadth counts).
+    keep = frames["member"].iloc[-1]
+    keep = keep[keep].index
+    close, high, low = frames["close"][keep], frames["high"][keep], frames["low"][keep]
     session = close.index[-1]
     as_of = session.strftime("%Y-%m-%d")
 

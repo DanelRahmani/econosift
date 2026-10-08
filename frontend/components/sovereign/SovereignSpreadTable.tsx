@@ -15,7 +15,7 @@ export function SovereignSpreadTable({ countries }: Props) {
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-border text-muted text-left">
+          <tr className="border-b border-border text-text-muted text-left">
             <th className="pb-2 pr-4">Country</th>
             <th className="pb-2 pr-4 text-right">10Y Yield</th>
             <th className="pb-2 pr-4 text-right">Spread vs US</th>

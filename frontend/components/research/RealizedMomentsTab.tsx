@@ -30,8 +30,8 @@ const WINDOWS = [
 ] as const;
 
 const tooltipStyle = {
-  backgroundColor: "var(--color-surface-alt)",
-  border: "1px solid var(--color-border)",
+  backgroundColor: "rgb(var(--surface-alt))",
+  border: "1px solid rgb(var(--border))",
   borderRadius: 8,
   fontSize: 12,
 };
@@ -180,9 +180,9 @@ export function RealizedMomentsTab() {
           </h3>
           <ResponsiveContainer width="100%" height={300}>
             <LineChart data={chartData} margin={{ left: 8, right: 16 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-              <XAxis dataKey="date" tick={{ fontSize: 10, fill: "var(--color-text-muted)" }} minTickGap={48} />
-              <YAxis tick={{ fontSize: 11, fill: "var(--color-text-muted)" }} domain={["auto", "auto"]} />
+              <CartesianGrid strokeDasharray="3 3" stroke="rgb(var(--border))" />
+              <XAxis dataKey="date" tick={{ fontSize: 10, fill: "rgb(var(--text-muted))" }} minTickGap={48} />
+              <YAxis tick={{ fontSize: 11, fill: "rgb(var(--text-muted))" }} domain={["auto", "auto"]} />
               <Tooltip contentStyle={tooltipStyle} />
               <Legend wrapperStyle={{ fontSize: 12 }} />
               {view === "rvol" && <>
@@ -255,12 +255,12 @@ export function RealizedMomentsTab() {
           </h3>
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={xsDeciles} margin={{ left: 8, right: 16 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-              <XAxis dataKey="decile" tick={{ fontSize: 11, fill: "var(--color-text-muted)" }} />
+              <CartesianGrid strokeDasharray="3 3" stroke="rgb(var(--border))" />
+              <XAxis dataKey="decile" tick={{ fontSize: 11, fill: "rgb(var(--text-muted))" }} />
               <YAxis
                 tickFormatter={(v) => `${v.toFixed(1)}%`}
-                tick={{ fontSize: 11, fill: "var(--color-text-muted)" }}
-                label={{ value: "Avg Fwd Return (%)", angle: -90, position: "insideLeft", fontSize: 10, fill: "var(--color-text-muted)", dy: 60 }}
+                tick={{ fontSize: 11, fill: "rgb(var(--text-muted))" }}
+                label={{ value: "Avg Fwd Return (%)", angle: -90, position: "insideLeft", fontSize: 10, fill: "rgb(var(--text-muted))", dy: 60 }}
               />
               <Tooltip
                 formatter={(v: number) => [`${v.toFixed(2)}%`, "Avg Fwd Return"]}

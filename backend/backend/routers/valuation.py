@@ -45,12 +45,13 @@ def _kpis(info: dict, bundle: dict | None = None) -> dict:
         "bookValue": mm["values"]["bookValue"],
         "evToFcf": mm["values"]["evToFcf"],
         "fcfYield": mm["values"]["fcfYield"],
-        "unavailable": {k: v for k, v in mm["unavailable"].items() if k in ("evToFcf", "fcfYield", "bookValue")},
+        "unavailable": {**{k: v for k, v in mm["unavailable"].items() if k in ("evToFcf", "fcfYield", "bookValue")},
+                        **({} if g("currency") else {"currency": "Yahoo reported no quote currency"})},
         "shortPercentOfFloat": g("shortPercentOfFloat"),
         "shortRatio": g("shortRatio"),
         "sector": g("sector"),
         "industry": g("industry"),
-        "currency": g("currency") or "USD",
+        "currency": g("currency") or None,
     }
 
 
@@ -118,7 +119,8 @@ async def capm_dcf(
             "trailingPE": info.get("trailingPE"),
             "spotPrice": spot,
             "dcfTarget": target,
-            "currency": info.get("currency") or "USD",
+            "currency": info.get("currency") or None,
+            **({} if info.get("currency") else {"unavailable": {"currency": "Yahoo reported no quote currency"}}),
             "signal": _signal(spot, target, expected_return),
         })
 
@@ -177,11 +179,12 @@ async def risk_free_rates():
 
 def _risk_free_provenance(rates: list[dict]) -> dict:
     """``rates.<country>`` (FRED yield or hard-coded fallback) and ``rates.<country>.erp`` per row."""
-    from ..services.discount_rates import load_erp
+    from ..services.discount_rates import bundled_as_of, load_erp
     erp_data = load_erp()
     table = erp_data.get("countries") or {}
     as_of = erp_data.get("asOf")
     erp_obs = as_of if isinstance(as_of, str) and as_of[:2] == "20" else None
+    erp_stamp = bundled_as_of(erp_data)  # a bundled snapshot is dated by its own asOf
     prov: dict = {"*": pv.ref("fred", None, "Government bond and money-market rates by country")}
     for r in rates:
         name = r["name"]
@@ -204,6 +207,8 @@ def _risk_free_provenance(rates: list[dict]) -> dict:
             prov[f"{key}.erp"] = pv.ref("damodaran", "ctryprem", f"Total equity risk premium, {name}",
                                         units="decimal (source percent / 100)", frequency="annual",
                                         observed=erp_obs, url=erp_data.get("sourceUrl"))
+            if erp_stamp:
+                prov[f"{key}.erp"]["fetchedAt"] = erp_stamp
         else:
             prov[f"{key}.erp"] = pv.ref("econosift", None, f"{name}: hard-coded equity risk premium (no Damodaran row)",
                                         units="decimal", flags=("fallback",))
@@ -298,7 +303,7 @@ def _kpi_provenance(sym: str, kpis: dict, beta_injected: bool, cross_currency: b
     prov["kpis.forwardEps"] = y("forwardEps", note=eps_note)
     prov["kpis.dividendYield"] = y("dividendYield", units="percent (0.98 = 0.98%)")
     prov["kpis.averageVolume"] = y("averageVolume (else averageDailyVolume10Day)", units="shares")
-    prov["kpis.currency"] = y("currency (USD if missing)")
+    prov["kpis.currency"] = y("currency")
     fx_note = ("Statements are reported in a different currency from the price, so free cash flow, debt and "
                "cash are converted to the price currency first and EV = market cap + debt − cash."
                if cross_currency else None)

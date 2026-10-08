@@ -23,25 +23,25 @@ export function DrawdownChart({ data }: Props) {
       <h3 className="font-semibold text-sm mb-3">Drawdown</h3>
       <ResponsiveContainer width="100%" height={200}>
         <AreaChart data={pts} margin={{ top: 4, right: 16, bottom: 0, left: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
+          <CartesianGrid strokeDasharray="3 3" stroke="rgb(var(--border))" />
           <XAxis
             dataKey="date"
             tickFormatter={(d) => d.slice(0, 7)}
-            tick={{ fontSize: 11, fill: "var(--color-text-muted)" }}
+            tick={{ fontSize: 11, fill: "rgb(var(--text-muted))" }}
             interval="preserveStartEnd"
             minTickGap={60}
           />
           <YAxis
             tickFormatter={(v) => `${v.toFixed(0)}%`}
-            tick={{ fontSize: 11, fill: "var(--color-text-muted)" }}
+            tick={{ fontSize: 11, fill: "rgb(var(--text-muted))" }}
             width={52}
           />
           <Tooltip
             formatter={(value: number) => [`${value.toFixed(2)}%`, "Drawdown"]}
             labelFormatter={(label: string) => `Date: ${label}`}
             contentStyle={{
-              backgroundColor: "var(--color-surface-alt)",
-              border: "1px solid var(--color-border)",
+              backgroundColor: "rgb(var(--surface-alt))",
+              border: "1px solid rgb(var(--border))",
               borderRadius: 8,
               fontSize: 12,
             }}

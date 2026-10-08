@@ -11,10 +11,11 @@ import json
 import logging
 import pathlib
 import re
-from datetime import datetime
+from datetime import date, datetime, timezone
 
 import requests
 
+from .. import provenance as pv
 from ..cache import cached
 
 log = logging.getLogger(__name__)
@@ -75,6 +76,19 @@ def get_meetings() -> list[dict]:
         return rows
     kept = [r for r in rows if not (r.get("bank") == "SNB" and r["date"][:4] in years)]
     return sorted(kept + feed, key=lambda r: (r["date"], r["bank"]))
+
+
+def retrieved_time(rows: list[dict]) -> str | None:
+    """``fetchedAt`` for data read from these rows: the oldest ``retrieved`` date among them.
+
+    Rows read live from the SNB feed carry no ``retrieved`` and are ignored; None
+    when no row has one.
+    """
+    dates = [r["retrieved"] for r in rows if r.get("retrieved")]
+    if not dates:
+        return None
+    d = date.fromisoformat(min(dates))
+    return pv.stamp(datetime(d.year, d.month, d.day, tzinfo=timezone.utc))
 
 
 def last_dates(rows: list[dict]) -> dict[str, str]:

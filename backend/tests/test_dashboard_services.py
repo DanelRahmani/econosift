@@ -12,9 +12,12 @@ import pytest
 
 
 @pytest.fixture(autouse=True)
-def _clear_caches():
+def _clear_caches(monkeypatch):
     """Isolate tests: the services are @cached by args, so clear between tests."""
     from backend import cache
+    from backend.services import constituents
+    # Breadth reads the membership change log; keep it offline (log unavailable).
+    monkeypatch.setattr(constituents, "get_membership_changes", lambda index="sp500": [])
     cache._caches.clear()
     cache._stats.clear()
     yield

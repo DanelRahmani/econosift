@@ -12,11 +12,12 @@ import { provOf } from "@/lib/provenance";
 import { useRefreshNonce } from "@/lib/refresh";
 
 const tooltipStyle = {
-  backgroundColor: "var(--color-surface-alt)",
-  border: "1px solid var(--color-border)",
+  backgroundColor: "rgb(var(--surface-alt))",
+  border: "1px solid rgb(var(--border))",
   borderRadius: 8,
   fontSize: 12,
 };
+
 
 type SortKey = "carry" | "volAdjCarry" | "fxVol" | "foreignRate";
 
@@ -97,7 +98,9 @@ export function FxCarryTab() {
                 </tr>
               </thead>
               <tbody>
-                {rows.map((r) => (
+                {rows.map((row) => {
+                  const r = row;
+                  return (
                   <tr key={r.ccy} data-prov-ctx={r.pair} className="border-b border-border/50 hover:bg-surface-alt/50">
                     <td className="py-2 pr-3 font-mono font-semibold">{r.pair}</td>
                     <td data-prov={`rows.${r.ccy}.spot`} className="text-right py-2 px-3 font-mono text-text-secondary">{num(r.spot, 4)}</td>
@@ -105,9 +108,10 @@ export function FxCarryTab() {
                     <td data-prov={`rows.${r.ccy}.carry`} className={`text-right py-2 px-3 font-mono font-semibold ${carryColor(r)}`}>{num(r.carry, 2, "%")}</td>
                     <td data-prov={`rows.${r.ccy}.fxVol`} className="text-right py-2 px-3 font-mono text-text-secondary">{num(r.fxVol, 1, "%")}</td>
                     <td data-prov={`rows.${r.ccy}.volAdjCarry`} className="text-right py-2 px-3 font-mono">{num(r.volAdjCarry, 3)}</td>
-                    <td data-prov={`rows.${r.ccy}.foreignRate`} className="text-right py-2 pl-3 font-mono text-text-muted text-xs">{r.rateSource}</td>
+                    <td data-prov={`rows.${r.ccy}.foreignRate`} className="text-right py-2 pl-3 font-mono text-text-muted text-xs">{r.rateType ?? r.rateSource}{r.rateSource === "proxy" ? " · proxy" : ""}</td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -139,9 +143,9 @@ export function FxCarryTab() {
             </div>
             <ResponsiveContainer width="100%" height={300}>
               <LineChart data={backtest.series} margin={{ left: 8, right: 16 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-                <XAxis dataKey="date" tick={{ fontSize: 10, fill: "var(--color-text-muted)" }} minTickGap={48} />
-                <YAxis tick={{ fontSize: 11, fill: "var(--color-text-muted)" }} domain={["auto", "auto"]} />
+                <CartesianGrid strokeDasharray="3 3" stroke="rgb(var(--border))" />
+                <XAxis dataKey="date" tick={{ fontSize: 10, fill: "rgb(var(--text-muted))" }} minTickGap={48} />
+                <YAxis tick={{ fontSize: 11, fill: "rgb(var(--text-muted))" }} domain={["auto", "auto"]} />
                 <Tooltip contentStyle={tooltipStyle} />
                 <Legend wrapperStyle={{ fontSize: 12 }} />
                 <Line type="monotone" dataKey="strategy" name="Carry Basket" stroke="#10b981" dot={false} strokeWidth={2} />

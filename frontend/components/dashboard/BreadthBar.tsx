@@ -96,9 +96,16 @@ export function BreadthBar({ index = "sp500" }: { index?: string }) {
           </div>
         </div>
       </div>
+      <p className="text-xs text-text-muted mt-2">New highs / lows: {HILO_DEF}</p>
+      {data.membership?.note && (
+        <p className="text-xs text-text-muted mt-1" data-prov="membership">Universe: {data.membership.note}.</p>
+      )}
     </div>
   );
 }
+
+/** P2-26: how the app counts new 52-week highs/lows (differs from some published counts). */
+const HILO_DEF = "index members on that session (point-in-time, session-aligned) whose intraday high (low) equals or exceeds (falls below) the highest high (lowest low) of the trailing 252 sessions, prices as traded; ties count; a member needs 30+ sessions of history. Published counts use other windows, universes and close-vs-intraday rules, so they can differ.";
 
 function Kpi({ label, value, tone, prov }: { label: React.ReactNode; value: string | number; tone?: "up" | "down" | "flat"; prov?: string }) {
   const color = tone === "up" ? "text-success" : tone === "down" ? "text-danger" : "text-text-primary";

@@ -55,11 +55,13 @@ def _to_timeseries(year_map: dict[int, float]) -> list[dict]:
     return [{"date": str(y), "value": v} for y, v in sorted(year_map.items())]
 
 
+_DOING_BUSINESS_PATH = Path(__file__).resolve().parent.parent / "data" / "doing_business.json"
+
+
 def _load_doing_business() -> dict:
     """Load historical Doing Business scores from static JSON."""
-    data_path = Path(__file__).resolve().parent.parent / "data" / "doing_business.json"
     try:
-        with open(data_path, "r", encoding="utf-8") as f:
+        with open(_DOING_BUSINESS_PATH, "r", encoding="utf-8") as f:
             return json.load(f)
     except Exception as exc:
         log.warning("Failed to load doing_business.json: %s", exc)
@@ -76,7 +78,10 @@ def _provenance(countries: list[dict]) -> dict:
     db = pv.ref("worldbank", None, "Doing Business score (0-100)", units="score 0-100", frequency="annual",
                 observed=max(years) if years else None, flags=("stale",),
                 note="Bundled snapshot (backend/data/doing_business.json) of the World Bank Doing Business "
-                     "reports 2015-2019; the series was discontinued in 2021.")
+                     "reports 2015-2019; the series was discontinued in 2021. Data is bundled with the app; "
+                     "dated by the file.")
+    if when := pv.file_time(_DOING_BUSINESS_PATH):
+        db["fetchedAt"] = when
     prov["kpis.doingBusinessScore"] = prov["history.doingBusinessScore"] = db
     prov["summary"] = pv.derived(
         "simple mean of the countries' latest newBusinessDensity and doingBusinessScore values "

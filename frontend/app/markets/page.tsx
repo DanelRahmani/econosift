@@ -31,7 +31,7 @@ import type {
   SectorFundamentalsResponse, SectorRotationResponse, SectorDrillResponse,
 } from "@/lib/types";
 import { useRefreshNonce } from "@/lib/refresh";
-import { useKeyboardShortcuts, tabKeys, periodKeys } from "@/lib/useKeyboardShortcuts";
+import { useKeyboardShortcuts, tabKeys, tabStepKeys, periodKeys } from "@/lib/useKeyboardShortcuts";
 
 const ValuationTab = lazy(() =>
   import("@/components/markets/ValuationTab").then((m) => ({ default: m.ValuationTab }))
@@ -124,6 +124,7 @@ function MarketsPageInner() {
   // P2-07: 1–9 pick a tab; ←/→ step the period control the active tab shows.
   useKeyboardShortcuts({
     onTabSwitch: tabKeys(TABS, (t) => setUrlState({ tab: t })),
+    ...tabStepKeys(TABS, (t) => t === tab, (t) => setUrlState({ tab: t })),
     ...(tab === "Sectors"
       ? periodKeys(SEC_PERIODS, secPeriod, setSecPeriod)
       : tab === "Treemap"

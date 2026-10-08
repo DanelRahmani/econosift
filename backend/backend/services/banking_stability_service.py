@@ -1,6 +1,6 @@
 """Banking & Financial Stability service — Phase 28.
 
-Bank NPL ratios, capital adequacy, bank Z-scores, domestic credit growth,
+Bank NPL ratios, capital-to-assets, bank Z-scores, domestic credit (% of GDP),
 and BIS credit-to-GDP gaps. Composite banking crisis early-warning model.
 """
 from __future__ import annotations
@@ -36,7 +36,7 @@ def _banking_signal(npl: float | None, cap: float | None, zscore: float | None,
                     credit_gap: float | None) -> str:
     flags = 0
     if npl is not None and npl > 10:
-        flags += 1
+        flags += 2  # severe: counts double
     elif npl is not None and npl > 5:
         flags += 1
     if cap is not None and cap < 6:
@@ -55,20 +55,19 @@ def _banking_signal(npl: float | None, cap: float | None, zscore: float | None,
 def _provenance(countries: list[dict], cur_year: int) -> dict:
     """Source map for the banking-stability dashboard (see provenance.py)."""
     codes = atlas_service._WB_CODES
-    rule = ("One flag each for NPL ratio > 5%, bank capital < 6, bank Z-score < 10 and BIS credit gap > 10pp; "
-            "red at 3+ flags, yellow at 1-2, green at none.")
+    rule = ("NPL ratio > 5% is one flag and > 10% (severe) is two flags; bank capital-to-assets < 6, bank Z-score < 10 "
+            "and BIS credit gap > 10pp are one flag each; red at 3+ flags, yellow at 1-2, green at none.")
     prov: dict = {
         "*": pv.derived(rule, title="Banking-stability flags"),
         "summary": pv.derived("count of countries per signal colour", ["*"], title="Signal counts"),
     }
     wb_kpis = (
         ("nplRatio", "npl_ratio", "Bank nonperforming loans to gross loans (%)", "% of gross loans", None),
-        ("capitalAdequacy", "bank_capital", "Bank capital to assets ratio (%)", "% of assets", None),
+        ("capitalToAssets", "bank_capital", "Bank capital to assets ratio (%)", "% of assets", None),
         ("bankZscore", "bank_zscore", "Bank Z-score", "Z-score",
          "From the Global Financial Development database, last updated in 2022 (data to 2021)."),
-        ("domesticCreditGrowth", "domestic_credit", "Claims on other sectors of the domestic economy (% of GDP)",
-         "% of GDP",
-         "This is a level (% of GDP), not a growth rate, despite the field name."),
+        ("domesticCreditGdp", "domestic_credit", "Claims on other sectors of the domestic economy (% of GDP)",
+         "% of GDP", None),
     )
     for c in countries:
         row = f"countries.{c['iso2']}"
@@ -131,9 +130,9 @@ async def get_banking_stability() -> dict:
             "signal": signal,
             "kpis": {
                 "nplRatio": npl_val,
-                "capitalAdequacy": cap_val,
+                "capitalToAssets": cap_val,
                 "bankZscore": zs_val,
-                "domesticCreditGrowth": dc_val,
+                "domesticCreditGdp": dc_val,
                 "creditGap": cg_latest,
             },
             # Observation period behind each KPI. The bank Z-score comes from
@@ -141,9 +140,9 @@ async def get_banking_stability() -> dict:
             # was last updated in 2022 (data to 2021).
             "periods": {
                 "nplRatio": _latest_year(npl_map),
-                "capitalAdequacy": _latest_year(cap_map),
+                "capitalToAssets": _latest_year(cap_map),
                 "bankZscore": _latest_year(zs_map),
-                "domesticCreditGrowth": _latest_year(dc_map),
+                "domesticCreditGdp": _latest_year(dc_map),
                 "creditGap": cg_pts[-1]["date"] if cg_pts else None,
             },
         })

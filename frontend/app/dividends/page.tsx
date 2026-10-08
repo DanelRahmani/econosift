@@ -8,6 +8,7 @@ import { TickerSearch } from "@/components/TickerSearch";
 import { useUrlState } from "@/lib/useUrlState";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
+import { currencySymbol } from "@/lib/format";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine,
@@ -168,10 +169,10 @@ function DividendsPageInner() {
                 <BarChart data={annualData}>
                   <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
                   <XAxis dataKey="year" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
-                  <YAxis tickFormatter={(v) => `$${v.toFixed(1)}`} tick={{ fontSize: 11 }} />
+                  <YAxis tickFormatter={(v) => `${currencySymbol(data.currency)}${v.toFixed(1)}`} tick={{ fontSize: 11 }} />
                   <Tooltip
-                    formatter={(v: number) => [`$${v.toFixed(4)}`, "Dividend"]}
-                    contentStyle={{ backgroundColor: "var(--color-surface-alt)", border: "1px solid var(--color-border)", borderRadius: 8, fontSize: 12 }}
+                    formatter={(v: number) => [`${currencySymbol(data.currency)}${v.toFixed(4)}`, "Dividend"]}
+                    contentStyle={{ backgroundColor: "rgb(var(--surface-alt))", border: "1px solid rgb(var(--border))", borderRadius: 8, fontSize: 12 }}
                   />
                   <Bar dataKey="dividend" fill="#10b981" radius={[4, 4, 0, 0]} />
                 </BarChart>
@@ -226,7 +227,7 @@ function DividendsPageInner() {
 
 export default function DividendsPage() {
   return (
-    <Suspense fallback={<div className="p-8 text-muted">Loading…</div>}>
+    <Suspense fallback={<div className="p-8 text-text-muted">Loading…</div>}>
       <DividendsPageInner />
     </Suspense>
   );

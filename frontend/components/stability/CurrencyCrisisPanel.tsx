@@ -30,7 +30,7 @@ export function CurrencyCrisisPanel() {
     api.stabilityCurrencyCrisis().then(setData).catch(() => setError(true)).finally(() => setLoading(false));
   }, [refreshNonce]);
 
-  if (loading) return <div className="py-8 text-center text-muted">Loading crisis early warning data…</div>;
+  if (loading) return <div className="py-8 text-center text-text-muted">Loading crisis early warning data…</div>;
   if (error || !data) return <div className="py-8 text-center text-red-400">Failed to load data.</div>;
 
   const { summary, countries, methodology, source } = data;
@@ -91,8 +91,8 @@ export function CurrencyCrisisPanel() {
               <div data-prov={`countries.${c.iso2}.kpis.debtGdp`} className={signalColor(c.kpis.debtGdp != null && c.kpis.debtGdp > 90 ? "red" : "")}>
                 Debt/GDP: {c.kpis.debtGdp != null ? `${c.kpis.debtGdp.toFixed(0)}%` : "N/A"}
               </div>
-              <div data-prov={`countries.${c.iso2}.kpis.reservesDecline`} className={signalColor(c.kpis.reservesDecline != null && c.kpis.reservesDecline > 10 ? "red" : "")}>
-                Reserves Δ: {c.kpis.reservesDecline != null ? `${c.kpis.reservesDecline.toFixed(0)}%` : "N/A"}
+              <div data-prov={`countries.${c.iso2}.kpis.reservesDecline`} title="Total reserves incl. gold, current US$: exchange-rate and gold-price moves count, not only intervention." className={signalColor(c.kpis.reservesDecline != null && c.kpis.reservesDecline > 10 ? "red" : "")}>
+                Reserves Δ (incl. valuation): {c.kpis.reservesDecline != null ? `${c.kpis.reservesDecline.toFixed(0)}%` : "N/A"}
               </div>
               <div data-prov={`countries.${c.iso2}.kpis.fxOvervaluation`} className={signalColor(c.kpis.fxOvervaluation != null && c.kpis.fxOvervaluation > 15 ? "red" : "")}>
                 FX Overval: {c.kpis.fxOvervaluation != null ? `${c.kpis.fxOvervaluation.toFixed(0)}%` : "N/A"}

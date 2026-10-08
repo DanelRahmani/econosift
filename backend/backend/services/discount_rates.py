@@ -5,8 +5,10 @@ import io
 import json
 import logging
 import math
+from datetime import date, datetime, timezone
 from pathlib import Path
 
+from .. import provenance as pv
 from ..cache import cached
 from .metrics import _clean
 
@@ -179,6 +181,19 @@ def load_erp() -> dict:
             return json.load(f)
     except Exception:
         return {"matureMarketERP": 4.46, "countries": {}}
+
+
+def bundled_as_of(data: dict) -> str | None:
+    """``fetchedAt`` for data read from a bundled JSON snapshot: its own ``asOf`` date.
+
+    None when it has no ISO date (the live Damodaran download is ``"live"``): that
+    data is dated by its cache entry.
+    """
+    try:
+        d = date.fromisoformat(str(data.get("asOf")))
+    except ValueError:
+        return None
+    return pv.stamp(datetime(d.year, d.month, d.day, tzinfo=timezone.utc))
 
 
 @cached("sector_multiples_json")
@@ -389,9 +404,10 @@ def blume_adjust(beta: float | None) -> float | None:
     return None if beta is None else _clean(0.67 * beta + 0.33)
 
 
-def _major_currency(ccy: str | None) -> str:
+def _major_currency(ccy: str | None) -> str | None:
     from .dcf_engine import _MINOR_UNITS  # GBp -> GBP, ZAc -> ZAR, ILA -> ILS
-    ccy = ccy or "USD"
+    if not ccy:
+        return None  # unknown stays unknown: never assumed USD
     return _MINOR_UNITS.get(ccy, (ccy, 1.0))[0]
 
 
@@ -413,6 +429,9 @@ def local_risk_free_rate(country: str, currency: str | None) -> dict:
 
     from .risk_free_service import ten_year_series
     ccy = _major_currency(currency)
+    if ccy is None:
+        return {"value": None, "reason": "Yahoo reported no quote currency, so no matching risk-free rate; "
+                                         "the US rate is not substituted."}
     sid, bond_ccy = ten_year_series(country), _COUNTRY_CURRENCY.get(country)
     if sid is None or bond_ccy is None:
         return {"value": None, "reason": f"No 10-year government bond yield for {country} on FRED, so a "
@@ -467,6 +486,8 @@ def wacc(bundle: dict, beta: float | None) -> dict:
 
     country = detect_country(info)
     unavailable: dict[str, str] = {}
+    if not info.get("currency"):
+        unavailable["currency"] = "Yahoo reported no quote currency"
     if _major_currency(info.get("currency")) == "USD":
         live = _risk_free_rate_live()  # one lookup, so the label always describes the rate used
         rf = live if live is not None else RISK_FREE_FALLBACK

@@ -35,7 +35,6 @@ const drawerGroups: DrawerGroup[] = [
     items: [
       { href: "/risk", label: "Risk" },
       { href: "/options", label: "Options" },
-      { href: "/scenario", label: "Scenario Lab" },
     ],
   },
   {
@@ -44,7 +43,7 @@ const drawerGroups: DrawerGroup[] = [
       { href: "/corporate", label: "Corporate Health" },
       { href: "/dividends", label: "Dividends" },
       { href: "/insider", label: "Insider Trading" },
-      { href: "/mergers", label: "Mergers & Acquisitions" },
+      { href: "/mergers", label: "Merger News" },
     ],
   },
   {
@@ -55,7 +54,6 @@ const drawerGroups: DrawerGroup[] = [
       { href: "/stability", label: "Stability" },
       { href: "/country", label: "Countries" },
       { href: "/yield", label: "Yield" },
-      { href: "/policy", label: "Policy & Sovereign" },
     ],
   },
   {

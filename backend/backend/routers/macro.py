@@ -245,6 +245,12 @@ async def forecast(
             units=macro_service.get_unit(indicator) or None, frequency="annual",
             flags=("estimate",) if estimated else (),
             note=f"Projections run to {s['data'][-1]['year']}." if estimated and s["data"] else None)
+    # The downloaded WEO file is read first when it exists: date the data by it.
+    from ..services.bulk_data_service import imf_path
+    bulk = imf_path(indicator)
+    if bulk is not None and (when := pv.file_time(bulk)):
+        for r in prov.values():
+            r["fetchedAt"] = when
     return pv.attach(result, prov)
 
 
@@ -309,11 +315,17 @@ async def fama_french():
     result = {"factors": factors}
     if not factors:
         return result
-    return pv.attach(result, {"*": pv.ref(
+    ref = pv.ref(
         "kenfrench", "F-F_Research_Data_Factors", "Fama/French 3 factors (Mkt-RF, SMB, HML) and RF",
         units="% per calendar year", frequency="annual", observed=str(max(f["year"] for f in factors)),
         note="Ken French's annual table, or the monthly factors compounded to complete calendar years "
-             "when the bulk file is present.")})
+             "when the bulk file is present.")
+    # The downloaded factor file is read first when it exists: date the data by it.
+    from ..services.bulk_data_service import famafrench_path
+    bulk = famafrench_path()
+    if bulk is not None and (when := pv.file_time(bulk)):
+        ref["fetchedAt"] = when
+    return pv.attach(result, {"*": ref})
 
 
 # ---------------------------------------------------------------------------
@@ -455,6 +467,12 @@ def _macro_series_refs(indicator: str, entry: dict, *, actuals_only: bool = Fals
         else:
             ref_ = pv.label_to_ref(label, series=series, **kw)
         ref_["title"] = f"{next((i['label'] for i in INDICATORS if i['id'] == indicator), indicator)} ({label})"
+        if label == source_imf.SOURCE_LABEL:
+            # The downloaded WEO file is read first when it exists: date the data by it.
+            from ..services.bulk_data_service import imf_path
+            bulk = imf_path(indicator)
+            if bulk is not None and (when := pv.file_time(bulk)):
+                ref_["fetchedAt"] = when
         refs.append(ref_)
     return refs
 
@@ -775,8 +793,8 @@ async def housing(country: str = Query("US", description="ISO2 country code (FRE
         prov["recessionPeriods"] = pv.fred(
             "USREC", _FRED_META["USREC"][0], units="0/1 indicator", frequency="monthly",
             transform="runs of months flagged 1 become {start, end} periods",
-            note=("The end of a recession still in progress is shown as the day the request was served."
-                  if recessions[-1].get("end") == str(date.today()) else None))
+            note=("The end of a recession still in progress is its last month flagged 1 in USREC."
+                  if recessions[-1].get("ongoing") else None))
     return pv.attach(result, prov)
 
 
@@ -1349,7 +1367,7 @@ async def financial_conditions(country: str = Query("US", description="ISO2 coun
         for p in fed_bs_raw if p.get("value") is not None
     ]
     # BUSLOANS is in billions USD → convert to trillions
-    ci_raw = data.get("BUSLOANS", data.get("TOTCI", []))
+    ci_raw = data.get("BUSLOANS", [])
     ci_loans = [
         {"date": p["date"], "value": round(p["value"] / 1_000, 4)}
         for p in ci_raw if p.get("value") is not None

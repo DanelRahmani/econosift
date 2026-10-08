@@ -49,7 +49,8 @@ export function CAPMAttribution({ data, loading }: Props) {
     );
   }
 
-  const annAlpha = data.annAlpha ?? data.alpha;
+  // `alpha` is the daily intercept; never show it under an annual label (P2-34).
+  const annAlpha = data.annAlpha ?? null;
   const alphaPct = annAlpha !== null ? `${(annAlpha * 100).toFixed(2)}%` : "—";
   const sysRiskPct = data.systematicVarPct !== null ? `${(data.systematicVarPct * 100).toFixed(1)}%` : "—";
   const idioRiskPct = data.idiosyncraticVarPct !== null ? `${(data.idiosyncraticVarPct * 100).toFixed(1)}%` : "—";

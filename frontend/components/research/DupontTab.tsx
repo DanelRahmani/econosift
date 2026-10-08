@@ -166,8 +166,8 @@ export function DupontTab() {
             <Tooltip
               formatter={(v: number) => [`${v?.toFixed(1)}%`, "ROE"]}
               contentStyle={{
-                backgroundColor: "var(--color-surface-alt)",
-                border: "1px solid var(--color-border)",
+                backgroundColor: "rgb(var(--surface-alt))",
+                border: "1px solid rgb(var(--border))",
                 borderRadius: 8,
                 fontSize: 12,
               }}

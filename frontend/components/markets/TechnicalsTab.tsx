@@ -10,6 +10,7 @@ import { useTheme } from "@/components/ThemeProvider";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
 import { api } from "@/lib/api";
+import { currencySymbol } from "@/lib/format";
 import type {
   TechnicalsResponse, BollingerPoint, IchimokuPoint, FibLevel, PivotSet,
 } from "@/lib/types";
@@ -322,7 +323,7 @@ export function TechnicalsTab({ ticker }: { ticker: string }) {
                 <XAxis dataKey="date" tick={{ fill: pal.axis, fontSize: 11 }} minTickGap={40} />
                 <YAxis
                   tick={{ fill: pal.axis, fontSize: 11 }}
-                  tickFormatter={(v: number) => `$${v.toFixed(0)}`}
+                  tickFormatter={(v: number) => `${currencySymbol(data?.currency)}${v.toFixed(0)}`}
                   domain={[yMin, yMax]}
                   width={60}
                 />

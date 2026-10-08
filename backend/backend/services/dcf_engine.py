@@ -185,7 +185,8 @@ def two_stage_dcf(
     shares_raw = info.get("sharesOutstanding")
     total_debt_raw = info.get("totalDebt") or 0
     total_cash_raw = info.get("totalCash") or 0
-    currency = info.get("currency") or "USD"
+    currency = info.get("currency") or None  # unknown stays None; never assumed USD
+    unavailable = {} if currency else {"currency": "Yahoo reported no quote currency"}
     spot_raw = info.get("currentPrice") or info.get("regularMarketPrice")
 
     fcf = _clean(fcf_raw)
@@ -220,6 +221,7 @@ def two_stage_dcf(
         return {
             "ticker": ticker,
             "currency": currency,
+            **({"unavailable": unavailable} if unavailable else {}),
             "spotPrice": spot,
             "intrinsicValue": None,
             "upsidePct": None,
@@ -317,6 +319,7 @@ def two_stage_dcf(
     return {
         "ticker": ticker,
         "currency": currency,
+        **({"unavailable": unavailable} if unavailable else {}),
         "spotPrice": spot,
         "intrinsicValue": intrinsic,
         "upsidePct": upside_pct,

@@ -82,7 +82,7 @@ def analyst_data(ticker: str) -> dict:
         except Exception:
             info = {}
 
-    currency: str = info.get("currency") or "USD"
+    currency: str | None = info.get("currency") or None  # unknown stays None; never assumed USD
 
     # Current price
     price: float | None = _clean(info.get("currentPrice") or info.get("regularMarketPrice"))
@@ -257,6 +257,7 @@ def analyst_data(ticker: str) -> dict:
     return {
         "ticker": ticker.upper(),
         "currency": currency,
+        **({} if currency else {"unavailable": {"currency": "Yahoo reported no quote currency"}}),
         "price": price,
         "priceTarget": price_target,
         "consensus": consensus,

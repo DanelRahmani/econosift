@@ -16,6 +16,8 @@ const nextConfig = {
       // Page redirects
       { source: "/sovereign", destination: "/yield?tab=Sovereign Risk", permanent: true },
       { source: "/policy", destination: "/yield", permanent: true },
+      // P2-10: Scenario Lab duplicated Portfolio's Scenario tab (same ScenarioTab component).
+      { source: "/scenario", destination: "/portfolio?tab=Scenario", permanent: true },
     ];
   },
 };

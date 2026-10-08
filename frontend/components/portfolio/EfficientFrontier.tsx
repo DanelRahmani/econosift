@@ -82,23 +82,23 @@ export function EfficientFrontier({ holdings, period }: Props) {
         <>
           <ResponsiveContainer width="100%" height={320}>
             <ScatterChart margin={{ top: 8, right: 24, bottom: 8, left: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
+              <CartesianGrid strokeDasharray="3 3" stroke="rgb(var(--border))" />
               <XAxis
                 type="number"
                 dataKey="x"
                 name="Volatility"
                 tickFormatter={(v) => `${v.toFixed(1)}%`}
-                tick={{ fontSize: 11, fill: "var(--color-text-muted)" }}
-                label={{ value: "Volatility (%)", position: "insideBottom", offset: -4, fontSize: 11, fill: "var(--color-text-muted)" }}
+                tick={{ fontSize: 11, fill: "rgb(var(--text-muted))" }}
+                label={{ value: "Volatility (%)", position: "insideBottom", offset: -4, fontSize: 11, fill: "rgb(var(--text-muted))" }}
               />
               <YAxis
                 type="number"
                 dataKey="y"
                 name="Return"
                 tickFormatter={(v) => `${v.toFixed(1)}%`}
-                tick={{ fontSize: 11, fill: "var(--color-text-muted)" }}
+                tick={{ fontSize: 11, fill: "rgb(var(--text-muted))" }}
                 width={52}
-                label={{ value: "Return (%)", angle: -90, position: "insideLeft", fontSize: 11, fill: "var(--color-text-muted)" }}
+                label={{ value: "Return (%)", angle: -90, position: "insideLeft", fontSize: 11, fill: "rgb(var(--text-muted))" }}
               />
               <Tooltip
                 cursor={{ strokeDasharray: "3 3" }}
@@ -128,7 +128,7 @@ export function EfficientFrontier({ holdings, period }: Props) {
               <Scatter
                 name="Current Portfolio"
                 data={currentPt}
-                fill="var(--color-accent)"
+                fill="rgb(var(--primary))"
                 r={8}
               />
               {/* Max Sharpe */}

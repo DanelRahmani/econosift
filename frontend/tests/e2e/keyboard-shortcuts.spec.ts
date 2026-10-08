@@ -55,3 +55,42 @@ test("number keys switch Macro tabs", async ({ page }) => {
     await expect(page).toHaveURL(/tab=inflation/, { timeout: 1_000 });
   });
 });
+
+test("[ and ] step Macro tabs past the ninth, clamped at the ends (P2-42)", async ({ page }) => {
+  // Macro has 14 tabs; keys 1–9 stop at "business" (9th). From it, ] reaches commodities (10th) and fx (11th).
+  // Each step waits for the URL: a key pressed before the page re-renders steps from the old tab.
+  await page.goto("/macro?tab=business", { waitUntil: "domcontentloaded" });
+  await pressUntil(page, "]", async () => {
+    await expect(page).toHaveURL(/tab=commodities/, { timeout: 1_000 });
+  });
+  await page.keyboard.press("]");
+  await expect(page).toHaveURL(/tab=fx/);
+  await page.keyboard.press("[");
+  await expect(page).toHaveURL(/tab=commodities/);
+  await page.keyboard.press("[");
+  await expect(page).toHaveURL(/tab=business/);
+
+  // The last tab clamps: ] on "sentiment" (14th) stays there.
+  await page.goto("/macro?tab=sentiment", { waitUntil: "domcontentloaded" });
+  await pressUntil(page, "[", async () => {
+    await expect(page).toHaveURL(/tab=financial/, { timeout: 1_000 });
+  });
+  await page.keyboard.press("]");
+  await expect(page).toHaveURL(/tab=sentiment/);
+  await page.keyboard.press("]");
+  await expect(page).toHaveURL(/tab=sentiment/);
+});
+
+test("AltGr+] still steps the tab; the footer lists the shortcuts (P3-40)", async ({ page }) => {
+  await page.goto("/macro?tab=business", { waitUntil: "domcontentloaded" });
+  await expect(page.getByTestId("shortcut-hint")).toContainText("prev / next tab");
+  // AltGr arrives as Ctrl+Alt with the AltGraph modifier state; dispatch it directly.
+  await expect(async () => {
+    await page.evaluate(() => {
+      const ev = new KeyboardEvent("keydown", { key: "]", ctrlKey: true, altKey: true, bubbles: true });
+      Object.defineProperty(ev, "getModifierState", { value: (k: string) => k === "AltGraph" });
+      window.dispatchEvent(ev);
+    });
+    await expect(page).toHaveURL(/tab=commodities/, { timeout: 1_000 });
+  }).toPass({ timeout: 30_000 });
+});

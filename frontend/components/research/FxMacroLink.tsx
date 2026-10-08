@@ -102,7 +102,7 @@ export function FxMacroLink() {
                   <div className="h-64">
                     <ResponsiveContainer>
                       <LineChart data={link.series}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgb(var(--border))" />
                         <XAxis dataKey="date" tick={{ fontSize: 10 }} />
                         <YAxis domain={["auto", "auto"]} tick={{ fontSize: 10 }} />
                         <Tooltip />
@@ -125,7 +125,7 @@ export function FxMacroLink() {
                         date: d,
                         correlation: link.rollingCorrelation.values[i],
                       }))}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgb(var(--border))" />
                         <XAxis dataKey="date" tick={{ fontSize: 10 }} />
                         <YAxis domain={[-1, 1]} tick={{ fontSize: 10 }} />
                         <Tooltip />

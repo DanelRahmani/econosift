@@ -1,8 +1,10 @@
-"""Sovereign Default Probability service — Phase 31.
+"""Sovereign default risk score service — Phase 31.
 
 Fits a logistic regression model on historical sovereign default data
 (Reinhart & Rogoff) using current macro predictors from World Bank data.
-Outputs 1Y and 5Y default probabilities per country with traffic-light signals.
+Outputs relative risk scores (0–100, scaled from model sigmoid) per country with traffic-light signals.
+The model is weakly calibrated (few post-2000 default episodes in the bundled training set);
+read the score as a ranking, not a default probability.
 
 Uses scipy only (NO statsmodels) — follows econ_lab_service.py pattern:
 scipy.optimize.minimize BFGS, scipy.special.expit, scipy.stats.t.
@@ -107,9 +109,9 @@ _TRAINING_DATA = [
 # Predictors: World Bank indicator keys used in the model
 PREDICTORS = ["debt_gdp", "fiscal_balance", "current_account", "inflation", "gdp_growth"]
 
-# Traffic-light thresholds for 1Y default probability
-TL_GREEN = 0.05   # <5% = green
-TL_RED = 0.20     # >20% = red, 5-20% = yellow
+# Traffic-light score bands (0–100)
+TL_GREEN = 5.0    # score < 5 = green
+TL_RED = 20.0     # score >= 20 = red, 5–20 = yellow
 
 
 def _sigmoid(z):
@@ -146,6 +148,52 @@ _PREDICTOR_TITLES = {
 }
 
 
+def _score_rows(raw: list[tuple[str, str, float]]) -> list[dict]:
+    """Assemble risk score rows from (iso3, name, model_output) tuples.
+
+    Args:
+        raw: list of (iso3, name, model_output) where model_output is float from _sigmoid(x_norm @ beta).
+
+    Returns:
+        list of dicts sorted by score descending, then iso3 ascending for ties.
+        Each dict has: {iso3, name, score, rank, signal}.
+        score = round(100 * model_output, 1)
+        rank = competition ranking (ties share lower rank)
+        signal: green < 5, yellow 5–20, red >= 20 (on score)
+    """
+    rows = []
+    for iso3, name, model_output in raw:
+        raw_score = 100.0 * model_output
+        score = round(raw_score, 1)
+        # Signal from the unrounded score, so 4.96 stays green (bands unchanged from the 0-1 model output)
+        if raw_score < TL_GREEN:
+            signal = "green"
+        elif raw_score < TL_RED:
+            signal = "yellow"
+        else:
+            signal = "red"
+        rows.append({"iso3": iso3, "name": name, "score": score, "signal": signal})
+
+    # Sort by score descending, then iso3 ascending for ties
+    rows.sort(key=lambda r: (-r["score"], r["iso3"]))
+
+    # Compute competition ranks: ties share the lower rank, next rank skips accordingly
+    ranks = []
+    current_rank = 1
+    prev_score = None
+    for i, row in enumerate(rows):
+        if row["score"] != prev_score:
+            current_rank = i + 1
+            prev_score = row["score"]
+        ranks.append(current_rank)
+
+    # Attach ranks
+    for row, rank in zip(rows, ranks):
+        row["rank"] = rank
+
+    return rows
+
+
 def _provenance(pred_data: dict, countries: list[dict], n_obs: int) -> dict:
     """Source map for the default-probability model (see provenance.py)."""
     from . import atlas_service
@@ -165,13 +213,14 @@ def _provenance(pred_data: dict, countries: list[dict], n_obs: int) -> dict:
     prov["*"] = pv.derived(
         "Logistic regression (BFGS) of the default flag on five standardised World Bank predictors, fitted on "
         f"the {n_obs} bundled default / non-default observations that have predictor data (nearest year within "
-        "+/-2 accepted). prob1y = sigmoid(intercept + sum(coef x standardised latest predictor)).",
-        [f"predictors.{p}" for p in PREDICTORS] + ["training_data"], title="Sovereign default probability model")
+        "+/-2 accepted). score = 100 x sigmoid(intercept + sum(coef x standardised latest predictor)).",
+        [f"predictors.{p}" for p in PREDICTORS] + ["training_data"], title="Sovereign risk score model")
     prov["model"] = prov["*"]
     prov["countries"] = pv.derived(
-        "prob1y = model probability from each country's latest predictors; prob5y = 1 - (1 - prob1y)^5 "
-        "(constant annual hazard); signal green < 5%, yellow 5-20%, red > 20% on prob1y.",
-        ["*"], title="Default probabilities")
+        "score = 100 x model output from each country's latest predictors; rank 1 = highest score; "
+        "signal green < 5, yellow 5-20, red >= 20. The model is weakly calibrated (few post-2000 default episodes "
+        "in the bundled training set), so read the score as a ranking, not a default probability.",
+        ["*"], title="Sovereign risk scores")
     prov["asOf"] = pv.derived(
         "the date the model was run; the predictor data behind it is older (see predictors.*)",
         title="Model run date")
@@ -185,9 +234,10 @@ def _with_provenance(result: dict, pred_data: dict, countries: list[dict], n_obs
 
 @async_cached("sovereign_default")
 async def get_default_probabilities() -> dict:
-    """Fit logistic regression and compute 1Y/5Y default probabilities.
+    """Fit logistic regression and compute relative risk scores.
 
-    Returns {model: {...}, countries: [{iso3, name, prob1y, prob5y, signal}], asOf, source}.
+    Returns {model: {...}, countries: [{iso3, name, score, rank, signal}], asOf, source}.
+    Scores are 0–100 (100 x model sigmoid output); read as a ranking, not a default probability.
     """
     from . import atlas_service
     from ..config import ISO2_TO_ISO3, COUNTRY_NAMES
@@ -336,12 +386,12 @@ async def get_default_probabilities() -> dict:
         "coefficients": coefficients,
     }
 
-    # Compute current 1Y and 5Y probabilities for all countries with predictor data
-    countries_out = []
+    # Compute risk scores for all countries with predictor data
     # Get country universe from atlas
     universe = atlas_service._country_universe()
     iso3_to_name = {c["iso3"]: c["name"] for c in universe}
 
+    raw_scores = []
     for iso3 in sorted(set(row["iso3"] for row in train_rows)):
         # Get latest predictor values
         features = []
@@ -364,30 +414,13 @@ async def get_default_probabilities() -> dict:
         # Normalize and predict
         x_norm = (np.array(features) - X_mean) / X_std
         x_norm = np.insert(x_norm, 0, 1.0)  # intercept
-        prob1y = float(_sigmoid(x_norm @ beta))
-
-        # 5Y probability: cumulative probability of default over 5 years
-        # Assumes constant annual hazard: P(5Y) = 1 - (1-P)^5
-        prob5y = 1.0 - (1.0 - prob1y) ** 5
-
-        # Traffic light
-        if prob1y < TL_GREEN:
-            signal = "green"
-        elif prob1y < TL_RED:
-            signal = "yellow"
-        else:
-            signal = "red"
+        model_output = float(_sigmoid(x_norm @ beta))
 
         name = iso3_to_name.get(iso3, iso3)
-        countries_out.append({
-            "iso3": iso3,
-            "name": name,
-            "prob1y": round(prob1y, 4),
-            "prob5y": round(prob5y, 4),
-            "signal": signal,
-        })
+        raw_scores.append((iso3, name, model_output))
 
-    countries_out.sort(key=lambda c: c["prob5y"], reverse=True)
+    # Assemble final rows with score, rank, signal
+    countries_out = _score_rows(raw_scores)
 
     return _with_provenance({
         "model": model,

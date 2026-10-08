@@ -6,6 +6,8 @@ Computes:
 """
 from __future__ import annotations
 
+import asyncio
+import concurrent.futures
 import logging
 import math
 from datetime import date, timedelta
@@ -15,14 +17,27 @@ import pandas as pd
 
 from .. import provenance as pv
 from ..cache import cached
+from ..sources import source_bis
 from . import rates_service
 from . import yfinance_service as yfs
+from .policy_service import _BIS_AREA, _BIS_RATE_TYPE, _bis_note, _proxy_rate_type
 
 log = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # G10 currency config
 # ---------------------------------------------------------------------------
+
+# Official BIS policy rates (WS_CBPOL) are tried first; the FRED series below are the
+# labelled fallback. CCY → BIS reference area, and the policy_service bank whose
+# rate-type label describes it (NZD has no tracker entry, so it has its own label).
+_BIS_SERIES = "WS_CBPOL"
+_BIS_CCY_AREA: dict[str, str] = {
+    "USD": "US", "EUR": "XM", "GBP": "GB", "JPY": "JP", "CAD": "CA", "AUD": "AU", "CHF": "CH", "NZD": "NZ",
+}
+_CCY_BANK: dict[str, str] = {
+    "USD": "Fed", "EUR": "ECB", "GBP": "BoE", "JPY": "BoJ", "CAD": "BoC", "AUD": "RBA", "CHF": "SNB",
+}
 
 # CCY → list of FRED series ids to try in order (first with recent data wins).
 # Primary: OECD "Immediate Rates (<24h): Central Bank Rates" (IRSTCI01*) — current
@@ -31,7 +46,7 @@ log = logging.getLogger(__name__)
 # series were dropped — they ended ~2021 and fail the staleness guard.
 _POLICY_RATE_SERIES: dict[str, list[str]] = {
     "USD": ["FEDFUNDS"],
-    "EUR": ["ECBMRRFR", "ECBDFR", "IRSTCI01EZM156N"],
+    "EUR": ["ECBDFR", "IRSTCI01EZM156N"],
     "GBP": ["IRSTCI01GBM156N", "IR3TIB01GBM156N"],
     "CAD": ["IRSTCI01CAM156N", "IR3TIB01CAM156N"],
     "AUD": ["IRSTCI01AUM156N", "IR3TIB01AUM156N"],
@@ -69,9 +84,39 @@ def _clean(v) -> float | None:
         return None
 
 
-def _resolve_policy_rate_series(start: str) -> tuple[dict[str, pd.Series], dict[str, str]]:
-    """Per currency, the full history of the first candidate FRED series whose
-    latest observation is recent. Returns (CCY -> series in %, CCY -> id)."""
+def _fetch_bis_rates(start: str) -> dict[str, dict]:
+    """BIS policy-rate history per area back to ``start``. Sync wrapper over the async
+    source: the carry endpoints run in worker threads, so there is normally no loop."""
+    def _run() -> dict[str, dict]:
+        return asyncio.run(source_bis.get_policy_rates_bulk(tuple(_BIS_CCY_AREA.values()), since=start))
+    try:
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            return _run()
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            return pool.submit(_run).result()
+    except Exception as exc:
+        log.warning("Carry: BIS policy rates unavailable, using FRED proxies: %s", exc)
+        return {}
+
+
+def _bis_series(entry: dict | None) -> pd.Series | None:
+    """BIS ``{"points": [{date, value}]}`` as a date-indexed series in %, or None."""
+    pts = [p for p in (entry or {}).get("points", []) if p.get("value") is not None]
+    if not pts:
+        return None
+    s = pd.Series([float(p["value"]) for p in pts], index=pd.to_datetime([p["date"] for p in pts]))
+    return s[~s.index.duplicated(keep="last")].sort_index()
+
+
+def _resolve_policy_rate_series(start: str, notes: dict[str, str | None] | None = None
+                                ) -> tuple[dict[str, pd.Series], dict[str, str]]:
+    """Per currency, the full history of the official BIS policy rate when its latest
+    observation is recent, else of the first candidate FRED series that is.
+    Returns (CCY -> series in %, CCY -> id: ``WS_CBPOL`` for BIS, else the FRED id).
+
+    If ``notes`` is given it is filled with CCY -> BIS compilation note for BIS rows."""
     all_series: list[str] = []
     for series_list in _POLICY_RATE_SERIES.values():
         all_series.extend(series_list)
@@ -80,12 +125,21 @@ def _resolve_policy_rate_series(start: str) -> tuple[dict[str, pd.Series], dict[
     unique_series = [s for s in all_series if not (s in seen or seen.add(s))]
 
     fred_data = rates_service._fetch_many_fred_sync(unique_series, start)
+    bis = _fetch_bis_rates(start)
 
     out: dict[str, pd.Series] = {}
     sources: dict[str, str] = {}
     cutoff = date.today() - timedelta(days=_MAX_STALE_DAYS)
 
     for ccy, candidates in _POLICY_RATE_SERIES.items():
+        bis_series = _bis_series(bis.get(_BIS_CCY_AREA[ccy]))
+        if bis_series is not None and bis_series.index[-1].date() >= cutoff:
+            out[ccy] = bis_series
+            sources[ccy] = _BIS_SERIES
+            if notes is not None:
+                notes[ccy] = _bis_note(bis[_BIS_CCY_AREA[ccy]].get("compilation"))
+            log.info("Carry: %s resolved via BIS (last obs %s)", ccy, bis_series.index[-1].date())
+            continue
         for sid in candidates:
             series = fred_data.get(sid)
             if series is None or series.empty:
@@ -109,11 +163,13 @@ def _resolve_policy_rate_series(start: str) -> tuple[dict[str, pd.Series], dict[
     return out, sources
 
 
-def _resolve_policy_rates(start: str, observed: dict[str, str] | None = None) -> tuple[dict[str, float], dict[str, str]]:
-    """Latest policy rate per currency (%), and the FRED id that resolved.
+def _resolve_policy_rates(start: str, observed: dict[str, str] | None = None,
+                          notes: dict[str, str | None] | None = None) -> tuple[dict[str, float], dict[str, str]]:
+    """Latest policy rate per currency (%), and the id that resolved (``WS_CBPOL`` or a FRED id).
 
-    If ``observed`` is given it is filled with CCY -> date of the latest observation."""
-    series, sources = _resolve_policy_rate_series(start)
+    If ``observed`` is given it is filled with CCY -> date of the latest observation;
+    ``notes`` with CCY -> BIS compilation note (see ``_resolve_policy_rate_series``)."""
+    series, sources = _resolve_policy_rate_series(start, notes)
     if observed is not None:
         observed.update({ccy: str(s.index[-1])[:10] for ccy, s in series.items()})
     return {ccy: round(float(s.iloc[-1]), 4) for ccy, s in series.items()}, sources
@@ -133,13 +189,23 @@ def _compute_fx_vol(close: pd.DataFrame, ticker: str, min_rows: int = 20) -> flo
     return round(vol, 4) if math.isfinite(vol) else None
 
 
-def _rate_ref(ccy: str, sid: str, observed: str | None) -> dict:
-    """FRED ref for the rate series that resolved for ``ccy``."""
+def _rate_kind(ccy: str, sid: str) -> tuple[str, str]:
+    """(rateSource, rateType) of the series that resolved for ``ccy``."""
+    if sid == _BIS_SERIES:
+        return "bis", _BIS_RATE_TYPE[_CCY_BANK[ccy]] if ccy in _CCY_BANK else "official cash rate"
+    return "proxy", _proxy_rate_type(sid)
+
+
+def _rate_ref(ccy: str, sid: str, observed: str | None, bis_note: str | None = None) -> dict:
+    """Source ref for the rate series that resolved for ``ccy`` (BIS, or the FRED fallback)."""
+    if sid == _BIS_SERIES:
+        return pv.ref("bis", _BIS_SERIES, f"{ccy} policy rate ({_rate_kind(ccy, sid)[1]})", units="% p.a.",
+                      observed=observed, note=bis_note)
     interbank = sid.startswith("IR3TIB01")
     primary = _POLICY_RATE_SERIES[ccy][0]
-    note = None
+    note = "fallback: BIS had no current value"
     if sid != primary:
-        note = f"Primary series {primary} was missing or stale, so {sid} stood in."
+        note += f". Primary series {primary} was missing or stale, so {sid} stood in."
     return pv.fred(
         sid, f"{ccy} short-term interest rate" + (" (3-month interbank, not a policy rate)" if interbank else ""),
         units="% p.a.", frequency="daily" if sid.startswith("ECB") else "monthly", observed=observed,
@@ -191,7 +257,8 @@ def get_carry_table(period: str = "3y") -> dict:
           "carry": float,
           "fxVol": float | None,
           "volAdjCarry": float | None,
-          "rateSource": "INTDSRAUAM193N"
+          "rateSource": "bis" | "proxy",
+          "rateType": "deposit facility rate"
         },
         ...
       ]  # sorted by carry desc
@@ -201,7 +268,8 @@ def get_carry_table(period: str = "3y") -> dict:
         # 5-year start to ensure we have recent observations
         start = (date.today() - timedelta(days=5 * 365)).strftime("%Y-%m-%d")
         rate_obs: dict[str, str] = {}
-        rates, sources = _resolve_policy_rates(start, rate_obs)
+        bis_notes: dict[str, str | None] = {}
+        rates, sources = _resolve_policy_rates(start, rate_obs, bis_notes)
 
         usd_rate = rates.get("USD")
         if usd_rate is None:
@@ -240,7 +308,8 @@ def get_carry_table(period: str = "3y") -> dict:
                 "carry": _clean(carry),
                 "fxVol": _clean(fx_vol),
                 "volAdjCarry": _clean(vol_adj_carry),
-                "rateSource": sources.get(ccy, "unknown"),
+                "rateSource": _rate_kind(ccy, sources[ccy])[0],
+                "rateType": _rate_kind(ccy, sources[ccy])[1],
             })
 
         rows.sort(key=lambda r: r["carry"] if r["carry"] is not None else -999, reverse=True)
@@ -258,12 +327,12 @@ def get_carry_table(period: str = "3y") -> dict:
         prov: dict = {
             "*": pv.derived("Carry = foreign short-term rate - US rate (percentage points), with FX spot and volatility "
                             "from Yahoo pairs", [fx_input, "usdRate"], title="G10 FX carry table", observed=as_of),
-            "usdRate": _rate_ref("USD", sources["USD"], rate_obs.get("USD")),
+            "usdRate": _rate_ref("USD", sources["USD"], rate_obs.get("USD"), bis_notes.get("USD")),
         }
         for r in rows:
             c = r["ccy"]
             pair = _fx_ticker(c)
-            prov[f"rows.{c}.foreignRate"] = _rate_ref(c, sources[c], rate_obs.get(c))
+            prov[f"rows.{c}.foreignRate"] = _rate_ref(c, sources[c], rate_obs.get(c), bis_notes.get(c))
             prov[f"rows.{c}.spot"] = pv.yahoo(
                 pair, f"{c}/USD spot (last close)", units="USD per unit", frequency="daily",
                 observed=pv.last_date(close[pair]) if pair in close.columns else None)
@@ -307,7 +376,8 @@ def get_carry_backtest(period: str = "3y") -> dict:
         # the whole history (look-ahead), and earned FX moves only — never
         # the interest differential that is the point of a carry trade (C-06).
         start = (date.today() - timedelta(days=8 * 365)).strftime("%Y-%m-%d")
-        rate_series, rate_sources = _resolve_policy_rate_series(start)
+        bis_notes: dict[str, str | None] = {}
+        rate_series, rate_sources = _resolve_policy_rate_series(start, bis_notes)
         if "USD" not in rate_series:
             return {**_EMPTY, "error": "USD policy rate unavailable"}
         ccys = [c for c in _NON_USD_CCYS if c in rate_series]
@@ -397,7 +467,7 @@ def get_carry_backtest(period: str = "3y") -> dict:
         obs = series_records[-1]["date"] if series_records else None
         fx_input = pv.ref("yahoo", None, "Daily adjusted close of the G10 pairs quoted as USD per unit of currency",
                           units="USD per unit", frequency="daily", observed=pv.last_date(close))
-        rate_inputs = [_rate_ref(c, rate_sources[c], str(rate_series[c].index[-1])[:10]) for c in ["USD"] + ccys]
+        rate_inputs = [_rate_ref(c, rate_sources[c], str(rate_series[c].index[-1])[:10], bis_notes.get(c)) for c in ["USD"] + ccys]
         if dxy_close is not None:
             bench_ref = pv.yahoo(dxy_sym, "US dollar index proxy, daily close", frequency="daily",
                                  observed=pv.last_date(dxy_close),

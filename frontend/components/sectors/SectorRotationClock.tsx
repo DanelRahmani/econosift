@@ -77,7 +77,9 @@ export function SectorRotationClock({ data, onSectorClick }: Props) {
           style={{ backgroundColor: color }}
           data-prov="phase"
         >
-          Phase: {data.phase} <span data-prov="confidence">({data.confidence}% confidence)</span>
+          Phase: {data.phase}{data.confidence != null && (
+            <span data-prov="confidence" title="The winning phase's share of the total score across the four phases, not a probability."> ({data.confidence}% confidence)</span>
+          )}
         </span>
         {data.regimeQuadrant && (
           <span className="text-sm text-text-secondary" data-prov="regimeQuadrant">

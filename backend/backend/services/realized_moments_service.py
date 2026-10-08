@@ -52,12 +52,15 @@ def _clean(x) -> Optional[float]:
 def _gk_variance(df: pd.DataFrame) -> pd.Series:
     """Per-day Garman-Klass variance estimate.
 
-    Formula: 0.5 * ln(H/L)^2 - _GK_K * ln(C/O)^2
-    Returns a Series aligned to df.index (may contain NaN where O or C == 0).
+    Formula (GK with the opening-jump term, so overnight variance is included):
+        ln(O_t/C_{t-1})^2 + 0.5 * ln(H/L)^2 - _GK_K * ln(C/O)^2
+    Returns a Series aligned to df.index; the first row has no prior close so
+    is NaN (also NaN where O or C == 0).
     """
+    ln_oc_prev = np.log(df["Open"] / df["Close"].shift(1))
     ln_hl = np.log(df["High"] / df["Low"])
     ln_co = np.log(df["Close"] / df["Open"])
-    return 0.5 * ln_hl ** 2 - _GK_K * ln_co ** 2
+    return ln_oc_prev ** 2 + 0.5 * ln_hl ** 2 - _GK_K * ln_co ** 2
 
 
 # ---------------------------------------------------------------------------
@@ -96,7 +99,7 @@ def get_moments(ticker: str, period: str = "3y") -> dict:
     gk = _gk_variance(df)
 
     # Rolling realized vol annualised from GK variance; clip(lower=0) before sqrt
-    # to guard against negative GK values caused by large open-to-close gaps.
+    # to guard against negative GK values caused by large open-to-close moves.
     rvol: dict[int, pd.Series] = {}
     for w in _WINDOWS:
         rvol[w] = np.sqrt(gk.clip(lower=0).rolling(w).mean() * 252)
@@ -145,7 +148,7 @@ def get_moments(ticker: str, period: str = "3y") -> dict:
                         title="Realised moments", observed=pv.last_date(df)),
         "series.rvol": pv.derived(
             "√(252 × mean over the window of max(Garman-Klass daily variance, 0)), where daily variance = "
-            "0.5·ln(High/Low)² − (2·ln2 − 1)·ln(Close/Open)²", [ohlc_ref], title="Realised volatility (Garman-Klass)"),
+            "ln(Open/previous Close)² + 0.5·ln(High/Low)² − (2·ln2 − 1)·ln(Close/Open)² (includes the overnight gap)", [ohlc_ref], title="Realised volatility (Garman-Klass)"),
         "series.skew": pv.derived("sample skewness of daily log returns of the close over the window", [ohlc_ref],
                                   title="Realised skewness"),
         "series.kurt": pv.derived("sample excess kurtosis of daily log returns of the close over the window",

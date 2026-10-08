@@ -110,15 +110,15 @@ class TestDdmSustainableGrowth:
         r, ddm = self._ddm(dividendRate=2.0, payoutRatio=0.5, returnOnEquity=0.06, growth=0.10)
         ke = r["wacc"]["costOfEquity"]
         assert ddm["detail"]["growthRate"] == pytest.approx(0.03)
-        # D1 = 2.0 * 1.03 = 2.06;  value = 2.06 / (ke - 0.03)
-        assert ddm["value"] == pytest.approx(2.06 / (ke - 0.03), rel=1e-9)
+        # dividendRate is already the forward dividend (D1): value = 2.0 / (ke - 0.03)
+        assert ddm["value"] == pytest.approx(2.0 / (ke - 0.03), rel=1e-9)
 
     def test_growth_capped_at_risk_free_rate(self):
         # MSFT-like: payout 23%, ROE 33% (normalised to 25%) -> 0.77 * 0.25 = 19.25% -> capped at rf.
         r, ddm = self._ddm(dividendRate=3.92, payoutRatio=0.23, returnOnEquity=0.33, growth=0.10)
         rf, ke = r["wacc"]["riskFree"], r["wacc"]["costOfEquity"]
         assert ddm["detail"]["growthRate"] == pytest.approx(rf)
-        assert ddm["value"] == pytest.approx(3.92 * (1 + rf) / (ke - rf), rel=1e-9)
+        assert ddm["value"] == pytest.approx(3.92 / (ke - rf), rel=1e-9)
 
     def test_earnings_growth_does_not_drive_ddm(self):
         _, low = self._ddm(dividendRate=2.0, payoutRatio=0.5, returnOnEquity=0.06, growth=0.02)

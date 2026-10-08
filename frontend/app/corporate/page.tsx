@@ -3,25 +3,13 @@
 import { Suspense, useEffect, useState, useCallback } from "react";
 import { api } from "@/lib/api";
 import type { CorporateHealthResponse } from "@/lib/types";
-import { Card, PageSkeleton } from "@/components/ui";
+import { Card, PageSkeleton, ControlBar } from "@/components/ui";
 import { TickerSearch } from "@/components/TickerSearch";
 import { useUrlState } from "@/lib/useUrlState";
 import { EarningsQuality } from "@/components/corporate/EarningsQuality";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
 import { useRefreshNonce } from "@/lib/refresh";
-
-function KpiCard({ label, value, sub, color }: {
-  label: string; value: string; sub?: string; color?: string;
-}) {
-  return (
-    <Card className="p-4">
-      <div className="text-xs text-text-secondary">{label}</div>
-      <div className={`text-2xl font-bold mt-1 ${color ?? ""}`}>{value}</div>
-      {sub && <div className="text-xs text-text-secondary mt-0.5">{sub}</div>}
-    </Card>
-  );
-}
 
 function fmtNum(v: number | null | undefined): string {
   if (v === null || v === undefined) return "—";
@@ -84,7 +72,7 @@ function CorporatePageInner() {
       </div>
 
       {/* Ticker Search */}
-      <div className="flex gap-2 items-start">
+      <ControlBar>
         <TickerSearch
           value={ticker}
           onChange={(t) => {
@@ -100,7 +88,7 @@ function CorporatePageInner() {
         >
           {loading ? "Loading…" : "Analyze"}
         </button>
-      </div>
+      </ControlBar>
 
       {/* Loading */}
       {loading && <PageSkeleton text={`Fetching corporate health data for ${ticker}…`} />}
@@ -293,7 +281,7 @@ function CorporatePageInner() {
 
 export default function CorporatePage() {
   return (
-    <Suspense fallback={<div className="p-8 text-muted">Loading…</div>}>
+    <Suspense fallback={<div className="p-8 text-text-muted">Loading…</div>}>
       <CorporatePageInner />
     </Suspense>
   );

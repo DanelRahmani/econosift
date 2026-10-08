@@ -20,14 +20,14 @@ import {
   BarChart, Bar, ReferenceLine,
 } from "recharts";
 import { useRefreshNonce } from "@/lib/refresh";
-import { useKeyboardShortcuts, tabKeys } from "@/lib/useKeyboardShortcuts";
+import { useKeyboardShortcuts, tabKeys, tabStepKeys } from "@/lib/useKeyboardShortcuts";
 
 const TABS = YIELD_TABS;
 
 function KpiCard({ label, value, badge, prov, ctx }: { label: string; value: string; badge?: string; prov?: string; ctx?: string }) {
   return (
     <div className="bg-surface rounded-lg p-4 border border-border" data-prov={prov} data-prov-ctx={ctx}>
-      <div className="text-xs text-muted mb-1">{label}</div>
+      <div className="text-xs text-text-muted mb-1">{label}</div>
       <div className="text-xl font-semibold">{value}</div>
       {badge && (
         <span className="text-xs mt-1 px-2 py-0.5 rounded-full bg-red-500/20 text-red-400">{badge}</span>
@@ -48,7 +48,7 @@ function USRatesDetailTab() {
   }, [refreshNonce]);
 
   if (loading) return <PageSkeleton text="Loading rates data…" />;
-  if (!data) return <div className="text-muted text-sm py-8 text-center">Rates data unavailable.</div>;
+  if (!data) return <div className="text-text-muted text-sm py-8 text-center">Rates data unavailable.</div>;
 
   // Neutral grid colour readable in both light & dark themes
   const GRID = "rgba(128,128,128,0.18)";
@@ -222,7 +222,7 @@ function USRatesDetailTab() {
 function GlobalYieldsTab({ data: countries }: { data: GlobalYieldCountry[] }) {
   const GRID = "rgba(128,128,128,0.18)";
   if (!countries || countries.length === 0) {
-    return <div className="text-muted text-sm py-8 text-center">No global yield data available.</div>;
+    return <div className="text-text-muted text-sm py-8 text-center">No global yield data available.</div>;
   }
 
   // Summary KPIs
@@ -254,7 +254,7 @@ function GlobalYieldsTab({ data: countries }: { data: GlobalYieldCountry[] }) {
       <UiCard className="p-4 overflow-x-auto">
         <h3 className="font-semibold mb-3">Global 10Y Government Bond Yields &amp; Spreads</h3>
         <p className="text-xs text-text-secondary mb-4">
-          Real yield = nominal 10Y − latest CPI inflation (World Bank). Sorted by nominal yield.
+          Real yield = nominal 10Y − latest CPI inflation (monthly BIS year-on-year when available, otherwise the World Bank annual average; hover a CPI cell for the observation used). Sorted by nominal yield.
         </p>
         <table className="w-full text-sm">
           <thead>
@@ -278,7 +278,7 @@ function GlobalYieldsTab({ data: countries }: { data: GlobalYieldCountry[] }) {
                 <td data-prov={`global_yields.${c.iso2}.real_yield`} className={`py-2 px-2 text-right font-mono ${(c.real_yield ?? 0) < -1 ? "text-red-400" : (c.real_yield ?? 0) > 2 ? "text-green-400" : ""}`}>
                   {fmtPct(c.real_yield)}
                 </td>
-                <td data-prov={`global_yields.${c.iso2}.inflation`} className="py-2 px-2 text-right font-mono text-text-secondary">{fmtPct(c.inflation)}</td>
+                <td data-prov={`global_yields.${c.iso2}.inflation`} title={c.cpiBasis ? `CPI: ${c.cpiBasis}` : undefined} className="py-2 px-2 text-right font-mono text-text-secondary">{fmtPct(c.inflation)}</td>
                 <td data-prov={`global_yields.${c.iso2}.spread_vs_us`} className={`py-2 px-2 text-right font-mono ${(c.spread_vs_us ?? 0) > 3 ? "text-red-400" : ""}`}>
                   {fmt(c.spread_vs_us)}
                 </td>
@@ -324,14 +324,17 @@ function GlobalYieldsTab({ data: countries }: { data: GlobalYieldCountry[] }) {
 function YieldPageInner() {
   const [urlState, setUrlState] = useUrlState({ tab: "US Curve" });
   const tab = urlState.tab;
-  useKeyboardShortcuts({ onTabSwitch: tabKeys(TABS, (t) => setUrlState({ tab: t })) }); // P2-07
+  useKeyboardShortcuts({
+    onTabSwitch: tabKeys(TABS, (t) => setUrlState({ tab: t })),
+    ...tabStepKeys(TABS, (t) => t === tab, (t) => setUrlState({ tab: t })),
+  }); // P2-07
   const { data, isLoading, error } = useQuery({
     queryKey: ["yieldCurves"],
     queryFn: api.yieldCurves,
   });
   const scope = useSourceScope(provOf(data));
 
-  if (isLoading) return <div className="p-8 text-muted">Loading yield curve data…</div>;
+  if (isLoading) return <div className="p-8 text-text-muted">Loading yield curve data…</div>;
   if (error || !data) return <div className="p-8 text-red-400">Failed to load yield data.</div>;
 
   const { us_curve, foreign_10y, real_yields, breakevens, term_premium, global_yields } = data;
@@ -366,7 +369,7 @@ function YieldPageInner() {
 
       {tab === "US Curve" && (
         <div className="bg-surface rounded-lg p-4 border border-border">
-          <h2 className="text-sm font-medium mb-4 text-muted">US Treasury Spot Curve</h2>
+          <h2 className="text-sm font-medium mb-4 text-text-muted">US Treasury Spot Curve</h2>
           <ResponsiveContainer width="100%" height={280}>
             <LineChart data={us_curve.points.filter(p => p.yield !== null)}>
               <XAxis dataKey="tenor" tick={{ fontSize: 11 }} />
@@ -380,7 +383,7 @@ function YieldPageInner() {
 
       {tab === "Foreign Spreads" && (
         <div className="bg-surface rounded-lg p-4 border border-border">
-          <h2 className="text-sm font-medium mb-4 text-muted">10Y Sovereign Spread vs US Treasury</h2>
+          <h2 className="text-sm font-medium mb-4 text-text-muted">10Y Sovereign Spread vs US Treasury</h2>
           <MultiCountryYieldChart data={foreign_10y} />
         </div>
       )}
@@ -389,7 +392,7 @@ function YieldPageInner() {
 
       {tab === "Real & Breakeven" && (
         <div className="bg-surface rounded-lg p-4 border border-border">
-          <h2 className="text-sm font-medium mb-4 text-muted">TIPS Real Yields by Tenor</h2>
+          <h2 className="text-sm font-medium mb-4 text-text-muted">TIPS Real Yields by Tenor</h2>
           <ResponsiveContainer width="100%" height={280}>
             <BarChart data={real_yields.filter(p => p.yield !== null)}>
               <XAxis dataKey="tenor" tick={{ fontSize: 11 }} />
@@ -408,7 +411,7 @@ function YieldPageInner() {
           {/* 5y5y forward breakeven — the FOMC's preferred anchor measure */}
           {(fwdBreakeven?.history?.length ?? 0) > 0 && (
             <div className="mt-6" data-prov="forward_breakeven_5y5y">
-              <h2 className="text-sm font-medium mb-1 text-muted">5y5y Forward Breakeven Inflation</h2>
+              <h2 className="text-sm font-medium mb-1 text-text-muted">5y5y Forward Breakeven Inflation</h2>
               <p className="text-xs text-text-secondary mb-3">
                 Inflation compensation priced for the five years starting five years out.
                 Because it strips near-term energy passthrough, it is the anchor measure the
@@ -450,7 +453,7 @@ function PolicyTrackerTab() {
   });
   const scope = useSourceScope(provOf(data));
 
-  if (isLoading) return <div className="p-8 text-muted">Loading policy data…</div>;
+  if (isLoading) return <div className="p-8 text-text-muted">Loading policy data…</div>;
   if (error || !data) return <div className="p-8 text-red-400">Failed to load policy data.</div>;
 
   const { divergence, carry_differentials } = data;
@@ -491,12 +494,12 @@ function PolicyTrackerTab() {
       </div>
 
       <UiCard className="p-4">
-        <h2 className="text-sm font-medium mb-4 text-muted">Policy Rate Divergence — All Central Banks</h2>
+        <h2 className="text-sm font-medium mb-4 text-text-muted">Policy Rate Divergence — All Central Banks</h2>
         <PolicyDivergenceTable entries={divergence} />
       </UiCard>
 
       <UiCard className="p-4">
-        <h2 className="text-sm font-medium mb-3 text-muted">G10 Carry Differentials vs USD</h2>
+        <h2 className="text-sm font-medium mb-3 text-text-muted">G10 Carry Differentials vs USD</h2>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
           {Object.entries(carry_differentials).map(([pair, val]) => (
             <div key={pair} className="flex justify-between px-3 py-2 rounded bg-background border border-border/50" data-prov={`carry_differentials.${pair}`} data-prov-ctx={pair}>
@@ -520,7 +523,7 @@ function SovereignRiskTab() {
   });
   const scope = useSourceScope(provOf(data));
 
-  if (isLoading) return <div className="p-8 text-muted">Loading sovereign risk data…</div>;
+  if (isLoading) return <div className="p-8 text-text-muted">Loading sovereign risk data…</div>;
   if (error || !data) return <div className="p-8 text-red-400">Failed to load sovereign data.</div>;
 
   const { countries, top_risk, bottom_risk } = data;
@@ -561,7 +564,7 @@ function SovereignRiskTab() {
       </div>
 
       <UiCard className="p-4">
-        <h2 className="text-sm font-medium mb-4 text-muted">All Countries — Sovereign Risk</h2>
+        <h2 className="text-sm font-medium mb-4 text-text-muted">All Countries — Sovereign Risk</h2>
         <SovereignSpreadTable countries={countries} />
       </UiCard>
     </div>
@@ -576,7 +579,7 @@ function DefaultRiskTab() {
   });
   const scope = useSourceScope(provOf(data));
 
-  if (isLoading) return <div className="p-8 text-muted">Computing default probabilities…</div>;
+  if (isLoading) return <div className="p-8 text-text-muted">Computing sovereign risk scores…</div>;
   if (error || !data) return <div className="p-8 text-red-400">Failed to load default model.</div>;
   if (data.error) return <div className="p-8 text-amber-400">{data.error}</div>;
 
@@ -588,14 +591,14 @@ function DefaultRiskTab() {
     <div className="space-y-6" {...scope}>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <KpiCard prov="countries" label="Countries" value={String(countries.length)} />
-        <KpiCard prov="countries" label="High Risk" value={String(redCount)} badge=">20%" />
-        <KpiCard prov="countries" label="Medium Risk" value={String(yellowCount)} badge="5-20%" />
+        <KpiCard prov="countries" label="High Risk" value={String(redCount)} badge="score ≥ 20" />
+        <KpiCard prov="countries" label="Medium Risk" value={String(yellowCount)} badge="score 5–20" />
         <KpiCard prov="model" label="Pseudo R²" value={model?.pseudoR2?.toFixed(3) ?? "—"} />
       </div>
 
       {model && (
         <UiCard className="p-4" data-prov="model">
-          <h2 className="text-sm font-medium mb-3 text-muted">Model Summary · {model.nObs} observations</h2>
+          <h2 className="text-sm font-medium mb-3 text-text-muted">Model Summary · {model.nObs} observations</h2>
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
@@ -624,26 +627,30 @@ function DefaultRiskTab() {
       )}
 
       <UiCard className="p-4">
-        <h2 className="text-sm font-medium mb-3 text-muted">Default Probabilities · sorted by 5Y risk</h2>
+        <h2 className="text-sm font-medium mb-1 text-text-muted">Relative Default Risk · sorted by score</h2>
+        <p className="text-xs text-text-muted mb-3">
+          Score 0–100 from a weakly calibrated logistic model (few post-2000 default episodes in its training set).
+          Read it as a ranking, not a default probability.
+        </p>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-text-secondary border-b border-border text-xs">
-                <th className="py-2 text-left">Country</th>
-                <th className="py-2 text-right">1Y Prob</th>
-                <th className="py-2 text-right">5Y Prob</th>
+                <th className="py-2 text-right">Rank</th>
+                <th className="py-2 text-left pl-3">Country</th>
+                <th className="py-2 text-right">Risk score</th>
                 <th className="py-2 text-center">Signal</th>
               </tr>
             </thead>
             <tbody>
               {countries.map((c) => (
                 <tr key={c.iso3} className="border-b border-border/30 hover:bg-surface-alt/50" data-prov="countries" data-prov-ctx={c.name}>
-                  <td className="py-1.5">
+                  <td className="py-1.5 text-right font-mono">{c.rank}</td>
+                  <td className="py-1.5 pl-3">
                     <span className="font-mono text-xs text-text-muted mr-2">{c.iso3}</span>
                     {c.name}
                   </td>
-                  <td className="py-1.5 text-right font-mono">{(c.prob1y * 100).toFixed(1)}%</td>
-                  <td className="py-1.5 text-right font-mono">{(c.prob5y * 100).toFixed(1)}%</td>
+                  <td className="py-1.5 text-right font-mono">{c.score.toFixed(1)}</td>
                   <td className="py-1.5 text-center">
                     <span className={`inline-block w-3 h-3 rounded-full ${
                       c.signal === "red" ? "bg-red-500" : c.signal === "yellow" ? "bg-amber-500" : "bg-green-500"
@@ -661,7 +668,7 @@ function DefaultRiskTab() {
 
 export default function YieldPage() {
   return (
-    <Suspense fallback={<div className="p-8 text-muted">Loading…</div>}>
+    <Suspense fallback={<div className="p-8 text-text-muted">Loading…</div>}>
       <YieldPageInner />
     </Suspense>
   );

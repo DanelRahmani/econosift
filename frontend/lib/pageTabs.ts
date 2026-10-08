@@ -45,9 +45,3 @@ export const MACRO_TABS = [
   { id: "sentiment", label: "Sentiment & Positioning" },
 ] as const;
 
-export const POLICY_TABS = [
-  { id: "policy", label: "Policy Tracker" },
-  { id: "sovereign", label: "Sovereign Risk" },
-  { id: "centralbanks", label: "Central Banks" },
-  { id: "default", label: "Default Risk" },
-] as const;

@@ -32,15 +32,15 @@ export function SectorReturnsChart({ data, onSectorClick }: Props) {
         <XAxis
           type="number"
           tickFormatter={(v: number) => `${v > 0 ? "+" : ""}${v.toFixed(1)}%`}
-          tick={{ fontSize: 11, fill: "var(--color-text-muted)" }}
-          stroke="var(--color-border)"
+          tick={{ fontSize: 11, fill: "rgb(var(--text-muted))" }}
+          stroke="rgb(var(--border))"
         />
         <YAxis
           type="category"
           dataKey="sector"
           width={140}
-          tick={{ fontSize: 12, fill: "var(--color-text-muted)" }}
-          stroke="var(--color-border)"
+          tick={{ fontSize: 12, fill: "rgb(var(--text-muted))" }}
+          stroke="rgb(var(--border))"
         />
         <Tooltip
           formatter={(v: number) => [`${v > 0 ? "+" : ""}${v.toFixed(2)}%`, "Return"]}

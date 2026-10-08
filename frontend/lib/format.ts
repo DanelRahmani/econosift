@@ -81,8 +81,8 @@ export const CURRENCY_SYMBOLS: Record<string, string> = {
   CHF: "Fr", CAD: "C$", AUD: "A$", INR: "₹", KRW: "₩",
 };
 
-export function currencySymbol(code: string | undefined): string {
-  if (!code) return "$";
+export function currencySymbol(code: string | null | undefined): string {
+  if (!code) return "";  // unknown currency: no symbol, never an assumed "$"
   return CURRENCY_SYMBOLS[code] || `${code} `;
 }
 
