@@ -57,20 +57,21 @@ import { REFRESH_HEADER, requestDone, requestStarted } from "./refresh";
 // sets NEXT_PUBLIC_API_URL=http://localhost:8000 in .env.production.
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
-async function get<T>(path: string): Promise<T> {
+async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
   const refreshing = requestStarted();
   let data: unknown;
   try {
-    data = await getJson(path, refreshing);
+    data = await getJson(path, refreshing, signal);
     return data as T;
   } finally {
     requestDone(refreshing, data);
   }
 }
 
-async function getJson(path: string, refreshing: boolean): Promise<unknown> {
+async function getJson(path: string, refreshing: boolean, signal?: AbortSignal): Promise<unknown> {
   const res = await fetch(`${API_BASE}/api${path}`, {
     cache: "no-store",
+    signal,
     headers: refreshing ? { [REFRESH_HEADER]: "1" } : undefined,
   });
   if (!res.ok) {
@@ -120,10 +121,10 @@ export const api = {
   quote: (ticker: string) =>
     get<Quote>(`/market/quote/${encodeURIComponent(ticker)}`),
 
-  risk: (tickers: string, period: string, riskFree?: number, benchmark?: string) =>
+  risk: (tickers: string, period: string, riskFree?: number, benchmark?: string, signal?: AbortSignal) =>
     get<RiskResponse>(`/market/risk?tickers=${encodeURIComponent(tickers)}&period=${period}` +
       (riskFree != null ? `&risk_free=${riskFree}` : "") +
-      (benchmark ? `&benchmark=${encodeURIComponent(benchmark)}` : "")),
+      (benchmark ? `&benchmark=${encodeURIComponent(benchmark)}` : ""), signal),
 
   valuation: (
     tickers: string, period: string,
@@ -286,21 +287,24 @@ export const api = {
     post<{ index: string; started: boolean }>(`/screener/refresh?index=${index}`, {}),
 
   // --- Phase 6: Risk & Rolling Metrics ---
-  riskRolling: (tickers: string, period: string, window: number, benchmark?: string) =>
+  riskRolling: (tickers: string, period: string, window: number, benchmark?: string, signal?: AbortSignal) =>
     get<RollingMetricsResponse>(
       `/risk/rolling?tickers=${encodeURIComponent(tickers)}&period=${period}&window=${window}` +
-      (benchmark ? `&benchmark=${encodeURIComponent(benchmark)}` : "")
+      (benchmark ? `&benchmark=${encodeURIComponent(benchmark)}` : ""),
+      signal,
     ),
 
-  riskExtended: (tickers: string, period: string, benchmark?: string) =>
+  riskExtended: (tickers: string, period: string, benchmark?: string, signal?: AbortSignal) =>
     get<ExtendedRiskResponse>(
       `/risk/extended?tickers=${encodeURIComponent(tickers)}&period=${period}` +
-      (benchmark ? `&benchmark=${encodeURIComponent(benchmark)}` : "")
+      (benchmark ? `&benchmark=${encodeURIComponent(benchmark)}` : ""),
+      signal,
     ),
 
-  riskCorrelation: (tickers: string, period: string, window: number) =>
+  riskCorrelation: (tickers: string, period: string, window: number, signal?: AbortSignal) =>
     get<CorrelationResponse>(
-      `/risk/correlation?tickers=${encodeURIComponent(tickers)}&period=${period}&window=${window}`
+      `/risk/correlation?tickers=${encodeURIComponent(tickers)}&period=${period}&window=${window}`,
+      signal,
     ),
 
   riskGarch: (ticker: string, period = "2y") =>

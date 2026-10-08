@@ -24,6 +24,8 @@ export function CommandPalette() {
   const [wiki, setWiki] = useState<CommandItem[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const requestId = useRef(0);
+  const openRef = useRef(open);
+  openRef.current = open;
 
   const close = useCallback(() => {
     setOpen(false);
@@ -39,6 +41,11 @@ export function CommandPalette() {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
         setOpen((v) => !v);
+      } else if (e.key === "Escape" && openRef.current) {
+        // Here rather than on the input: focus moves into the input a tick after opening, and Esc
+        // must close the dialog whatever has focus (the button that opened it, or the list).
+        e.preventDefault();
+        close();
       }
     }
     function onOpen() {
@@ -50,7 +57,7 @@ export function CommandPalette() {
       window.removeEventListener("keydown", onKey);
       window.removeEventListener(OPEN_COMMAND_PALETTE, onOpen);
     };
-  }, []);
+  }, [close]);
 
   useEffect(() => {
     if (open) setTimeout(() => inputRef.current?.focus(), 0);
@@ -126,9 +133,6 @@ export function CommandPalette() {
     } else if (e.key === "Enter") {
       e.preventDefault();
       go(items[active]);
-    } else if (e.key === "Escape") {
-      e.preventDefault();
-      close();
     }
   }
 
