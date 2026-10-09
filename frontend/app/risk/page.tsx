@@ -82,55 +82,58 @@ function RiskPageInner() {
   const [corrLoading, setCorrLoading] = useState(false);
 
   // Fetch base risk (for KPI row)
-  const fetchBase = useCallback(async () => {
+  const fetchBase = useCallback(async (signal: AbortSignal) => {
     if (!tickersStr.trim()) return;
     setBaseLoading(true);
     try {
-      const res = await api.risk(tickersStr, "1y", 0.04, benchmark || undefined);
+      const res = await api.risk(tickersStr, "1y", 0.04, benchmark || undefined, signal);
       setBaseMetrics(res.metrics);
       setBaseProv(provOf(res));
     } catch {
+      if (signal.aborted) return;
       setBaseMetrics([]);
       setBaseProv(undefined);
     } finally {
-      setBaseLoading(false);
+      if (!signal.aborted) setBaseLoading(false);
     }
   }, [tickersStr, benchmark]);
 
   // Fetch rolling
-  const fetchRolling = useCallback(async () => {
+  const fetchRolling = useCallback(async (signal: AbortSignal) => {
     if (!tickersStr.trim()) return;
     setRollingLoading(true);
     try {
-      const res: RollingMetricsResponse = await api.riskRolling(tickersStr, period, window, benchmark || undefined);
+      const res: RollingMetricsResponse = await api.riskRolling(tickersStr, period, window, benchmark || undefined, signal);
       setRollingData(res.tickers ?? []);
       setRollingProv(provOf(res));
     } catch {
+      if (signal.aborted) return;
       setRollingData([]);
       setRollingProv(undefined);
     } finally {
-      setRollingLoading(false);
+      if (!signal.aborted) setRollingLoading(false);
     }
   }, [tickersStr, period, window, benchmark]);
 
   // Fetch extended
-  const fetchExtended = useCallback(async () => {
+  const fetchExtended = useCallback(async (signal: AbortSignal) => {
     if (!tickersStr.trim()) return;
     setExtendedLoading(true);
     try {
-      const res: ExtendedRiskResponse = await api.riskExtended(tickersStr, period, benchmark || undefined);
+      const res: ExtendedRiskResponse = await api.riskExtended(tickersStr, period, benchmark || undefined, signal);
       setExtendedData(res.tickers ?? []);
       setExtendedProv(provOf(res));
     } catch {
+      if (signal.aborted) return;
       setExtendedData([]);
       setExtendedProv(undefined);
     } finally {
-      setExtendedLoading(false);
+      if (!signal.aborted) setExtendedLoading(false);
     }
   }, [tickersStr, period, benchmark]);
 
   // Fetch correlation
-  const fetchCorr = useCallback(async () => {
+  const fetchCorr = useCallback(async (signal: AbortSignal) => {
     const tickers = tickersStr.split(",").map((t) => t.trim()).filter(Boolean);
     if (tickers.length < 2) {
       setCorrData(null);
@@ -138,21 +141,26 @@ function RiskPageInner() {
     }
     setCorrLoading(true);
     try {
-      const res = await api.riskCorrelation(tickersStr, period, window);
+      const res = await api.riskCorrelation(tickersStr, period, window, signal);
       setCorrData(res);
     } catch {
+      if (signal.aborted) return;
       setCorrData(null);
     } finally {
-      setCorrLoading(false);
+      if (!signal.aborted) setCorrLoading(false);
     }
   }, [tickersStr, period, window]);
 
   const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
   useEffect(() => {
-    fetchBase();
-    fetchRolling();
-    fetchExtended();
-    fetchCorr();
+    // Cancel the requests a new period/ticker/window supersedes: left running on a slow backend they
+    // hold the browser's 6 connections to this origin and the next ?p= navigation never starts.
+    const ctrl = new AbortController();
+    fetchBase(ctrl.signal);
+    fetchRolling(ctrl.signal);
+    fetchExtended(ctrl.signal);
+    fetchCorr(ctrl.signal);
+    return () => ctrl.abort();
   }, [fetchBase, fetchRolling, fetchExtended, fetchCorr, refreshNonce]);
 
   const primaryTicker = tickersStr.split(",")[0].trim().toUpperCase() || "AAPL";
