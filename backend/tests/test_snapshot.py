@@ -16,9 +16,13 @@ TS = int(datetime(2026, 10, 14, 16, 0, tzinfo=ET).timestamp())
 def _clean():
     store.init_schema()
     with store.connect() as conn:
-        for t in ("fetch_queue", "security", "price_daily", "quote_latest", "quote_intraday"):
+        for t in ("fetch_queue", "security", "price_daily", "quote_latest", "quote_intraday",
+                  "index_membership"):
             conn.execute(f"DELETE FROM {t}")
-        conn.executemany("INSERT INTO security (symbol) VALUES (?)", [("AAA",), ("BBB",), ("CCC",)])
+        conn.executemany("INSERT INTO security (symbol, history_at) VALUES (?, 'x')",
+                         [("AAA",), ("BBB",), ("CCC",)])
+        conn.executemany("INSERT INTO index_membership (index_name, symbol, start) VALUES ('sp500', ?, '')",
+                         [("AAA",), ("BBB",), ("CCC",)])
     yield
 
 
@@ -51,7 +55,8 @@ def test_screen_pages_until_the_universe_is_covered():
 def test_close_snapshot_writes_quotes_intraday_bar_and_fills_missing_members():
     fake, _ = _fake_screen([[_quote("AAA", 10), _quote("BBB", 20)], []])
     filled = [dict({c: None for c in snapshot.FIELDS}, symbol="CCC", price=30.0, open=29.0,
-                   high=31.0, low=28.0, volume=500.0, ts=TS, market_state=None, source="yahoo_chart")]
+                   high=31.0, low=28.0, volume=500.0, ts=TS, market_state=None, source="yahoo_chart",
+                   currency=None, name=None)]
     with patch("yfinance.screen", side_effect=fake), \
          patch.object(snapshot, "download_quotes", return_value=filled) as dl:
         assert snapshot.run("close") == 3
@@ -66,6 +71,19 @@ def test_close_snapshot_writes_quotes_intraday_bar_and_fills_missing_members():
     assert bars.iloc[0].tolist() == [10.0, 30.0]
 
 
+def test_the_close_pass_covers_every_stored_symbol_and_intraday_only_members():
+    with store.connect() as conn:
+        conn.execute("INSERT INTO security (symbol, history_at) VALUES ('EURUSD=X', 'x')")
+        conn.execute("INSERT INTO security (symbol) VALUES ('NOHIST')")  # queued, not stored yet
+    fake, _ = _fake_screen([[_quote("AAA", 10), _quote("BBB", 20), _quote("CCC", 30)], [], []])
+    with patch("yfinance.screen", side_effect=fake), \
+         patch.object(snapshot, "download_quotes", return_value=[]) as dl:
+        snapshot.run("close")
+        snapshot.run("intraday")
+    assert dl.call_args_list[0].args == (["EURUSD=X"],)
+    assert dl.call_args_list[1].args == (sorted(fetcher.INTRADAY_EXTRAS),)
+
+
 def test_intraday_snapshot_does_not_write_a_daily_bar():
     fake, _ = _fake_screen([[_quote("AAA", 10), _quote("BBB", 20), _quote("CCC", 30)]])
     with patch("yfinance.screen", side_effect=fake):
@@ -78,7 +96,8 @@ def test_a_failed_screen_falls_back_to_chart_downloads_for_everyone():
          patch.object(snapshot, "download_quotes", return_value=[]) as dl, \
          pytest.raises(RuntimeError):
         snapshot.run("intraday")
-    dl.assert_called_once_with(["AAA", "BBB", "CCC"])
+    # Intraday: the index members plus the dashboard's index levels.
+    dl.assert_called_once_with(sorted(["AAA", "BBB", "CCC", *fetcher.INTRADAY_EXTRAS]))
     with store.connect() as conn:  # nothing stored from an empty result
         assert conn.execute("SELECT COUNT(*) FROM quote_latest").fetchone()[0] == 0
 

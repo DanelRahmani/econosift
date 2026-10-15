@@ -117,13 +117,13 @@ def test_universe_stores_rosters_and_queues_missing_history():
         conn.execute("INSERT INTO security (symbol, history_at) VALUES ('BBB', '2026-10-01T00:00:00Z')")
     with patch("backend.services.constituents.get_constituents", side_effect=lambda i: members[i]), \
          patch("backend.services.constituents.get_membership_changes", return_value=[]):
-        assert fetcher.run_universe("all") == 3
+        assert fetcher.run_universe("all") == 3 + len(fetcher.INTRADAY_EXTRAS)
     with store.connect() as conn:
-        assert conn.execute("SELECT symbol, sector FROM security ORDER BY symbol").fetchall() == [
-            ("AAA", "Tech"), ("BBB", "Energy"), ("CCC", "Health")]
+        assert conn.execute("SELECT symbol, sector FROM security WHERE symbol NOT LIKE '^%' "
+                            "ORDER BY symbol").fetchall() == [("AAA", "Tech"), ("BBB", "Energy"), ("CCC", "Health")]
         assert conn.execute("SELECT COUNT(*) FROM index_membership").fetchone()[0] == 4
-    assert [k for _, k, _ in _queue()] == ["AAA", "CCC"]
-    assert fetcher.status()["backfill"] == {"total": 3, "done": 1}
+    assert sorted(k for _, k, _ in _queue()) == sorted(["AAA", "CCC", *fetcher.INTRADAY_EXTRAS])
+    assert fetcher.status()["backfill"] == {"total": 3 + len(fetcher.INTRADAY_EXTRAS), "done": 1}
     assert fetcher._last_success("constituents") is not None
 
 
@@ -145,6 +145,26 @@ def test_history_rotation_queues_one_fifth_per_weekday():
         conn.execute("DELETE FROM fetch_queue")
     fetcher.queue_history_rotation(datetime(2026, 10, 17, tzinfo=timezone.utc))  # Saturday
     assert _queue() == []
+
+
+def test_request_history_queues_only_unstored_symbols_and_leaves_failures_alone():
+    with store.connect() as conn:
+        conn.execute("INSERT INTO security (symbol, history_at) VALUES ('HAVE', 'x')")
+    assert fetcher.request_history(["HAVE", "NEW", "BAD"]) == ["NEW", "BAD"]
+    with store.connect() as conn:
+        conn.execute(f"UPDATE fetch_queue SET attempts = {fetcher.MAX_ATTEMPTS} WHERE key = 'BAD'")
+    fetcher.request_history(["BAD"])  # a page asking again must not retry a symbol Yahoo lacks
+    assert ("history", "BAD", fetcher.MAX_ATTEMPTS) in _queue()
+    with store.connect() as conn:
+        assert {p for p, in conn.execute("SELECT priority FROM fetch_queue")} == {fetcher.PRIORITY_ON_DEMAND}
+
+
+def test_snapshot_task_clears_the_intraday_page_caches():
+    cleared = []
+    with patch("backend.snapshot.run", return_value=5), \
+         patch("backend.cache.clear_all", side_effect=cleared.append):
+        assert fetcher.run_snapshot("intraday") == 5
+    assert cleared == list(fetcher.SNAPSHOT_CACHES)
 
 
 def test_source_health_counts_todays_yahoo_requests():

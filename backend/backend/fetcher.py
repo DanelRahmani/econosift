@@ -31,7 +31,17 @@ INDEXES = ("sp500", "ndx", "dow")
 PRIORITY_SNAPSHOT = 0
 PRIORITY_UNIVERSE = 1
 PRIORITY_REFETCH = 2    # history whose stored closes no longer match (a split)
+PRIORITY_ON_DEMAND = 3  # a symbol a page asked for that is not stored yet
 PRIORITY_HISTORY = 5
+
+# Index levels the dashboard shows intraday; yf.screen covers equities only,
+# so these are filled by chart calls in every snapshot (4 calls a run).
+INTRADAY_EXTRAS = {"^GSPC": "S&P 500", "^NDX": "Nasdaq 100", "^DJI": "Dow Jones Industrial Average",
+                   "^VIX": "CBOE Volatility Index"}
+
+# Page caches built from the store's intraday data: a snapshot clears them so
+# pages show the new quotes instead of an hour-old computation.
+SNAPSHOT_CACHES = ("treemap", "movers", "indices", "feargreed", "breadth", "sector_returns")
 
 
 def _now() -> str:
@@ -42,16 +52,36 @@ def _now() -> str:
 # Queue
 # ---------------------------------------------------------------------------
 
-def enqueue(kind: str, key: str, priority: int = PRIORITY_HISTORY) -> None:
-    """Queue a task once; a task already queued keeps its place (and resets if it had failed)."""
+def enqueue(kind: str, key: str, priority: int = PRIORITY_HISTORY, retry_failed: bool = True) -> None:
+    """Queue a task once; a task already queued keeps its place. A failed one is
+    retried only with ``retry_failed``, so pages asking for a symbol Yahoo
+    doesn't have never re-trigger its fetch."""
+    reset = "attempts = 0, last_error = NULL, " if retry_failed else ""
     with store.connect() as conn:
         conn.execute(
             "INSERT INTO fetch_queue (kind, key, priority, created_at) VALUES (?, ?, ?, ?) "
-            "ON CONFLICT (kind, key) DO UPDATE SET attempts = 0, last_error = NULL, "
-            "priority = MIN(priority, excluded.priority)",
+            f"ON CONFLICT (kind, key) DO UPDATE SET {reset}priority = MIN(priority, excluded.priority)",
             (kind, key, priority, _now()),
         )
     _wake.set()
+
+
+def request_history(symbols) -> list[str]:
+    """Queue history for requested symbols that aren't stored; returns those symbols.
+
+    Called on the read path: it only writes the queue, never calls a source.
+    """
+    syms = list(dict.fromkeys(symbols))
+    if not syms:
+        return []
+    with store.connect() as conn:
+        have = {r[0] for r in conn.execute(
+            f"SELECT symbol FROM security WHERE history_at IS NOT NULL AND symbol IN "
+            f"({', '.join('?' * len(syms))})", syms)}
+    missing = [s for s in syms if s not in have]
+    for sym in missing:
+        enqueue("history", sym, PRIORITY_ON_DEMAND, retry_failed=False)
+    return missing
 
 
 def _next_task() -> tuple[int, str, str] | None:
@@ -118,6 +148,8 @@ def run_universe(_key: str) -> int:
         for sym, start, end in membership_intervals([m["symbol"] for m in members], changes):
             membership.append(dict(index_name=index, symbol=sym, start=start, end=end))
 
+    for sym, name in INTRADAY_EXTRAS.items():
+        securities.setdefault(sym, dict(symbol=sym, name=name, sector=None, industry=None))
     store.upsert("security", list(securities.values()), ("symbol",))
     with store.connect() as conn:
         conn.execute("DELETE FROM index_membership")
@@ -165,8 +197,11 @@ def run_history(symbol: str) -> int:
 
 
 def run_snapshot(key: str) -> int:
-    from . import snapshot
-    return snapshot.run(key)
+    from . import cache, snapshot
+    rows = snapshot.run(key)
+    for name in SNAPSHOT_CACHES:
+        cache.clear_all(name)
+    return rows
 
 
 HANDLERS: dict[str, Callable[[str], int]] = {

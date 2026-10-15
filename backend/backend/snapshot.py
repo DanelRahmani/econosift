@@ -76,7 +76,8 @@ def _row_from_screen(q: dict) -> dict:
     row = {col: _num(q.get(key)) for col, key in FIELDS.items()}
     ts = q.get("regularMarketTime")
     row.update(symbol=q["symbol"], ts=int(ts) if _num(ts) is not None else None,
-               market_state=q.get("marketState"), source="yahoo_screen")
+               market_state=q.get("marketState"), source="yahoo_screen", currency=q.get("currency"),
+               name=q.get("shortName") or q.get("longName"))
     return row
 
 
@@ -103,7 +104,7 @@ def download_quotes(symbols: list[str]) -> list[dict]:
             row.update(symbol=sym, price=_num(bars["Close"].iloc[-1]), open=_num(bars["Open"].iloc[0]),
                        high=_num(bars["High"].max()), low=_num(bars["Low"].min()),
                        volume=_num(bars["Volume"].sum()), ts=int(bars.index[-1].timestamp()),
-                       market_state=None, source="yahoo_chart")
+                       market_state=None, source="yahoo_chart", currency=None, name=None)
             rows.append(row)
     return rows
 
@@ -130,9 +131,20 @@ def _check_splits(rows: list[dict]) -> list[str]:
 
 
 def run(key: str) -> int:
-    """``key`` is 'intraday' or 'close' (also writes today's daily bar)."""
+    """``key`` is 'intraday' or 'close' (also writes today's daily bar).
+
+    Intraday covers the index members and the dashboard's index levels; the
+    close pass covers every stored symbol (ETFs, FX, other indices a page
+    asked for), so each gets today's bar once a day.
+    """
+    from .fetcher import INTRADAY_EXTRAS
+
     with store.connect() as conn:
-        universe = {r[0] for r in conn.execute("SELECT symbol FROM security")}
+        if key == "close":
+            universe = {r[0] for r in conn.execute("SELECT symbol FROM security WHERE history_at IS NOT NULL")}
+        else:
+            universe = {r[0] for r in conn.execute("SELECT symbol FROM index_membership WHERE end IS NULL")}
+            universe |= set(INTRADAY_EXTRAS)
     if not universe:
         raise RuntimeError("no universe yet")
 

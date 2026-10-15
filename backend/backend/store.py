@@ -79,7 +79,9 @@ CREATE TABLE IF NOT EXISTS quote_latest (
     avg_vol_10d REAL,
     market_state TEXT,
     source      TEXT,
-    fetched_at  TEXT
+    fetched_at  TEXT,
+    currency    TEXT,
+    name        TEXT
 );
 CREATE TABLE IF NOT EXISTS quote_intraday (
     symbol  TEXT NOT NULL,
@@ -195,10 +197,20 @@ def connect() -> Iterator:
         conn.close()
 
 
+# Columns added after a table was first created; CREATE TABLE IF NOT EXISTS
+# does not add them to a database built by an earlier version.
+_ADDED_COLUMNS = {"quote_latest": {"currency": "TEXT", "name": "TEXT"}}
+
+
 def init_schema() -> None:
     """Create the market-data tables. Idempotent (CREATE ... IF NOT EXISTS)."""
     with connect() as conn:
         conn.executescript(SCHEMA)
+        for table, cols in _ADDED_COLUMNS.items():
+            have = {r[1] for r in conn.execute(f"PRAGMA table_info({table})")}
+            for col, ddl in cols.items():
+                if col not in have:
+                    conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {ddl}")
 
 
 def upsert(table: str, rows: Sequence[dict], key: Sequence[str]) -> int:
@@ -221,20 +233,21 @@ def upsert(table: str, rows: Sequence[dict], key: Sequence[str]) -> int:
     return len(rows)
 
 
-def prices(symbols: Iterable[str], start: str | None = None, end: str | None = None,
-           field: str = "adj_close") -> pd.DataFrame:
-    """One ``price_daily`` column as a wide frame: DatetimeIndex x symbol.
+def frames(symbols: Iterable[str], fields: Sequence[str], start: str | None = None,
+           end: str | None = None) -> dict[str, pd.DataFrame]:
+    """Several ``price_daily`` columns from one query, each a wide frame:
+    DatetimeIndex x symbol. ``start``/``end`` are inclusive ISO dates.
 
-    ``start``/``end`` are inclusive ISO dates. Symbols with no stored rows are
-    left out, so callers can tell missing data from a flat price. Returns an
-    empty frame when nothing is stored.
+    Symbols with no stored rows are left out, so callers can tell missing data
+    from a flat price. Every frame is empty when nothing is stored.
     """
-    if field not in PRICE_FIELDS:
-        raise ValueError(f"unknown price field {field!r}")
+    bad = [f for f in fields if f not in PRICE_FIELDS]
+    if bad:
+        raise ValueError(f"unknown price field {bad[0]!r}")
     syms = list(dict.fromkeys(symbols))
     if not syms:
-        return pd.DataFrame()
-    sql = (f"SELECT symbol, date, {field} FROM price_daily "
+        return {f: pd.DataFrame() for f in fields}
+    sql = (f"SELECT symbol, date, {', '.join(fields)} FROM price_daily "
            f"WHERE symbol IN ({', '.join('?' * len(syms))})")
     params: list = list(syms)
     if start:
@@ -246,12 +259,33 @@ def prices(symbols: Iterable[str], start: str | None = None, end: str | None = N
     with connect() as conn:
         rows = conn.execute(sql, params).fetchall()
     if not rows:
-        return pd.DataFrame()
-    df = pd.DataFrame(rows, columns=["symbol", "date", field])
-    wide = df.pivot(index="date", columns="symbol", values=field)
-    wide.index = pd.to_datetime(wide.index)
-    wide.columns.name = None
-    return wide[[s for s in syms if s in wide.columns]].sort_index()
+        return {f: pd.DataFrame() for f in fields}
+    df = pd.DataFrame(rows, columns=["symbol", "date", *fields])
+    df["date"] = pd.to_datetime(df["date"])
+    out = {}
+    for f in fields:
+        wide = df.pivot(index="date", columns="symbol", values=f)
+        wide.columns.name = None
+        wide.index.name = None
+        out[f] = wide[[s for s in syms if s in wide.columns]].sort_index()
+    return out
+
+
+def prices(symbols: Iterable[str], start: str | None = None, end: str | None = None,
+           field: str = "adj_close") -> pd.DataFrame:
+    """One ``price_daily`` column as a wide frame (see :func:`frames`)."""
+    return frames(symbols, (field,), start, end)[field]
+
+
+def quotes(symbols: Iterable[str]) -> dict[str, dict]:
+    """``quote_latest`` rows by symbol, for the symbols that have one."""
+    syms = list(dict.fromkeys(symbols))
+    if not syms:
+        return {}
+    with connect() as conn:
+        cur = conn.execute(f"SELECT * FROM quote_latest WHERE symbol IN ({', '.join('?' * len(syms))})", syms)
+        cols = [d[0] for d in cur.description]
+        return {r[0]: dict(zip(cols, r)) for r in cur.fetchall()}
 
 
 def records(df: pd.DataFrame, cols: Sequence[str]) -> list[tuple]:
