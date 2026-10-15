@@ -101,8 +101,9 @@ with `CREATE TABLE IF NOT EXISTS` at startup, and there is no migration tooling.
 ### 2.2 The fetcher — how we stop flooding Yahoo
 
 A single scheduler thread owns all external calls, with a **global token bucket per source**
-(set from the 65.0 measurements, §8.2: **Yahoo 2 requests/s, burst 4, with jitter**. 100 chart
-calls ran clean at 3/s, so this leaves a third of headroom. **SEC 5/s**, half its 10/s limit).
+(set from the measurements in §8.2: **Yahoo chart 8 requests/s, burst 16** (clean at 10/s);
+**Yahoo API** (quoteSummary/quote/options/screen/crumb) **2/s, burst 4**; **SEC 5/s**, half its
+10/s limit).
 It slows down
 exponentially on HTTP 429 and opens a **circuit breaker** after repeated failures, so a source
 that is down is skipped for N minutes instead of being retried on every page.
@@ -293,6 +294,14 @@ symbols** (the app's own `constituents.py`). Throwaway scripts; nothing committe
   app sees come from volume (thousands of `.info` calls at boot), not from per-second rate. Set the
   bucket to **2/s, burst 4**, with exponential backoff and the circuit breaker on any 429. Don't
   probe higher rates: the first 429 can lead to a long IP block.
+- **Phase 65 gate correction (2026-10-15).** One shared 2/s bucket made cold pages much slower
+  than before (quote/AAPL 0.2 s → 71 s; movers, Fear & Greed, sectors, prices and risk timed out),
+  because the cold breadth/treemap fan-outs need ~500 chart calls each and every other Yahoo call
+  queued behind them. A second probe from the backend image (yfinance 1.7.0), concurrent and
+  stopping at the first 429: **chart 150 calls at 5/s and 200 at 10/s, all clean** (p50 0.29 s);
+  **`.info` 40 calls at 2/s, clean**. So Yahoo now has two buckets, each with its own breaker:
+  chart **8/s, burst 16**; everything else **2/s, burst 4**. Rates above 10/s weren't probed.
+- The backend image runs yfinance **1.7.0** (65.0's local probes used 1.5.1; same endpoints).
 - SEC: ~35 calls at ≤5/s with the owner's `EDGAR_IDENTITY` as the User-Agent: no throttling. Keep 5/s.
 
 ### 8.3 SEC coverage (S&P 500, 503 CIKs)
