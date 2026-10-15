@@ -28,6 +28,13 @@ if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
 
+@pytest.fixture(scope="session", autouse=True)
+def _store_schema():
+    """Create econosift.db's tables once: services read them without the app's lifespan."""
+    from backend import store
+    store.init_schema()
+
+
 @pytest.fixture(autouse=True)
 def _fresh_caches():
     """Reset both cache tiers before each test.
