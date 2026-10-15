@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { api } from "@/lib/api";
+import { useCallback, useMemo, useState } from "react";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
+import { apiQuery } from "@/lib/queries";
 import { Card, Skeleton } from "@/components/ui";
 import { WorldMap } from "@/components/atlas/WorldMap";
 import { IndicatorSelector } from "@/components/atlas/IndicatorSelector";
@@ -13,8 +14,7 @@ import { RankingTable } from "@/components/atlas/RankingTable";
 import { buildAtlasScale } from "@/lib/atlasScale";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
-import type { AtlasIndicator, AtlasRegion, AtlasTimelineResponse } from "@/lib/types";
-import { useRefreshNonce } from "@/lib/refresh";
+import type { AtlasIndicator, AtlasRegion } from "@/lib/types";
 
 const DEFAULT_INDICATOR = "gdp_growth";
 const YEAR_MIN = 2000;
@@ -24,45 +24,31 @@ const YEAR_MAX = new Date().getFullYear() - 1;
 const DEFAULT_YEAR = YEAR_MAX - 1;
 
 export default function AtlasPage() {
-  const [indicators, setIndicators] = useState<AtlasIndicator[]>([]);
-  const [regions, setRegions] = useState<AtlasRegion[]>([]);
-  const [timeline, setTimeline] = useState<AtlasTimelineResponse | null>(null);
-  const [loadingMeta, setLoadingMeta] = useState(true);
-  const [loadingTimeline, setLoadingTimeline] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const [indicator, setIndicator] = useState(DEFAULT_INDICATOR);
   const [year, setYear] = useState(DEFAULT_YEAR);
   const [region, setRegion] = useState("World");
   const [playing, setPlaying] = useState(false);
+
+  // Indicators + regions load once; the timeline whenever the indicator changes
+  // (the previous indicator's map stays on screen until the new one arrives).
+  const indicatorsQ = useQuery(apiQuery("atlasIndicators"));
+  const regionsQ = useQuery(apiQuery("atlasRegions"));
+  const timelineQ = useQuery({
+    ...apiQuery("atlasTimeline", indicator, YEAR_MIN, YEAR_MAX),
+    placeholderData: keepPreviousData,
+  });
+  const indicators = useMemo<AtlasIndicator[]>(() => indicatorsQ.data?.indicators ?? [], [indicatorsQ.data]);
+  const regions = useMemo<AtlasRegion[]>(() => regionsQ.data?.regions ?? [], [regionsQ.data]);
+  const timeline = timelineQ.data ?? null;
+  const loadingMeta = indicatorsQ.isLoading || regionsQ.isLoading;
+  const loadingTimeline = timelineQ.isFetching;
+  const error = timelineQ.isError
+    ? `Failed to load data for ${indicator}`
+    : indicatorsQ.isError || regionsQ.isError
+      ? "Failed to load atlas metadata"
+      : null;
   const scope = useSourceScope(provOf(timeline));
-
-  // Fetch indicators + regions once on mount
-  useEffect(() => {
-    let alive = true;
-    Promise.all([api.atlasIndicators(), api.atlasRegions()])
-      .then(([ind, reg]) => {
-        if (!alive) return;
-        setIndicators(ind.indicators);
-        setRegions(reg.regions);
-      })
-      .catch(() => alive && setError("Failed to load atlas metadata"))
-      .finally(() => alive && setLoadingMeta(false));
-    return () => { alive = false; };
-  }, []);
-
-  // Fetch timeline whenever indicator changes
-  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
-  useEffect(() => {
-    let alive = true;
-    setLoadingTimeline(true);
-    setError(null);
-    api.atlasTimeline(indicator, YEAR_MIN, YEAR_MAX)
-      .then((data) => alive && setTimeline(data))
-      .catch(() => alive && setError(`Failed to load data for ${indicator}`))
-      .finally(() => alive && setLoadingTimeline(false));
-    return () => { alive = false; };
-  }, [indicator, refreshNonce]);
 
   // Memoised region -> member ISO3 set
   const members = useMemo<Set<string>>(() => {

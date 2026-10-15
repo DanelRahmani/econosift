@@ -1,6 +1,7 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
-import { api } from "@/lib/api";
+import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { apiQuery } from "@/lib/queries";
 import type { OilShocksData } from "@/lib/types";
 import { Card, ChartSkeleton, chartPalette } from "@/components/ui";
 import { useSourceScope } from "@/components/provenance/SourceScope";
@@ -17,7 +18,6 @@ import {
   CartesianGrid,
   ReferenceLine,
 } from "recharts";
-import { useRefreshNonce } from "@/lib/refresh";
 
 function fmt(v: number | null | undefined, decimals = 1, suffix = ""): string {
   return v != null ? `${v.toFixed(decimals)}${suffix}` : "—";
@@ -34,20 +34,15 @@ function Kpi({ label, value, color, sub, prov }: { label: string; value: string;
 }
 
 export function OilShockDecomposition() {
-  const [data, setData] = useState<OilShocksData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const oilQ = useQuery(apiQuery("macroOilShocks"));
+  const data = useMemo<OilShocksData | null>(
+    () => (oilQ.isError ? { available: false, reason: "unavailable" } : oilQ.data ?? null),
+    [oilQ.isError, oilQ.data],
+  );
+  const loading = oilQ.isLoading;
   const [months, setMonths] = useState(60);
   const scope = useSourceScope(provOf(data));
   const pal = chartPalette("dark");
-
-  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
-  useEffect(() => {
-    api
-      .macroOilShocks()
-      .then(setData)
-      .catch(() => setData({ available: false, reason: "unavailable" }))
-      .finally(() => setLoading(false));
-  }, [refreshNonce]);
 
   const chart = useMemo(() => {
     const hist = data?.history ?? [];

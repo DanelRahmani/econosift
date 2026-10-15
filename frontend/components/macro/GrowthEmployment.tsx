@@ -1,8 +1,8 @@
 "use client";
-import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { apiQuery } from "@/lib/queries";
 import { asOf } from "@/lib/series";
-import type { EmploymentData } from "@/lib/types";
 import { Card } from "@/components/ui";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
@@ -22,7 +22,6 @@ import {
   Bar,
   Cell,
 } from "recharts";
-import { useRefreshNonce } from "@/lib/refresh";
 
 const GRID = "rgba(255,255,255,0.08)";
 const RECESSION_FILL = "rgba(120,120,120,0.18)";
@@ -55,20 +54,9 @@ function fmt(v: number | null, decimals = 1) {
 }
 
 export function GrowthEmployment() {
-  const [data, setData] = useState<EmploymentData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
+  const { data = null, isLoading: loading, isError: error } = useQuery(apiQuery("macroEmployment"));
   const [nfpRange, setNfpRange] = useState<"5Y" | "All">("5Y");
   const scope = useSourceScope(provOf(data));
-
-  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
-  useEffect(() => {
-    api
-      .macroEmployment()
-      .then(setData)
-      .catch(() => setError(true))
-      .finally(() => setLoading(false));
-  }, [refreshNonce]);
 
   if (loading) {
     return (

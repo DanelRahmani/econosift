@@ -1,8 +1,8 @@
 "use client";
-import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { apiQuery } from "@/lib/queries";
 import { asOf } from "@/lib/series";
-import type { FinancialConditionsData, CreditGapsData } from "@/lib/types";
 import { Card } from "@/components/ui";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
@@ -23,7 +23,6 @@ import {
   Bar,
   Cell,
 } from "recharts";
-import { useRefreshNonce } from "@/lib/refresh";
 
 const GRID = "rgba(255,255,255,0.08)";
 
@@ -61,26 +60,13 @@ function nfciColor(v: number | null): string {
 }
 
 export function FinancialConditions() {
-  const [data, setData] = useState<FinancialConditionsData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
+  const { data = null, isLoading: loading, isError: error } = useQuery(apiQuery("macroFinancialConditions"));
+  const { data: fundingData = null } = useQuery(apiQuery("macroFunding"));
+  const { data: creditGaps = null } = useQuery(apiQuery("macroCreditGaps"));
   const [epuLogScale, setEpuLogScale] = useState(false);
-  const [fundingData, setFundingData] = useState<any>(null);
-  const [creditGaps, setCreditGaps] = useState<CreditGapsData | null>(null);
   const scope = useSourceScope(provOf(data));
   const fundingScope = useSourceScope(provOf(fundingData));
   const gapsScope = useSourceScope(provOf(creditGaps));
-
-  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
-  useEffect(() => {
-    api
-      .macroFinancialConditions()
-      .then(setData)
-      .catch(() => setError(true))
-      .finally(() => setLoading(false));
-    api.macroFunding().then(setFundingData).catch(() => {});
-    api.macroCreditGaps().then(setCreditGaps).catch(() => {});
-  }, [refreshNonce]);
 
   if (loading) {
     return (

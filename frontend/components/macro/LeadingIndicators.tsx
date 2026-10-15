@@ -1,7 +1,7 @@
 "use client";
-import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
-import type { LeadingData, MacroTimeSeries } from "@/lib/types";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { apiQuery } from "@/lib/queries";
 import { Card } from "@/components/ui";
 import { RecessionProbability } from "@/components/macro/RecessionProbability";
 import { useSourceScope } from "@/components/provenance/SourceScope";
@@ -20,7 +20,6 @@ import {
   Scatter,
   ZAxis,
 } from "recharts";
-import { useRefreshNonce } from "@/lib/refresh";
 
 const GRID = "rgba(255,255,255,0.08)";
 
@@ -51,21 +50,9 @@ function KpiCard({
 }
 
 export function LeadingIndicators() {
-  const [data, setData] = useState<LeadingData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
   const [baseYear, setBaseYear] = useState(2020);
+  const { data = null, isLoading: loading, isError: error } = useQuery(apiQuery("macroLeading", baseYear));
   const scope = useSourceScope(provOf(data));
-
-  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
-  useEffect(() => {
-    setLoading(true);
-    api
-      .macroLeading(baseYear)
-      .then(setData)
-      .catch(() => setError(true))
-      .finally(() => setLoading(false));
-  }, [baseYear, refreshNonce]);
 
   if (loading) {
     return (

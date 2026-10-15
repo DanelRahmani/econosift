@@ -1,5 +1,7 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { apiQuery } from "@/lib/queries";
 import { api } from "@/lib/api";
 import type { Country, RegressResponse } from "@/lib/types";
 import { Card } from "@/components/ui";
@@ -84,11 +86,8 @@ export function EconLabTab() {
   const [loading, setLoading]       = useState(false);
   const scope = useSourceScope(provOf(result));
 
-  const [allCountries, setAllCountries] = useState<Country[]>([]);
-
-  useEffect(() => {
-    api.countries().then((r) => setAllCountries(r.countries)).catch(() => {});
-  }, []);
+  const { data: countriesData } = useQuery(apiQuery("countries"));
+  const allCountries: Country[] = countriesData?.countries ?? [];
   // Available indep = all indicators except the chosen dep
   const availableIndep = LAB_INDICATORS.filter((ind) => ind.id !== dep);
 

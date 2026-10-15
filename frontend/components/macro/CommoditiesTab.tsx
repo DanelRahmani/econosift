@@ -1,7 +1,7 @@
 "use client";
-import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
-import type { CommoditiesData, CommodityRow } from "@/lib/types";
+import { useQuery } from "@tanstack/react-query";
+import { apiQuery } from "@/lib/queries";
+import type { CommodityRow } from "@/lib/types";
 import { Card } from "@/components/ui";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
@@ -18,7 +18,6 @@ import {
   AreaChart,
   Area,
 } from "recharts";
-import { useRefreshNonce } from "@/lib/refresh";
 
 const GRID = "rgba(255,255,255,0.08)";
 
@@ -67,19 +66,8 @@ function pct(v: number | null) {
 }
 
 export function CommoditiesTab() {
-  const [data, setData] = useState<CommoditiesData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
+  const { data = null, isLoading: loading, isError: error } = useQuery(apiQuery("macroCommodities"));
   const scope = useSourceScope(provOf(data));
-
-  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
-  useEffect(() => {
-    api
-      .macroCommodities()
-      .then(setData)
-      .catch(() => setError(true))
-      .finally(() => setLoading(false));
-  }, [refreshNonce]);
 
   if (loading) {
     return (

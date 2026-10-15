@@ -1,10 +1,8 @@
 "use client";
-import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
-import type { MacroRegimeData } from "@/lib/types";
+import { useQuery } from "@tanstack/react-query";
+import { apiQuery } from "@/lib/queries";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
-import { useRefreshNonce } from "@/lib/refresh";
 
 const QUADRANT_STYLES: Record<number, string> = {
   1: "bg-green-500/20 border-green-500/50 text-green-500 dark:text-green-400",
@@ -17,13 +15,8 @@ const Z_LABEL = (z: number | null) =>
   z != null ? `${z > 0 ? "+" : ""}${z.toFixed(2)}σ` : "—";
 
 export function RegimeOverlay() {
-  const [data, setData] = useState<MacroRegimeData | null>(null);
+  const { data = null } = useQuery(apiQuery("macroRegime"));
   const scope = useSourceScope(provOf(data));
-
-  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
-  useEffect(() => {
-    api.macroRegime().then(setData).catch(console.error);
-  }, [refreshNonce]);
 
   if (!data) return null;
 

@@ -1,13 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
-import type { SnapshotResponse, Country } from "@/lib/types";
+import { useQuery } from "@tanstack/react-query";
+import { apiQuery } from "@/lib/queries";
+import type { Country } from "@/lib/types";
 import { Card, Skeleton } from "@/components/ui";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
 import { fmtNum, fmtLarge } from "@/lib/format";
-import { useRefreshNonce } from "@/lib/refresh";
 
 const LABELS: Record<string, string> = {
   gdp_growth: "GDP Growth",
@@ -45,23 +44,12 @@ function formatValue(id: string, unit: string, v: number): string {
 }
 
 export function CountryComparison({ selected, countries }: { selected: string[]; countries: Country[] }) {
-  const [data, setData] = useState<SnapshotResponse | null>(null);
-  const [loading, setLoading] = useState(false);
   const cols = selected.slice(0, 4);
   const key = cols.join(",");
+  const snapQ = useQuery({ ...apiQuery("snapshot", key), enabled: cols.length > 0 });
+  const data = cols.length ? snapQ.data ?? null : null;
+  const loading = snapQ.isLoading;
   const scope = useSourceScope(provOf(data));
-
-  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
-  useEffect(() => {
-    if (!cols.length) { setData(null); return; }
-    let live = true;
-    setLoading(true);
-    api.snapshot(key)
-      .then((r) => live && setData(r))
-      .catch(() => live && setData(null))
-      .finally(() => live && setLoading(false));
-    return () => { live = false; };
-  }, [key, refreshNonce]);
 
   const nameOf = (iso: string) => countries.find((c) => c.iso2 === iso)?.name ?? iso;
 

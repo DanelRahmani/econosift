@@ -1,6 +1,7 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
-import { api } from "@/lib/api";
+import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { apiQuery } from "@/lib/queries";
 import type { CreditConditionsData, ConditionSignal } from "@/lib/types";
 import { Card, ChartSkeleton, chartPalette } from "@/components/ui";
 import { useSourceScope } from "@/components/provenance/SourceScope";
@@ -20,7 +21,6 @@ import {
   CartesianGrid,
   ReferenceLine,
 } from "recharts";
-import { useRefreshNonce } from "@/lib/refresh";
 
 function fmt(v: number | null | undefined, decimals = 2, suffix = ""): string {
   return v != null ? `${v.toFixed(decimals)}${suffix}` : "—";
@@ -58,19 +58,14 @@ function ConditionKpi({
 }
 
 export function CreditConditions() {
-  const [data, setData] = useState<CreditConditionsData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const creditQ = useQuery(apiQuery("macroCreditConditions"));
+  const data = useMemo<CreditConditionsData | null>(
+    () => (creditQ.isError ? { error: "unavailable" } : creditQ.data ?? null),
+    [creditQ.isError, creditQ.data],
+  );
+  const loading = creditQ.isLoading;
   const scope = useSourceScope(provOf(data));
   const pal = chartPalette("dark");
-
-  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
-  useEffect(() => {
-    api
-      .macroCreditConditions()
-      .then(setData)
-      .catch(() => setData({ error: "unavailable" }))
-      .finally(() => setLoading(false));
-  }, [refreshNonce]);
 
   const kpis = data?.kpis;
   const signals = data?.signals;

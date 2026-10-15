@@ -1,7 +1,9 @@
 "use client";
 import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { apiQuery } from "@/lib/queries";
 import { api } from "@/lib/api";
-import type { Country, Indicator, MacroResponse, MacroSeries } from "@/lib/types";
+import type { Country, Indicator, MacroSeries } from "@/lib/types";
 import { provOf, type Provenance } from "@/lib/provenance";
 import { Card, Skeleton } from "@/components/ui";
 import { FxWidget } from "./FxWidget";
@@ -15,7 +17,6 @@ import { CountrySelector } from "./CountrySelector";
 import { IndicatorSelector } from "./IndicatorSelector";
 import { MacroChart } from "./MacroChart";
 import { AiSummaryPanel } from "@/components/AiSummaryPanel";
-import { useRefreshNonce } from "@/lib/refresh";
 
 const CURRENT_YEAR = new Date().getFullYear();
 const FORECASTABLE = new Set([
@@ -28,24 +29,17 @@ const FORECASTABLE = new Set([
 ]);
 
 export function MacroOverview() {
-  const [countries, setCountries] = useState<Country[]>([]);
-  const [indicators, setIndicators] = useState<Indicator[]>([]);
   const [selected, setSelected] = useState<string[]>(["US", "DE", "JP"]);
   const [regimeCountry, setRegimeCountry] = useState("US");
   const [indicator, setIndicator] = useState("gdp_growth");
   const [start, setStart] = useState(2000);
   const [end, setEnd] = useState(CURRENT_YEAR);
-  const [data, setData] = useState<MacroResponse | null>(null);
-  const [loading, setLoading] = useState(false);
   const [showForecast, setShowForecast] = useState(false);
-  const [forecast, setForecast] = useState<MacroSeries[]>([]);
-  const [forecastProv, setForecastProv] = useState<Provenance | undefined>(undefined);
-  const [forecastLoading, setForecastLoading] = useState(false);
 
-  useEffect(() => {
-    api.countries().then((r) => setCountries(r.countries)).catch(() => {});
-    api.indicators().then((r) => setIndicators(r.indicators)).catch(() => {});
-  }, []);
+  const { data: countriesData } = useQuery(apiQuery("countries"));
+  const { data: indicatorsData } = useQuery(apiQuery("indicators"));
+  const countries: Country[] = countriesData?.countries ?? [];
+  const indicators: Indicator[] = indicatorsData?.indicators ?? [];
 
   // Keep regime country in sync with selected countries
   useEffect(() => {
@@ -57,28 +51,15 @@ export function MacroOverview() {
   const canForecast = FORECASTABLE.has(indicator);
   const selKey = selected.join(",");
 
-  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
-  useEffect(() => {
-    if (!selected.length) { setData(null); return; }
-    let active = true;
-    setLoading(true);
-    api.macroData(selKey, indicator, start, end)
-      .then((d) => active && setData(d))
-      .catch(() => active && setData(null))
-      .finally(() => active && setLoading(false));
-    return () => { active = false; };
-  }, [selKey, indicator, start, end, refreshNonce]);
+  const dataQ = useQuery({ ...apiQuery("macroData", selKey, indicator, start, end), enabled: selected.length > 0 });
+  const data = selected.length ? dataQ.data ?? null : null;
+  const loading = dataQ.isLoading;
 
-  useEffect(() => {
-    if (!showForecast || !canForecast || !selected.length) { setForecast([]); setForecastProv(undefined); return; }
-    let active = true;
-    setForecastLoading(true);
-    api.forecast(selKey, indicator, CURRENT_YEAR + 5)
-      .then((r) => { if (active) { setForecast(r.series); setForecastProv(provOf(r)); } })
-      .catch(() => { if (active) { setForecast([]); setForecastProv(undefined); } })
-      .finally(() => active && setForecastLoading(false));
-    return () => { active = false; };
-  }, [showForecast, canForecast, selKey, indicator]);
+  const forecastOn = showForecast && canForecast && selected.length > 0;
+  const forecastQ = useQuery({ ...apiQuery("forecast", selKey, indicator, CURRENT_YEAR + 5), enabled: forecastOn });
+  const forecast: MacroSeries[] = (forecastOn && forecastQ.data?.series) || [];
+  const forecastProv: Provenance | undefined = forecastOn && forecastQ.data ? provOf(forecastQ.data) : undefined;
+  const forecastLoading = forecastQ.isLoading;
 
   return (
     <div className="space-y-6">

@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { api } from "@/lib/api";
-import type { MacroResponse, Country } from "@/lib/types";
+import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { apiQuery } from "@/lib/queries";
+import type { Country } from "@/lib/types";
 import { Card, Skeleton } from "@/components/ui";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
-import { useRefreshNonce } from "@/lib/refresh";
 
 // Map a CPI inflation value to a colour: blue (low/deflation) → red (high).
 function heatColor(v: number | null): string {
@@ -30,23 +30,11 @@ const SPAN = 15; // years of history to show
 export function InflationHeatmap({ selected, countries }: { selected: string[]; countries: Country[] }) {
   const endYear = new Date().getFullYear();
   const startYear = endYear - SPAN + 1;
-  const [data, setData] = useState<MacroResponse | null>(null);
-  const [loading, setLoading] = useState(false);
   const key = selected.join(",");
+  const heatQ = useQuery({ ...apiQuery("macroData", key, "inflation", startYear, endYear), enabled: selected.length > 0 });
+  const data = selected.length ? heatQ.data ?? null : null;
+  const loading = heatQ.isLoading;
   const scope = useSourceScope(provOf(data));
-
-  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
-  useEffect(() => {
-    if (!selected.length) { setData(null); return; }
-    let live = true;
-    setLoading(true);
-    api.macroData(key, "inflation", startYear, endYear)
-      .then((r) => live && setData(r))
-      .catch(() => live && setData(null))
-      .finally(() => live && setLoading(false));
-    return () => { live = false; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, refreshNonce]);
 
   const years = useMemo(
     () => Array.from({ length: SPAN }, (_, i) => String(startYear + i)),

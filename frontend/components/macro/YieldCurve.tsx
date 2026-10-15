@@ -1,12 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { apiQuery } from "@/lib/queries";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
-import { api } from "@/lib/api";
-import { useRefreshNonce } from "@/lib/refresh";
-import type { YieldCurveResponse } from "@/lib/types";
 import { Card, Skeleton, chartTooltipStyle, chartPalette } from "@/components/ui";
 import { useTheme } from "@/components/ThemeProvider";
 import { useSourceScope } from "@/components/provenance/SourceScope";
@@ -16,19 +14,8 @@ import { fmtNum } from "@/lib/format";
 export function YieldCurve() {
   const { theme } = useTheme();
   const pal = chartPalette(theme);
-  const [data, setData] = useState<YieldCurveResponse | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { data = null, isLoading: loading } = useQuery(apiQuery("yieldCurve"));
   const scope = useSourceScope(provOf(data));
-
-  const refreshNonce = useRefreshNonce(); // re-fetch on the page's Refresh (P1-20)
-  useEffect(() => {
-    let live = true;
-    api.yieldCurve()
-      .then((r) => live && setData(r))
-      .catch(() => live && setData(null))
-      .finally(() => live && setLoading(false));
-    return () => { live = false; };
-  }, [refreshNonce]);
 
   const rows = data?.points.map((p) => ({ tenor: p.tenor, yield: p.yield })) ?? [];
 

@@ -1,33 +1,22 @@
 "use client";
-import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
+import { useQuery } from "@tanstack/react-query";
+import { apiQuery } from "@/lib/queries";
 import { Card, PageSkeleton, chartPalette } from "@/components/ui";
 import { CHART_COLORS } from "@/lib/format";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf, type Provenance } from "@/lib/provenance";
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend } from "recharts";
-import { useRefreshNonce } from "@/lib/refresh";
 
 export function TaylorRuleWidget() {
-  const [data, setData] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [prov, setProv] = useState<Provenance | undefined>(undefined);
+  const taylorQ = useQuery(apiQuery("macroTaylorRule"));
+  const res = taylorQ.data;
+  const loading = taylorQ.isLoading;
+  const error: string | null = taylorQ.error ? String(taylorQ.error) : res?.error ?? null;
+  const data: any[] = res && !res.error ? res.data || [] : [];
+  const prov: Provenance | undefined = res && !res.error ? provOf(res) : undefined;
   const scope = useSourceScope(prov);
   // Use dark as default since chartPalette dark values work reasonably in both themes
   const pal = chartPalette("dark");
-
-  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
-  useEffect(() => {
-    setLoading(true);
-    api.macroTaylorRule()
-      .then(res => {
-        if (res.error) setError(res.error);
-        else { setData(res.data || []); setProv(provOf(res)); }
-      })
-      .catch(e => setError(e.toString()))
-      .finally(() => setLoading(false));
-  }, [refreshNonce]);
 
   if (loading) return <PageSkeleton text="Loading Taylor Rule…" />;
   if (error) return <div className="text-red-500 text-sm">Failed to load Taylor Rule data: {error}</div>;

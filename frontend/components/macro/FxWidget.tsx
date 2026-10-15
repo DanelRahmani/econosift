@@ -1,35 +1,20 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
-import type { FxResponse } from "@/lib/types";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { apiQuery } from "@/lib/queries";
 import { Card, Skeleton } from "@/components/ui";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
 import { fmtNum } from "@/lib/format";
-import { useRefreshNonce } from "@/lib/refresh";
 
 const BASES = ["USD", "EUR", "GBP", "JPY", "CHF"];
 const TARGETS = "EUR,GBP,JPY,CNY,CHF,CAD,AUD,INR";
 
 export function FxWidget() {
   const [base, setBase] = useState("USD");
-  const [data, setData] = useState<FxResponse | null>(null);
-  const [loading, setLoading] = useState(false);
+  const { data = null, isLoading: loading } = useQuery(apiQuery("fx", base, TARGETS));
   const scope = useSourceScope(provOf(data));
-
-  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
-  useEffect(() => {
-    let active = true;
-    setLoading(true);
-    api.fx(base, TARGETS)
-      .then((d) => active && setData(d))
-      .catch(() => active && setData(null))
-      .finally(() => active && setLoading(false));
-    return () => {
-      active = false;
-    };
-  }, [base, refreshNonce]);
 
   return (
     <Card {...scope}>

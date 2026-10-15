@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { apiQuery } from "@/lib/queries";
 import {
   ScatterChart,
   Scatter,
@@ -14,13 +16,12 @@ import {
   type TooltipProps,
 } from "recharts";
 import { api } from "@/lib/api";
-import type { RegimeResponse, RegimePoint, RegimeQuadrant } from "@/lib/types";
+import type { RegimePoint, RegimeQuadrant } from "@/lib/types";
 import { Card, Skeleton, chartPalette, chartTooltipStyle } from "@/components/ui";
 import { useTheme } from "@/components/ThemeProvider";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
 import { fmtPct } from "@/lib/format";
-import { useRefreshNonce } from "@/lib/refresh";
 
 // ─── colour maps ────────────────────────────────────────────────────────────
 
@@ -95,10 +96,6 @@ export function RegimeClock({
   const { theme } = useTheme();
   const pal = chartPalette(theme);
 
-  const [data, setData] = useState<RegimeResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const scope = useSourceScope(provOf(data));
 
   // scrubber index — defaults to last point
   const [scrubIdx, setScrubIdx] = useState(0);
@@ -106,38 +103,29 @@ export function RegimeClock({
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // ── fetch on country change ──
-  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
+  const regimeQ = useQuery(apiQuery("regime", country, 2000));
+  const data = regimeQ.data ?? null;
+  const loading = regimeQ.isLoading;
+  const error = regimeQ.error ? (regimeQ.error instanceof Error ? regimeQ.error.message : "Failed to load regime data.") : null;
+  const scope = useSourceScope(provOf(data));
+
+  // A new country stops playback.
   useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-    setData(null);
     setPlaying(false);
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
     }
+  }, [country]);
 
-    api.regime(country, 2000)
-      .then((res) => {
-        if (cancelled) return;
-        setData(res);
-        // default scrubber to last valid index
-        const validLen = res.series.filter(
-          (p) => p.gdpGrowth !== null && p.cpiInflation !== null
-        ).length;
-        setScrubIdx(Math.max(0, validLen - 1));
-      })
-      .catch((e: unknown) => {
-        if (cancelled) return;
-        setError(e instanceof Error ? e.message : "Failed to load regime data.");
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-
-    return () => { cancelled = true; };
-  }, [country, refreshNonce]);
+  // default scrubber to last valid index whenever a response arrives
+  useEffect(() => {
+    if (!data) return;
+    const validLen = data.series.filter(
+      (p) => p.gdpGrowth !== null && p.cpiInflation !== null
+    ).length;
+    setScrubIdx(Math.max(0, validLen - 1));
+  }, [data]);
 
   // ── play / pause logic ──
   const validPoints = (data?.series ?? []).filter(

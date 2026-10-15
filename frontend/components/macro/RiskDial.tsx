@@ -1,11 +1,11 @@
 "use client";
-import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
-import type { RiskDialData, RiskDialBacktest } from "@/lib/types";
+import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { apiQuery } from "@/lib/queries";
+import type { RiskDialData } from "@/lib/types";
 import { Card, ChartSkeleton } from "@/components/ui";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
-import { useRefreshNonce } from "@/lib/refresh";
 
 /**
  * Composite risk dial — Phase 43 (task D3).
@@ -35,20 +35,15 @@ function regimeTone(regime?: string): string {
 }
 
 export function RiskDial() {
-  const [data, setData] = useState<RiskDialData | null>(null);
-  const [bt, setBt] = useState<RiskDialBacktest | null>(null);
-  const [loading, setLoading] = useState(true);
+  const dialQ = useQuery(apiQuery("macroRiskDial"));
+  const data = useMemo<RiskDialData | null>(
+    () => (dialQ.isError ? { available: false, reason: "unavailable" } : dialQ.data ?? null),
+    [dialQ.isError, dialQ.data],
+  );
+  const loading = dialQ.isLoading;
+  const { data: bt = null } = useQuery(apiQuery("macroRiskDialBacktest"));
   const scope = useSourceScope(provOf(data));
   const btScope = useSourceScope(provOf(bt));
-
-  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
-  useEffect(() => {
-    api.macroRiskDial()
-      .then(setData)
-      .catch(() => setData({ available: false, reason: "unavailable" }))
-      .finally(() => setLoading(false));
-    api.macroRiskDialBacktest().then(setBt).catch(() => setBt(null));
-  }, [refreshNonce]);
 
   if (loading) return <ChartSkeleton />;
 

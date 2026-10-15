@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { api } from "@/lib/api";
-import { useRefreshNonce } from "@/lib/refresh";
+import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { apiQuery } from "@/lib/queries";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf, resolveRefs, type Provenance, type SourceRef } from "@/lib/provenance";
 
@@ -53,41 +53,19 @@ interface Props {
 }
 
 export function RegimeDetector({ country, countryName }: Props) {
-  const [gdp, setGdp] = useState<number | null>(null);
-  const [cpi, setCpi] = useState<number | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [gdpProv, setGdpProv] = useState<Provenance | undefined>(undefined);
-  const [cpiProv, setCpiProv] = useState<Provenance | undefined>(undefined);
-
-  const refreshNonce = useRefreshNonce(); // re-fetch on the page's Refresh (P1-20)
-  const shownFor = useRef<string | null>(null);
-  useEffect(() => {
-    // A new country starts blank; a Refresh keeps the current reading on
-    // screen until the new one arrives.
-    if (shownFor.current !== country) {
-      setLoading(true);
-      setGdp(null);
-      setCpi(null);
-      setGdpProv(undefined);
-      setCpiProv(undefined);
-      shownFor.current = country;
-    }
-    const year = new Date().getFullYear();
-    Promise.all([
-      api.macroData(country, "gdp_growth", year - 3, year),
-      api.macroData(country, "inflation", year - 3, year),
-    ])
-      .then(([gdpRes, cpiRes]) => {
-        const gdpPts = gdpRes.series.find((s) => s.country === country)?.data ?? [];
-        const cpiPts = cpiRes.series.find((s) => s.country === country)?.data ?? [];
-        setGdp(gdpPts.length ? gdpPts[gdpPts.length - 1].value : null);
-        setCpi(cpiPts.length ? cpiPts[cpiPts.length - 1].value : null);
-        setGdpProv(provOf(gdpRes));
-        setCpiProv(provOf(cpiRes));
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [country, refreshNonce]);
+  // A new country starts blank; a Refresh keeps the current reading on screen until the new one arrives.
+  const year = new Date().getFullYear();
+  const gdpQ = useQuery(apiQuery("macroData", country, "gdp_growth", year - 3, year));
+  const cpiQ = useQuery(apiQuery("macroData", country, "inflation", year - 3, year));
+  const loading = gdpQ.isLoading || cpiQ.isLoading;
+  const lastOf = (res: typeof gdpQ.data) => {
+    const pts = res?.series.find((s) => s.country === country)?.data ?? [];
+    return pts.length ? pts[pts.length - 1].value : null;
+  };
+  const gdp = lastOf(gdpQ.data);
+  const cpi = lastOf(cpiQ.data);
+  const gdpProv = gdpQ.data ? provOf(gdpQ.data) : undefined;
+  const cpiProv = cpiQ.data ? provOf(cpiQ.data) : undefined;
 
   const regime = classify(gdp, cpi);
 

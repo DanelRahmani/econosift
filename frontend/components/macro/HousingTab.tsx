@@ -1,7 +1,6 @@
 "use client";
-import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
-import type { HousingData, GlobalHousingData } from "@/lib/types";
+import { useQuery } from "@tanstack/react-query";
+import { apiQuery } from "@/lib/queries";
 import { Card } from "@/components/ui";
 import { shortCountryName, categoryBarHeight } from "@/lib/format";
 import { useSourceScope } from "@/components/provenance/SourceScope";
@@ -20,7 +19,6 @@ import {
   Bar,
   Cell,
 } from "recharts";
-import { useRefreshNonce } from "@/lib/refresh";
 
 const GRID = "rgba(255,255,255,0.08)";
 const RECESSION_FILL = "rgba(120,120,120,0.18)";
@@ -49,22 +47,10 @@ function KpiCard({
 }
 
 export function HousingTab() {
-  const [data, setData] = useState<HousingData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
-  const [globalHousing, setGlobalHousing] = useState<GlobalHousingData | null>(null);
+  const { data = null, isLoading: loading, isError: error } = useQuery(apiQuery("macroHousing"));
+  const { data: globalHousing = null } = useQuery(apiQuery("macroHousingGlobal"));
   const scope = useSourceScope(provOf(data));
   const globalScope = useSourceScope(provOf(globalHousing));
-
-  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
-  useEffect(() => {
-    api
-      .macroHousing()
-      .then(setData)
-      .catch(() => setError(true))
-      .finally(() => setLoading(false));
-    api.macroHousingGlobal().then(setGlobalHousing).catch(() => {});
-  }, [refreshNonce]);
 
   if (loading) {
     return (

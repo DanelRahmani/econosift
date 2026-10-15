@@ -1,22 +1,15 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { apiQuery } from "@/lib/queries";
 import Link from "next/link";
-import { api } from "@/lib/api";
 import type { FactbookCountry } from "@/lib/types";
 import { Card, PageSkeleton } from "@/components/ui";
 
 export default function CountryListPage() {
-  const [countries, setCountries] = useState<FactbookCountry[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
+  const { data: countriesData, isLoading: loading, isError: error } = useQuery(apiQuery("factbookCountries"));
+  const countries: FactbookCountry[] = countriesData ?? [];
   const [search, setSearch] = useState("");
-
-  useEffect(() => {
-    api.factbookCountries()
-      .then(setCountries)
-      .catch(() => setError(true))
-      .finally(() => setLoading(false));
-  }, []);
 
   const filtered = search.trim()
     ? countries.filter((c) =>

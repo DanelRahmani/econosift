@@ -1,13 +1,13 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { apiQuery } from "@/lib/queries";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { api } from "@/lib/api";
-import type { FactbookProfile, FactbookCountry } from "@/lib/types";
+import type { FactbookCountry } from "@/lib/types";
 import { Card, PageSkeleton } from "@/components/ui";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
-import { useRefreshNonce } from "@/lib/refresh";
 
 function CollapsibleSection({ title, fields, defaultOpen = false }: {
   title: string; fields: { label: string; value: string }[]; defaultOpen?: boolean;
@@ -50,21 +50,15 @@ function CollapsibleSection({ title, fields, defaultOpen = false }: {
 
 export default function CountryDetailClient({ iso2 }: { iso2: string }) {
   const router = useRouter();
-  const [profile, setProfile] = useState<FactbookProfile | null>(null);
-  const [countries, setCountries] = useState<FactbookCountry[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
+  const { data: profile = null, isLoading: loading, isError: error } = useQuery({
+    ...apiQuery("factbookCountry", iso2),
+    enabled: !!iso2,
+  });
+  const { data: countriesData } = useQuery(apiQuery("factbookCountries"));
+  const countries = useMemo<FactbookCountry[]>(() => countriesData ?? [], [countriesData]);
   const [search, setSearch] = useState("");
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const scope = useSourceScope(provOf(profile));
-
-  useEffect(() => { api.factbookCountries().then(setCountries).catch(() => {}); }, []);
-  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
-  useEffect(() => {
-    if (!iso2) return;
-    setLoading(true); setError(false);
-    api.factbookCountry(iso2).then(setProfile).catch(() => setError(true)).finally(() => setLoading(false));
-  }, [iso2, refreshNonce]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();

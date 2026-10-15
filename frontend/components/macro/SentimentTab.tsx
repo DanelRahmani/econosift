@@ -1,10 +1,9 @@
-import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
-import type { CotData, CotContract } from "@/lib/types";
+import { useQuery } from "@tanstack/react-query";
+import { apiQuery } from "@/lib/queries";
+import type { CotContract } from "@/lib/types";
 import { Card } from "@/components/ui";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
-import { useRefreshNonce } from "@/lib/refresh";
 
 function CotIndexBar({ value }: { value: number | null }) {
   if (value == null) return <span className="text-text-secondary">—</span>;
@@ -28,17 +27,10 @@ function fmtCot(v: number | null): string {
 }
 
 export function SentimentTab() {
-  const [data, setData] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [cotData, setCotData] = useState<CotData | null>(null);
+  const { data = null, isLoading: loading } = useQuery(apiQuery("macroSentiment"));
+  const { data: cotData = null } = useQuery(apiQuery("macroCot"));
   const scope = useSourceScope(provOf(data));
   const cotScope = useSourceScope(provOf(cotData));
-
-  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
-  useEffect(() => {
-    api.macroSentiment().then(setData).catch(console.error).finally(() => setLoading(false));
-    api.macroCot().then(setCotData).catch(() => {});
-  }, [refreshNonce]);
 
   if (loading) return <div className="h-64 animate-pulse bg-surface rounded"></div>;
   if (!data || data.error) return <div className="text-red-500">{data?.error || "Failed to load"}</div>;

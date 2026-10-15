@@ -1,6 +1,7 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
-import { api } from "@/lib/api";
+import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { apiQuery } from "@/lib/queries";
 import type { RecessionProbabilityData } from "@/lib/types";
 import { PageSkeleton, Card, chartPalette } from "@/components/ui";
 import { CHART_COLORS } from "@/lib/format";
@@ -19,7 +20,6 @@ import {
   ReferenceLine,
   ReferenceArea,
 } from "recharts";
-import { useRefreshNonce } from "@/lib/refresh";
 
 function fmtNum(v: number | null | undefined, decimals = 1, suffix = ""): string {
   return v != null ? `${v.toFixed(decimals)}${suffix}` : "—";
@@ -35,20 +35,15 @@ function RecessionKpi({ label, value, color, prov }: { label: string; value: str
 }
 
 export function RecessionProbability() {
-  const [data, setData] = useState<RecessionProbabilityData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const recQ = useQuery(apiQuery("macroRecessionProbability"));
+  const data = useMemo<RecessionProbabilityData | null>(
+    () => (recQ.isError ? {} : recQ.data ?? null),
+    [recQ.isError, recQ.data],
+  );
+  const loading = recQ.isLoading;
   const scope = useSourceScope(provOf(data));
   // Use dark as default since chartPalette dark values work reasonably in both themes
   const pal = chartPalette("dark");
-
-  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
-  useEffect(() => {
-    api
-      .macroRecessionProbability()
-      .then(setData)
-      .catch(() => setData({}))
-      .finally(() => setLoading(false));
-  }, [refreshNonce]);
 
   const kpis = data?.kpis;
   const recessions = data?.recessions ?? [];
