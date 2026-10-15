@@ -17,7 +17,7 @@ we get rate-limited. The goal is an app that **feels snappy**, without changing 
    git fetch origin
    git checkout refactor/data-layer
    git pull origin refactor/data-layer
-   git log --oneline -3   # top commit should be the "Plan: run refactor on refactor/data-layer…" commit
+   git log --oneline -3   # should show the "Prompt: spell out the branch checkout commands…" and "Plan: run refactor…" commits
    ```
    Do **all** work on this branch. Commit one item per commit (message about the "why") and
    push after each with `git push origin refactor/data-layer`. Never push to `DEV`, `main` or
