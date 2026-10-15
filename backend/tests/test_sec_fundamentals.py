@@ -158,3 +158,51 @@ def test_run_facts_with_nothing_usable_stores_nothing(db):
     with store.connect() as conn:
         assert conn.execute("SELECT COUNT(*) FROM fundamental").fetchone()[0] == 0
         assert conn.execute("SELECT facts_at FROM security").fetchone()[0] is None
+
+
+# --- item 3: nightly frames change detection ----------------------------------
+
+def test_frame_calls_cover_the_last_quarters_and_years():
+    from datetime import date
+    calls = sf.frame_calls(date(2026, 10, 15))
+    assert len(calls) == 10
+    assert ("us-gaap", "Assets", "USD", "CY2026Q3I") in calls
+    assert ("us-gaap", "Assets", "USD", "CY2026Q1I") in calls
+    assert ("us-gaap", "NetIncomeLoss", "USD", "CY2025") in calls
+    jan = sf.frame_calls(date(2026, 1, 5))
+    assert ("us-gaap", "Assets", "USD", "CY2025Q4I") in jan and ("us-gaap", "Assets", "USD", "CY2025Q2I") in jan
+
+
+def test_frames_queue_only_tracked_ciks_with_an_unknown_filing(db):
+    store.upsert("security", [dict(symbol="AAA", cik="0000000001"), dict(symbol="BBB", cik="0000000002")],
+                 ("symbol",))
+    store.upsert("sec_filing", [dict(cik="0000000001", accn="old-1", filed="2026-05-01", form="10-Q"),
+                                dict(cik="0000000002", accn="old-2", filed="2026-05-01", form="10-Q")],
+                 ("cik", "accn"))
+    frame = {"data": [{"cik": 1, "accn": "old-1", "end": "2026-06-30", "val": 1},
+                      {"cik": 2, "accn": "new-2", "end": "2026-09-30", "val": 1},   # filed since
+                      {"cik": 3, "accn": "new-3", "end": "2026-09-30", "val": 1}]}  # not tracked
+    calls = []
+
+    def fake_frame(*args):
+        calls.append(args)
+        return frame if len(calls) == 1 else None  # the other frames have no filings yet
+
+    with patch("backend.sources.source_sec.frame", side_effect=fake_frame):
+        assert fetcher.run_frames("2026-10-15") == 1
+    assert len(calls) == 10
+    with store.connect() as conn:
+        assert conn.execute("SELECT kind, key FROM fetch_queue").fetchall() == [("facts", "0000000002")]
+    assert fetcher.sec_status()["framesAt"]
+
+
+def test_frames_with_no_answer_fail(db):
+    with patch("backend.sources.source_sec.frame", return_value=None), pytest.raises(RuntimeError):
+        fetcher.run_frames("2026-10-15")
+
+
+def test_frames_are_not_queued_without_an_identity(db, monkeypatch):
+    monkeypatch.setattr(config, "EDGAR_IDENTITY", None)
+    fetcher.queue_frames()
+    with store.connect() as conn:
+        assert conn.execute("SELECT COUNT(*) FROM fetch_queue").fetchone()[0] == 0

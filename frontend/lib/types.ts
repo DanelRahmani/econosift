@@ -2165,6 +2165,8 @@ export interface StoreStatus {
     identity: boolean;
     ciks: number;
     ciksAt: string | null;
+    /** last nightly frames check for new filings */
+    framesAt?: string | null;
     /** companyfacts backfill, counted in companies (CIKs) */
     facts?: { total: number; done: number; lastAt: string | null };
   };

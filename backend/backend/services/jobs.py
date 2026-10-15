@@ -313,6 +313,14 @@ def start_scheduler():
             max_instances=1,
             replace_existing=True,
         )
+        # New SEC filings: ~10 frames calls; changed companies get companyfacts re-fetched.
+        scheduler.add_job(
+            fetcher.queue_frames,
+            CronTrigger(day_of_week="mon-fri", hour=23, minute=0, timezone=MARKET_TZ),
+            id="sec_frames",
+            max_instances=1,
+            replace_existing=True,
+        )
         scheduler.add_job(
             refresh_fx_rates,
             CronTrigger(hour="6,17,21", minute=0, timezone=MARKET_TZ),

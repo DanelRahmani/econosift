@@ -280,6 +280,7 @@ function StoreSection({ store }: { store: StoreStatus }) {
             {store.sec.ciks.toLocaleString()} symbols mapped to a CIK
             {store.sec.ciksAt ? ` · as of ${store.sec.ciksAt.slice(0, 16).replace("T", " ")} UTC` : ""}
             {store.sec.facts?.lastAt ? ` · last filing stored ${store.sec.facts.lastAt.slice(0, 16).replace("T", " ")} UTC` : ""}
+            {store.sec.framesAt ? ` · new-filing check ${store.sec.framesAt.slice(0, 16).replace("T", " ")} UTC` : ""}
           </p>
         </div>
       )}

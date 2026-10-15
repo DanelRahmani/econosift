@@ -272,3 +272,27 @@ def filings(doc: dict) -> dict[str, tuple[str, str | None]]:
                         out.setdefault(f["accn"], (f["filed"], f.get("form")))
     return out
 
+
+# --- nightly change detection (§8.3 step 2) -----------------------------------
+
+def frame_calls(today: date) -> list[tuple[str, str, str, str]]:
+    """The ~10 frames (taxonomy, concept, unit, period) that show who filed lately.
+
+    Every 10-K and 10-Q reports total assets at its period end and net income
+    for its quarter or year, so a new filing shows up as a new ``accn`` in one
+    of these: assets at the last three calendar quarter ends, net income for
+    the last three quarters and two years, equity at the last two quarter ends.
+    """
+    y, q = today.year, (today.month - 1) // 3  # the last quarter that has ended
+    if q == 0:
+        y, q = y - 1, 4
+    quarters = []
+    for _ in range(3):
+        quarters.append((y, q))
+        y, q = (y, q - 1) if q > 1 else (y - 1, 4)
+    calls = [("us-gaap", "Assets", "USD", f"CY{y_}Q{q_}I") for y_, q_ in quarters]
+    calls += [("us-gaap", "StockholdersEquity", "USD", f"CY{y_}Q{q_}I") for y_, q_ in quarters[:2]]
+    calls += [("us-gaap", "NetIncomeLoss", "USD", f"CY{y_}Q{q_}") for y_, q_ in quarters]
+    last_year = today.year - 1
+    calls += [("us-gaap", "NetIncomeLoss", "USD", f"CY{yr}") for yr in (last_year, last_year - 1)]
+    return calls

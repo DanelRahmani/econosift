@@ -241,6 +241,37 @@ def run_facts(cik: str) -> int:
     return len(rows)
 
 
+def run_frames(day: str) -> int:
+    """Nightly: ~10 SEC frames calls; queue companyfacts for every tracked CIK
+    that has filed something not stored yet. Returns the number queued."""
+    from datetime import date
+    from . import sec_fundamentals
+    from .sources import source_sec
+
+    with store.connect() as conn:
+        tracked = {r[0] for r in conn.execute("SELECT DISTINCT cik FROM security WHERE cik IS NOT NULL")}
+        known = set(conn.execute("SELECT cik, accn FROM sec_filing"))
+    changed: set[str] = set()
+    answered = 0
+    for call in sec_fundamentals.frame_calls(date.fromisoformat(day)):
+        doc = source_sec.frame(*call)
+        if doc is None:
+            continue  # a frame with no filings yet
+        answered += 1
+        for row in doc.get("data") or []:
+            if row.get("cik") is None or not row.get("accn"):
+                continue
+            cik = source_sec.cik10(row["cik"])
+            if cik in tracked and (cik, row["accn"]) not in known:
+                changed.add(cik)
+    if not answered:
+        raise RuntimeError("no SEC frame answered")
+    for cik in sorted(changed):
+        enqueue("facts", cik, PRIORITY_FACTS)
+    _mark_success("sec_frames")
+    return len(changed)
+
+
 def run_snapshot(key: str) -> int:
     from . import cache, snapshot
     rows = snapshot.run(key)
@@ -255,6 +286,7 @@ HANDLERS: dict[str, Callable[[str], int]] = {
     "snapshot": run_snapshot,
     "ciks": run_ciks,
     "facts": run_facts,
+    "frames": run_frames,
 }
 
 
@@ -292,6 +324,13 @@ def queue_facts_backfill() -> None:
             "SELECT DISTINCT cik FROM security WHERE cik IS NOT NULL AND facts_at IS NULL ORDER BY cik")]
     for cik in ciks:
         enqueue("facts", cik, PRIORITY_FACTS, retry_failed=False)
+
+
+def queue_frames(today: datetime | None = None) -> None:
+    """Nightly: check SEC frames for new filings (skipped without an EDGAR identity)."""
+    if sec_enabled():
+        day = (today or datetime.now(timezone.utc)).date().isoformat()
+        enqueue("frames", day, PRIORITY_FACTS)
 
 
 def queue_ciks() -> None:
@@ -481,6 +520,7 @@ def sec_status() -> dict:
             "SELECT COUNT(cik), COUNT(DISTINCT cik), COUNT(DISTINCT CASE WHEN facts_at IS NOT NULL THEN cik END) "
             "FROM security").fetchone()
         stamps = dict(conn.execute(
-            "SELECT source, last_success FROM source_health WHERE source IN ('sec_ciks', 'sec_facts')"))
+            "SELECT source, last_success FROM source_health WHERE source IN ('sec_ciks', 'sec_facts', 'sec_frames')"))
     return {"identity": sec_enabled(), "ciks": ciks, "ciksAt": stamps.get("sec_ciks"),
+            "framesAt": stamps.get("sec_frames"),
             "facts": {"total": total, "done": done, "lastAt": stamps.get("sec_facts")}}
