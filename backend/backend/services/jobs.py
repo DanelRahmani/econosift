@@ -279,7 +279,7 @@ def start_scheduler():
         tz = os.getenv("SCHEDULER_TIMEZONE", "UTC")
         scheduler = BackgroundScheduler(timezone=tz)
 
-        from .screener_service import warm_all
+        from functools import partial
         from .. import fetcher
 
         # The fetcher thread makes the calls; these only queue its work.
@@ -329,8 +329,9 @@ def start_scheduler():
             max_instances=1,
             replace_existing=True,
         )
+        # Yahoo jobs run on the fetcher thread: these only queue them.
         scheduler.add_job(
-            refresh_fx_rates,
+            partial(fetcher.queue_job, "refresh_fx_rates"),
             CronTrigger(hour="6,17,21", minute=0, timezone=MARKET_TZ),
             id="refresh_fx_rates",
             max_instances=1,
@@ -351,7 +352,7 @@ def start_scheduler():
             replace_existing=True,
         )
         scheduler.add_job(
-            record_daily_snapshots,
+            partial(fetcher.queue_job, "record_daily_snapshots"),
             # After the US close, whatever timezone the scheduler runs in.
             CronTrigger(day_of_week="mon-fri", hour=16, minute=30, timezone="America/New_York"),
             id="record_daily_snapshots",
@@ -359,8 +360,8 @@ def start_scheduler():
             replace_existing=True,
         )
         scheduler.add_job(
-            # The screener's ~500-ticker refresh used to run at every boot.
-            warm_all,
+            # The screener's ~500-ticker rebuild (store reads only since Phase 68) used to run at every boot.
+            partial(fetcher.queue_job, "screener_warm_all"),
             CronTrigger(day_of_week="mon-fri", hour=19, minute=0, timezone=MARKET_TZ),
             id="screener_warm_all",
             max_instances=1,

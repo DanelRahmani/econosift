@@ -313,6 +313,29 @@ def run_analyst(symbol: str) -> int:
     return 1
 
 
+# Scheduled jobs that call Yahoo: APScheduler queues them, this thread runs them (plan §2.2).
+def _scheduled_jobs() -> dict[str, Callable[[], object]]:
+    from .services import jobs, screener_service
+    return {
+        "refresh_fx_rates": jobs.refresh_fx_rates,              # G10 FX closes -> fx_daily
+        "record_daily_snapshots": jobs.record_daily_snapshots,  # SPY put/call + IV30 (options chains)
+        "screener_warm_all": screener_service.warm_all,         # store-only since Phase 68
+    }
+
+
+def run_job(name: str) -> int:
+    job = _scheduled_jobs().get(name)
+    if job is None:
+        raise RuntimeError(f"unknown scheduled job {name!r}")
+    job()
+    return 0
+
+
+def queue_job(name: str) -> None:
+    """APScheduler entry point for a scheduled job: queue it for this thread."""
+    enqueue("job", name, PRIORITY_ON_DEMAND)
+
+
 def run_snapshot(key: str) -> int:
     from . import cache, snapshot
     rows = snapshot.run(key)
@@ -330,6 +353,7 @@ HANDLERS: dict[str, Callable[[str], int]] = {
     "frames": run_frames,
     "yahoo_info": run_yahoo_info,
     "analyst": run_analyst,
+    "job": run_job,
 }
 
 
