@@ -10,7 +10,11 @@ import { defineConfig, devices } from "@playwright/test";
 // docker-compose stack on :80, which is what CI uses). Left unset, the config
 // keeps its original behaviour of booting `next dev` on :3000, so local runs
 // are unchanged.
-const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";
+// PW_MOCK_API=1 (CI's smoke job) runs the suite against the static export with /api answered
+// from recorded fixtures by tests/e2e/mock-server.mjs: no backend, no live sources. The gate
+// still runs the suite against live Docker (PLAYWRIGHT_BASE_URL=http://localhost).
+const mockApi = !!process.env.PW_MOCK_API;
+const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? (mockApi ? "http://localhost:4100" : "http://localhost:3000");
 const useExternalServer = !!process.env.PLAYWRIGHT_BASE_URL;
 
 export default defineConfig({
@@ -22,6 +26,7 @@ export default defineConfig({
   // the fix, not longer timeouts.
   workers: 2,
   forbidOnly: !!process.env.CI,
+  ...(mockApi && !process.env.PLAYWRIGHT_BASE_URL ? { globalTeardown: "./tests/e2e/mock-teardown.mjs" } : {}),
   retries: process.env.CI ? 2 : 0,
   reporter: "list",
   // Pages fan out to many uncached upstream endpoints on a cold backend.
@@ -36,6 +41,15 @@ export default defineConfig({
   ],
   ...(useExternalServer
     ? {}
+    : mockApi
+    ? {
+        webServer: {
+          command: "node tests/e2e/mock-server.mjs",
+          url: "http://localhost:4100/api/health",
+          reuseExistingServer: !process.env.CI,
+          timeout: 30_000,
+        },
+      }
     : {
         webServer: {
           command: "npm run dev",

@@ -8,7 +8,7 @@ import { test, expect } from "@playwright/test";
  * chunks can be cached forever (`immutable`). Only nginx sets these, so the spec
  * skips when the suite runs against `next dev` instead of the Docker stack.
  */
-test.skip(!process.env.PLAYWRIGHT_BASE_URL, "cache headers come from nginx (Docker stack only)");
+test.skip(!process.env.PLAYWRIGHT_BASE_URL || !!process.env.PW_MOCK_API, "cache headers come from nginx (Docker stack only)");
 
 test("HTML revalidates every load and hashed static chunks are immutable", async ({ request }) => {
   const html = await request.get("/dashboard");

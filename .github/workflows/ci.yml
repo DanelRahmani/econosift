@@ -23,7 +23,8 @@ name: CI
 
 on:
   push:
-    branches: [DEV, main]
+    # refactor/** too: the Phase 65+ refactor branches must show CI green before their PR.
+    branches: [DEV, main, "refactor/**"]
   pull_request:
     branches: [main]
 
@@ -89,66 +90,42 @@ jobs:
   e2e:
     name: Playwright smoke
     runs-on: ubuntu-latest
-    # Slower than the other jobs: it builds and boots the whole stack. Kept
-    # separate so a type error is reported in seconds rather than minutes.
-    timeout-minutes: 30
+    # Runs against the static export with /api answered from recorded fixtures
+    # (tests/e2e/mock-server.mjs, tests/e2e/fixtures/api): no Docker stack, no
+    # live Yahoo/FRED/World Bank, so a slow or failing upstream can no longer
+    # make this job flaky. A request without a fixture fails the run. The live
+    # suite against Docker stays part of each phase's local gate.
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
-
-      - name: Create an empty .env
-        # docker-compose declares `env_file: .env` and bind-mounts it, but .env
-        # is gitignored so it does not exist on a runner. Compose would fail
-        # outright, and the bind mount would silently create a directory.
-        run: touch .env
-
-      - name: Start the stack
-        # No API keys in CI, so every source degrades to an empty result. The
-        # pages must still render their shell and panels — which is exactly the
-        # regression these tests exist to catch.
-        run: |
-          docker compose up -d --wait --build
-          docker compose ps
-
-      - name: Start the cold World Bank trade fetch
-        # /trade's exports are not in the bulk World Bank download, so on a fresh
-        # volume the page waits on a live pull for ~200 countries x 3 series,
-        # which alone can outlast the test's 90 s. A developer's stack serves it
-        # from its warm cache. Kick it off now, in the background, so it runs
-        # while dependencies and Chromium install; the test's own request joins
-        # the in-flight fetch (the cache locks per key) instead of starting cold.
-        # Nothing is faked: if the World Bank fails, the page still shows its
-        # unavailable state, which the test accepts.
-        run: nohup curl -s -o /dev/null --max-time 600 http://localhost/api/macro/trade > /dev/null 2>&1 &
 
       - name: Install dependencies
         working-directory: frontend
         run: npm ci
 
+      - name: Build the static export
+        working-directory: frontend
+        env:
+          # .env.production points the desktop build at :8000; the mocked suite
+          # needs same-origin /api, like the Docker image (frontend/Dockerfile).
+          NEXT_PUBLIC_API_URL: ""
+        run: npx next build
+
       - name: Install Chromium
         working-directory: frontend
         run: npx playwright install --with-deps chromium
 
-      - name: Run smoke tests
+      - name: Run smoke tests (mocked /api)
         working-directory: frontend
         env:
-          PLAYWRIGHT_BASE_URL: http://localhost
+          PW_MOCK_API: "1"
         run: npx playwright test
-
-      - name: Backend logs on failure
-        if: failure()
-        # The whole run, not a tail: a request that hangs is logged (or not) long
-        # before the last test finishes. nginx's log shows whether the browser's
-        # request ever left the page (a 499 is a request the test gave up on).
-        run: |
-          docker compose logs --timestamps backend > stack-logs.txt
-          docker compose logs --timestamps nginx >> stack-logs.txt
-          tail -n 300 stack-logs.txt
 
       - uses: actions/upload-artifact@v4
         if: failure()
@@ -156,11 +133,5 @@ jobs:
           # The reporter is `list`, so there is no playwright-report/ — the
           # retry traces and error contexts live in test-results/.
           name: playwright-traces
-          path: |
-            frontend/test-results/
-            stack-logs.txt
+          path: frontend/test-results/
           retention-days: 7
-
-      - name: Tear down
-        if: always()
-        run: docker compose down -v
