@@ -1,10 +1,10 @@
 """P3-36: data read from downloaded bulk files and bundled JSON is dated by the file.
 
 ``provenance.attach`` stamps a ref with the oldest ``@cached`` read, else *now*.
-Data served from the IMF / Fama-French bulk parquet files, or from JSON bundled
-with the app, must carry ``fetchedAt`` from the file's write time (or, for
-bundled data that records its own date, that date), so the Navbar's "Data as
-of" is not newer than the data.
+Data served from the IMF / Fama-French bulk downloads (stored in econosift.db
+since Phase 66), or from JSON bundled with the app, must carry ``fetchedAt``
+from when it was stored (or, for bundled data that records its own date, that
+date), so the Navbar's "Data as of" is not newer than the data.
 """
 from __future__ import annotations
 
@@ -28,49 +28,52 @@ def test_epoch_constant_is_2026_09_01_noon_utc():
     assert pv.stamp(SEP_1_NOON) == SEP_1_NOON_ISO
 
 
-def test_imf_path_is_the_downloaded_file_or_none(tmp_path, monkeypatch):
+def _stored(monkeypatch, *series):
+    """Pretend ``series`` were stored by a bulk download at SEP_1_NOON."""
+    from backend import store
+    monkeypatch.setattr(store, "series_stored_at", lambda s: SEP_1_NOON_ISO if s in series else None)
+
+
+def test_imf_stored_at_is_the_store_time_or_none(monkeypatch):
     from backend.services import bulk_data_service as bulk
 
-    monkeypatch.setattr(bulk, "DATA_DIR", tmp_path)
-    assert bulk.imf_path("gdp_growth") is None
-    assert bulk.imf_path("no_such_indicator") is None
-    f = _file(tmp_path / "imf_gdp_growth.parquet")
-    assert bulk.imf_path("gdp_growth") == f
+    _stored(monkeypatch)
+    assert bulk.imf_stored_at("gdp_growth") is None
+    assert bulk.imf_stored_at("no_such_indicator") is None
+    _stored(monkeypatch, "imf_gdp_growth")
+    assert bulk.imf_stored_at("gdp_growth") == SEP_1_NOON_ISO
 
 
-def test_famafrench_path_is_the_downloaded_file_or_none(tmp_path, monkeypatch):
+def test_famafrench_stored_at_is_the_store_time_or_none(monkeypatch):
     from backend.services import bulk_data_service as bulk
 
-    monkeypatch.setattr(bulk, "FF_PATH", tmp_path / "ff_factors.parquet")
-    assert bulk.famafrench_path() is None
-    f = _file(tmp_path / "ff_factors.parquet")
-    assert bulk.famafrench_path() == f
+    _stored(monkeypatch)
+    assert bulk.famafrench_stored_at() is None
+    _stored(monkeypatch, "ff_mkt_rf")
+    assert bulk.famafrench_stored_at() == SEP_1_NOON_ISO
 
 
-def test_macro_imf_series_ref_from_the_bulk_file_is_dated_by_it(tmp_path, monkeypatch):
+def test_macro_imf_series_ref_from_the_bulk_download_is_dated_by_it(monkeypatch):
     from backend.routers import macro
-    from backend.services import bulk_data_service as bulk
     from backend.sources import source_imf
 
-    monkeypatch.setattr(bulk, "DATA_DIR", tmp_path)
+    _stored(monkeypatch)
     entry = {"country": "BR", "data": [{"year": 2024, "value": 3.0, "src": source_imf.SOURCE_LABEL}]}
 
-    assert "fetchedAt" not in macro._macro_series_refs("gdp_growth", entry)[0]   # no file: waterfall used the API
+    assert "fetchedAt" not in macro._macro_series_refs("gdp_growth", entry)[0]   # not stored: waterfall used the API
 
-    _file(tmp_path / "imf_gdp_growth.parquet")
+    _stored(monkeypatch, "imf_gdp_growth")
     refs = macro._macro_series_refs("gdp_growth", entry)
 
     assert refs[0]["provider"] == "imf"
     assert refs[0]["fetchedAt"] == SEP_1_NOON_ISO
 
 
-def test_macro_forecast_from_the_bulk_file_is_dated_by_it(tmp_path, monkeypatch):
+def test_macro_forecast_from_the_bulk_download_is_dated_by_it(monkeypatch):
     from backend.routers import macro
-    from backend.services import bulk_data_service as bulk
     from backend.sources import source_imf
 
-    monkeypatch.setattr(bulk, "DATA_DIR", tmp_path)
-    _file(tmp_path / "imf_gdp_growth.parquet")
+    _stored(monkeypatch, "imf_gdp_growth")
 
     async def fake_fetch(indicator, countries, start, end):
         return [{"country": "BR", "countryName": "Brazil", "source_label": source_imf.SOURCE_LABEL,
@@ -83,16 +86,13 @@ def test_macro_forecast_from_the_bulk_file_is_dated_by_it(tmp_path, monkeypatch)
     assert out["provenance"]["series.BR"]["fetchedAt"] == SEP_1_NOON_ISO
 
 
-def test_fama_french_from_the_bulk_file_is_dated_by_it(tmp_path, monkeypatch):
+def test_fama_french_from_the_bulk_download_is_dated_by_it(monkeypatch):
     from backend.routers import macro
-    from backend.services import bulk_data_service as bulk
     from backend.sources import source_datareader
 
-    monkeypatch.setattr(bulk, "FF_PATH", tmp_path / "ff_factors.parquet")
     monkeypatch.setattr(source_datareader, "fama_french",
                         lambda: [{"year": 2024, "mkt_rf": 1.0, "smb": 0.1, "hml": 0.2, "rf": 0.3}])
-
-    _file(tmp_path / "ff_factors.parquet")
+    _stored(monkeypatch, "ff_mkt_rf")
 
     out = asyncio.run(macro.fama_french())
 

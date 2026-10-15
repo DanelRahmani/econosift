@@ -1,8 +1,9 @@
 """Bulk data downloader: World Bank, Fama-French, IMF WEO.
 
 Downloads large historical datasets in bulk instead of making hundreds of
-individual API calls.  Data is stored as Parquet files under data/bulk/
-for fast local reads.  Falls back to existing per-request API calls on failure.
+individual API calls.  The World Bank, IMF, Fama-French and BIS datasets are
+stored in econosift.db (``macro_series``, Phase 66); the Factbook JSON stays
+under data/bulk/.  Falls back to existing per-request API calls on failure.
 
 Run weekly or manually from the admin panel.
 """
@@ -19,6 +20,7 @@ from datetime import datetime, timezone
 import httpx
 import pandas as pd
 
+from .. import store
 from ..config import DATA_DIR as _APP_DATA_DIR
 
 logger = logging.getLogger(__name__)
@@ -122,11 +124,10 @@ def _download_worldbank() -> dict:
                 errors.append(f"{label}: no parseable rows")
                 continue
 
-            result = pd.DataFrame(rows)
-            path = DATA_DIR / f"wb_{label}.parquet"
-            result.to_parquet(path, index=False)
-            total_rows += len(result)
-            logger.info("World Bank %s: %d rows -> %s", label, len(result), path)
+            n = store.replace_series(f"wb_{label}", [(r["iso3"], str(r["year"]), r["value"]) for r in rows],
+                                     "World Bank")
+            total_rows += n
+            logger.info("World Bank %s: %d rows stored", label, n)
         except Exception as exc:
             errors.append(f"{label}: {exc}")
             logger.warning("World Bank %s download failed: %s", label, exc)
@@ -134,23 +135,35 @@ def _download_worldbank() -> dict:
     return {"rows": total_rows, "error": "; ".join(errors) if errors else None}
 
 
-def worldbank_path(indicator_key: str) -> pathlib.Path | None:
-    """The downloaded World Bank parquet for an indicator key, or None if not downloaded."""
+def _wb_series(indicator_key: str) -> str | None:
     from ..sources.source_worldbank import INDICATOR_MAP as WB_MAP
     label = WB_INDICATORS.get(WB_MAP.get(indicator_key) or "")
-    path = DATA_DIR / f"wb_{label}.parquet" if label else None
-    return path if path is not None and path.exists() else None
+    return f"wb_{label}" if label else None
+
+
+def worldbank_stored_at(indicator_key: str) -> str | None:
+    """When the World Bank download for an indicator key was stored, or None if it wasn't."""
+    series = _wb_series(indicator_key)
+    return store.series_stored_at(series) if series else None
+
+
+def _annual(series: str, countries: list[str], start: int, end: int) -> pd.DataFrame | None:
+    """A stored annual series as columns iso3, year, value; None when not downloaded."""
+    if store.series_stored_at(series) is None:
+        return None
+    df = store.read_series(series, countries)
+    df = df.rename(columns={"country": "iso3"})
+    df["year"] = df["date"].astype(int)
+    return df[(df["year"] >= start) & (df["year"] <= end)][["iso3", "year", "value"]]
 
 
 def load_worldbank(indicator_key: str, iso3_list: list[str],
                    start: int, end: int) -> pd.DataFrame | None:
-    path = worldbank_path(indicator_key)
-    if path is None:
+    series = _wb_series(indicator_key)
+    if series is None:
         return None
     try:
-        df = pd.read_parquet(path)
-        mask = df["iso3"].isin(iso3_list) & (df["year"] >= start) & (df["year"] <= end)
-        return df[mask]
+        return _annual(series, iso3_list, start, end)
     except Exception as exc:
         logger.warning("load_worldbank failed for %s: %s", indicator_key, exc)
         return None
@@ -162,7 +175,7 @@ def load_worldbank(indicator_key: str, iso3_list: list[str],
 
 FF_URL = ("https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/"
           "ftp/F-F_Research_Data_Factors_CSV.zip")
-FF_PATH = DATA_DIR / "ff_factors.parquet"
+FF_FACTORS = ("mkt_rf", "smb", "hml", "rf")
 
 
 def _download_famafrench(client: httpx.Client | None = None) -> dict:
@@ -210,26 +223,34 @@ def _download_famafrench(client: httpx.Client | None = None) -> dict:
         if not rows:
             raise Exception("no data rows parsed from FF CSV")
 
-        df = pd.DataFrame(rows)
-        df.to_parquet(FF_PATH, index=False)
-        return {"rows": len(df), "error": None}
+        n = 0
+        for f in FF_FACTORS:
+            n += store.replace_series(f"ff_{f}", [("US", r["date"][:7], r[f]) for r in rows if r[f] is not None],
+                                      "Kenneth R. French Data Library")
+        return {"rows": n, "error": None}
     except Exception as exc:
         logger.warning("Fama-French download failed: %s", exc)
         return {"rows": 0, "error": str(exc)}
 
 
-def famafrench_path() -> pathlib.Path | None:
-    """The downloaded Fama-French parquet, or None if not downloaded."""
-    return FF_PATH if FF_PATH.exists() else None
+def famafrench_stored_at() -> str | None:
+    """When the Fama-French factors were stored, or None if they weren't."""
+    return store.series_stored_at("ff_mkt_rf")
 
 
 def load_famafrench(start_year: int = 2000) -> pd.DataFrame | None:
-    path = famafrench_path()
-    if path is None:
+    """Monthly factors (decimals) as columns date ('YYYY-MM-01'), year, month, mkt_rf, smb, hml, rf."""
+    if famafrench_stored_at() is None:
         return None
     try:
-        df = pd.read_parquet(path)
-        return df[df["year"] >= start_year]
+        wide = pd.concat({f: store.read_series(f"ff_{f}").set_index("date")["value"] for f in FF_FACTORS},
+                         axis=1).sort_index()
+        df = wide.reset_index(names="month_key")
+        df["date"] = df["month_key"] + "-01"
+        df["year"] = df["month_key"].str[:4].astype(int)
+        df["month"] = df["month_key"].str[5:7].astype(int)
+        df = df[["date", "year", "month", *FF_FACTORS]]
+        return df[df["year"] >= start_year].reset_index(drop=True)
     except Exception as exc:
         logger.warning("load_famafrench failed: %s", exc)
         return None
@@ -240,7 +261,6 @@ def load_famafrench(start_year: int = 2000) -> pd.DataFrame | None:
 # ---------------------------------------------------------------------------
 
 IMF_URL = "https://www.imf.org/external/datamapper/api/v1"
-IMF_PATH = DATA_DIR / "imf_weo.parquet"
 
 IMF_INDICATORS = {
     "NGDP_RPCH":   "gdp_growth",
@@ -292,13 +312,10 @@ def _download_imf() -> dict:
                 errors.append(f"{label}: no parseable rows")
                 continue
 
-            df = pd.DataFrame(rows)
-            df = df.dropna(subset=["value"])
-            # Store per-indicator for faster loading
-            path = DATA_DIR / f"imf_{label}.parquet"
-            df.to_parquet(path, index=False)
-            total_rows += len(df)
-            logger.info("IMF %s: %d rows -> %s", label, len(df), path)
+            n = store.replace_series(f"imf_{label}", [(r["iso3"], str(r["year"]), r["value"]) for r in rows
+                                                      if r["value"] is not None], "IMF WEO (DataMapper)")
+            total_rows += n
+            logger.info("IMF %s: %d rows stored", label, n)
         except Exception as exc:
             errors.append(f"{label}: {exc}")
             logger.warning("IMF %s download failed: %s", label, exc)
@@ -306,27 +323,27 @@ def _download_imf() -> dict:
     return {"rows": total_rows, "error": "; ".join(errors) if errors else None}
 
 
-def imf_path(indicator_key: str) -> pathlib.Path | None:
-    """The downloaded IMF WEO parquet for an indicator key, or None if not downloaded."""
+def _imf_series(indicator_key: str) -> str | None:
     from ..sources.source_imf import INDICATOR_MAP as IMAP
     label = IMF_INDICATORS.get(IMAP.get(indicator_key) or "")
-    path = DATA_DIR / f"imf_{label}.parquet" if label else None
-    return path if path is not None and path.exists() else None
+    return f"imf_{label}" if label else None
+
+
+def imf_stored_at(indicator_key: str) -> str | None:
+    """When the IMF WEO download for an indicator key was stored, or None if it wasn't."""
+    series = _imf_series(indicator_key)
+    return store.series_stored_at(series) if series else None
 
 
 def load_imf(indicator_key: str, iso2_list: list[str],
              start: int, end: int) -> pd.DataFrame | None:
     from ..config import iso2_to_iso3
 
-    path = imf_path(indicator_key)
-    if path is None:
+    series = _imf_series(indicator_key)
+    if series is None:
         return None
-
-    iso3_set = {iso2_to_iso3(c) for c in iso2_list}
     try:
-        df = pd.read_parquet(path)
-        mask = df["iso3"].isin(iso3_set) & (df["year"] >= start) & (df["year"] <= end)
-        return df[mask]
+        return _annual(series, sorted({iso2_to_iso3(c) for c in iso2_list}), start, end)
     except Exception as exc:
         logger.warning("load_imf failed for %s: %s", indicator_key, exc)
         return None
@@ -373,7 +390,7 @@ BIS_DATASETS = {
 
 
 def _download_bis_dataset(ds: dict) -> dict:
-    """Download and parse a single BIS dataset, store as parquet."""
+    """Download and parse a single BIS dataset into macro_series."""
     import io as _io, zipfile as _zipfile
 
     url_map = {
@@ -437,12 +454,11 @@ def _download_bis_dataset(ds: dict) -> dict:
                 df.loc[mask, "value"] = 1.0 / df.loc[mask, "value"]
 
         # Select output columns
-        out_cols = ["iso2", "year" if freq == "A" else "date", "value"]
-        result = df[[c for c in out_cols if c in df.columns]].dropna()
-
-        path = DATA_DIR / f"{ds['zip_key']}.parquet"
-        result.to_parquet(path, index=False)
-        return {"rows": len(result), "error": None}
+        period = "year" if freq == "A" else "date"
+        result = df[["iso2", period, "value"]].dropna()
+        n = store.replace_series(f"bis_{ds['zip_key']}", [
+            (str(r.iso2), str(getattr(r, period)), float(r.value)) for r in result.itertuples()], "BIS")
+        return {"rows": n, "error": None}
     except Exception as exc:
         logger.warning("BIS %s download failed: %s", ds["zip_key"], exc)
         return {"rows": 0, "error": str(exc)}
@@ -576,7 +592,6 @@ def _download_all_bulk_datasets(status: dict) -> None:
                 "last_attempt": now,
                 "last_ok": now if not wb["error"] else status.get("worldbank", {}).get("last_ok"),
                 "error": wb["error"], "rows": wb["rows"],
-                "size_kb": _dir_size(DATA_DIR, "wb_"),
             }
         except Exception as exc:
             status["worldbank"] = {**status.get("worldbank", {}), "last_attempt": now, "error": str(exc)}
@@ -587,7 +602,6 @@ def _download_all_bulk_datasets(status: dict) -> None:
                 "last_attempt": now,
                 "last_ok": now if not ff["error"] else status.get("famafrench", {}).get("last_ok"),
                 "error": ff["error"], "rows": ff["rows"],
-                "size_kb": _file_size(FF_PATH),
             }
         except Exception as exc:
             status["famafrench"] = {**status.get("famafrench", {}), "last_attempt": now, "error": str(exc)}
@@ -598,9 +612,6 @@ def _download_all_bulk_datasets(status: dict) -> None:
                 "last_attempt": now,
                 "last_ok": now if not imf["error"] else status.get("imf_weo", {}).get("last_ok"),
                 "error": imf["error"], "rows": imf["rows"],
-                # IMF WEO is stored as one parquet per indicator (imf_*.parquet),
-                # not a single imf_weo.parquet — sum them for the reported size.
-                "size_kb": _dir_size(DATA_DIR, "imf_"),
             }
         except Exception as exc:
             status["imf_weo"] = {**status.get("imf_weo", {}), "last_attempt": now, "error": str(exc)}
@@ -617,7 +628,6 @@ def _download_all_bulk_datasets(status: dict) -> None:
                         "last_attempt": now,
                         "error": (status.get("bis", {}).get("error", "") + "; " + bis_result["error"]).strip("; "),
                         "rows": total_bis_rows,
-                        "size_kb": _dir_size(DATA_DIR, "cpi") or _dir_size(DATA_DIR, "policy") or _dir_size(DATA_DIR, "fx") or _dir_size(DATA_DIR, "crossborder"),
                     }
                 else:
                     status["bis"] = {
@@ -625,7 +635,6 @@ def _download_all_bulk_datasets(status: dict) -> None:
                         "last_ok": now,
                         "error": None,
                         "rows": total_bis_rows,
-                        "size_kb": _dir_size(DATA_DIR, "cpi") or _dir_size(DATA_DIR, "policy") or _dir_size(DATA_DIR, "fx") or _dir_size(DATA_DIR, "crossborder"),
                     }
             except Exception as exc:
                 status["bis"] = {**status.get("bis", {}), "last_attempt": now, "error": str(exc)}

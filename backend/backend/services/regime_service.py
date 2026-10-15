@@ -4,7 +4,7 @@ Classifies quarterly macro regime for a given country based on:
   - GDP growth (YoY %) vs threshold (default 2.0 %)
   - CPI inflation (YoY %) vs threshold (default 2.5 %)
 
-Primary data source: World Bank (wb_gdp_growth.parquet, wb_inflation.parquet)
+Primary data source: World Bank (wb_gdp_growth, wb_inflation in econosift.db)
    — covers ~200 countries, annual, 1960–2024.
 Augmented: FRED for US quarterly, Eurostat for EZ quarterly, FRED for JP quarterly.
    — these provide higher-frequency quarterly data when available.
@@ -26,7 +26,7 @@ import pandas as pd
 from .. import provenance as pv
 from ..cache import cached
 from ..config import FRED_API_KEY
-from .bulk_data_service import DATA_DIR as _BULK_DIR
+from .bulk_data_service import _annual as _wb_annual
 
 GDP_THRESHOLD = 2.0   # % YoY real GDP growth
 CPI_THRESHOLD = 2.5   # % YoY CPI inflation
@@ -193,14 +193,8 @@ def _fetch_eurozone(start_year: int) -> tuple[pd.Series, pd.Series, str]:
 # World Bank bulk-data fallback — covers ~200 countries (annual)
 # ---------------------------------------------------------------------------
 
-# The bulk directory differs between Docker and the desktop build; a
-# hard-coded container path left every non-US regime empty on desktop.
-_WB_GDP_PATH = _BULK_DIR / "wb_gdp_growth.parquet"
-_WB_CPI_PATH = _BULK_DIR / "wb_inflation.parquet"
-
-
 def _fetch_wb_country(iso2: str, start_year: int) -> tuple[pd.Series, pd.Series, str]:
-    """Read annual GDP growth and CPI inflation from World Bank parquet files."""
+    """Read annual GDP growth and CPI inflation from the stored World Bank download."""
     gdp_s = pd.Series(dtype=float)
     cpi_s = pd.Series(dtype=float)
     source = "World Bank (bulk)"
@@ -214,22 +208,20 @@ def _fetch_wb_country(iso2: str, start_year: int) -> tuple[pd.Series, pd.Series,
         iso3 = iso2
 
     try:
-        if _WB_GDP_PATH.exists():
-            wb_gdp = pd.read_parquet(_WB_GDP_PATH)
-            mask = (wb_gdp["iso3"] == iso3) & (wb_gdp["year"] >= start_year)
-            gdp_rows = wb_gdp[mask][["year", "value"]].dropna()
+        wb_gdp = _wb_annual("wb_gdp_growth", [iso3], start_year, 9999)
+        if wb_gdp is not None:
+            gdp_rows = wb_gdp[["year", "value"]].dropna()
             if not gdp_rows.empty:
                 gdp_s = pd.Series(gdp_rows["value"].values, index=gdp_rows["year"].values)
                 gdp_s.index = pd.to_datetime(gdp_s.index.astype(str) + "-12-31")
-        if _WB_CPI_PATH.exists():
-            wb_cpi = pd.read_parquet(_WB_CPI_PATH)
-            mask = (wb_cpi["iso3"] == iso3) & (wb_cpi["year"] >= start_year)
-            cpi_rows = wb_cpi[mask][["year", "value"]].dropna()
+        wb_cpi = _wb_annual("wb_inflation", [iso3], start_year, 9999)
+        if wb_cpi is not None:
+            cpi_rows = wb_cpi[["year", "value"]].dropna()
             if not cpi_rows.empty:
                 cpi_s = pd.Series(cpi_rows["value"].values, index=cpi_rows["year"].values)
                 cpi_s.index = pd.to_datetime(cpi_s.index.astype(str) + "-12-31")
     except Exception:
-        source = "World Bank (error reading parquet)"
+        source = "World Bank (error reading stored data)"
     return gdp_s, cpi_s, source
 
 def _fetch_japan(start_year: int) -> tuple[pd.Series, pd.Series, str]:
@@ -310,9 +302,10 @@ def _provenance(country: str, series: list[dict], gdp_q: pd.Series, cpi_q: pd.Se
         cpi = pv.ref("worldbank", "FP.CPI.TOTL.ZG", "Inflation, consumer prices", units="annual %",
                      frequency="annual", observed=obs("cpiInflation"),
                      note="Annual value dated 31 December and shown on the quarterly axis.")
-        # Read from the downloaded bulk files: fetched when they were written (P3-35).
-        for ref, path in ((gdp, _WB_GDP_PATH), (cpi, _WB_CPI_PATH)):
-            if when := pv.file_time(path):
+        # Read from the stored bulk download: fetched when it was stored (P3-35).
+        from .. import store
+        for ref, series in ((gdp, "wb_gdp_growth"), (cpi, "wb_inflation")):
+            if when := store.series_stored_at(series):
                 ref["fetchedAt"] = when
     prov: dict = {}
     if not gdp_q.empty:
@@ -348,7 +341,7 @@ def regime_series(
       US — FRED quarterly (GDPC1, CPIAUCSL)
       EZ/EA — Eurostat quarterly (namq_10_gdp, prc_hicp_minr)
       JP — FRED quarterly GDP (JPNRGDPEXP), BIS monthly CPI
-      ALL OTHERS — World Bank annual (wb_gdp_growth, wb_inflation parquet)
+      ALL OTHERS — World Bank annual (wb_gdp_growth, wb_inflation in econosift.db)
     """
     note: str | None = None
     source_label = ""

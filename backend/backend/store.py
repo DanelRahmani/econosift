@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import contextlib
 from collections.abc import Iterable, Iterator, Sequence
+from datetime import datetime, timezone
 
 import pandas as pd
 
@@ -218,3 +219,50 @@ def counts() -> dict[str, int]:
               "macro_series", "fx_daily", "fetch_queue")
     with connect() as conn:
         return {t: conn.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0] for t in tables}
+
+# Series periods are stored as each source publishes them: 'YYYY' (annual),
+# 'YYYY-MM' (monthly), 'YYYY-Qn' (quarterly) or an ISO date (daily).
+
+def replace_series(series: str, rows: Sequence[tuple[str, str, float]], source: str) -> int:
+    """Replace one full ``macro_series`` dataset with ``(country, date, value)`` rows.
+
+    A bulk download is the whole dataset, so points the source has since
+    dropped go too. The delete, the insert and the stored-at stamp share one
+    transaction: a reader never sees the series half-written.
+    """
+    if not rows:
+        return 0  # never replace stored data with an empty download
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    with connect() as conn:
+        conn.execute("DELETE FROM macro_series WHERE series = ?", (series,))
+        conn.executemany(
+            "INSERT OR REPLACE INTO macro_series (series, country, date, value, source) VALUES (?, ?, ?, ?, ?)",
+            [(series, c, d, v, source) for c, d, v in rows])
+        conn.execute(
+            "INSERT INTO source_health (source, last_success) VALUES (?, ?) "
+            "ON CONFLICT (source) DO UPDATE SET last_success = excluded.last_success",
+            (f"series:{series}", now))
+    return len(rows)
+
+
+def series_stored_at(series: str) -> str | None:
+    """UTC time ``series`` was last stored, or None if it never was."""
+    with connect() as conn:
+        row = conn.execute("SELECT last_success FROM source_health WHERE source = ?",
+                           (f"series:{series}",)).fetchone()
+    return row[0] if row else None
+
+
+def read_series(series: str, countries: Iterable[str] | None = None) -> pd.DataFrame:
+    """``macro_series`` rows as a frame with columns country, date, value."""
+    sql = "SELECT country, date, value FROM macro_series WHERE series = ?"
+    params: list = [series]
+    if countries is not None:
+        cs = list(countries)
+        if not cs:
+            return pd.DataFrame(columns=["country", "date", "value"])
+        sql += f" AND country IN ({', '.join('?' * len(cs))})"
+        params += cs
+    with connect() as conn:
+        rows = conn.execute(sql + " ORDER BY country, date", params).fetchall()
+    return pd.DataFrame(rows, columns=["country", "date", "value"])
