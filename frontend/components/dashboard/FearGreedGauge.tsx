@@ -1,10 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { AreaChart, Area, ResponsiveContainer, YAxis, Tooltip } from "recharts";
-import { api } from "@/lib/api";
-import { useRefreshNonce } from "@/lib/refresh";
-import type { FearGreedResponse } from "@/lib/types";
+import { useQuery } from "@tanstack/react-query";
+import { apiQuery } from "@/lib/queries";
 import { Card, Skeleton, chartTooltipStyle, chartPalette, SemiGauge } from "@/components/ui";
 import { useTheme } from "@/components/ThemeProvider";
 import { MetricTooltip } from "@/components/MetricTooltip";
@@ -18,19 +16,8 @@ import { provOf } from "@/lib/provenance";
  */
 export function FearGreedGauge() {
   const { theme } = useTheme();
-  const [data, setData] = useState<FearGreedResponse | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { data = null, isLoading: loading } = useQuery(apiQuery("fearGreed"));
   const scope = useSourceScope(provOf(data));
-
-  const refreshNonce = useRefreshNonce(); // re-fetch on the page's Refresh (P1-20)
-  useEffect(() => {
-    let alive = true;
-    api.fearGreed()
-      .then((r) => alive && setData(r))
-      .catch(() => alive && setData(null))
-      .finally(() => alive && setLoading(false));
-    return () => { alive = false; };
-  }, [refreshNonce]);
 
   if (loading && !data) return <Skeleton className="h-72" />;
   if (!data || data.index === null)

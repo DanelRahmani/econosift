@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
-import { useRefreshNonce } from "@/lib/refresh";
-import type { MoversResponse, MoverRow } from "@/lib/types";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { apiQuery } from "@/lib/queries";
+import type { MoverRow } from "@/lib/types";
 import { Card, Skeleton } from "@/components/ui";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
@@ -20,21 +20,9 @@ type TabKey = (typeof TABS)[number]["key"];
 
 /** Top movers from the S&P 500 universe (compute tier 🟢). */
 export function TopMovers({ index = "sp500" }: { index?: string }) {
-  const [data, setData] = useState<MoversResponse | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { data = null, isLoading: loading } = useQuery(apiQuery("movers", index));
   const [tab, setTab] = useState<TabKey>("gainers");
   const scope = useSourceScope(provOf(data));
-
-  const refreshNonce = useRefreshNonce(); // re-fetch on the page's Refresh (P1-20)
-  useEffect(() => {
-    let alive = true;
-    setLoading(true);
-    api.movers(index)
-      .then((r) => alive && setData(r))
-      .catch(() => alive && setData(null))
-      .finally(() => alive && setLoading(false));
-    return () => { alive = false; };
-  }, [index, refreshNonce]);
 
   if (loading && !data) return <Skeleton className="h-80" />;
   if (!data) return <Card><div className="text-text-muted text-sm">Movers unavailable.</div></Card>;

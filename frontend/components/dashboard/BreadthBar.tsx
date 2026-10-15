@@ -1,10 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { LineChart, Line, ResponsiveContainer, YAxis } from "recharts";
-import { api } from "@/lib/api";
-import { useRefreshNonce } from "@/lib/refresh";
-import type { BreadthResponse } from "@/lib/types";
+import { useQuery } from "@tanstack/react-query";
+import { apiQuery } from "@/lib/queries";
 import { Skeleton } from "@/components/ui";
 import { fmtNum } from "@/lib/format";
 import { MetricTooltip } from "@/components/MetricTooltip";
@@ -17,20 +15,8 @@ import { provOf } from "@/lib/provenance";
  * oscillator, and the cumulative advance-decline line as a sparkline.
  */
 export function BreadthBar({ index = "sp500" }: { index?: string }) {
-  const [data, setData] = useState<BreadthResponse | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { data = null, isLoading: loading } = useQuery(apiQuery("breadth", index));
   const scope = useSourceScope(provOf(data));
-
-  const refreshNonce = useRefreshNonce(); // re-fetch on the page's Refresh (P1-20)
-  useEffect(() => {
-    let alive = true;
-    setLoading(true);
-    api.breadth(index)
-      .then((r) => alive && setData(r))
-      .catch(() => alive && setData(null))
-      .finally(() => alive && setLoading(false));
-    return () => { alive = false; };
-  }, [index, refreshNonce]);
 
   if (loading && !data) return <Skeleton className="h-20" />;
   if (!data || data.status === "unavailable" || !data.total)

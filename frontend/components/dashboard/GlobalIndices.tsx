@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { LineChart, Line, ResponsiveContainer, YAxis } from "recharts";
-import { api } from "@/lib/api";
-import { useRefreshNonce } from "@/lib/refresh";
-import type { IndicesResponse, IndexRow } from "@/lib/types";
+import { useQuery } from "@tanstack/react-query";
+import { apiQuery } from "@/lib/queries";
+import type { IndexRow } from "@/lib/types";
 import { Card, Skeleton } from "@/components/ui";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
@@ -12,20 +12,9 @@ import { fmtNum } from "@/lib/format";
 
 /** Global equity indices (compute tier 🟢) with region tabs and sparklines. */
 export function GlobalIndices() {
-  const [data, setData] = useState<IndicesResponse | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { data = null, isLoading: loading } = useQuery(apiQuery("indices"));
   const [region, setRegion] = useState<string>("Americas");
   const scope = useSourceScope(provOf(data));
-
-  const refreshNonce = useRefreshNonce(); // re-fetch on the page's Refresh (P1-20)
-  useEffect(() => {
-    let alive = true;
-    api.indices()
-      .then((r) => alive && setData(r))
-      .catch(() => alive && setData(null))
-      .finally(() => alive && setLoading(false));
-    return () => { alive = false; };
-  }, [refreshNonce]);
 
   const rows = useMemo(
     () => (data?.indices ?? []).filter((i) => i.region === region),
