@@ -418,7 +418,8 @@ decision holds. `pyarrow` stays in `requirements.txt` because edgartools needs i
 - **Still calling Yahoo outside the fetcher** (not in this phase's items): options chains (on demand, by
   plan); the **Calendar page's per-ticker fan-out** (`earnings_dates` + `.info` for ~500 members on page
   open, missed in the Phase 67 notes); event-study earnings dates; the Markets news/events tabs.
-- **Open performance item:** 500-company passes (DuPont, S&P 500 earnings quality) still cost ~15–19 s
-  cold. Proposed fix: have the fetcher materialise one summary row per company after each facts/snapshot
-  update, so these pages read 500 rows instead of ~750 k.
+- **500-company pages, fixed after the gate:** the fetcher stores one summary row per company (its last two
+  annual statement columns, `fundamental_summary`) whenever its facts change, and builds the 547 missing rows
+  once after an upgrade (~2 min). DuPont 15.3 s → **0.49 s** cold, S&P 500 earnings quality ~19 s → **0.79 s**,
+  Dow 0.11 s, with 0 external calls.
 - Tests: 1,396 backend; tsc clean; Playwright 48/48 after rerunning 3 cold-start timeouts (yield/macro).
