@@ -38,11 +38,13 @@ def test_13f_holders_are_dated_by_the_data_set_build(tmp_path, monkeypatch):
         f.writestr("SUBMISSION.tsv", _tsv(SUBMISSION))
         f.writestr("COVERPAGE.tsv", _tsv(COVERPAGE))
         f.writestr("INFOTABLE.tsv", _tsv(INFOTABLE))
-    store = tmp_path / "13f"
-    monkeypatch.setattr(tf, "_DIR", store)
+    from backend import store as db
+    monkeypatch.setattr(tf, "_DIR", tmp_path / "13f")
+    with db.connect() as conn:
+        conn.execute("DELETE FROM sec_dataset WHERE name = 'form13f'")
     tf.write_reduced("01mar2026-31may2026", *tf.reduce_dataset(z))
-    meta = store / "meta_01mar2026-31may2026.json"
-    meta.write_text(json.dumps({**json.loads(meta.read_text()), "builtAt": JULY_15_NOON_ISO}))
+    with db.connect() as conn:                         # as if it had been built on 2026-07-15
+        conn.execute("UPDATE sec_dataset SET built_at = ? WHERE name = 'form13f'", (JULY_15_NOON_ISO,))
     monkeypatch.setattr(tf, "_cusips_for", lambda t: [AAPL])
     monkeypatch.setattr(tf, "_latest_window", lambda: None)   # no newer data set published
     monkeypatch.setattr(tf, "_shares_outstanding", lambda t: None)
@@ -77,8 +79,12 @@ def test_insider_aggregate_is_dated_by_the_stored_data_set(tmp_path, monkeypatch
         def today(cls):
             return date(2026, 10, 1)
     monkeypatch.setattr(ds, "date", Oct1)
+    from tests.test_insider_aggregator import _empty_insider_store
+    from backend import store as db
+    _empty_insider_store()
     ds.load_latest()                                   # downloads and stores 2026q2
-    os.utime(store / "meta_2026q2.json", (JULY_15_NOON, JULY_15_NOON))
+    with db.connect() as conn:                         # as if it had been built on 2026-07-15
+        conn.execute("UPDATE sec_dataset SET built_at = ? WHERE name = 'form345'", (JULY_15_NOON_ISO,))
 
     out = agg.get_insider_aggregate()
 

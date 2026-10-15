@@ -11,7 +11,18 @@ from datetime import date
 import pandas as pd
 import pytest
 
+from backend import store
 from backend.services import thirteenf_service as tf
+
+
+@pytest.fixture(autouse=True)
+def _empty_store():
+    store.init_schema()
+    with store.connect() as conn:
+        for table in ("thirteenf_holder", "thirteenf_total"):
+            conn.execute(f"DELETE FROM {table}")
+        conn.execute("DELETE FROM sec_dataset WHERE name = 'form13f'")
+    yield
 
 AAPL = "037833100"
 MSFT = "594918104"
@@ -123,14 +134,12 @@ def test_share_class_tickers_match_the_mapping_spelling():
     assert tf._ticker_keys("AAPL") == {"AAPL"}
 
 
-def test_files_built_by_older_code_are_ignored(dataset, tmp_path, monkeypatch):
-    import json
+def test_data_sets_built_by_older_code_are_ignored(dataset, tmp_path, monkeypatch):
     monkeypatch.setattr(tf, "_DIR", tmp_path)
     tf.write_reduced("01mar2026-31may2026", *tf.reduce_dataset(dataset))
-    meta = tmp_path / "meta_01mar2026-31may2026.json"
-    m = json.loads(meta.read_text())
     assert tf._latest_meta()["format"] == tf._FORMAT
-    meta.write_text(json.dumps({**m, "format": tf._FORMAT - 1}))
+    with store.connect() as conn:
+        conn.execute("UPDATE sec_dataset SET format = ? WHERE name = 'form13f'", (tf._FORMAT - 1,))
     assert tf._latest_meta() is None  # triggers a rebuild
 
 
@@ -197,16 +206,21 @@ def test_previous_window_steps_back_one_filing_quarter():
 
 
 def test_the_two_newest_data_sets_are_kept(dataset, prev_dataset, tmp_path, monkeypatch):
-    store = tmp_path / "13f"
-    monkeypatch.setattr(tf, "_DIR", store)
+    monkeypatch.setattr(tf, "_DIR", tmp_path / "13f")
+
+    def stored():
+        with store.connect() as conn:
+            windows = {r[0] for r in conn.execute("SELECT DISTINCT filing_window FROM thirteenf_holder")}
+        assert windows == {m["window"] for m in tf._metas()}  # rows go with their meta
+        return windows
+
     tf.write_reduced(CUR, *tf.reduce_dataset(dataset))
     tf.write_reduced(PREV, *tf.reduce_dataset(prev_dataset))   # older, built on request: keeps CUR
-    assert {p.name for p in store.glob("meta_*.json")} == {f"meta_{CUR}.json", f"meta_{PREV}.json"}
+    assert stored() == {CUR, PREV}
     assert tf._latest_meta()["window"] == CUR
 
     tf.write_reduced("01jun2026-31aug2026", *tf.reduce_dataset(dataset))  # a newer quarter: PREV drops out
-    assert {p.name for p in store.glob("meta_*.json")} == {
-        f"meta_{CUR}.json", "meta_01jun2026-31aug2026.json"}
+    assert stored() == {CUR, "01jun2026-31aug2026"}
 
 
 def test_lookup_computes_qoq_change_and_pct_of_shares_outstanding(dataset, prev_dataset, tmp_path, monkeypatch):

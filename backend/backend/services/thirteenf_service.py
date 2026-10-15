@@ -16,7 +16,6 @@ from __future__ import annotations
 import asyncio
 import calendar
 import csv
-import json
 import logging
 import threading
 import time
@@ -28,14 +27,14 @@ import pandas as pd
 import requests
 
 from .. import provenance as pv
-from .. import cache
+from .. import cache, store
 from ..cache import async_cached, cached
 from . import sec_datasets
 from .bulk_data_service import DATA_DIR as _BULK_DIR
 
 log = logging.getLogger(__name__)
 
-_DIR = _BULK_DIR / "13f"
+_DIR = _BULK_DIR / "13f"  # download scratch only; reduced data sets live in thirteenf_* tables
 _TOP_N = 25          # holders kept per CUSIP in the reduced file
 _SHOW = 10           # holders returned per lookup
 _RETRY_AFTER = 3600  # seconds before a failed download is retried
@@ -169,35 +168,62 @@ def _fix_thousands(pos: pd.DataFrame) -> pd.DataFrame:
     return pos
 
 
+_HOLDER_COLS = ["cusip", "rank", "cik", "manager", "shares", "value"]
+_TOTAL_COLS = ["cusip", "filers", "shares", "value"]
+
+
 def write_reduced(window: str, holders: pd.DataFrame, totals: pd.DataFrame, period: str, url: str = "") -> None:
     """Store a reduced data set and keep only the two newest: the newest serves lookups,
-    the one before it gives the quarter-on-quarter change (P2-37)."""
-    _DIR.mkdir(parents=True, exist_ok=True)
-    holders.to_parquet(_DIR / f"holders_{window}.parquet", index=False)
-    totals.to_parquet(_DIR / f"totals_{window}.parquet", index=False)
-    meta = {"window": window, "period": period, "format": _FORMAT, "url": url,
-            "builtAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}
-    # Meta last: its presence marks the data set as complete.
-    (_DIR / f"meta_{window}.json").write_text(json.dumps(meta))
-    keep = sorted((p.stem[len("meta_"):] for p in _DIR.glob("meta_*.json")), key=_window_end)[-2:]
-    for p in _DIR.iterdir():
-        if not any(w in p.name for w in keep):
-            p.unlink(missing_ok=True)
+    the one before it gives the quarter-on-quarter change (P2-37). One transaction,
+    so a reader never sees a half-written data set."""
+    built = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    with store.connect() as conn:
+        for table in ("thirteenf_holder", "thirteenf_total"):
+            conn.execute(f"DELETE FROM {table} WHERE filing_window = ?", (window,))
+        conn.executemany(
+            f"INSERT INTO thirteenf_holder (filing_window, {', '.join(_HOLDER_COLS)}) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            [(window, *r) for r in store.records(holders, _HOLDER_COLS)])
+        conn.executemany(
+            f"INSERT INTO thirteenf_total (filing_window, {', '.join(_TOTAL_COLS)}) VALUES (?, ?, ?, ?, ?)",
+            [(window, *r) for r in store.records(totals, _TOTAL_COLS)])
+        conn.execute(
+            "INSERT OR REPLACE INTO sec_dataset (name, period_key, period, format, url, built_at) "
+            "VALUES ('form13f', ?, ?, ?, ?, ?)", (window, period, _FORMAT, url, built))
+        stored = [r[0] for r in conn.execute("SELECT period_key FROM sec_dataset WHERE name = 'form13f'")]
+        for old in sorted(stored, key=_window_end)[:-2]:
+            conn.execute("DELETE FROM sec_dataset WHERE name = 'form13f' AND period_key = ?", (old,))
+            for table in ("thirteenf_holder", "thirteenf_total"):
+                conn.execute(f"DELETE FROM {table} WHERE filing_window = ?", (old,))
+
+
+def _metas() -> list[dict]:
+    with store.connect() as conn:
+        rows = conn.execute("SELECT period_key, period, format, url, built_at FROM sec_dataset "
+                            "WHERE name = 'form13f'").fetchall()
+    return [{"window": w, "period": p, "format": f, "url": u, "builtAt": b} for w, p, f, u, b in rows]
 
 
 def _meta(window: str) -> dict | None:
     """Meta of the stored data set of ``window``, or None if absent or built by older code."""
-    path = _DIR / f"meta_{window}.json"
-    meta = json.loads(path.read_text()) if path.exists() else None
+    meta = next((m for m in _metas() if m["window"] == window), None)
     return meta if meta and meta.get("format") == _FORMAT else None
 
 
 def _latest_meta() -> dict | None:
-    if not _DIR.exists():
-        return None
-    metas = sorted(_DIR.glob("meta_*.json"), key=lambda p: _window_end(p.stem[len("meta_"):]))
-    meta = json.loads(metas[-1].read_text()) if metas else None
+    metas = sorted(_metas(), key=lambda m: _window_end(m["window"]))
+    meta = metas[-1] if metas else None
     return meta if meta and meta.get("format") == _FORMAT else None
+
+
+def _rows(table: str, window: str, cusips: list[str]) -> pd.DataFrame:
+    cols = _HOLDER_COLS if table == "thirteenf_holder" else _TOTAL_COLS
+    if not cusips:
+        return pd.DataFrame(columns=cols)
+    with store.connect() as conn:
+        rows = conn.execute(
+            f"SELECT {', '.join(cols)} FROM {table} WHERE filing_window = ? "
+            f"AND cusip IN ({', '.join('?' * len(cusips))})", (window, *cusips)).fetchall()
+    return pd.DataFrame(rows, columns=cols)
 
 
 # ---------------------------------------------------------------------------
@@ -236,8 +262,8 @@ def _changes(holders: pd.DataFrame, cusip: str, prev: dict) -> dict:
     list cut at the top ``_TOP_N`` may simply have ranked lower: no change.
     """
     w = prev["window"]
-    totals = pd.read_parquet(_DIR / f"totals_{w}.parquet", filters=[("cusip", "==", cusip)])
-    before = pd.read_parquet(_DIR / f"holders_{w}.parquet", filters=[("cusip", "==", cusip)])
+    totals = _rows("thirteenf_total", w, [cusip])
+    before = _rows("thirteenf_holder", w, [cusip])
     complete = totals.empty or int(totals["filers"].iloc[0]) <= _TOP_N
     had = dict(zip(before["cik"], before["shares"]))
     out = {}
@@ -265,13 +291,13 @@ def lookup(ticker: str, shares_outstanding: float | None = None) -> dict | None:
            "filers": None, "totalShares": None, "cusip": None, "dataset": window, "error": None,
            "change": change}
     cusips = _cusips_for(ticker)
-    totals = pd.read_parquet(_DIR / f"totals_{window}.parquet", filters=[("cusip", "in", cusips)]) if cusips else None
-    if totals is None or totals.empty:
+    totals = _rows("thirteenf_total", window, cusips)
+    if totals.empty:
         out["error"] = f"No 13F holdings of {ticker} were reported for the quarter ending {meta['period']}."
         return out
     # A ticker can map to several CUSIPs (old issues); use the one most held.
     top = totals.sort_values("filers", ascending=False).iloc[0]
-    holders = pd.read_parquet(_DIR / f"holders_{window}.parquet", filters=[("cusip", "==", top["cusip"])])
+    holders = _rows("thirteenf_holder", window, [top["cusip"]])
     holders = holders.sort_values("rank").head(_SHOW)
     changes = _changes(holders, top["cusip"], prev) if prev else {}
     out.update(cusip=top["cusip"], filers=int(top["filers"]), totalShares=int(top["shares"]), holders=[

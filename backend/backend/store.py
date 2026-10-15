@@ -134,6 +134,47 @@ CREATE TABLE IF NOT EXISTS fetch_queue (
     last_error  TEXT,
     UNIQUE (kind, key)
 );
+-- SEC quarterly data sets (Form 3/4/5 insider trades, Form 13F), reduced on download.
+CREATE TABLE IF NOT EXISTS sec_dataset (
+    name        TEXT NOT NULL,      -- 'form345' | 'form13f'
+    period_key  TEXT NOT NULL,      -- quarter ('2026q2') or filing window ('01mar2026-31may2026')
+    period      TEXT,               -- 13F: the quarter-end the holdings are reported for
+    format      INTEGER,            -- reduce_dataset version that built it
+    url         TEXT,
+    built_at    TEXT,
+    PRIMARY KEY (name, period_key)
+);
+CREATE TABLE IF NOT EXISTS insider_trade (
+    quarter       TEXT NOT NULL,
+    accession     TEXT NOT NULL,
+    sk            TEXT NOT NULL,
+    symbols       TEXT,
+    insider_name  TEXT,
+    title         TEXT,
+    code          TEXT,
+    shares        REAL,
+    price         REAL,
+    date          TEXT,
+    PRIMARY KEY (quarter, accession, sk)
+) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS thirteenf_holder (
+    filing_window TEXT NOT NULL,
+    cusip         TEXT NOT NULL,
+    rank          INTEGER NOT NULL,
+    cik           TEXT,
+    manager       TEXT,
+    shares        REAL,
+    value         REAL,
+    PRIMARY KEY (filing_window, cusip, rank)
+) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS thirteenf_total (
+    filing_window TEXT NOT NULL,
+    cusip         TEXT NOT NULL,
+    filers        INTEGER,
+    shares        REAL,
+    value         REAL,
+    PRIMARY KEY (filing_window, cusip)
+) WITHOUT ROWID;
 """
 
 # Columns prices() may read, so the field name can be interpolated safely.
@@ -211,6 +252,12 @@ def prices(symbols: Iterable[str], start: str | None = None, end: str | None = N
     wide.index = pd.to_datetime(wide.index)
     wide.columns.name = None
     return wide[[s for s in syms if s in wide.columns]].sort_index()
+
+
+def records(df: pd.DataFrame, cols: Sequence[str]) -> list[tuple]:
+    """``df[cols]`` as tuples of plain Python values (NaN -> None) for executemany."""
+    part = df[list(cols)].astype(object)
+    return [tuple(r) for r in part.where(part.notna(), None).values.tolist()]
 
 
 def counts() -> dict[str, int]:

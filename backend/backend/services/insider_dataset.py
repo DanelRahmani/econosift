@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import calendar
 import csv
-import json
 import logging
 import zipfile
 from datetime import date
@@ -19,13 +18,15 @@ from pathlib import Path
 import pandas as pd
 import requests
 
-from .. import provenance as pv
+from .. import store
 from . import sec_datasets
 from .bulk_data_service import DATA_DIR as _BULK_DIR
 
 log = logging.getLogger(__name__)
 
-_DIR = _BULK_DIR / "form345"
+_DIR = _BULK_DIR / "form345"  # download scratch only; the reduced trades live in insider_trade
+_COLS = ["accession", "sk", "symbols", "insiderName", "title", "code", "shares", "price", "date"]
+_DB_COLS = ["accession", "sk", "symbols", "insider_name", "title", "code", "shares", "price", "date"]
 _CODES = {"P", "S"}  # open-market purchase / sale
 
 
@@ -93,16 +94,43 @@ def _user_agent() -> str | None:
     return EDGAR_IDENTITY or None
 
 
+def _meta(quarter: str) -> tuple[str, str] | None:
+    """``(url, built_at)`` of the stored data set of ``quarter``, or None."""
+    with store.connect() as conn:
+        return conn.execute("SELECT url, built_at FROM sec_dataset WHERE name = 'form345' AND period_key = ?",
+                            (quarter,)).fetchone()
+
+
 def _stored(quarter: str) -> tuple[pd.DataFrame, str] | None:
-    meta = _DIR / f"meta_{quarter}.json"
-    if not meta.exists():
+    meta = _meta(quarter)
+    if meta is None:
         return None
-    return pd.read_parquet(_DIR / f"trades_{quarter}.parquet"), json.loads(meta.read_text())["url"]
+    with store.connect() as conn:
+        rows = conn.execute(f"SELECT {', '.join(_DB_COLS)} FROM insider_trade WHERE quarter = ?",
+                            (quarter,)).fetchall()
+    return pd.DataFrame(rows, columns=_COLS), meta[0]
+
+
+def _write(quarter: str, trades: pd.DataFrame, url: str) -> None:
+    """Store one quarter's trades and drop older ones, in one transaction (the
+    meta row marks it complete, so a reader never sees a half-written quarter)."""
+    from datetime import datetime, timezone
+    built = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    with store.connect() as conn:
+        conn.execute("DELETE FROM insider_trade")
+        conn.execute("DELETE FROM sec_dataset WHERE name = 'form345'")
+        conn.executemany(
+            f"INSERT OR REPLACE INTO insider_trade (quarter, {', '.join(_DB_COLS)}) "
+            f"VALUES ({', '.join('?' * (len(_DB_COLS) + 1))})",
+            [(quarter, *r) for r in store.records(trades, _COLS)])
+        conn.execute("INSERT INTO sec_dataset (name, period_key, url, built_at) VALUES ('form345', ?, ?, ?)",
+                     (quarter, url, built))
 
 
 def built_at(quarter: str) -> str | None:
-    """When the stored data set of ``quarter`` was written (its meta file marks it complete)."""
-    return pv.file_time(_DIR / f"meta_{quarter}.json")
+    """When the stored data set of ``quarter`` was built."""
+    meta = _meta(quarter)
+    return meta[1] if meta else None
 
 
 def load_latest() -> tuple[str, pd.DataFrame, str] | None:
@@ -131,12 +159,7 @@ def load_latest() -> tuple[str, pd.DataFrame, str] | None:
             trades = reduce_dataset(part)
         finally:
             part.unlink(missing_ok=True)
-        trades.to_parquet(_DIR / f"trades_{quarter}.parquet", index=False)
-        # Meta last: its presence marks the quarter as complete.
-        (_DIR / f"meta_{quarter}.json").write_text(json.dumps({"url": url}))
-        for p in _DIR.iterdir():
-            if quarter not in p.name:
-                p.unlink(missing_ok=True)
+        _write(quarter, trades, url)
         log.info("Insider data set %s: %d open-market trades", quarter, len(trades))
         return quarter, trades, url
     return None

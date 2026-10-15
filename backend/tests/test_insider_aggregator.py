@@ -123,7 +123,16 @@ def test_aggregate_known_values(dataset):
     assert {t["ticker"] for t in out["topTrades"]} == {"AAPL", "BRK-B", "HEI", "XOM"}
 
 
+def _empty_insider_store():
+    from backend import store
+    store.init_schema()
+    with store.connect() as conn:
+        conn.execute("DELETE FROM insider_trade")
+        conn.execute("DELETE FROM sec_dataset WHERE name = 'form345'")
+
+
 def test_load_latest_uses_newest_published_quarter(dataset, tmp_path, monkeypatch):
+    _empty_insider_store()
     monkeypatch.setattr(ds, "_DIR", tmp_path / "form345")
     published = {"insider-transactions-data-sets/2026q2_form345.zip": "https://sec.example/2026q2_form345.zip"}
     probes = []
