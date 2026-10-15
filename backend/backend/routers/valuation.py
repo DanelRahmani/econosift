@@ -174,7 +174,7 @@ async def risk_free_rates():
     """Live country risk-free rates from FRED (cached nightly)."""
     from ..services.risk_free_service import get_risk_free_rates
     rates = await get_risk_free_rates()
-    return pv.attach({"rates": rates}, _risk_free_provenance(rates))
+    return pv.attach({"rates": rates}, await asyncio.to_thread(_risk_free_provenance, rates))
 
 
 def _risk_free_provenance(rates: list[dict]) -> dict:
@@ -226,7 +226,8 @@ async def dcf(
     """Two-stage DCF valuation with scenario table and sensitivity heatmap."""
     sym = ticker.strip().upper()
     bundle = await asyncio.to_thread(yfs.get_info, sym)
-    result = two_stage_dcf(
+    result = await asyncio.to_thread(
+        two_stage_dcf,
         bundle,
         fcf_growth=fcf_growth,
         terminal_growth=terminal_growth,
@@ -258,7 +259,7 @@ async def full(ticker: str):
         asyncio.to_thread(valuation_models, bundle, beta),
         asyncio.to_thread(extended_fundamentals, bundle),
     )
-    kpis = _kpis(bundle.get("info", {}) or {}, bundle)
+    kpis = await asyncio.to_thread(_kpis, bundle.get("info", {}) or {}, bundle)
     # Fix 7: Inject computed beta when yfinance info.beta is null
     beta_injected = kpis.get("beta") is None and beta is not None
     if beta_injected:
@@ -267,7 +268,7 @@ async def full(ticker: str):
     info = bundle.get("info", {}) or {}
     prov.update(_kpi_provenance(sym, kpis, beta_injected,
                                 info.get("financialCurrency") not in (None, info.get("currency"))))
-    prov.update(valuation_engine.provenance(bundle, valuation, beta, "valuation"))
+    prov.update(await asyncio.to_thread(valuation_engine.provenance, bundle, valuation, beta, "valuation"))
     prov.update(fundamentals_svc.provenance(bundle, "fundamentals"))
     prov.update(analyst_service.provenance(analyst, "analyst"))
     # A bundle Yahoo answered only in part is never cached (get_info's skip_if), so asking again soon

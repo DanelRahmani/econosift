@@ -39,7 +39,7 @@ FIELDS = {
 async def _row_for(sym: str, period: str, risk_free: float) -> dict:
     bench = yfs.benchmark_for(sym)
     bundle = await asyncio.to_thread(yfs.get_info, sym)
-    payload = metrics.compute_ratios(bundle)
+    payload = await asyncio.to_thread(metrics.compute_ratios, bundle)
 
     frame = await asyncio.to_thread(
         yfs.get_close_frame, tuple(dict.fromkeys([sym, bench])), period)
@@ -148,7 +148,7 @@ async def get_presets():
 
 
 @router.get("/status")
-async def get_status(index: str = Query("dow")):
+def get_status(index: str = Query("dow")):
     """Return cache freshness info for a given index universe."""
     if index not in _VALID_INDICES:
         raise HTTPException(status_code=422, detail=f"index must be one of {sorted(_VALID_INDICES)}")
@@ -173,7 +173,7 @@ async def trigger_refresh(index: str = Query("dow")):
 
 
 @router.get("/universe")
-async def get_universe(
+def get_universe(
     index: str = Query("dow"),
     presets: str = Query("", description="Comma-separated preset IDs"),
     filters: str = Query("", description="JSON array of {field,op,value} objects"),

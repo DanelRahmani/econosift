@@ -21,7 +21,7 @@ async def ratios(ticker: str, period: str = "1y", risk_free: float | None = None
     bench = yfs.benchmark_for(sym)
 
     bundle = await asyncio.to_thread(yfs.get_info, sym)
-    payload = metrics.compute_ratios(bundle)
+    payload = await asyncio.to_thread(metrics.compute_ratios, bundle)
 
     frame = await asyncio.to_thread(
         yfs.get_close_frame, tuple(dict.fromkeys([sym, bench])), period)

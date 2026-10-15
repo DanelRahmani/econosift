@@ -7,6 +7,7 @@ Three capabilities built on existing data infrastructure:
 """
 from __future__ import annotations
 
+import asyncio
 import numpy as np
 import pandas as pd
 
@@ -108,7 +109,7 @@ async def get_cross_asset_correlations(tickers: list[str], period: str = "3y") -
     if not tickers or len(tickers) < 2:
         return {"assets": [], "labels": [], "matrix": [], "rolling": {"dates": [], "values": []}}
 
-    frame = yfs.get_close_frame(tuple(tickers), period)
+    frame = await asyncio.to_thread(yfs.get_close_frame, tuple(tickers), period)
     if frame is None or frame.empty:
         return {"assets": tickers, "labels": tickers, "matrix": [], "rolling": {"dates": [], "values": []}}
 
@@ -154,7 +155,7 @@ async def get_fx_macro_link() -> dict:
         all_tickers.add(link["commodity"])
     tickers = tuple(all_tickers)
 
-    frame = yfs.get_close_frame(tickers, "5y")
+    frame = await asyncio.to_thread(yfs.get_close_frame, tickers, "5y")
     if frame is None or frame.empty:
         return {"links": [], "error": "No data available"}
 
@@ -277,7 +278,7 @@ async def get_multi_country_portfolio(holdings: list[dict], period: str = "3y") 
 
     # Get price data
     tickers = tuple(dict.fromkeys(h["ticker"] for h in cleaned))
-    frame = yfs.get_close_frame(tickers, period)
+    frame = await asyncio.to_thread(yfs.get_close_frame, tickers, period)
     if frame is None or frame.empty:
         return {"error": "No price data available", "holdings": cleaned}
 
@@ -287,7 +288,8 @@ async def get_multi_country_portfolio(holdings: list[dict], period: str = "3y") 
     currencies = set(h["currency"] for h in cleaned if h["currency"] != "USD")
     fx_data: dict[str, pd.Series] = {}
     if currencies:
-        fx_frame = yfs.get_close_frame(tuple(f"{c}USD=X" for c in currencies) + tuple(f"USD{c}=X" for c in currencies), period)
+        fx_frame = await asyncio.to_thread(
+            yfs.get_close_frame, tuple(f"{c}USD=X" for c in currencies) + tuple(f"USD{c}=X" for c in currencies), period)
         if fx_frame is not None and not fx_frame.empty:
             for ccy in currencies:
                 direct = f"{ccy}USD=X"

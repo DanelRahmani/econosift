@@ -153,6 +153,8 @@ async def get_risk_free_rates() -> list[dict]:
                    "tenor": "hard-coded estimate", "asOf": None, "stale": None}
         else:
             continue
-        result.append({"name": country, **row, "erp": _get_country_erp(country)})
+        # The first ERP lookup downloads the Damodaran sheet; keep it off the event loop.
+        erp = await asyncio.to_thread(_get_country_erp, country)
+        result.append({"name": country, **row, "erp": erp})
 
     return result

@@ -14,7 +14,7 @@ router = APIRouter(prefix="/api/corporate", tags=["corporate"])
 
 
 @router.get("/health")
-async def corporate_health(ticker: str = Query(..., description="Ticker symbol, e.g. AAPL")):
+def corporate_health(ticker: str = Query(..., description="Ticker symbol, e.g. AAPL")):
     """Return Altman Z-Score, Piotroski F-Score, and Beneish M-Score for a ticker."""
     try:
         ticker = ticker.strip().upper()

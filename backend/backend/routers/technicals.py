@@ -11,7 +11,7 @@ _VALID_PERIODS = {"1mo", "3mo", "6mo", "1y", "2y", "5y"}
 
 
 @router.get("")
-async def get_technicals(
+def get_technicals(
     ticker: str = Query(..., description="Ticker symbol, e.g. AAPL"),
     period: str = Query("1y", description="Period: 1mo, 3mo, 6mo, 1y, 2y, 5y"),
 ):

@@ -25,7 +25,7 @@ def _oldest_row_time(symbols: list[str]) -> str | None:
 
 
 @router.get("")
-async def get_snowflake(ticker: str = Query(..., description="Stock ticker symbol")):
+def get_snowflake(ticker: str = Query(..., description="Stock ticker symbol")):
     """Full Snowflake score for a single ticker (5 axes, 0–10 each)."""
     if not ticker:
         raise HTTPException(status_code=400, detail="ticker is required")
@@ -36,7 +36,7 @@ async def get_snowflake(ticker: str = Query(..., description="Stock ticker symbo
 
 
 @router.get("/batch")
-async def get_snowflake_batch(
+def get_snowflake_batch(
     tickers: str = Query(..., description="Comma-separated ticker symbols"),
 ):
     """Lightweight Snowflake scores for multiple tickers (cache-only)."""

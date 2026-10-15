@@ -9,7 +9,7 @@ router = APIRouter(prefix="/api/dividend", tags=["dividend"])
 
 
 @router.get("/analysis")
-async def dividend_analysis(ticker: str = Query(..., description="Ticker symbol, e.g. KO, AAPL")):
+def dividend_analysis(ticker: str = Query(..., description="Ticker symbol, e.g. KO, AAPL")):
     """Dividend yield, growth rates, payout ratio, sustainability, and DDM fair value."""
     try:
         ticker = ticker.strip().upper()

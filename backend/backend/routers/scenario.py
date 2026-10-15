@@ -13,12 +13,12 @@ class CustomShockRequest(PortfolioRequest):
     shocks: dict[str, float] # {"equities": -0.10, "rates": 50, "credit": 100}
 
 @router.get("/historical")
-async def get_historical_episodes():
+def get_historical_episodes():
     """Return predefined historical episodes and shocks."""
     return scenario_lab.get_historical_episodes()
 
 @router.post("/historical/stress")
-async def stress_historical(req: PortfolioRequest):
+def stress_historical(req: PortfolioRequest):
     """Stress test a portfolio using predefined historical periods."""
     tickers = [h["ticker"] for h in req.holdings]
     if not tickers:
@@ -48,7 +48,7 @@ async def stress_historical(req: PortfolioRequest):
         raise HTTPException(500, f"Stress test failed: {str(e)}")
 
 @router.post("/custom")
-async def simulate_custom(req: CustomShockRequest):
+def simulate_custom(req: CustomShockRequest):
     """Simulate a custom shock using beta exposure."""
     tickers = [h["ticker"] for h in req.holdings] + ["^GSPC", "TLT", "HYG"]
     tickers = list(set(tickers))

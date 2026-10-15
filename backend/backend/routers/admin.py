@@ -1,7 +1,6 @@
 """Backend health dashboard: cache stats and data-source availability."""
 from __future__ import annotations
 
-import asyncio
 import os
 import re
 import time
@@ -20,7 +19,7 @@ _STARTED = time.time()
 
 
 @router.get("/health")
-async def health():
+def health():
     cache_stats = cache.stats()
     total_hits = sum(s["hits"] for s in cache_stats.values())
     total_misses = sum(s["misses"] for s in cache_stats.values())
@@ -57,7 +56,7 @@ async def health():
             "overallHitRate": round(total_hits / total, 4) if total else None,
             "ttlSeconds": cache._CACHE_TTL,
             # Entries cached before an upgrade added sources (P2-33); Admin suggests a clear.
-            "provenanceGaps": await asyncio.to_thread(cache.provenance_gaps),
+            "provenanceGaps": cache.provenance_gaps(),
         },
         "config": {
             "fredApiKey": bool(FRED_API_KEY),
@@ -69,7 +68,7 @@ async def health():
 
 
 @router.get("/performance")
-async def performance():
+def performance():
     """System performance stats: cache hit rates, recent job executions, DB info."""
     # Cache stats (uses the same cache.stats() as /health)
     cache_stats = cache.stats()
