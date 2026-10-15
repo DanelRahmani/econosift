@@ -208,7 +208,7 @@ one item per commit and push after each one. Open a PR to `DEV` only when the ow
 |---|---|---|
 | **65.0 — Verify sources live** | Before writing code, run quick throwaway checks from the owner's machine against every endpoint in §7. Don't commit probe scripts or add tests for this. Record the results (works / limits / response shape) in a new §8 of this file, and adjust the plan where something doesn't work | Every source in §3 is marked ✅ verified or ❌ dropped, with a replacement |
 | **65 — Stop the bleeding** | Empty-DataFrame cache guard; fix the ~25 blocking `async` routes; nginx: no retry on timeout; frontend `retry: 1` + request timeout; stagger startup (no screener warm-up at boot); a global Yahoo rate limiter + circuit breaker wrapped around the existing yfinance calls | No app-wide freezes; no Yahoo 429 storms in the logs on a cold start; blank panels show an error instead |
-| **66 — One database + fetcher** | Consolidated `econosift.db` with the schema above, built fresh with no data migration; fetcher thread; bulk 15-min snapshot via `yf.screen` (decided in §8.1, no spike needed); one-time backfill with progress in Admin; `store.prices()` helper | Restart is instant and warm; one Yahoo request log shows ≤ a few hundred calls/day |
+| **66 — One database + fetcher** ✅ | Consolidated `econosift.db` with the schema above, built fresh with no data migration; fetcher thread; bulk 15-min snapshot via `yf.screen` (decided in §8.1, no spike needed); one-time backfill with progress in Admin; `store.prices()` helper | Restart is instant and warm; one Yahoo request log shows ≤ a few hundred calls/day |
 | **67 — Read from the store** | Move treemap, breadth, sector, screener, risk, portfolio, technicals, markets to DB reads; `asOf` on responses; remove the old per-ticker paths and the now-unused cache code | **Zero** Yahoo calls on any page open for daily/snapshot data |
 | **68 — SEC fundamentals** | SEC companyfacts backfill + nightly frames change-detection → `fundamental`, with the §8.3 concept fallbacks; screener/valuation/ratios read from it; weekly rotating Yahoo refresh for estimates; optional free-key fallbacks in Admin | Screener refresh makes no per-ticker `.info` calls |
 | **69 — Frontend data layer** | `useQuery` migration, `asOf`/pending UI, per-panel error boundaries, lazy tabs, mocked e2e | Tab switches don't refetch; CI e2e green |
@@ -356,3 +356,22 @@ Frames coverage per concept (duration `CY2025Q2`, instant `CY2025Q2I`):
 **Plan change:** the price and macro Parquet files still move into `econosift.db` (Phase 66). The
 insider and 13F datasets move too, as indexed tables keyed on cusip/quarter, so the "one database"
 decision holds. `pyarrow` stays in `requirements.txt` because edgartools needs it.
+
+### 8.7 Phase 66 gate (2026-10-15, Docker)
+
+- **Backfill:** 518/518 symbols, `period="max"`, **4.44 M daily bars** and 51 k splits/dividends. It took
+  ~1,040 chart requests (about 2 per symbol, because yfinance also looks up each symbol's timezone the
+  first time) and ~20 min. Zero failures, zero 429s. A container recreate mid-run resumed at the
+  stored count. The plan's ~100 MB estimate assumed 10 years; with full history the database is
+  **~450 MB**. Range reads stay single B-tree walks.
+- **Snapshot:** live `yf.screen` returned 518/518 members in 5 API calls. The closing pass wrote
+  today's bar for all 518, and no false split re-fetches fired.
+- **Daily Yahoo budget, steady state:** about 145 screen calls (27 intraday runs + 2 after the close,
+  5 calls each), plus the weekday history rotation of ~104 symbols (104–208 chart calls depending on
+  the timezone cache). That is **~250–350 per day**, a little above §2.2's 200–300 because of the
+  rotation that keeps adjusted closes current. It can be cut later if needed (e.g. rotate weekly by
+  dividend calendar).
+- Pages still fetch live in 66, so cold page timings are unchanged from Phase 65 (breadth, movers
+  and treemap still over 120 s cold). Phase 67 moves them to the store.
+- Found and fixed: the Fama-French bulk parser stored 12 annual rows misdated `0020-01…12` instead of
+  the ~1,200 monthly rows. Readers had always filtered them out and used the live API.
