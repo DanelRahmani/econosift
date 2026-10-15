@@ -8,7 +8,7 @@ import { api } from "@/lib/api";
 import { useUrlState } from "@/lib/useUrlState";
 import type { EventsResponse } from "@/lib/types";
 import { SearchBar } from "@/components/SearchBar";
-import { Card, Skeleton, ChartSkeleton, ScrollableTabBar, ExportPdfButton } from "@/components/ui";
+import { Card, Skeleton, ChartSkeleton, ScrollableTabBar, ExportPdfButton, PanelBoundary } from "@/components/ui";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
 import { PriceChart } from "@/components/markets/PriceChart";
@@ -277,7 +277,7 @@ function MarketsPageInner() {
       <ErrorBoundary key={tab}>
       {tab === "Overview" && tickers.length > 0 && (
         <div className="space-y-6">
-          <QuoteCards tickers={tickers} />
+          <PanelBoundary name="Quotes" resetKey={tickersKey}><QuoteCards tickers={tickers} /></PanelBoundary>
           {risk && (
             <div className="space-y-4" {...riskScope}>
               {(risk.metrics ?? []).map((m) => {
@@ -327,14 +327,14 @@ function MarketsPageInner() {
             <h2 className="text-sm font-semibold mb-4 text-text-secondary">Normalised Price (base 100)</h2>
             {pricesLoading ? <Skeleton className="h-96" /> : prices && <PriceChart data={prices} events={events} />}
           </Card>
-          <SnowflakeChart ticker={tickers[0]} onAxisClick={handleSnowflakeClick} />
+          <PanelBoundary name="Snowflake score" resetKey={tickers[0]}><SnowflakeChart ticker={tickers[0]} onAxisClick={handleSnowflakeClick} /></PanelBoundary>
           <AiSummaryPanel
             summaryType="company"
             title="AI Analysis"
             options={tickers.map((t) => ({ key: t, label: t }))}
             onGenerate={(model, force, selected) => api.aiCompany(selected.join(",") || tickers[0], model, force)}
           />
-          <NewsFeed tickers={tickers} />
+          <PanelBoundary name="News" resetKey={tickersKey}><NewsFeed tickers={tickers} /></PanelBoundary>
         </div>
       )}
 
@@ -364,9 +364,9 @@ function MarketsPageInner() {
         <div className="space-y-6">
           {tickers.length > 0 ? (
             <>
-              <InstitutionalHolders ticker={tickers[0]} />
-              <InsiderActivity ticker={tickers[0]} />
-              <NewsFeed tickers={tickers} />
+              <PanelBoundary name="Institutional holders" resetKey={tickers[0]}><InstitutionalHolders ticker={tickers[0]} /></PanelBoundary>
+              <PanelBoundary name="Insider activity" resetKey={tickers[0]}><InsiderActivity ticker={tickers[0]} /></PanelBoundary>
+              <PanelBoundary name="News" resetKey={tickersKey}><NewsFeed tickers={tickers} /></PanelBoundary>
             </>
           ) : (
             <Card><div className="text-text-muted">Search and add a ticker to begin.</div></Card>

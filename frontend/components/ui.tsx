@@ -1,5 +1,5 @@
 "use client";
-import { useRef, useState, useEffect, type HTMLAttributes, type ReactNode } from "react";
+import { Component, useRef, useState, useEffect, type ErrorInfo, type HTMLAttributes, type ReactNode } from "react";
 import { RadialBarChart, RadialBar, PolarAngleAxis, ResponsiveContainer } from "recharts";
 import { asOfLabel, isPending } from "@/lib/asOf";
 
@@ -330,6 +330,46 @@ export function DataAsOf({ data, label = "Data", className = "" }: { data: unkno
       {label ? `${label} as of` : "as of"} {when}
     </span>
   );
+}
+
+/**
+ * Catches a render error inside one panel, so the rest of the page keeps working (Phase 69).
+ * Shows a compact card naming the panel, with a retry; `resetKey` (e.g. the ticker) clears the
+ * error when the panel's input changes. Page-level crashes are ErrorBoundary's job.
+ */
+export class PanelBoundary extends Component<
+  { name: string; resetKey?: unknown; children: ReactNode },
+  { error: Error | null; key: unknown }
+> {
+  state: { error: Error | null; key: unknown } = { error: null, key: this.props.resetKey };
+
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+
+  static getDerivedStateFromProps(props: { resetKey?: unknown }, state: { error: Error | null; key: unknown }) {
+    return props.resetKey !== state.key ? { error: null, key: props.resetKey } : null;
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error(`Panel "${this.props.name}" failed to render:`, error, info.componentStack);
+  }
+
+  render() {
+    if (!this.state.error) return this.props.children;
+    return (
+      <div role="alert" className="card border border-danger/30" data-testid="panel-error">
+        <p className="text-sm font-semibold text-text-primary">{this.props.name} failed to render</p>
+        <p className="text-xs text-text-muted mt-1 break-words">{this.state.error.message}</p>
+        <button
+          onClick={() => this.setState({ error: null })}
+          className="mt-3 px-3 py-1.5 rounded-lg text-xs font-medium border border-border text-text-secondary hover:text-text-primary hover:bg-surface-alt transition-colors"
+        >
+          Try again
+        </button>
+      </div>
+    );
+  }
 }
 
 export function ChartSkeleton({ height = "h-80" }: { height?: string }) {

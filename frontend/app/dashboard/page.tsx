@@ -1,6 +1,6 @@
 "use client";
 
-import { Card } from "@/components/ui";
+import { Card, PanelBoundary } from "@/components/ui";
 import { BreadthBar } from "@/components/dashboard/BreadthBar";
 import { FearGreedGauge } from "@/components/dashboard/FearGreedGauge";
 import { GlobalIndices } from "@/components/dashboard/GlobalIndices";
@@ -23,30 +23,30 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       <WalkthroughBanner pageKey="dashboard" />
-      <BreadthBar />
+      <PanelBoundary name="Market breadth"><BreadthBar /></PanelBoundary>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-1">
-          <FearGreedGauge />
+          <PanelBoundary name="Fear & Greed"><FearGreedGauge /></PanelBoundary>
         </div>
         <div className="lg:col-span-2 space-y-6">
           <Card>
             <h2 className="text-sm font-semibold mb-3 text-text-secondary">Macro Regime &amp; Session</h2>
             <div className="flex flex-wrap items-center gap-4">
-              <RegimeDetector country="US" countryName="United States" />
+              <PanelBoundary name="Macro regime"><RegimeDetector country="US" countryName="United States" /></PanelBoundary>
               <MarketSession />
             </div>
           </Card>
-          <GlobalIndices />
+          <PanelBoundary name="Global indices"><GlobalIndices /></PanelBoundary>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <YieldCurve />
-        <TopMovers />
+        <PanelBoundary name="Yield curve"><YieldCurve /></PanelBoundary>
+        <PanelBoundary name="Top movers"><TopMovers /></PanelBoundary>
       </div>
 
-      <SectorHeatmap />
+      <PanelBoundary name="Sector performance"><SectorHeatmap /></PanelBoundary>
 
       <AiSummaryPanel
         summaryType="dashboard"

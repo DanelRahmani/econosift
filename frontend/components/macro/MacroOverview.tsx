@@ -5,7 +5,7 @@ import { apiQuery } from "@/lib/queries";
 import { api } from "@/lib/api";
 import type { Country, Indicator, MacroSeries } from "@/lib/types";
 import { provOf, type Provenance } from "@/lib/provenance";
-import { Card, Skeleton } from "@/components/ui";
+import { Card, Skeleton, PanelBoundary } from "@/components/ui";
 import { FxWidget } from "./FxWidget";
 import { YieldCurve } from "./YieldCurve";
 import { RegimeClock } from "./RegimeClock";
@@ -63,7 +63,7 @@ export function MacroOverview() {
 
   return (
     <div className="space-y-6">
-      <FxWidget />
+      <PanelBoundary name="FX rates"><FxWidget /></PanelBoundary>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="lg:col-span-1">
@@ -182,11 +182,11 @@ export function MacroOverview() {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <CountryComparison selected={selected} countries={countries} />
-        <YieldCurve />
+        <PanelBoundary name="Country comparison"><CountryComparison selected={selected} countries={countries} /></PanelBoundary>
+        <PanelBoundary name="Yield curve"><YieldCurve /></PanelBoundary>
       </div>
 
-      <InflationHeatmap selected={selected} countries={countries} />
+      <PanelBoundary name="Inflation heatmap"><InflationHeatmap selected={selected} countries={countries} /></PanelBoundary>
 
       <AiSummaryPanel
         summaryType="macro"

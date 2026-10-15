@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiQuery } from "@/lib/queries";
 import type { CountryRate } from "@/lib/types";
-import { Card } from "@/components/ui";
+import { Card, PanelBoundary } from "@/components/ui";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf, type Provenance } from "@/lib/provenance";
 import { ValuationEngine } from "@/components/markets/ValuationEngine";
@@ -112,7 +112,7 @@ export function ValuationTab({
         </div>
       </Card>
 
-      <ValuationEngine tickers={tickers} onNavigateTab={onNavigateTab} />
+      <PanelBoundary name="Valuation engine" resetKey={tickers.join(",")}><ValuationEngine tickers={tickers} onNavigateTab={onNavigateTab} /></PanelBoundary>
       <div>
         <h2 className="text-sm font-semibold mb-3 text-text-secondary">
           Interactive Two-Stage DCF
@@ -120,7 +120,7 @@ export function ValuationTab({
         <p className="text-xs text-text-muted mb-3">
           Starts from the same assumptions as the DCF model above (the ticker&apos;s WACC and growth); move the sliders to stress them.
         </p>
-        <DcfPanel tickers={tickers} sharedWacc={customWacc} />
+        <PanelBoundary name="DCF" resetKey={tickers.join(",")}><DcfPanel tickers={tickers} sharedWacc={customWacc} /></PanelBoundary>
       </div>
     </div>
   );

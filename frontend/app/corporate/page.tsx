@@ -3,7 +3,7 @@
 import { Suspense } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiQuery } from "@/lib/queries";
-import { Card, PageSkeleton, ControlBar, DataAsOf } from "@/components/ui";
+import { Card, PageSkeleton, ControlBar, DataAsOf, PanelBoundary } from "@/components/ui";
 import { TickerSearch } from "@/components/TickerSearch";
 import { useUrlState } from "@/lib/useUrlState";
 import { EarningsQuality } from "@/components/corporate/EarningsQuality";
@@ -258,7 +258,7 @@ function CorporatePageInner() {
       )}
 
       {/* Earnings Quality & Accruals (Sloan) */}
-      <EarningsQuality />
+      <PanelBoundary name="Earnings quality"><EarningsQuality /></PanelBoundary>
     </div>
   );
 }
