@@ -191,17 +191,12 @@ def _download_famafrench(client: httpx.Client | None = None) -> dict:
             )
             raw = zf.read(csv_name).decode("utf-8", errors="replace")
 
-        lines = raw.splitlines()
-        data_start = 0
-        for i, line in enumerate(lines):
-            if line.strip() == "" and i > 3:
-                data_start = i + 1
-                break
-
+        # Monthly rows are keyed YYYYMM. The file's annual table follows, keyed
+        # YYYY; reading those as YYYYMM turned 2001-2012 into months of "year 20".
         rows = []
-        for line in lines[data_start:]:
+        for line in raw.splitlines():
             parts = line.split(",")
-            if len(parts) < 5:
+            if len(parts) < 5 or not (parts[0].strip().isdigit() and len(parts[0].strip()) == 6):
                 continue
             try:
                 year_mon = int(parts[0].strip())

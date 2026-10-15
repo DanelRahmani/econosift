@@ -52,3 +52,36 @@ def test_load_famafrench_rebuilds_the_monthly_factor_table():
     df = bulk.load_famafrench(2000)
     assert df.to_dict("records") == [{"date": "2024-01-01", "year": 2024, "month": 1,
                                       "mkt_rf": 0.01, "smb": 0.02, "hml": 0.03, "rf": 0.04}]
+
+
+def test_famafrench_download_keeps_the_monthly_table_and_skips_the_annual_one():
+    import io
+    import zipfile
+
+    csv = ("This file was created using the 202608 CRSP database.\n"
+           "The 1-month TBill rate data until 202405 ...\n\n"
+           ",Mkt-RF,SMB,HML,RF\n"
+           "192607,    2.89,   -2.55,   -2.39,    0.22\n"
+           "202608,    1.10,    0.20,   -0.30,    0.40\n\n"
+           " Annual Factors: January-December \n"
+           ",Mkt-RF,SMB,HML,RF\n"
+           "  1927,   29.47,   -2.46,   -3.75,    3.12\n"
+           "  2005,    3.09,   -1.04,    9.17,    2.95\n")
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        z.writestr("F-F_Research_Data_Factors.CSV", csv)
+
+    class Resp:
+        content = buf.getvalue()
+
+        def raise_for_status(self):
+            pass
+
+    class Client:
+        def get(self, url):
+            return Resp()
+
+    assert bulk._download_famafrench(Client()) == {"rows": 8, "error": None}
+    got = store.read_series("ff_mkt_rf")
+    assert got["date"].tolist() == ["1926-07", "2026-08"]
+    assert got["value"].tolist() == pytest.approx([0.0289, 0.011])
