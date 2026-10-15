@@ -8,9 +8,10 @@ import logging
 
 import numpy as np
 import pandas as pd
-import yfinance as yf
 
+from .. import fundamentals_store as fs
 from .. import provenance as pv
+from .. import store
 from ..cache import cached
 from . import dcf_engine
 
@@ -31,6 +32,19 @@ def _now() -> pd.Timestamp:
     return pd.Timestamp.now()
 
 
+def _stored_dividends(ticker: str) -> pd.Series:
+    """Per-share dividends from the stored daily history (``corporate_action``), as
+    Ticker.dividends returned them; queues the history when it isn't stored."""
+    with store.connect() as conn:
+        rows = conn.execute("SELECT date, value FROM corporate_action WHERE symbol = ? AND type = 'dividend' "
+                            "ORDER BY date", (ticker,)).fetchall()
+    if not rows:
+        from .. import fetcher
+        fetcher.request_history([ticker])
+        return pd.Series(dtype=float)
+    return pd.Series([v for _, v in rows], index=pd.DatetimeIndex([d for d, _ in rows]))
+
+
 def _safe_div(a: float | None, b: float | None) -> float | None:
     if a is None or b is None or b == 0:
         return None
@@ -42,10 +56,11 @@ def get_dividend_analysis(ticker: str) -> dict:
     """Return dividend yield, growth rates, payout ratio, sustainability, and DDM fair value."""
     ticker = ticker.strip().upper()
     try:
-        stock = yf.Ticker(ticker)
-        info = stock.info or {}
-        dividends = stock.dividends
-        cashflow = stock.cashflow
+        from . import yfinance_service as yfs
+        bundle = yfs.get_info(ticker)  # stored fundamentals, no Yahoo call
+        info = bundle.get("info") or {}
+        dividends = _stored_dividends(ticker)
+        cashflow = bundle.get("cashflow_df")
 
         price = info.get("currentPrice") or info.get("regularMarketPrice")
         name = info.get("shortName") or info.get("longName") or ticker
@@ -211,19 +226,20 @@ def get_dividend_analysis(ticker: str) -> dict:
             "ddmUpsidePct": round((ddm_value / price - 1) * 100, 1) if ddm_value and price else None,
             "annualDividends": {str(y): round(v, 4) for y, v in sorted(annual_divs.items())},
             "asOf": last_div_date.strftime("%Y-%m-%d") if last_div_date is not None else None,
-        }, _provenance(ticker, last_div_date.strftime("%Y-%m-%d") if last_div_date is not None else None))
+        }, _provenance(bundle, last_div_date.strftime("%Y-%m-%d") if last_div_date is not None else None))
     except Exception as exc:
         logger.warning("dividend_analysis failed for %s: %s", ticker, exc)
         return {"ticker": ticker, "error": str(exc)}
 
 
-def _provenance(ticker: str, last_div: str | None) -> dict:
-    """Refs for /dividend/analysis: dividend history, TTM figures from Yahoo info, and the DDM inputs."""
+def _provenance(bundle: dict, last_div: str | None) -> dict:
+    """Refs for /dividend/analysis: dividend history, stored company fields, and the DDM inputs."""
     from .discount_rates import risk_free_rate_is_fallback
 
-    hist = pv.yahoo(ticker, "Ticker.dividends: per-share dividend payments", frequency="event",
-                    units="currency per share", observed=last_div)
-    info = pv.yahoo(ticker, "Ticker.info: price, yield, EPS, shares, free cash flow")
+    ticker = bundle.get("ticker")
+    hist = pv.yahoo(ticker, "Per-share dividend payments from the stored daily history (Yahoo chart events)",
+                    frequency="event", units="currency per share", observed=last_div)
+    info = [fs.field_ref(bundle, f) for f in ("trailingEps", "sharesOutstanding", "freeCashflow")]
     rf_fallback = risk_free_rate_is_fallback()
 
     def d(formula: str, inputs: list, title: str, **kw) -> dict:
@@ -235,10 +251,10 @@ def _provenance(ticker: str, last_div: str | None) -> dict:
                  note="Hard-coded 4% used because FRED could not be read." if rf_fallback else None)
     return {
         "*": hist,
-        "price": pv.yahoo(ticker, "info.currentPrice (else regularMarketPrice)"),
-        "name": pv.yahoo(ticker, "info.shortName (else longName)"),
-        "sector": pv.yahoo(ticker, "info.sector"),
-        "dividendYield": pv.yahoo(ticker, "info.dividendYield", units="percent (0.98 = 0.98%)"),
+        "price": fs.field_ref(bundle, "currentPrice"),
+        "name": fs.field_ref(bundle, "shortName"),
+        "sector": fs.field_ref(bundle, "sector"),
+        "dividendYield": fs.field_ref(bundle, "dividendYield", units="percent (0.98 = 0.98%)"),
         "annualDividends": d(annual, [hist], title="Annual dividends per share"),
         "latestAnnualDividend": d(annual + ", latest complete year", [hist], title="Latest annual dividend"),
         "ttmDividend": d("sum of dividends paid in the last 365 days", [hist], title="Trailing-12-month dividend"),
@@ -248,10 +264,10 @@ def _provenance(ticker: str, last_div: str | None) -> dict:
                      [hist], title="10-year dividend growth"),
         "consecutiveGrowthYears": d("number of consecutive most recent years in which the annual dividend rose",
                                     [hist], title="Consecutive years of dividend growth"),
-        "payoutRatio": d("trailing-12-month dividend / info.trailingEps (only if EPS > 0)", [hist, info],
+        "payoutRatio": d("trailing-12-month dividend / info.trailingEps (only if EPS > 0)", [hist, *info],
                          title="Payout ratio"),
         "fcfPayoutRatio": d("trailing-12-month dividend × shares outstanding / free cash flow (info.freeCashflow, "
-                            "else the latest annual cash-flow statement; only if positive)", [hist, info],
+                            "else the latest annual cash-flow statement; only if positive)", [hist, *info],
                             title="FCF payout ratio"),
         "sustainabilityScore": d(
             "50 + points for payout ratio (<50% +15, 50-70% +5, ≥70% −10, >100% a further −20), FCF payout (<60% "

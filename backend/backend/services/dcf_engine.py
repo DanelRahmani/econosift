@@ -350,12 +350,13 @@ def _assumption(text: str) -> dict:
     return r
 
 
-def provenance(sym: str, result: dict, root: str = "", *, growth=None, wacc=None) -> dict:
-    """Provenance for a successful :func:`two_stage_dcf` result.
+def provenance(bundle: dict, result: dict, root: str = "", *, growth=None, wacc=None) -> dict:
+    """Provenance for a successful :func:`two_stage_dcf` result on ``bundle``.
 
     Keys sit under ``root`` (``""`` = the response root). ``growth`` / ``wacc`` are
     provenance keys or refs for those inputs when they are not plain request parameters.
     """
+    from .. import fundamentals_store as fs
     def k(*parts: str) -> str:
         return ".".join(p for p in (root, *parts) if p) or "*"
 
@@ -367,22 +368,22 @@ def provenance(sym: str, result: dict, root: str = "", *, growth=None, wacc=None
     conv = f" × FX rate ({from_ccy}→{to_ccy})" if converted else ""
 
     period = inp.get("fcfPeriod") or "TTM"
-    fcf = pv.yahoo(sym, "info.freeCashflow: trailing-twelve-month levered free cash flow (Yahoo)" if period == "TTM"
-                   else f"Free Cash Flow, annual cash-flow statement {period} (Yahoo has no trailing figure)")
+    fcf = (fs.field_ref(bundle, "freeCashflow") if period == "TTM" else
+           fs.statement_ref(bundle, f"Free Cash Flow, annual cash-flow statement {period} (no trailing figure)"))
     prov = {
-        k("inputs", "ttmFcf"): pv.derived(f"Yahoo freeCashflow{conv}", [fcf, *fx], title="Free cash flow used")
+        k("inputs", "ttmFcf"): pv.derived(f"freeCashflow{conv}", [fcf, *fx], title="Free cash flow used")
         if converted else fcf,
-        k("inputs", "shares"): pv.yahoo(
-            sym, "info.sharesOutstanding",
+        k("inputs", "shares"): fs.field_ref(
+            bundle, "sharesOutstanding",
             note="Replaced by marketCap / price when the two disagree by more than 5x."),
         k("inputs", "netDebt"): pv.derived(
             f"(info.totalDebt − info.totalCash, a missing one counted as 0){conv}",
-            [pv.yahoo(sym, "info.totalDebt"), pv.yahoo(sym, "info.totalCash"), *fx], title="Net debt"),
+            [fs.field_ref(bundle, "totalDebt"), fs.field_ref(bundle, "totalCash"), *fx], title="Net debt"),
         k("inputs", "fcfGrowth"): growth or _assumption("Stage-1 free-cash-flow growth (fcf_growth parameter)"),
         k("inputs", "terminalGrowth"): _assumption("Terminal growth rate (terminal_growth parameter)"),
         k("inputs", "wacc"): wacc or _assumption("Discount rate (wacc parameter)"),
         k("inputs", "stage1Years"): _assumption("Length of stage 1 in years (stage1_years parameter)"),
-        k("spotPrice"): pv.yahoo(sym, "info.currentPrice (else regularMarketPrice)", units=to_ccy),
+        k("spotPrice"): fs.field_ref(bundle, "currentPrice", units=to_ccy),
     }
     prov[k()] = pv.derived(
         "Σ FCF₀(1+g)ᵗ/(1+w)ᵗ for t = 1…N  +  FCF_N(1+gₜ)/(w−gₜ)/(1+w)ᴺ, minus net debt, divided by shares "

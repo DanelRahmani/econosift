@@ -11,8 +11,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date
 
 import pandas as pd
-import yfinance as yf
 
+from .. import fundamentals_store as fs
 from .. import provenance as pv
 from ..cache import cached
 from . import constituents
@@ -486,22 +486,24 @@ def get_corporate_health(ticker: str) -> dict:
     """Return Altman Z-Score, Piotroski F-Score, and Beneish M-Score for a ticker."""
     ticker = ticker.strip().upper()
     try:
-        stock = yf.Ticker(ticker)
-        info = stock.info or {}
-        fin = stock.financials
-        bs = stock.balance_sheet
-        cf = stock.cashflow
+        from . import yfinance_service as yfs
+        bundle = yfs.get_info(ticker)  # stored SEC/Yahoo statements, no Yahoo call
+        info = bundle.get("info") or {}
+        fin = bundle.get("financials_df")
+        bs = bundle.get("balance_sheet_df")
+        cf = bundle.get("cashflow_df")
 
-        # Quarterly fallback for prior-year comparisons (if annual only has 1 column)
-        fin_q = stock.quarterly_financials if fin is not None and fin.shape[1] < 2 else None
-        bs_q = stock.quarterly_balance_sheet if bs is not None and bs.shape[1] < 2 else None
-        cf_q = stock.quarterly_cashflow if cf is not None and cf.shape[1] < 2 else None
+        # Quarterly fallback for prior-year comparisons (set only where the annual has 1 column)
+        fin_q = bundle.get("financials_q_df")
+        bs_q = bundle.get("balance_sheet_q_df")
+        cf_q = bundle.get("cashflow_q_df")
 
         # Validate we have enough data
+        pending = {"status": "pending"} if bundle.get("status") == "pending" else {}
         if fin is None or fin.empty:
-            return {"ticker": ticker, "error": "No financial statement data available for this ticker"}
+            return {"ticker": ticker, "error": "No financial statement data available for this ticker", **pending}
         if bs is None or bs.empty:
-            return {"ticker": ticker, "error": "No balance sheet data available for this ticker"}
+            return {"ticker": ticker, "error": "No balance sheet data available for this ticker", **pending}
 
         # Determine if financial company (banks, insurers — Altman Z not applicable)
         sector = info.get("sector", "")
@@ -533,21 +535,22 @@ def get_corporate_health(ticker: str) -> dict:
             "piotroski": piotroski_data,
             "beneish": beneish_data,
             "asOf": fy_end,
-        }, _health_provenance(ticker, fy_end, bool(fin_q is not None or bs_q is not None or cf_q is not None)))
+        }, _health_provenance(bundle, fy_end, bool(fin_q is not None or bs_q is not None or cf_q is not None)))
     except Exception as exc:
         logger.warning("corporate_health failed for %s: %s", ticker, exc)
         return {"ticker": ticker, "error": str(exc)}
 
 
-def _health_provenance(ticker: str, fy_end: str | None, quarterly_fallback: bool) -> dict:
-    statements = pv.yahoo(ticker, "Annual income statement, balance sheet and cash-flow statement",
-                          frequency="annual", observed=fy_end,
-                          note=("The prior year is taken from quarterly statements where Yahoo "
-                                "publishes only one annual column.") if quarterly_fallback else None)
-    market_cap = pv.yahoo(ticker, "info.marketCap (market value of equity)")
+def _health_provenance(bundle: dict, fy_end: str | None, quarterly_fallback: bool) -> dict:
+    statements = fs.statement_ref(bundle, "Annual income statement, balance sheet and cash-flow statement",
+                                  observed=fy_end)
+    if quarterly_fallback:
+        statements["note"] = ((statements.get("note") or "") + "; the prior year is taken from quarterly "
+                              "statements where only one annual column is stored.").lstrip("; ")
+    market_cap = fs.field_ref(bundle, "marketCap")
     return {
         "*": statements,
-        "price": pv.yahoo(ticker, "info.currentPrice (else regularMarketPrice)"),
+        "price": fs.field_ref(bundle, "currentPrice"),
         "altmanZ": pv.derived(
             "Z = 1.2·(working capital/TA) + 1.4·(retained earnings/TA) + 3.3·(EBIT/TA) "
             "+ 0.6·(market cap/total liabilities) + 1.0·(sales/TA); Safe > 2.99, Distress ≤ 1.81; "
@@ -747,12 +750,13 @@ def compute_earnings_quality(rows: list[dict]) -> dict:
 
 
 def _fetch_eq_inputs(ticker: str, sector: str | None) -> dict | None:
-    """Fetch raw earnings-quality inputs for a single ticker from yfinance."""
+    """Raw earnings-quality inputs for a single ticker from its stored statements."""
     try:
-        stock = yf.Ticker(ticker)
-        fin = stock.financials
-        bs = stock.balance_sheet
-        cf = stock.cashflow
+        from . import yfinance_service as yfs
+        bundle = yfs.get_info(ticker)
+        fin = bundle.get("financials_df")
+        bs = bundle.get("balance_sheet_df")
+        cf = bundle.get("cashflow_df")
         if fin is None or fin.empty or bs is None or bs.empty or cf is None or cf.empty:
             return None
 
@@ -819,8 +823,9 @@ def get_earnings_quality(universe: str = "dow") -> dict:
     if not result:
         return {}
     result["universe"] = universe
-    statements = pv.ref("yahoo", None, f"Latest two annual statements of each {universe} member",
-                        frequency="annual", note="Fiscal year ends differ by company.")
+    statements = pv.ref("sec_edgar", None, f"Latest two annual statements of each {universe} member",
+                        frequency="annual", note="Stored XBRL company facts (10-K); Yahoo's statements for a "
+                        "company SEC has none for. Fiscal year ends differ by company.")
     members_ref = pv.ref("wikipedia", None, f"Current {universe} constituents")
     return pv.attach(result, {
         "*": pv.derived("Sloan (1996) accruals screen over the index members", [statements, members_ref],

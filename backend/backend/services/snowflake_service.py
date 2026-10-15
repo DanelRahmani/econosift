@@ -13,11 +13,11 @@ import math
 import sqlite3
 from typing import Any
 
-import yfinance as yf
-
+from .. import fundamentals_store as fs
 from .. import provenance as pv
 from ..cache import cached
 from . import screener_cache
+from . import yfinance_service as yfs
 from .fundamentals import piotroski_f, ohlson_o, _unpack
 from .discount_rates import wacc as compute_wacc, risk_free_rate
 from .metrics import _clean
@@ -473,8 +473,8 @@ def _axis_dividend(row: dict, peers: list[dict], info: dict) -> tuple[float | No
     # Dividend consistency: count years with non-zero dividend in last 5
     consistency_years = 0
     try:
-        ticker_obj = yf.Ticker(info.get("symbol") or "")
-        hist_div = ticker_obj.dividends
+        from .dividend_service import _stored_dividends
+        hist_div = _stored_dividends(info.get("symbol") or "")
         if hist_div is not None and len(hist_div) > 0:
             import pandas as pd
             hist_div.index = pd.to_datetime(hist_div.index, utc=True)
@@ -570,12 +570,9 @@ def compute_snowflake(ticker: str) -> dict:
         sector = None
         industry = None
 
-    # Fetch yfinance info (cached via cache.py)
-    yf_ticker = yf.Ticker(ticker)
-    try:
-        info = yf_ticker.info or {}
-    except Exception:
-        info = {}
+    # Stored fundamentals bundle (SEC statements, quote snapshot, stored Yahoo info; no Yahoo call)
+    bundle = yfs.get_info(ticker)
+    info = bundle.get("info") or {}
 
     # If row is empty, populate basic fields from yfinance info
     if not row:
@@ -609,41 +606,8 @@ def compute_snowflake(ticker: str) -> dict:
         "No peer set: the sector is unknown or fewer than 10 cached stocks share it, so percentile-ranked "
         "components are not scored (the whole universe is not used instead).")
 
-    # Fetch historical financials (for 3Y CAGR + full Piotroski)
-    fin_df = None
-    try:
-        fin_df = yf_ticker.financials  # index = line items, columns = dates
-    except Exception:
-        pass
-
-    # Build a bundle for fundamentals functions
-    bs_data = {}
-    cf_data = {}
-    fin_data = {}
-    bs_raw = cf_raw = None
-    try:
-        bs_raw = yf_ticker.balance_sheet
-        if bs_raw is not None and not bs_raw.empty:
-            cols = sorted(bs_raw.columns, reverse=True)
-            bs_data = {str(k): _safe(bs_raw.loc[k, cols[0]]) for k in bs_raw.index}
-    except Exception:
-        pass
-    try:
-        cf_raw = yf_ticker.cashflow
-        if cf_raw is not None and not cf_raw.empty:
-            cols = sorted(cf_raw.columns, reverse=True)
-            cf_data = {str(k): _safe(cf_raw.loc[k, cols[0]]) for k in cf_raw.index}
-    except Exception:
-        pass
-    if fin_df is not None and not fin_df.empty:
-        cols = sorted(fin_df.columns, reverse=True)
-        fin_data = {str(k): _safe(fin_df.loc[k, cols[0]]) for k in fin_df.index}
-
-    bundle = {"info": info, "financials": fin_data, "balance_sheet": bs_data, "cashflow": cf_data}
-    # Statement DataFrames (newest column first) let piotroski_f build the prior year: all nine tests.
-    for key, df in (("financials_df", fin_df), ("balance_sheet_df", bs_raw), ("cashflow_df", cf_raw)):
-        if df is not None and not df.empty:
-            bundle[key] = df
+    # Annual statements (3Y CAGR); the *_df frames let piotroski_f build the prior year: all nine tests.
+    fin_df = bundle.get("financials_df")
 
     # Score axes
     val_score, val_comps = _axis_value(row, peers)
@@ -685,7 +649,7 @@ def compute_snowflake(ticker: str) -> dict:
         "risks": risks,
         "axisDetails": axis_details,
     }, _provenance(
-        ticker, bool(cache_rows),
+        bundle, bool(cache_rows),
         peer_scope or "none", n_peers))
 
 
@@ -833,12 +797,13 @@ _COMPONENT_FORMULAS: dict[str, list[tuple[str, float, str]]] = {
 }
 
 
-def _provenance(ticker: str, in_cache: bool, peer_scope: str, n_peers: int) -> dict:
+def _provenance(bundle: dict, in_cache: bool, peer_scope: str, n_peers: int) -> dict:
     """Keys for /snowflake: ``scores.<axis>``, ``axisDetails.<axis>[.components.<label>]`` and the headline fields."""
-    yahoo = pv.yahoo(ticker, "Quote, key statistics and annual statements (Ticker.info, financials, balance sheet, "
-                             "cash flow, dividends)")
-    peers = pv.ref("econosift", "screener_cache", "Screener universe cache: Yahoo fundamentals for the Dow 30, "
-                   "Nasdaq-100 and S&P 500, refreshed nightly")
+    ticker = bundle.get("ticker")
+    yahoo = fs.statement_ref(bundle, "Stored company data: annual statements, key statistics (quote snapshot and "
+                                     "Yahoo info) and dividend history")
+    peers = pv.ref("econosift", "screener_cache", "Screener universe cache: stored fundamentals for the Dow 30, "
+                   "Nasdaq-100 and S&P 500, built from the stored fundamentals")
     row = peers if in_cache else yahoo
     cols = {"value": "P/E, EV/EBITDA, EV/FCF, FCF yield, P/B, PEG", "growth": "revenue and EPS growth, forward P/E",
             "performance": "ROE and margins, 3-year CAGRs", "health": "Altman, Piotroski, Ohlson, ROIC, WACC, ratios",
@@ -861,12 +826,12 @@ def _provenance(ticker: str, in_cache: bool, peer_scope: str, n_peers: int) -> d
         "risks": pv.derived("the three lowest component scores across all axes", ["*"],
                             title="Top risks"),
         "sector": pv.ref("econosift", "screener_cache", "Sector from the screener cache (index constituent list, "
-                         "else Yahoo)") if in_cache else pv.yahoo(ticker, "info.sector"),
+                         "else Yahoo)") if in_cache else fs.field_ref(bundle, "sector"),
         "industry": pv.ref("econosift", "screener_cache", "Industry from the screener cache (index constituent "
-                           "list, else Yahoo)") if in_cache else pv.yahoo(ticker, "info.industry"),
+                           "list, else Yahoo)") if in_cache else fs.field_ref(bundle, "industry"),
     }
     if not in_cache:
-        prov["*"]["note"] = ("Ticker is not in the screener cache: its fields come straight from Yahoo, with "
+        prov["*"]["note"] = ("Ticker is not in the screener cache: its fields come from its stored data, with "
                              "returnOnAssets standing in for ROIC and no EV/FCF, FCF yield or Altman Z.")
     for axis, what in cols.items():
         prov[f"scores.{axis}"] = prov[f"axisDetails.{axis}"] = pv.derived(

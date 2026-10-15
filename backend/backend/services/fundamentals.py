@@ -29,6 +29,7 @@ from typing import Any
 # Re-use _clean from the sibling metrics module so NaN/Inf/None handling is
 # consistent across the whole backend.
 # ---------------------------------------------------------------------------
+from .. import fundamentals_store as fs
 from .. import provenance as pv
 from ..cache import cached
 from .metrics import _clean
@@ -698,28 +699,27 @@ def provenance(bundle: dict, root: str = "fundamentals") -> dict:
     def k(*parts: str) -> str:
         return ".".join(p for p in (root, *parts) if p)
 
-    sym = bundle.get("ticker") or ""
     info = bundle.get("info") or {}
-    inc = pv.yahoo(sym, "Income statement, latest fiscal year", frequency="annual",
-                   observed=_stmt_date(bundle, "financials_df"))
-    bal = pv.yahoo(sym, "Balance sheet, latest fiscal year", frequency="annual",
-                   observed=_stmt_date(bundle, "balance_sheet_df"))
-    cfs = pv.yahoo(sym, "Cash-flow statement, latest fiscal year", frequency="annual",
-                   observed=_stmt_date(bundle, "cashflow_df"))
-    snap = pv.yahoo(sym, "Quote and key-statistics snapshot (Ticker.info)")
+    inc = fs.statement_ref(bundle, "Income statement, latest fiscal year",
+                           observed=_stmt_date(bundle, "financials_df"))
+    bal = fs.statement_ref(bundle, "Balance sheet, latest fiscal year",
+                           observed=_stmt_date(bundle, "balance_sheet_df"))
+    cfs = fs.statement_ref(bundle, "Cash-flow statement, latest fiscal year",
+                           observed=_stmt_date(bundle, "cashflow_df"))
+    snap = fs.field_ref(bundle, "effectiveTaxRate")
     prior = "prior fiscal year (the previous annual column)"
 
     def d(formula: str, inputs: list, title: str, **kw) -> dict:
         return pv.derived(formula, inputs, title=title, **kw)
 
-    prov: dict = {k(): d("ROIC, DuPont, Piotroski F-Score, Ohlson O-Score and cash conversion cycle from Yahoo's "
-                         "annual statements", [inc, bal, cfs], title="Extended fundamentals")}
+    prov: dict = {k(): d("ROIC, DuPont, Piotroski F-Score, Ohlson O-Score and cash conversion cycle from the "
+                         "stored annual statements", [inc, bal, cfs], title="Extended fundamentals")}
 
     # ROIC: the WACC's fallback tax rate is used when info.effectiveTaxRate is missing or outside (0, 60 %).
     etr = _clean(info.get("effectiveTaxRate"))
     tax_fallback = etr is None or not 0.0 < etr < 0.6
     tax_flag = ("fallback",) if tax_fallback else ()
-    tax_note = ("Country statutory tax rate (Damodaran; 21% if unknown) assumed: Yahoo's effectiveTaxRate is "
+    tax_note = ("Country statutory tax rate (Damodaran; 21% if unknown) assumed: the effectiveTaxRate is "
                 "missing or implausible.") if tax_fallback else None
     prov[k("roic", "nopat")] = d("EBIT (Operating Income if missing) × (1 − tax rate); the tax rate is the WACC's: "
                                  "info.effectiveTaxRate, else the country statutory rate, else 21%",

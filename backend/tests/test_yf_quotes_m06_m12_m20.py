@@ -82,8 +82,11 @@ class _EpsTicker:
 
 def test_forward_eps_fallback_uses_next_year_estimate(monkeypatch):
     # Samsung: price 276 000 / forwardPE 3.8856752 = 71 030 = the +1y estimate (not the 0y 47 965).
-    monkeypatch.setattr(yfs.yf, "Ticker", _EpsTicker)
-    info = yfs.get_info.__wrapped__("005930.KS")["info"]
+    from backend import yahoo_info
+    monkeypatch.setattr("yfinance.Ticker", _EpsTicker)
+    monkeypatch.setattr(yahoo_info, "statement_rows", lambda *a: [])
+    yahoo_info.fetch("005930.KS")
+    info = yahoo_info.stored(["005930.KS"])["005930.KS"][0]
     assert info["forwardEps"] == pytest.approx(71030.125)
     assert info["currentPrice"] / info["forwardPE"] == pytest.approx(info["forwardEps"], rel=1e-4)
 

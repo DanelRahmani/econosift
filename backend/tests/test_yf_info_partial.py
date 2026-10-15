@@ -1,14 +1,27 @@
-"""A failed Ticker.info call must not be cached as a half-empty bundle.
+"""A failed Ticker.info call must not be stored or cached as a half-empty bundle.
 
 Live, after a cache clear, a burst of requests made Yahoo fail some info calls; get_info kept
 the statements, injected a few derived keys and cached the result for an hour (24 h stale), so
-JPM showed no price and every model "Shares outstanding unavailable". No network: Ticker is faked.
+JPM showed no price and every model "Shares outstanding unavailable". Since Phase 68 the fetcher
+makes the call (yahoo_info.fetch) and pages read the stored copy. No network: Ticker is faked.
 """
 from __future__ import annotations
 
 import pandas as pd
+import pytest
 
+from backend import store, yahoo_info
 from backend.services import yfinance_service as yfs
+
+
+@pytest.fixture(autouse=True)
+def _clean():
+    store.init_schema()
+    with store.connect() as conn:
+        conn.execute("DELETE FROM yahoo_doc")
+    yield
+    with store.connect() as conn:
+        conn.execute("DELETE FROM yahoo_doc")
 
 GOOD = {"currentPrice": 330.83, "beta": 1.1, "forwardEps": 25.0, "trailingEps": 20.0}
 
@@ -29,13 +42,14 @@ class _FakeTicker:
 
 def _patch(monkeypatch, fail_first: int):
     _FakeTicker.calls = 0
-    monkeypatch.setattr(yfs.yf, "Ticker", lambda sym: _FakeTicker(sym, fail_first))
+    monkeypatch.setattr("yfinance.Ticker", lambda sym: _FakeTicker(sym, fail_first))
+    monkeypatch.setattr(yahoo_info.time, "sleep", lambda s: None)
 
 
 def test_info_failure_is_retried_once(monkeypatch):
     _patch(monkeypatch, fail_first=1)
-    b = yfs.get_info.__wrapped__("JPM")
-    assert b["info"]["currentPrice"] == 330.83
+    yahoo_info.fetch("JPM")
+    assert yahoo_info.stored(["JPM"])["JPM"][0]["currentPrice"] == 330.83
     assert _FakeTicker.calls == 2
 
 
@@ -79,24 +93,32 @@ class _SeqTicker:
 def _seq(monkeypatch, seq):
     _SeqTicker.seq, _SeqTicker.calls = seq, 0
     slept: list[float] = []
-    monkeypatch.setattr(yfs.yf, "Ticker", _SeqTicker)
-    monkeypatch.setattr(yfs.time, "sleep", slept.append)
+    monkeypatch.setattr("yfinance.Ticker", _SeqTicker)
+    monkeypatch.setattr(yahoo_info.time, "sleep", slept.append)
     return slept
 
 
 def test_quote_only_bundle_gets_a_spaced_third_attempt(monkeypatch):
     # Two quote-only answers in a row (the Phase 54 ASML case), the third, after a pause, is complete.
     slept = _seq(monkeypatch, [QUOTE_ONLY, QUOTE_ONLY, FULL])
-    b = yfs.get_info.__wrapped__("ASML.AS")
-    assert b["info"]["sector"] == "Technology"
+    monkeypatch.setattr(yahoo_info, "statement_rows", lambda *a: [])
+    yahoo_info.fetch("ASML.AS")
+    assert yahoo_info.stored(["ASML.AS"])["ASML.AS"][0]["sector"] == "Technology"
     assert _SeqTicker.calls == 3
     assert slept and all(s > 0 for s in slept)
+
+
+def _stored_bundle(monkeypatch, info: dict):
+    """/valuation/full over a bundle whose stored data is ``info`` only."""
+    monkeypatch.setattr(yfs, "get_info", lambda sym: {
+        "ticker": sym, "info": dict(info), "financials": {}, "balance_sheet": {}, "cashflow": {},
+        "_sources": {"origin": None, "fields": {}}})
 
 
 def test_full_marks_a_still_partial_bundle_degraded(monkeypatch):
     import asyncio
     from backend.routers import valuation as vr
-    _seq(monkeypatch, [QUOTE_ONLY])
+    _stored_bundle(monkeypatch, QUOTE_ONLY)
     monkeypatch.setattr(vr, "_beta_for", lambda sym: None)
     monkeypatch.setattr(vr, "analyst_data", lambda sym: {})
     out = asyncio.run(vr.full("ASML.AS"))
@@ -107,7 +129,7 @@ def test_full_marks_a_still_partial_bundle_degraded(monkeypatch):
 def test_full_is_not_degraded_for_a_complete_bundle(monkeypatch):
     import asyncio
     from backend.routers import valuation as vr
-    _seq(monkeypatch, [FULL])
+    _stored_bundle(monkeypatch, FULL)
     monkeypatch.setattr(vr, "_beta_for", lambda sym: None)
     monkeypatch.setattr(vr, "analyst_data", lambda sym: {})
     out = asyncio.run(vr.full("ASML.AS"))

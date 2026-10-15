@@ -51,11 +51,21 @@ class _NvoTicker:
         self.cashflow = pd.DataFrame()
 
 
+def _install_stored(monkeypatch, ticker_cls):
+    """Serve ``ticker_cls``'s fields as the stored bundle and dividend history (Phase 68)."""
+    from backend.services import dividend_service, yfinance_service as yfs
+    t = ticker_cls("X")
+    monkeypatch.setattr(yfs, "get_info", lambda sym: {
+        "ticker": sym, "info": dict(t.info), "financials": {}, "balance_sheet": {}, "cashflow": {},
+        "cashflow_df": t.cashflow, "_sources": {"origin": None, "fields": {}}})
+    monkeypatch.setattr(dividend_service, "_stored_dividends", lambda sym: t.dividends)
+
+
 def test_dividend_fcf_payout_uses_fcf_in_the_price_currency(monkeypatch):
     # TTM dividend $2.00 × 4.4bn shares = $8.8bn; FCF DKK 70bn × 0.15 = $10.5bn
     #   payout = 8.8 / 10.5 = 0.8381   (unconverted: 8.8 / 70 = 0.1257, looks "very safe")
     from backend.services import dcf_engine, discount_rates, dividend_service
-    monkeypatch.setattr(dividend_service.yf, "Ticker", _NvoTicker)
+    _install_stored(monkeypatch, _NvoTicker)
     monkeypatch.setattr(discount_rates, "risk_free_rate", lambda: 0.045)
     monkeypatch.setattr(dividend_service, "_now", lambda: pd.Timestamp(2026, 9, 30))
     monkeypatch.setattr(dcf_engine, "_fx_rate", lambda f, t: 0.15 if (f, t) == ("DKK", "USD") else None)
@@ -65,7 +75,7 @@ def test_dividend_fcf_payout_uses_fcf_in_the_price_currency(monkeypatch):
 
 def test_dividend_fcf_payout_none_when_fx_unavailable(monkeypatch):
     from backend.services import dcf_engine, discount_rates, dividend_service
-    monkeypatch.setattr(dividend_service.yf, "Ticker", _NvoTicker)
+    _install_stored(monkeypatch, _NvoTicker)
     monkeypatch.setattr(discount_rates, "risk_free_rate", lambda: 0.045)
     monkeypatch.setattr(dividend_service, "_now", lambda: pd.Timestamp(2026, 9, 30))
     monkeypatch.setattr(dcf_engine, "_fx_rate", lambda f, t: None)

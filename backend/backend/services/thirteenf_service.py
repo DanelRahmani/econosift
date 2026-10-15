@@ -426,11 +426,13 @@ def _holders_sync(ticker: str) -> dict:
     # A stored data set: fetched when it was built, not at request time (P3-35).
     ref["fetchedAt"] = have["builtAt"]
     prov: dict = {"*": ref}
-    yahoo = pv.yahoo(ticker, "sharesOutstanding (Ticker.info)", units="shares")
+    from .. import fundamentals_store as fs
+    from . import yfinance_service as yfs
+    shares = fs.field_ref(yfs.get_info(ticker), "sharesOutstanding", units="shares")
     prov["pctFloat"] = pv.derived(
-        "13F shares held ÷ shares outstanding × 100", [ref, yahoo], title="% of shares outstanding",
-        note="Shares outstanding is Yahoo's current count, not the quarter-end one, and covers the listed "
-             "class only; for ADRs Yahoo may count ordinary shares rather than ADSs. Float is not used.")
+        "13F shares held ÷ shares outstanding × 100", [ref, shares], title="% of shares outstanding",
+        note="Shares outstanding is the latest stored count (SEC cover page, else Yahoo), not the quarter-end "
+             "one; for ADRs Yahoo may count ordinary shares rather than ADSs. Float is not used.")
     prev = _meta(out["change"]["previousDataset"])
     if prev:
         before = pv.ref("sec_edgar", None, f"Form 13F data set, filings {prev['window']}", url=prev["url"],
@@ -445,7 +447,7 @@ def _holders_sync(ticker: str) -> dict:
 
 
 def _shares_outstanding(ticker: str) -> float | None:
-    """``sharesOutstanding`` from the cached Yahoo info, or None."""
+    """``sharesOutstanding`` from the stored fundamentals, or None."""
     try:
         from . import yfinance_service as yfs
         value = (yfs.get_info(ticker).get("info") or {}).get("sharesOutstanding")

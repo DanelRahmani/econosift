@@ -67,10 +67,9 @@ def test_industry_fallback_when_sector_is_thin():
 # ── FCF coverage display unit ──
 
 def test_fcf_coverage_value_is_a_multiple_not_a_percent_ratio(monkeypatch):
-    class Boom:
-        def __init__(self, *a, **k):
-            raise RuntimeError("no network")
-    monkeypatch.setattr(sf.yf, "Ticker", Boom)
+    def boom(sym):
+        raise RuntimeError("no stored history")
+    monkeypatch.setattr("backend.services.dividend_service._stored_dividends", boom)
     # dividend yield 2.0 (percent units), FCF yield 0.05 (fraction): coverage = 0.05 / 0.02 = 2.5x
     _, comps = sf._axis_dividend({"dividend_yield": 2.0, "fcf_yield": 0.05}, [], {"symbol": "X"})
     cov = next(c for c in comps if c["label"] == "FCF Coverage")

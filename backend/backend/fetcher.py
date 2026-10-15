@@ -42,7 +42,7 @@ INTRADAY_EXTRAS = {"^GSPC": "S&P 500", "^NDX": "Nasdaq 100", "^DJI": "Dow Jones 
 
 # Page caches built from the store's intraday data: a snapshot clears them so
 # pages show the new quotes instead of an hour-old computation.
-SNAPSHOT_CACHES = ("treemap", "movers", "indices", "feargreed", "breadth", "sector_returns")
+SNAPSHOT_CACHES = ("treemap", "movers", "indices", "feargreed", "breadth", "sector_returns", "yf_info")
 
 
 def _now() -> str:
@@ -242,7 +242,7 @@ def run_ciks(_key: str) -> int:
 
 def run_facts(cik: str) -> int:
     """Store one company's SEC companyfacts (every symbol sharing the CIK) into `fundamental`."""
-    from . import sec_fundamentals
+    from . import cache, sec_fundamentals
     from .sources import source_sec
 
     with store.connect() as conn:
@@ -259,6 +259,7 @@ def run_facts(cik: str) -> int:
     with store.connect() as conn:
         conn.executemany("UPDATE security SET facts_at = ? WHERE symbol = ?", [(_now(), s) for s in syms])
     _mark_success("sec_facts")
+    cache.clear_all("yf_info")  # bundles built before these facts were stored
     return len(rows)
 
 
@@ -294,8 +295,10 @@ def run_frames(day: str) -> int:
 
 
 def run_yahoo_info(symbol: str) -> int:
-    from . import yahoo_info
-    return yahoo_info.fetch(symbol)
+    from . import cache, yahoo_info
+    rows = yahoo_info.fetch(symbol)
+    cache.clear_all("yf_info")
+    return rows
 
 
 def run_analyst(symbol: str) -> int:

@@ -9,8 +9,6 @@ import logging
 import math
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-import yfinance as yf
-
 from .. import provenance as pv
 from ..cache import cached
 from . import constituents
@@ -29,11 +27,12 @@ def _clean(v) -> float | None:
 
 
 def _fetch_one(ticker: str, sector: str) -> dict | None:
-    """Fetch DuPont components for a single ticker from yfinance."""
+    """DuPont components for a single ticker from its stored annual statements."""
     try:
-        stock = yf.Ticker(ticker)
+        from . import yfinance_service as yfs
+        bundle = yfs.get_info(ticker)  # stored SEC/Yahoo statements, no Yahoo call
         # Income statement — get most recent annual row
-        fin = stock.financials
+        fin = bundle.get("financials_df")
         if fin is None or fin.empty:
             return None
         # Use the first column (most recent annual)
@@ -41,7 +40,7 @@ def _fetch_one(ticker: str, sector: str) -> dict | None:
         rev = _clean(fin.loc["Total Revenue"].iloc[0]) if "Total Revenue" in fin.index else None
 
         # Balance sheet
-        bs = stock.balance_sheet
+        bs = bundle.get("balance_sheet_df")
         if bs is None or bs.empty:
             return None
         ta = _clean(bs.loc["Total Assets"].iloc[0]) if "Total Assets" in bs.index else None
@@ -132,9 +131,10 @@ def get_sector_dupont() -> dict:
         })
 
     statements = pv.ref(
-        "yahoo", None, "Annual income statement and balance sheet of each S&P 500 member (Net Income, Total Revenue, "
-        "Total Assets, Stockholders Equity)", frequency="annual",
-        note="Each company's most recent fiscal year as Yahoo reports it; fiscal year-ends differ across companies.")
+        "sec_edgar", None, "Annual income statement and balance sheet of each S&P 500 member (Net Income, Total "
+        "Revenue, Total Assets, Stockholders Equity)", frequency="annual",
+        note="Each company's most recent 10-K from the stored XBRL company facts (Yahoo's statements for a company "
+             "SEC has none for); fiscal year-ends differ across companies.")
     members = pv.ref("wikipedia", None, "Current S&P 500 constituents and their GICS sectors")
     prov: dict = {
         "*": pv.derived(

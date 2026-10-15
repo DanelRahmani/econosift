@@ -282,7 +282,12 @@ export interface AnalystData {
   earningsSurprises: { date: string; epsEstimate: number | null; epsActual: number | null; surprisePct: number | null }[];
   estimates: Record<string, unknown>;
   growthEstimates: Record<string, Record<string, number | null>> | null;
-  asOf: string;
+  /** date the panel was built; null while it is still being fetched */
+  asOf: string | null;
+  /** when the fetcher stored this panel (Phase 68: pages read the stored copy) */
+  fetchedAt?: string;
+  /** no panel stored yet; one has been queued */
+  status?: "pending";
 }
 export interface ValuationKpis {
   price: number | null;
@@ -313,9 +318,11 @@ export interface ValuationFullResponse {
   valuation: ValuationCore;
   fundamentals: Fundamentals;
   analyst: AnalystData;
-  /** Yahoo answered with partial company data; the UI re-requests until it is complete (P2-39). */
+  /** Only partial company data is stored; the UI re-requests until it is complete (P2-39). */
   degraded?: boolean;
   degradedReason?: string | null;
+  /** nothing is stored for this ticker yet; the fetcher has queued it */
+  status?: "pending";
 }
 export interface FactorResponse {
   ticker: string;

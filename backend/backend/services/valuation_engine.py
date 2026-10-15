@@ -786,8 +786,10 @@ def provenance(bundle: dict, result: dict, beta: float | None, root: str = "valu
     w: dict = result.get("wacc") or {}
     ccy = result.get("currency")
 
-    def y(field: str, **kw) -> dict:
-        return pv.yahoo(sym, f"info.{field}", **kw)
+    from .. import fundamentals_store as fs
+
+    def y(field: str, **kw) -> dict:  # "currentPrice (else regularMarketPrice)" names its first field
+        return fs.field_ref(bundle, field.split(" ")[0], **kw)
 
     fx = result.get("statementFx") or {}
     fx_note = (f"Statement-currency figures (debt, cash, EBITDA, cash flow) are converted from {fx['from']} to "
@@ -947,7 +949,8 @@ def provenance(bundle: dict, result: dict, beta: float | None, root: str = "valu
             "TTM ROE capped at 25% and fades linearly to ke by year 5; book grows by ROE_t × retention, "
             "retention = 1 − dividend payout − net buybacks / net income (clamped to 0–1); no terminal value",
             [y("bookValue"), y("returnOnEquity"), ke, y("payoutRatio"),
-             pv.yahoo(sym, "Annual cash-flow statement: net common stock issuance / repurchases, and net income")]),
+             fs.statement_ref(bundle, "Annual cash-flow statement: net common stock issuance / repurchases, "
+                                      "and net income")]),
         "EPV (Earnings Power Value)": (
             "(EBIT × (1 − tax rate) / WACC − net debt) / shares; tax rate 21% if unavailable",
             [y("ebit (else statement EBIT / Operating Income)"), k("wacc", "taxRate"), k("wacc", "wacc"), net_debt,
@@ -958,7 +961,7 @@ def provenance(bundle: dict, result: dict, beta: float | None, root: str = "valu
         if name == "DCF (Two-Stage)":
             d = (m.get("detail") or {}).get("inputs")
             if d:
-                sub = dcf_engine.provenance(sym, {"inputs": d, "currency": ccy}, k("models", name, "detail"),
+                sub = dcf_engine.provenance(bundle, {"inputs": d, "currency": ccy}, k("models", name, "detail"),
                                             growth=growth, wacc=k("wacc", "wacc"))
                 prov.update(sub)
                 prov[k("models", name)] = sub[k("models", name, "detail")]

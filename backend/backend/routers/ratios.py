@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 from fastapi import APIRouter
 
+from .. import fundamentals_store as fs
 from .. import provenance as pv
 from ..services import yfinance_service as yfs
 from ..services import discount_rates, metrics
@@ -99,22 +100,22 @@ _VALUATION_FIELDS = {
 def ratio_provenance(sym: str, bundle: dict, prefix: str = "") -> dict:
     """Provenance for a ``metrics.compute_ratios`` payload; ``prefix`` places it under a parent key."""
     p = f"{prefix}." if prefix else ""
-    snap = pv.yahoo(sym, "Quote and key-statistics snapshot (Ticker.info)")
+    snap = fs.field_ref(bundle, "currentPrice")  # quote snapshot: price, market cap
     src = {
-        "i": pv.yahoo(sym, "Income statement, latest fiscal year", frequency="annual",
-                      observed=stmt_date(bundle, "financials_df")),
-        "b": pv.yahoo(sym, "Balance sheet, latest fiscal year", frequency="annual",
-                      observed=stmt_date(bundle, "balance_sheet_df")),
-        "c": pv.yahoo(sym, "Cash-flow statement, latest fiscal year", frequency="annual",
-                      observed=stmt_date(bundle, "cashflow_df")),
+        "i": fs.statement_ref(bundle, "Income statement, latest fiscal year",
+                              observed=stmt_date(bundle, "financials_df")),
+        "b": fs.statement_ref(bundle, "Balance sheet, latest fiscal year",
+                              observed=stmt_date(bundle, "balance_sheet_df")),
+        "c": fs.statement_ref(bundle, "Cash-flow statement, latest fiscal year",
+                              observed=stmt_date(bundle, "cashflow_df")),
         "q": snap,
     }
-    prov = {prefix or "*": pv.yahoo(sym, "Company fundamentals: annual statements and the info snapshot")}
+    prov = {prefix or "*": fs.statement_ref(bundle, "Company fundamentals: annual statements and key statistics")}
     for key, (formula, needs) in _RATIO_FORMULAS.items():
         prov[p + key] = pv.derived(formula, [src[c] for c in needs], title=key.split(".")[-1],
                                    observed=src[needs[0]].get("observed"))
     for key, field in _VALUATION_FIELDS.items():
-        prov[f"{p}valuation.{key}"] = pv.yahoo(sym, f"info.{field}")
+        prov[f"{p}valuation.{key}"] = fs.field_ref(bundle, field)
     # ADRs / cross-listings: these four are rebuilt from statement figures converted to the price currency.
     if bundle.get("info", {}).get("financialCurrency") not in (None, bundle.get("info", {}).get("currency")):
         for key, formula in _CROSS_CURRENCY_FORMULAS.items():

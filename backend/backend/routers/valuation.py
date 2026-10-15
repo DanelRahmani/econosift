@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 from fastapi import APIRouter, Query
 
+from .. import fundamentals_store as fs
 from .. import provenance as pv
 from ..services import yfinance_service as yfs
 from ..services import metrics
@@ -21,7 +22,7 @@ router = APIRouter(prefix="/api/valuation", tags=["valuation"])
 
 
 def _kpis(info: dict, bundle: dict | None = None) -> dict:
-    """Headline KPI + extended-fundamental fields straight from Ticker.info.
+    """Headline KPI + extended-fundamental fields from the stored ``info`` (see fundamentals_store).
 
     Every access is guarded; short data is US-listed only and may be absent.
     ``evToFcf`` / ``fcfYield`` are built in the price currency (ADRs report in
@@ -93,6 +94,7 @@ async def capm_dcf(
     frame = await asyncio.to_thread(yfs.get_close_frame, all_syms, period)
 
     valuations = []
+    bundles: dict[str, dict] = {}
     for sym in syms:
         bench = yfs.benchmark_for(sym)
         beta = None
@@ -101,7 +103,7 @@ async def capm_dcf(
             m = metrics.risk_metrics(frame[sym], bench_series, risk_free)
             beta = m.get("beta")
 
-        bundle = await asyncio.to_thread(yfs.get_info, sym)
+        bundle = bundles[sym] = await asyncio.to_thread(yfs.get_info, sym)
         info = bundle.get("info", {}) or {}
 
         expected_return = metrics.capm_expected_return(beta, risk_free, market_premium)
@@ -125,15 +127,15 @@ async def capm_dcf(
         })
 
     return pv.attach({"valuations": valuations},
-                     _capm_dcf_provenance(valuations, frame, period, risk_free, market_premium,
+                     _capm_dcf_provenance(valuations, bundles, frame, period, risk_free, market_premium,
                                           fcf_growth, terminal_growth))
 
 
-def _capm_dcf_provenance(rows: list[dict], frame, period: str, rf: float, mp: float,
+def _capm_dcf_provenance(rows: list[dict], bundles: dict[str, dict], frame, period: str, rf: float, mp: float,
                          g: float, gt: float) -> dict:
     """``valuations.<ticker>.<field>`` for each row of /capm-dcf."""
     prov: dict = {"*": pv.derived(
-        "CAPM expected return and a 5-year free-cash-flow DCF for each ticker, from Yahoo prices and fundamentals",
+        "CAPM expected return and a 5-year free-cash-flow DCF for each ticker, from stored prices and fundamentals",
         title="CAPM and DCF valuation")}
     for v in rows:
         sym, bench = v["ticker"], v["benchmark"]
@@ -143,7 +145,7 @@ def _capm_dcf_provenance(rows: list[dict], frame, period: str, rf: float, mp: fl
                   pv.yahoo(bench, f"Benchmark daily adjusted close, {period}", frequency="daily",
                            observed=pv.last_date(frame[bench]) if frame is not None and bench in frame.columns
                            else None)]
-        info = {f: pv.yahoo(sym, f"info.{f}") for f in
+        info = {f: fs.field_ref(bundles[sym], f) for f in
                 ("trailingPE", "freeCashflow", "operatingCashflow", "sharesOutstanding", "totalDebt", "totalCash")}
         prov[f"{base}.beta"] = pv.derived(
             f"cov(r, r_{bench}) / var(r_{bench}) of daily log returns over the common days", prices, title="Beta")
@@ -152,9 +154,8 @@ def _capm_dcf_provenance(rows: list[dict], frame, period: str, rf: float, mp: fl
             "request parameters (server defaults 0.04 and 0.055), not observed data",
             [f"{base}.beta"], title="CAPM expected return")
         prov[f"{base}.trailingPE"] = info["trailingPE"]
-        prov[f"{base}.spotPrice"] = pv.yahoo(sym, "info.currentPrice (else regularMarketPrice)",
-                                             units=v.get("currency"))
-        prov[f"{base}.currency"] = pv.yahoo(sym, "info.currency")
+        prov[f"{base}.spotPrice"] = fs.field_ref(bundles[sym], "currentPrice", units=v.get("currency"))
+        prov[f"{base}.currency"] = fs.field_ref(bundles[sym], "currency")
         prov[f"{base}.dcfTarget"] = pv.derived(
             "Σ FCF(1+g)^t/(1+r)^t for t = 1…5 + FCF₅(1+gₜ)/(r−gₜ)/(1+r)^5, plus cash minus debt, divided by shares; "
             f"FCF = info.freeCashflow (else operatingCashflow), r = the CAPM expected return (risk-free + market "
@@ -236,7 +237,7 @@ async def dcf(
     )
     if result.get("locked"):
         return result
-    return pv.attach(result, dcf_engine.provenance(sym, result))
+    return pv.attach(result, dcf_engine.provenance(bundle, result))
 
 
 @router.get("/full")
@@ -264,15 +265,15 @@ async def full(ticker: str):
     beta_injected = kpis.get("beta") is None and beta is not None
     if beta_injected:
         kpis["beta"] = beta
-    prov = {"*": pv.yahoo(sym, "Company fundamentals, valuation inputs and analyst data")}
+    prov = {"*": fs.statement_ref(bundle, "Company fundamentals, valuation inputs and analyst data")}
     info = bundle.get("info", {}) or {}
-    prov.update(_kpi_provenance(sym, kpis, beta_injected,
+    prov.update(_kpi_provenance(bundle, kpis, beta_injected,
                                 info.get("financialCurrency") not in (None, info.get("currency"))))
     prov.update(await asyncio.to_thread(valuation_engine.provenance, bundle, valuation, beta, "valuation"))
     prov.update(fundamentals_svc.provenance(bundle, "fundamentals"))
     prov.update(analyst_service.provenance(analyst, "analyst"))
-    # A bundle Yahoo answered only in part is never cached (get_info's skip_if), so asking again soon
-    # gets the full one; the UI says so and re-requests (P2-39).
+    # A bundle stored only in part is never cached (get_info's skip_if), so asking again once the
+    # fetcher has stored the rest gets the full one; the UI says so and re-requests (P2-39).
     degraded = yfs._info_failed(bundle)
     no_price = not (info.get("currentPrice") or info.get("regularMarketPrice"))
     return pv.attach({
@@ -282,20 +283,24 @@ async def full(ticker: str):
         "fundamentals": fundamentals,
         "analyst": analyst,
         "degraded": degraded,
+        **({"status": "pending"} if bundle.get("status") == "pending" else {}),
         "degradedReason": (None if not degraded else
-                           "Yahoo returned no price for this ticker; the models cannot run." if no_price else
-                           "Yahoo returned partial company data (no sector, industry or revenue); models that "
+                           "No price is stored for this ticker yet (it has been queued); the models cannot run."
+                           if no_price else
+                           "Only partial company data is stored (no sector, industry or revenue); models that "
                            "need it may be off or locked."),
     }, prov)
 
 
-def _kpi_provenance(sym: str, kpis: dict, beta_injected: bool, cross_currency: bool = False) -> dict:
+def _kpi_provenance(bundle: dict, kpis: dict, beta_injected: bool, cross_currency: bool = False) -> dict:
     """``kpis.<field>`` refs for the headline block of /full."""
-    def y(field: str, **kw) -> dict:
-        return pv.yahoo(sym, f"info.{field}", **kw)
+    sym = bundle.get("ticker")
 
-    eps_note = ("Yahoo's field; when Yahoo omits it, get_info derives it (price / P/E, or the current-year "
-                "earnings estimate) and the response does not say which.")
+    def y(field: str, **kw) -> dict:  # "currentPrice (else regularMarketPrice)" names its first field
+        return fs.field_ref(bundle, field.split(" ")[0], **kw)
+
+    eps_note = ("When neither the snapshot nor the stored Yahoo info has it, it is derived as price / P/E "
+                "and the response does not say which.")
     prov = {f"kpis.{f}": y(f) for f in (
         "marketCap", "trailingPE", "forwardPE", "fiftyTwoWeekHigh", "fiftyTwoWeekLow", "bookValue",
         "shortPercentOfFloat", "shortRatio", "sector", "industry")}
@@ -316,17 +321,17 @@ def _kpi_provenance(sym: str, kpis: dict, beta_injected: bool, cross_currency: b
     if cross_currency:
         prov["kpis.bookValue"] = pv.derived(
             "stockholders' equity × FX to the price currency × price / market cap",
-            [pv.yahoo(sym, "Balance sheet, latest fiscal year", frequency="annual"), y("marketCap")],
-            title="Book value per share", note="Yahoo's bookValue mixes currencies for ADRs, so it is rebuilt.")
+            [fs.statement_ref(bundle, "Balance sheet, latest fiscal year"), y("marketCap")],
+            title="Book value per share", note="A per-share book value from Yahoo mixes currencies for ADRs, "
+                                               "so it is rebuilt.")
     if beta_injected:
         prov["kpis.beta"] = pv.derived(
             "cov(r, r_benchmark) / var(r_benchmark) of 2 years of daily log returns",
             [pv.yahoo(sym, "Daily adjusted close, 2y", frequency="daily"),
              pv.yahoo(yfs.benchmark_for(sym), "Benchmark daily adjusted close, 2y", frequency="daily")],
-            title="Beta", flags=("fallback",), note="Yahoo supplied no beta, so this computed beta stands in.")
+            title="Beta", flags=("fallback",), note="No beta is stored, so this computed beta stands in.")
     else:
-        prov["kpis.beta"] = y("beta", note="Yahoo's beta; when Yahoo has none, get_info substitutes fast_info's beta "
-                                          "or a 2-year beta against the benchmark, and the response does not say which.")
+        prov["kpis.beta"] = y("beta")
     return prov
 
 

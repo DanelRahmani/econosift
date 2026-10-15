@@ -4,7 +4,6 @@ from __future__ import annotations
 import logging
 import re
 import time
-import numpy as np
 import pandas as pd
 import yfinance as yf
 
@@ -237,139 +236,24 @@ def _info_failed(bundle: dict) -> bool:
         info.get(k) for k in ("sector", "industry", "totalRevenue"))
 
 
-_INFO_RETRY_DELAYS = (0.0, 0.0, 3.0)  # seconds before each Ticker.info attempt
-
-
 @cached("yf_info", skip_if=_info_failed)
 def get_info(ticker: str) -> dict:
-    """Full .info dict plus financial statements for ratio analysis."""
-    t = yf.Ticker(ticker)
-    out: dict = {"ticker": ticker, "info": {}}
-    # Yahoo intermittently fails info calls, or answers with the quote half only, under load: retry at
-    # once, then once more after a pause (P2-39: two quick tries were often both quote-only).
-    for delay in _INFO_RETRY_DELAYS:
-        if delay:
-            time.sleep(delay)
-        try:
-            out["info"] = t.get_info() or {}
-        except Exception:
-            log.warning("Ticker.info failed for %s", ticker, exc_info=True)
-            out["info"] = {}
-        if not _info_failed(out):
-            break
-    info = out["info"]
+    """Company fundamentals bundle (``info`` + statements) read from the store (Phase 68).
 
-    # ── Store raw DataFrames for multi-period consumers (Piotroski, Beneish) ──
-    fin_df = _safe_stmt(t, "financials")
-    bs_df = _safe_stmt(t, "balance_sheet")
-    cf_df = _safe_stmt(t, "cashflow")
-    out["financials"] = _df_to_dict(fin_df)
-    out["balance_sheet"] = _df_to_dict(bs_df)
-    out["cashflow"] = _df_to_dict(cf_df)
-    out["financials_df"] = fin_df if fin_df is not None and not fin_df.empty else None
-    out["balance_sheet_df"] = bs_df if bs_df is not None and not bs_df.empty else None
-    out["cashflow_df"] = cf_df if cf_df is not None and not cf_df.empty else None
-    # Quarterly statements where Yahoo publishes only one annual column, so Beneish can date-match
-    # the prior year the way /corporate/health does (audit M-14).
-    for key, df, name in (("financials_q_df", fin_df, "quarterly_financials"),
-                          ("balance_sheet_q_df", bs_df, "quarterly_balance_sheet"),
-                          ("cashflow_q_df", cf_df, "quarterly_cashflow")):
-        q = _safe_stmt(t, name) if df is not None and not df.empty and df.shape[1] < 2 else None
-        out[key] = q if q is not None and not q.empty else None
+    Built by :func:`fundamentals_store.bundle` from SEC facts, the quote
+    snapshot and the stored Yahoo info; no Yahoo call. A symbol with no
+    statements or no price yet (a ticker outside the universe) is queued for
+    the fetcher and returned with ``status: "pending"`` until it is stored.
+    """
+    from .. import fetcher, fundamentals_store
 
-    # ── Fix 1: Inject missing keys from alternative yfinance accessors ──
-    price = info.get("currentPrice") or info.get("regularMarketPrice")
-
-    # trailingEps: compute from trailingPE and price
-    if "trailingEps" not in info or info["trailingEps"] is None:
-        pe = info.get("trailingPE")
-        if pe and price and pe > 0:
-            info["trailingEps"] = price / pe
-
-    # forwardEps: try earnings_estimate DataFrame, fallback to price/forwardPE
-    if "forwardEps" not in info or info["forwardEps"] is None:
-        try:
-            ee = t.earnings_estimate
-            # +1y = next fiscal year, the year forwardPE is struck on (0y gave Samsung Fwd EPS 47,965 beside a
-            # Fwd P/E that implies 71,030).
-            if ee is not None and not ee.empty and "+1y" in ee.index:
-                row = ee.loc["+1y"]
-                if "avg" in ee.columns:
-                    info["forwardEps"] = float(row["avg"])
-        except Exception:
-            pass
-        if "forwardEps" not in info or info["forwardEps"] is None:
-            fpe = info.get("forwardPE")
-            if fpe and price and fpe > 0:
-                info["forwardEps"] = price / fpe
-
-    # freeCashflow: from cashflow statement dict
-    cf_dict = out.get("cashflow", {})
-    if "freeCashflow" not in info or info["freeCashflow"] is None:
-        fcf = cf_dict.get("Free Cash Flow")
-        if fcf is not None:
-            info["freeCashflow"] = fcf
-            # The annual statement, not a trailing figure: label it (P3-26).
-            info["_fcfPeriod"] = f"FY{pd.Timestamp(cf_df.columns[0]).year}" if cf_df is not None else "annual"
-
-    # operatingCashflow: from cashflow statement dict
-    if "operatingCashflow" not in info or info["operatingCashflow"] is None:
-        ocf = cf_dict.get("Operating Cash Flow") or cf_dict.get("Total Cash From Operating Activities")
-        if ocf is not None:
-            info["operatingCashflow"] = ocf
-
-    # sector / industry: yfinance populates sectorKey/industryKey alternate keys
-    if "sector" not in info or info["sector"] is None:
-        sector = info.get("sectorKey") or info.get("sectorDisp")
-        if sector:
-            info["sector"] = sector
-    if "industry" not in info or info["industry"] is None:
-        industry = info.get("industryKey") or info.get("industryDisp")
-        if industry:
-            info["industry"] = industry
-
-    # beta: try fast_info first, fallback to 2Y daily returns vs benchmark
-    if "beta" not in info or info["beta"] is None:
-        try:
-            fi_beta = t.fast_info.get("beta") if hasattr(t, "fast_info") else None
-            if fi_beta:
-                info["beta"] = float(fi_beta)
-        except Exception:
-            pass
-        if "beta" not in info or info["beta"] is None:
-            try:
-                bench = benchmark_for(ticker)
-                close = get_close_frame((ticker, bench), "2y")
-                if not close.empty:
-                    if ticker in close.columns and bench in close.columns:
-                        r = np.log(close[ticker] / close[ticker].shift(1)).dropna()
-                        br = np.log(close[bench] / close[bench].shift(1)).dropna()
-                        joined = pd.concat([r, br], axis=1, join="inner").dropna()
-                        if len(joined) > 2:
-                            var_b = joined.iloc[:, 1].var(ddof=1)
-                            if var_b and var_b > 0:
-                                info["beta"] = joined.iloc[:, 0].cov(joined.iloc[:, 1]) / var_b
-            except Exception:
-                pass
-
-    # ── Fix 6: Shares precision guard for large-cap tickers ──
-    shares_raw = info.get("sharesOutstanding")
-    if shares_raw is not None:
-        try:
-            shares_val = float(shares_raw)
-        except (TypeError, ValueError):
-            shares_val = None
-        mcap = info.get("marketCap")
-        if shares_val is not None and mcap is not None and shares_val < 1_000_000_000 and mcap > 100_000_000_000:
-            # Shares look too low for a large-cap — try fast_info fallback
-            try:
-                fi_shares = t.fast_info.get("shares_outstanding")
-                if fi_shares and float(fi_shares) > 1_000_000_000:
-                    info["sharesOutstanding"] = float(fi_shares)
-            except Exception:
-                pass
-
-    return out
+    bundle = fundamentals_store.bundle(ticker)
+    info = bundle["info"]
+    if bundle["_sources"]["origin"] is None or not (info.get("currentPrice") or info.get("regularMarketPrice")):
+        pending = fetcher.request_yahoo_info([ticker]) + fetcher.request_history([ticker])
+        if pending:
+            bundle["status"] = "pending"
+    return bundle
 
 
 # Lightweight keyword sentiment for headlines (no ML dependency).
@@ -481,31 +365,6 @@ def get_events(ticker: str) -> dict:
     except Exception:
         pass
 
-    return out
-
-
-def _safe_stmt(t, name: str):
-    try:
-        df = getattr(t, name)
-        return df
-    except Exception:
-        return None
-
-
-def _df_to_dict(df) -> dict:
-    if df is None or not hasattr(df, "empty") or df.empty:
-        return {}
-    # Most-recent column first; keep row label -> latest value.
-    out: dict = {}
-    try:
-        latest = df.columns[0]
-        for idx, val in df[latest].items():
-            try:
-                out[str(idx)] = None if pd.isna(val) else float(val)
-            except Exception:
-                continue
-    except Exception:
-        return {}
     return out
 
 
