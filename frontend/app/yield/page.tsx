@@ -2,16 +2,13 @@
 import { Suspense } from "react";
 import { apiQuery } from "@/lib/queries";
 import { useQuery } from "@tanstack/react-query";
-import { asOf } from "@/lib/series";
+import { asOf, capPoints } from "@/lib/series";
 import { useUrlState } from "@/lib/useUrlState";
 import type { GlobalYieldCountry } from "@/lib/types";
-import { MultiCountryYieldChart } from "@/components/yield/MultiCountryYieldChart";
 import { Card as UiCard, PageSkeleton, ScrollableTabBar, TabButton } from "@/components/ui";
 import { CHART_COLORS } from "@/lib/format";
 import { PolicyDivergenceTable } from "@/components/policy/PolicyDivergenceTable";
 import { SovereignSpreadTable } from "@/components/sovereign/SovereignSpreadTable";
-import { CentralBanksTab } from "@/components/macro/CentralBanksTab";
-import { CurveNoiseTab } from "@/components/yield/CurveNoiseTab";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
 import { YIELD_TABS } from "@/lib/pageTabs";
@@ -21,6 +18,12 @@ import {
 } from "recharts";
 import { useKeyboardShortcuts, tabKeys, tabStepKeys } from "@/lib/useKeyboardShortcuts";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import dynamic from "next/dynamic";
+
+// Tabs load on first open, so the page ships only the tab it shows (Phase 69).
+const MultiCountryYieldChart = dynamic(() => import("@/components/yield/MultiCountryYieldChart").then((m) => ({ default: m.MultiCountryYieldChart })));
+const CentralBanksTab = dynamic(() => import("@/components/macro/CentralBanksTab").then((m) => ({ default: m.CentralBanksTab })));
+const CurveNoiseTab = dynamic(() => import("@/components/yield/CurveNoiseTab").then((m) => ({ default: m.CurveNoiseTab })));
 
 const TABS = YIELD_TABS;
 
@@ -98,7 +101,7 @@ function USRatesDetailTab() {
       <UiCard className="p-4">
         <h3 className="font-semibold mb-3">US Treasury Yield Curve</h3>
         <ResponsiveContainer width="100%" height={220}>
-          <LineChart data={curveData}>
+          <LineChart data={capPoints(curveData)}>
             <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
             <XAxis dataKey="tenor" tick={{ fontSize: 12 }} />
             <YAxis tickFormatter={(v) => `${v}%`} domain={["auto", "auto"]} tick={{ fontSize: 11 }} />
@@ -113,7 +116,7 @@ function USRatesDetailTab() {
         <UiCard className="p-4">
           <h3 className="font-semibold mb-3">Treasury Yields — Historical</h3>
           <ResponsiveContainer width="100%" height={260}>
-            <LineChart data={histData}>
+            <LineChart data={capPoints(histData)}>
               <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
               <XAxis dataKey="date" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
               <YAxis tickFormatter={(v) => `${v}%`} tick={{ fontSize: 11 }} />
@@ -145,7 +148,7 @@ function USRatesDetailTab() {
             </div>
           </div>
           <ResponsiveContainer width="100%" height={240}>
-            <LineChart data={breakevenData}>
+            <LineChart data={capPoints(breakevenData)}>
               <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
               <XAxis dataKey="date" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
               <YAxis tickFormatter={(v) => `${v}%`} tick={{ fontSize: 11 }} />
@@ -162,7 +165,7 @@ function USRatesDetailTab() {
         <UiCard className="p-4">
           <h3 className="font-semibold mb-3">Credit Spreads — IG / HY OAS</h3>
           <ResponsiveContainer width="100%" height={260}>
-            <LineChart data={spreadHistoryData}>
+            <LineChart data={capPoints(spreadHistoryData)}>
               <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
               <XAxis dataKey="date" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
               <YAxis tickFormatter={(v) => `${v}%`} tick={{ fontSize: 11 }} />
@@ -179,7 +182,7 @@ function USRatesDetailTab() {
         <UiCard className="p-4" data-prov="taylor_rule.implied">
           <h3 className="font-semibold mb-3">Taylor Rule — Implied vs Actual Fed Funds</h3>
           <ResponsiveContainer width="100%" height={260}>
-            <LineChart data={taylorData}>
+            <LineChart data={capPoints(taylorData)}>
               <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
               <XAxis dataKey="date" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
               <YAxis tickFormatter={(v) => `${v}%`} tick={{ fontSize: 11 }} />
@@ -197,7 +200,7 @@ function USRatesDetailTab() {
         <UiCard className="p-4" data-prov="acm.term_premium">
           <h3 className="font-semibold mb-3">ACM Term Premium Decomposition</h3>
           <ResponsiveContainer width="100%" height={260}>
-            <LineChart data={acmData}>
+            <LineChart data={capPoints(acmData)}>
               <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
               <XAxis dataKey="date" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
               <YAxis tickFormatter={(v) => `${v}%`} tick={{ fontSize: 11 }} />
@@ -363,7 +366,7 @@ function YieldPageInner() {
         <div className="bg-surface rounded-lg p-4 border border-border">
           <h2 className="text-sm font-medium mb-4 text-text-muted">US Treasury Spot Curve</h2>
           <ResponsiveContainer width="100%" height={280}>
-            <LineChart data={us_curve.points.filter(p => p.yield !== null)}>
+            <LineChart data={capPoints(us_curve.points.filter(p => p.yield !== null))}>
               <XAxis dataKey="tenor" tick={{ fontSize: 11 }} />
               <YAxis tickFormatter={(v) => `${v.toFixed(1)}%`} domain={["auto", "auto"]} />
               <Tooltip formatter={(v: number) => [`${v.toFixed(3)}%`, "Yield"]} />
@@ -411,7 +414,7 @@ function YieldPageInner() {
                 risk premium, so it is not a pure expectation.
               </p>
               <ResponsiveContainer width="100%" height={240}>
-                <LineChart data={fwdBreakeven!.history.map((p) => ({ date: p.date, value: p.value }))}>
+                <LineChart data={capPoints(fwdBreakeven!.history.map((p) => ({ date: p.date, value: p.value })))}>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(128,128,128,0.18)" />
                   <XAxis dataKey="date" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
                   <YAxis tickFormatter={(v) => `${v.toFixed(1)}%`} domain={["auto", "auto"]} tick={{ fontSize: 11 }} />

@@ -12,6 +12,7 @@ import { useTheme } from "@/components/ThemeProvider";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
 import { legendProv } from "./legendProv";
+import { capPoints } from "@/lib/series";
 
 const CB_COLORS: Record<string, string> = {
   Fed: "#3b82f6",
@@ -146,7 +147,7 @@ export function CentralBanksTab() {
           </div>
         </div>
         <ResponsiveContainer width="100%" height={320}>
-          <LineChart data={chartData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+          <LineChart data={capPoints(chartData)} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" stroke={pal.grid} />
             <XAxis dataKey="date" tick={{ fill: pal.axis, fontSize: 10 }}
                    tickFormatter={tickFmt}
@@ -172,7 +173,7 @@ export function CentralBanksTab() {
         <div className="card p-4" data-prov="balance_sheet" data-prov-ctx="US Federal Reserve balance sheet">
           <h3 className="text-sm font-medium text-text-secondary mb-4">US Federal Reserve Balance Sheet (Total Assets, $T)</h3>
           <ResponsiveContainer width="100%" height={200}>
-            <AreaChart data={data.balance_sheet.filter((_, i) => i % 4 === 0)}
+            <AreaChart data={capPoints(data.balance_sheet.filter((_, i) => i % 4 === 0))}
                        margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke={pal.grid} />
               <XAxis dataKey="date" tick={{ fill: pal.axis, fontSize: 10 }}

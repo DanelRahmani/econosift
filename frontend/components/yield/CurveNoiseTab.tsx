@@ -16,6 +16,7 @@ import {
   CartesianGrid,
   ReferenceLine,
 } from "recharts";
+import { capPoints } from "@/lib/series";
 
 function fmt(v: number | null | undefined, decimals = 2, suffix = ""): string {
   return v != null ? `${v.toFixed(decimals)}${suffix}` : "—";
@@ -100,7 +101,7 @@ export function CurveNoiseTab() {
           Higher = the curve is more dislocated relative to a smooth three-factor shape.
         </p>
         <ResponsiveContainer width="100%" height={280}>
-          <AreaChart data={chart}>
+          <AreaChart data={capPoints(chart)}>
             <CartesianGrid strokeDasharray="3 3" stroke={pal.grid} />
             <XAxis dataKey="date" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
             <YAxis tickFormatter={(v) => `${v}`} tick={{ fontSize: 11 }} />

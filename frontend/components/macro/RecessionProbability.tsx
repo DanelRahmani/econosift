@@ -20,6 +20,7 @@ import {
   ReferenceLine,
   ReferenceArea,
 } from "recharts";
+import { capPoints } from "@/lib/series";
 
 function fmtNum(v: number | null | undefined, decimals = 1, suffix = ""): string {
   return v != null ? `${v.toFixed(decimals)}${suffix}` : "—";
@@ -101,6 +102,10 @@ export function RecessionProbability() {
     kpis.prob12m != null ? (kpis.prob12m > 30 ? "text-danger" : kpis.prob12m > 15 ? "text-warning" : "text-success") : undefined;
   const sahmTriggered = kpis.sahm != null && kpis.sahm >= 0.5;
 
+  // Thinning must keep the dates the recession shading is pinned to (category x-axis).
+  const recessionEdges = new Set(recessions.flatMap((r) => [r.start, r.end]));
+  const keepEdge = (p: { date: string }) => recessionEdges.has(p.date);
+
   function RecessionAreas() {
     return (
       <>
@@ -150,7 +155,7 @@ export function RecessionProbability() {
           </p>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={probChart}>
+              <LineChart data={capPoints(probChart, undefined, keepEdge)}>
                 <CartesianGrid strokeDasharray="3 3" stroke={pal.grid} />
                 <XAxis dataKey="date" fontSize={10} minTickGap={40} />
                 <YAxis domain={[0, 100]} width={36} fontSize={10} tickFormatter={(v) => `${v}%`} />
@@ -185,7 +190,7 @@ export function RecessionProbability() {
           <h3 className="font-semibold text-sm mb-2">10y–3m Treasury Spread (Monthly Mean)</h3>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={spreadChart}>
+              <LineChart data={capPoints(spreadChart, undefined, keepEdge)}>
                 <CartesianGrid strokeDasharray="3 3" stroke={pal.grid} />
                 <XAxis dataKey="date" fontSize={10} minTickGap={40} />
                 <YAxis domain={["auto", "auto"]} width={40} fontSize={10} tickFormatter={(v) => `${v}%`} />

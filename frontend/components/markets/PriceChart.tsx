@@ -10,6 +10,7 @@ import { chartTooltipStyle, chartPalette, ToggleChip } from "@/components/ui";
 import { useTheme } from "@/components/ThemeProvider";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
+import { capPoints } from "@/lib/series";
 
 const SMA_WINDOWS = [20, 50, 200];
 
@@ -145,7 +146,7 @@ export function PriceChart({ data, events = [], isLoading }: { data: PricesRespo
       )}
       <div className="h-96 w-full">
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={chartData}>
+          <LineChart data={capPoints(chartData)}>
             <CartesianGrid stroke={pal.grid} strokeDasharray="3 3" />
             <XAxis dataKey="Date" tick={{ fill: pal.axis, fontSize: 12 }} minTickGap={40} />
             <YAxis tick={{ fill: pal.axis, fontSize: 12 }} domain={["auto", "auto"]} />

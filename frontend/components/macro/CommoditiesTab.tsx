@@ -18,6 +18,7 @@ import {
   AreaChart,
   Area,
 } from "recharts";
+import { capPoints } from "@/lib/series";
 
 const GRID = "rgba(255,255,255,0.08)";
 
@@ -168,7 +169,7 @@ export function CommoditiesTab() {
             optimism / supply shock).
           </p>
           <ResponsiveContainer width="100%" height={220}>
-            <LineChart data={goldOilData}>
+            <LineChart data={capPoints(goldOilData)}>
               <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
               <XAxis dataKey="date" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
               <YAxis tick={{ fontSize: 11 }} />
@@ -193,7 +194,7 @@ export function CommoditiesTab() {
             Equal-weighted basket of major commodities, indexed to 100 at inception.
           </p>
           <ResponsiveContainer width="100%" height={220}>
-            <AreaChart data={commodityIndexData}>
+            <AreaChart data={capPoints(commodityIndexData)}>
               <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
               <XAxis dataKey="date" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
               <YAxis tick={{ fontSize: 11 }} />

@@ -6,6 +6,7 @@ import { queryClient } from '@/lib/queryClient';
 import { LearningProvider } from '@/lib/learningContext';
 import { RefreshProvider } from '@/lib/refresh';
 import { setBackendStarting } from '@/lib/backendStatus';
+import '@/lib/chartDefaults';
 
 // Relative by default (Docker/web hit /api via nginx); the Tauri desktop build
 // sets NEXT_PUBLIC_API_URL=http://localhost:8000 in .env.production.

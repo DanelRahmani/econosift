@@ -1,23 +1,26 @@
 "use client";
 
 import { Suspense } from "react";
-import { RiskParityTab } from "@/components/research/RiskParityTab";
-import { FxCarryTab } from "@/components/research/FxCarryTab";
-import { MomentumTab } from "@/components/research/MomentumTab";
-import { RealizedMomentsTab } from "@/components/research/RealizedMomentsTab";
-import { DupontTab } from "@/components/research/DupontTab";
-import { EconLabTab } from "@/components/macro/EconLabTab";
-import { CrossAssetCorrelation } from "@/components/research/CrossAssetCorrelation";
-import { FxMacroLink } from "@/components/research/FxMacroLink";
-import { MultiCountryPortfolio } from "@/components/research/MultiCountryPortfolio";
-import { EventStudyTab } from "@/components/research/EventStudyTab";
-import { BacktestTab } from "@/components/research/BacktestTab";
-import { FactorRegimeTab } from "@/components/research/FactorRegimeTab";
 import { ScrollableTabBar } from "@/components/ui";
 import { useUrlState } from "@/lib/useUrlState";
 import { RESEARCH_TABS } from "@/lib/pageTabs";
 import { useKeyboardShortcuts, tabKeys, tabStepKeys } from "@/lib/useKeyboardShortcuts";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import dynamic from "next/dynamic";
+
+// Tabs load on first open, so the page ships only the tab it shows (Phase 69).
+const RiskParityTab = dynamic(() => import("@/components/research/RiskParityTab").then((m) => ({ default: m.RiskParityTab })));
+const FxCarryTab = dynamic(() => import("@/components/research/FxCarryTab").then((m) => ({ default: m.FxCarryTab })));
+const MomentumTab = dynamic(() => import("@/components/research/MomentumTab").then((m) => ({ default: m.MomentumTab })));
+const RealizedMomentsTab = dynamic(() => import("@/components/research/RealizedMomentsTab").then((m) => ({ default: m.RealizedMomentsTab })));
+const DupontTab = dynamic(() => import("@/components/research/DupontTab").then((m) => ({ default: m.DupontTab })));
+const EconLabTab = dynamic(() => import("@/components/macro/EconLabTab").then((m) => ({ default: m.EconLabTab })));
+const CrossAssetCorrelation = dynamic(() => import("@/components/research/CrossAssetCorrelation").then((m) => ({ default: m.CrossAssetCorrelation })));
+const FxMacroLink = dynamic(() => import("@/components/research/FxMacroLink").then((m) => ({ default: m.FxMacroLink })));
+const MultiCountryPortfolio = dynamic(() => import("@/components/research/MultiCountryPortfolio").then((m) => ({ default: m.MultiCountryPortfolio })));
+const EventStudyTab = dynamic(() => import("@/components/research/EventStudyTab").then((m) => ({ default: m.EventStudyTab })));
+const BacktestTab = dynamic(() => import("@/components/research/BacktestTab").then((m) => ({ default: m.BacktestTab })));
+const FactorRegimeTab = dynamic(() => import("@/components/research/FactorRegimeTab").then((m) => ({ default: m.FactorRegimeTab })));
 
 const TABS = RESEARCH_TABS;
 type TabKey = (typeof TABS)[number]["key"];

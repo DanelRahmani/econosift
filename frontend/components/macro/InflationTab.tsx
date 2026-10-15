@@ -1,7 +1,7 @@
 "use client";
 import { useQuery } from "@tanstack/react-query";
 import { apiQuery } from "@/lib/queries";
-import { asOf } from "@/lib/series";
+import { asOf, capPoints } from "@/lib/series";
 import { Card, PageSkeleton } from "@/components/ui";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
@@ -159,7 +159,7 @@ export function InflationTab() {
         <Card className="p-4" data-prov="history.cpiYoY" data-prov-ctx="Inflation measures (YoY %)">
           <h3 className="font-semibold mb-3">Inflation Measures (YoY %)</h3>
           <ResponsiveContainer width="100%" height={280}>
-            <LineChart data={cpiMulti}>
+            <LineChart data={capPoints(cpiMulti)}>
               <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
               <XAxis dataKey="date" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
               <YAxis tickFormatter={(v) => `${v}%`} tick={{ fontSize: 11 }} />
@@ -183,7 +183,7 @@ export function InflationTab() {
             PPI leads CPI — producer price pressures flow through to consumers
           </p>
           <ResponsiveContainer width="100%" height={220}>
-            <LineChart data={ppiData}>
+            <LineChart data={capPoints(ppiData)}>
               <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
               <XAxis dataKey="date" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
               <YAxis tickFormatter={(v) => `${v}%`} tick={{ fontSize: 11 }} />
@@ -204,7 +204,7 @@ export function InflationTab() {
             Market-implied inflation derived from TIPS spreads
           </p>
           <ResponsiveContainer width="100%" height={220}>
-            <LineChart data={beData}>
+            <LineChart data={capPoints(beData)}>
               <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
               <XAxis dataKey="date" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
               <YAxis tickFormatter={(v) => `${v}%`} tick={{ fontSize: 11 }} />
@@ -229,7 +229,7 @@ export function InflationTab() {
             5Y Breakeven (market-implied, from TIPS) vs the Michigan survey&apos;s 1-year-ahead consumer expectation (FRED MICH). The horizons differ, so read divergence loosely.
           </p>
           <ResponsiveContainer width="100%" height={220}>
-            <LineChart data={msData}>
+            <LineChart data={capPoints(msData)}>
               <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
               <XAxis dataKey="date" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
               <YAxis tickFormatter={(v) => `${v}%`} tick={{ fontSize: 11 }} />
@@ -251,7 +251,7 @@ export function InflationTab() {
             Excess money supply growth tends to precede inflation with a 12–18 month lag
           </p>
           <ResponsiveContainer width="100%" height={220}>
-            <LineChart data={m2Data}>
+            <LineChart data={capPoints(m2Data)}>
               <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
               <XAxis dataKey="date" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
               <YAxis tickFormatter={(v) => `${v}%`} tick={{ fontSize: 11 }} />
@@ -272,7 +272,7 @@ export function InflationTab() {
             M2 growth (right axis) vs Nominal GDP growth (left axis). If velocity is stable, money growth drives nominal GDP.
           </p>
           <ResponsiveContainer width="100%" height={220}>
-            <LineChart data={qtData}>
+            <LineChart data={capPoints(qtData)}>
               <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
               <XAxis dataKey="date" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
               <YAxis yAxisId="left" tickFormatter={(v) => `${v}%`} tick={{ fontSize: 11 }} domain={[-10, 30]} />

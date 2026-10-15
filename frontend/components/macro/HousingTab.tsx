@@ -19,6 +19,7 @@ import {
   Bar,
   Cell,
 } from "recharts";
+import { capPoints } from "@/lib/series";
 
 const GRID = "rgba(255,255,255,0.08)";
 const RECESSION_FILL = "rgba(120,120,120,0.18)";
@@ -193,7 +194,7 @@ export function HousingTab() {
         <Card className="p-4" data-prov="history.mortgageRate" data-prov-ctx="30-year mortgage rate">
           <h3 className="font-semibold mb-3">30-Year Mortgage Rate (%)</h3>
           <ResponsiveContainer width="100%" height={220}>
-            <LineChart data={mortgageData}>
+            <LineChart data={capPoints(mortgageData)}>
               <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
               <XAxis dataKey="date" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
               <YAxis tickFormatter={(v) => `${v}%`} tick={{ fontSize: 11 }} />

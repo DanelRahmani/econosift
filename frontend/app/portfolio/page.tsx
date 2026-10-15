@@ -13,22 +13,25 @@ import { PortfolioKPIs } from "@/components/portfolio/PortfolioKPIs";
 import { PerformanceChart } from "@/components/portfolio/PerformanceChart";
 import { DrawdownChart } from "@/components/portfolio/DrawdownChart";
 import { HoldingsTable } from "@/components/portfolio/HoldingsTable";
-import { CorrelationHeatmap } from "@/components/portfolio/CorrelationHeatmap";
-import { RiskContribution } from "@/components/portfolio/RiskContribution";
-import { RollingMetrics } from "@/components/portfolio/RollingMetrics";
-import { CAPMAttribution } from "@/components/portfolio/CAPMAttribution";
-import { KellyTable } from "@/components/portfolio/KellyTable";
-import { FFAttribution } from "@/components/portfolio/FFAttribution";
-import { EfficientFrontier } from "@/components/portfolio/EfficientFrontier";
-import { MonteCarlo } from "@/components/portfolio/MonteCarlo";
-import { BlackLitterman } from "@/components/portfolio/BlackLitterman";
-import { StressTesting } from "@/components/portfolio/StressTesting";
-import { ScenarioTab } from "@/components/portfolio/ScenarioTab";
-import { TransactionLog } from "@/components/portfolio/TransactionLog";
 import { WalkthroughBanner } from "@/components/WalkthroughBanner";
 import { PORTFOLIO_TABS } from "@/lib/pageTabs";
 import { useKeyboardShortcuts, tabKeys, tabStepKeys, periodKeys } from "@/lib/useKeyboardShortcuts";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import dynamic from "next/dynamic";
+
+// Tabs load on first open, so the page ships only the tab it shows (Phase 69).
+const CorrelationHeatmap = dynamic(() => import("@/components/portfolio/CorrelationHeatmap").then((m) => ({ default: m.CorrelationHeatmap })));
+const RiskContribution = dynamic(() => import("@/components/portfolio/RiskContribution").then((m) => ({ default: m.RiskContribution })));
+const RollingMetrics = dynamic(() => import("@/components/portfolio/RollingMetrics").then((m) => ({ default: m.RollingMetrics })));
+const CAPMAttribution = dynamic(() => import("@/components/portfolio/CAPMAttribution").then((m) => ({ default: m.CAPMAttribution })));
+const KellyTable = dynamic(() => import("@/components/portfolio/KellyTable").then((m) => ({ default: m.KellyTable })));
+const FFAttribution = dynamic(() => import("@/components/portfolio/FFAttribution").then((m) => ({ default: m.FFAttribution })));
+const EfficientFrontier = dynamic(() => import("@/components/portfolio/EfficientFrontier").then((m) => ({ default: m.EfficientFrontier })));
+const MonteCarlo = dynamic(() => import("@/components/portfolio/MonteCarlo").then((m) => ({ default: m.MonteCarlo })));
+const BlackLitterman = dynamic(() => import("@/components/portfolio/BlackLitterman").then((m) => ({ default: m.BlackLitterman })));
+const StressTesting = dynamic(() => import("@/components/portfolio/StressTesting").then((m) => ({ default: m.StressTesting })));
+const ScenarioTab = dynamic(() => import("@/components/portfolio/ScenarioTab").then((m) => ({ default: m.ScenarioTab })));
+const TransactionLog = dynamic(() => import("@/components/portfolio/TransactionLog").then((m) => ({ default: m.TransactionLog })));
 
 const LS_KEY = "econosift_portfolio";
 const LEGACY_LS_KEY = "axiom_portfolio";

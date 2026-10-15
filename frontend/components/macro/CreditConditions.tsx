@@ -21,6 +21,7 @@ import {
   CartesianGrid,
   ReferenceLine,
 } from "recharts";
+import { capPoints } from "@/lib/series";
 
 function fmt(v: number | null | undefined, decimals = 2, suffix = ""): string {
   return v != null ? `${v.toFixed(decimals)}${suffix}` : "—";
@@ -181,7 +182,7 @@ export function CreditConditions() {
             )}
           </p>
           <ResponsiveContainer width="100%" height={240}>
-            <LineChart data={ebpChart}>
+            <LineChart data={capPoints(ebpChart)}>
               <CartesianGrid strokeDasharray="3 3" stroke={pal.grid} />
               <XAxis dataKey="date" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
               <YAxis tick={{ fontSize: 11 }} />
@@ -237,7 +238,7 @@ export function CreditConditions() {
             spliced in before IORB replaced it on 2021-07-29.
           </p>
           <ResponsiveContainer width="100%" height={220}>
-            <LineChart data={sofrChart}>
+            <LineChart data={capPoints(sofrChart)}>
               <CartesianGrid strokeDasharray="3 3" stroke={pal.grid} />
               <XAxis dataKey="date" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
               <YAxis tickFormatter={(v) => `${v}`} tick={{ fontSize: 11 }} />
@@ -261,7 +262,7 @@ export function CreditConditions() {
             two. Zero = average conditions; positive = tighter.
           </p>
           <ResponsiveContainer width="100%" height={240}>
-            <LineChart data={nfciChart}>
+            <LineChart data={capPoints(nfciChart)}>
               <CartesianGrid strokeDasharray="3 3" stroke={pal.grid} />
               <XAxis dataKey="date" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
               <YAxis tick={{ fontSize: 11 }} />

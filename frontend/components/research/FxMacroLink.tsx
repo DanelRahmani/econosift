@@ -8,6 +8,7 @@ import { Card } from "@/components/ui";
 import type { FxMacroLinkItem } from "@/lib/types";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf, type Provenance } from "@/lib/provenance";
+import { capPoints } from "@/lib/series";
 
 export function FxMacroLink() {
   const { data: linksData, isLoading: loading, error: linksError } = useQuery(apiQuery("fxMacroLink"));
@@ -92,7 +93,7 @@ export function FxMacroLink() {
                   </h3>
                   <div className="h-64">
                     <ResponsiveContainer>
-                      <LineChart data={link.series}>
+                      <LineChart data={capPoints(link.series)}>
                         <CartesianGrid strokeDasharray="3 3" stroke="rgb(var(--border))" />
                         <XAxis dataKey="date" tick={{ fontSize: 10 }} />
                         <YAxis domain={["auto", "auto"]} tick={{ fontSize: 10 }} />
@@ -112,10 +113,10 @@ export function FxMacroLink() {
                   <h3 className="text-sm font-semibold mb-3">60-Day Rolling Correlation</h3>
                   <div className="h-48">
                     <ResponsiveContainer>
-                      <LineChart data={link.rollingCorrelation.dates.map((d, i) => ({
+                      <LineChart data={capPoints(link.rollingCorrelation.dates.map((d, i) => ({
                         date: d,
                         correlation: link.rollingCorrelation.values[i],
-                      }))}>
+                      })))}>
                         <CartesianGrid strokeDasharray="3 3" stroke="rgb(var(--border))" />
                         <XAxis dataKey="date" tick={{ fontSize: 10 }} />
                         <YAxis domain={[-1, 1]} tick={{ fontSize: 10 }} />

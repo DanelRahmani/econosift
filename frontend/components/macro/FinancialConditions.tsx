@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiQuery } from "@/lib/queries";
-import { asOf } from "@/lib/series";
+import { asOf, capPoints } from "@/lib/series";
 import { Card } from "@/components/ui";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
@@ -163,7 +163,7 @@ export function FinancialConditions() {
             STLFSI4 (St. Louis Fed): similar interpretation.
           </p>
           <ResponsiveContainer width="100%" height={240}>
-            <LineChart data={stressData}>
+            <LineChart data={capPoints(stressData)}>
               <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
               <XAxis dataKey="date" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
               <YAxis tick={{ fontSize: 11 }} />
@@ -185,7 +185,7 @@ export function FinancialConditions() {
             Total assets (USD trillions). QE = expansion; QT = contraction.
           </p>
           <ResponsiveContainer width="100%" height={220}>
-            <AreaChart data={balanceSheetData}>
+            <AreaChart data={capPoints(balanceSheetData)}>
               <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
               <XAxis dataKey="date" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
               <YAxis tickFormatter={(v) => `$${v}T`} tick={{ fontSize: 11 }} />
@@ -212,7 +212,7 @@ export function FinancialConditions() {
             Share of credit card balances 90+ days overdue — signals consumer stress.
           </p>
           <ResponsiveContainer width="100%" height={200}>
-            <LineChart data={delinquencyData}>
+            <LineChart data={capPoints(delinquencyData)}>
               <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
               <XAxis dataKey="date" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
               <YAxis tickFormatter={(v) => `${v}%`} tick={{ fontSize: 11 }} />
@@ -237,7 +237,7 @@ export function FinancialConditions() {
             Bank lending to businesses — slowdown signals tighter credit.
           </p>
           <ResponsiveContainer width="100%" height={200}>
-            <LineChart data={loansData}>
+            <LineChart data={capPoints(loansData)}>
               <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
               <XAxis dataKey="date" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
               <YAxis tickFormatter={(v) => `$${v}T`} tick={{ fontSize: 11 }} />
@@ -272,7 +272,7 @@ export function FinancialConditions() {
             Baker, Bloom & Davis index. Higher = more uncertainty. {epuLogScale ? "Log scale reduces outlier skew." : ""}
           </p>
           <ResponsiveContainer width="100%" height={200}>
-            <LineChart data={epuData}>
+            <LineChart data={capPoints(epuData)}>
               <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
               <XAxis dataKey="date" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
               <YAxis tick={{ fontSize: 11 }} scale={epuLogScale ? "log" : "linear"} domain={["auto", "auto"]} />
@@ -298,7 +298,7 @@ export function FinancialConditions() {
               <Card className="p-4" data-prov="m2" data-prov-ctx="M2 money supply">
                 <h3 className="font-semibold text-sm mb-2">M2 Money Supply</h3>
                 <ResponsiveContainer width="100%" height={180}>
-                  <LineChart data={fundingData.m2}>
+                  <LineChart data={capPoints(fundingData.m2)}>
                     <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
                     <XAxis dataKey="date" hide /><YAxis domain={['auto','auto']} width={40} fontSize={10} /><Tooltip />
                     <Line type="monotone" dataKey="value" stroke="#3b82f6" dot={false} />
@@ -310,7 +310,7 @@ export function FinancialConditions() {
               <Card className="p-4" data-prov="sofr" data-prov-ctx="SOFR">
                 <h3 className="font-semibold text-sm mb-2">SOFR</h3>
                 <ResponsiveContainer width="100%" height={180}>
-                  <LineChart data={fundingData.sofr}>
+                  <LineChart data={capPoints(fundingData.sofr)}>
                     <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
                     <XAxis dataKey="date" hide /><YAxis domain={['auto','auto']} width={40} fontSize={10} /><Tooltip />
                     <Line type="monotone" dataKey="value" stroke="#f59e0b" dot={false} />
@@ -322,7 +322,7 @@ export function FinancialConditions() {
               <Card className="p-4" data-prov="cp_spread" data-prov-ctx="3M CP spread vs fed funds">
                 <h3 className="font-semibold text-sm mb-2">3M CP Spread vs Fed Funds</h3>
                 <ResponsiveContainer width="100%" height={180}>
-                  <LineChart data={fundingData.cp_spread}>
+                  <LineChart data={capPoints(fundingData.cp_spread)}>
                     <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
                     <XAxis dataKey="date" hide /><YAxis domain={['auto','auto']} width={40} fontSize={10} /><Tooltip />
                     <Line type="monotone" dataKey="value" stroke="#ef4444" dot={false} />
