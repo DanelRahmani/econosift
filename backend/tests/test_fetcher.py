@@ -125,7 +125,9 @@ def test_universe_stores_rosters_and_queues_missing_history():
         assert conn.execute("SELECT symbol, sector FROM security WHERE symbol NOT LIKE '^%' "
                             "ORDER BY symbol").fetchall() == [("AAA", "Tech"), ("BBB", "Energy"), ("CCC", "Health")]
         assert conn.execute("SELECT COUNT(*) FROM index_membership").fetchone()[0] == 4
-    assert sorted(k for _, k, _ in _queue()) == sorted(["AAA", "CCC", *fetcher.INTRADAY_EXTRAS])
+    assert sorted(k for kind, k, _ in _queue() if kind == "history") == sorted(
+        ["AAA", "CCC", *fetcher.INTRADAY_EXTRAS])
+    assert ("ciks" in {kind for kind, _, _ in _queue()}) == fetcher.sec_enabled()  # new members need a CIK
     assert fetcher.status()["backfill"] == {"total": 3 + len(fetcher.INTRADAY_EXTRAS), "done": 1}
     assert fetcher._last_success("constituents") is not None
 

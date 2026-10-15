@@ -160,6 +160,7 @@ def run_universe(_key: str) -> int:
         conn.execute("DELETE FROM index_membership")
     store.upsert("index_membership", membership, ("index_name", "symbol", "start"))
     _mark_success("constituents")
+    queue_ciks()  # new members need their CIK for SEC fundamentals
 
     with store.connect() as conn:
         missing = [r[0] for r in conn.execute(
@@ -201,6 +202,21 @@ def run_history(symbol: str) -> int:
     return len(bars)
 
 
+def run_ciks(_key: str) -> int:
+    """Map every stored security to its SEC CIK (``company_tickers.json``, one request)."""
+    from .sources import source_sec
+
+    ciks = source_sec.ticker_ciks()
+    if not ciks:
+        raise RuntimeError("SEC company_tickers.json returned no tickers")  # never store an empty result
+    with store.connect() as conn:
+        syms = [r[0] for r in conn.execute("SELECT symbol FROM security")]
+        rows = [(ciks[s], s) for s in syms if s in ciks]
+        conn.executemany("UPDATE security SET cik = ? WHERE symbol = ?", rows)
+    _mark_success("sec_ciks")
+    return len(rows)
+
+
 def run_snapshot(key: str) -> int:
     from . import cache, snapshot
     rows = snapshot.run(key)
@@ -213,6 +229,7 @@ HANDLERS: dict[str, Callable[[str], int]] = {
     "universe": run_universe,
     "history": run_history,
     "snapshot": run_snapshot,
+    "ciks": run_ciks,
 }
 
 
@@ -235,6 +252,17 @@ def queue_history_rotation(today: datetime | None = None) -> None:
 
 def queue_universe() -> None:
     enqueue("universe", "all", PRIORITY_UNIVERSE)
+
+
+def sec_enabled() -> bool:
+    from .sources import source_sec
+    return source_sec.identity() is not None
+
+
+def queue_ciks() -> None:
+    """Refresh the ticker -> CIK map; skipped without an EDGAR identity (Admin says so)."""
+    if sec_enabled():
+        enqueue("ciks", "all", PRIORITY_UNIVERSE)
 
 
 def queue_snapshot(now: datetime | None = None) -> None:
@@ -332,10 +360,10 @@ def run_one() -> bool:
         record_source_health()
         logger.info("fetcher: %s %s -> %d rows", kind, key, rows)
     except YFRateLimitError:
-        # The circuit is open: wait it out without spending the task's attempts.
+        # A circuit (Yahoo or SEC) is open: wait it out without spending the task's attempts.
         record_source_health()
         wait = max((st["openForSeconds"] for st in rate_limit.status().values()), default=30.0)
-        logger.warning("fetcher: Yahoo rate-limited; pausing %.0f s", wait)
+        logger.warning("fetcher: %s rate-limited; pausing %.0f s", kind, wait)
         _stop.wait(max(wait, 1.0))
     except Exception as exc:
         _fail(task_id, f"{type(exc).__name__}: {exc}")
@@ -352,6 +380,9 @@ def _loop(start_delay: float) -> None:
     universe_at = _last_success("constituents")
     if universe_at is None or datetime.now(timezone.utc) - universe_at > UNIVERSE_MAX_AGE:
         queue_universe()
+    ciks_at = _last_success("sec_ciks")
+    if ciks_at is None or datetime.now(timezone.utc) - ciks_at > UNIVERSE_MAX_AGE:
+        queue_ciks()
     logged = time.monotonic()
     while not _stop.is_set():
         try:
@@ -404,4 +435,13 @@ def status() -> dict:
         "queue": {"pending": pending, "failed": failed, "errors": errors},
         "universeAt": next((h["lastSuccess"] for h in health if h["source"] == "constituents"), None),
         "sources": health,
+        "sec": sec_status(),
     }
+
+
+def sec_status() -> dict:
+    """SEC fundamentals for Admin: whether an EDGAR identity is set, and CIK coverage."""
+    with store.connect() as conn:
+        ciks = conn.execute("SELECT COUNT(*) FROM security WHERE cik IS NOT NULL").fetchone()[0]
+        row = conn.execute("SELECT last_success FROM source_health WHERE source = 'sec_ciks'").fetchone()
+    return {"identity": sec_enabled(), "ciks": ciks, "ciksAt": row[0] if row else None}

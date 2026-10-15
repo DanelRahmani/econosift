@@ -114,8 +114,8 @@ def test_a_429_on_one_bucket_leaves_the_other_open_for_calls():
     assert chart.call(lambda: "ok") == "ok"
 
 
-def test_status_reports_both_yahoo_buckets():
-    assert set(rl.status()) == {"yahoo_chart", "yahoo_api"}
+def test_status_reports_both_yahoo_buckets_and_sec():
+    assert set(rl.status()) == {"yahoo_chart", "yahoo_api", "sec"}
 
 
 def test_bulk_request_yields_while_an_interactive_one_waits():

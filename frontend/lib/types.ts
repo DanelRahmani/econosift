@@ -2160,6 +2160,8 @@ export interface StoreStatus {
     lastError: string | null;
     openUntil: string | null;
   }[];
+  /** SEC fundamentals: off without an EDGAR identity. */
+  sec?: { identity: boolean; ciks: number; ciksAt: string | null };
   error?: string;
 }
 

@@ -275,10 +275,21 @@ function StoreSection({ store }: { store: StoreStatus }) {
           {store.universeAt ? ` · index rosters as of ${store.universeAt.slice(0, 16).replace("T", " ")} UTC` : ""}
         </p>
       </div>
+      {store.sec && !store.sec.identity && (
+        <p className="text-xs text-danger mb-4">
+          SEC fundamentals are off: set EDGAR_IDENTITY (your name and contact email) so SEC accepts the requests.
+        </p>
+      )}
+      {store.sec?.identity && (
+        <p className="text-xs text-text-muted mb-4">
+          SEC: {store.sec.ciks.toLocaleString()} symbols mapped to a CIK
+          {store.sec.ciksAt ? ` · as of ${store.sec.ciksAt.slice(0, 16).replace("T", " ")} UTC` : ""}
+        </p>
+      )}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
         <DbStat label="Queued" value={store.queue?.pending?.toLocaleString() ?? "—"} />
         <DbStat label="Failed" value={store.queue?.failed?.toLocaleString() ?? "—"} />
-        {(store.sources ?? []).filter((s) => s.source !== "constituents").map((s) => (
+        {(store.sources ?? []).filter((s) => s.source !== "constituents" && !s.source.startsWith("sec_")).map((s) => (
           <DbStat key={s.source} label={`${s.source} requests today`} value={s.requestsToday?.toLocaleString() ?? "—"} />
         ))}
       </div>

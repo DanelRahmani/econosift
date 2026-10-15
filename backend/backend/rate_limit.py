@@ -161,6 +161,9 @@ class SourceGuard:
 
 YAHOO_CHART = SourceGuard("yahoo_chart", rate=8.0, burst=16, jitter=0.05)
 YAHOO_API = SourceGuard("yahoo_api", rate=2.0, burst=4, jitter=0.1)
+# SEC EDGAR allows 10 requests/s per caller; half of that leaves room for the
+# edgartools Form 4 / 13F paths, which don't pass this guard (§8.2).
+SEC = SourceGuard("sec", rate=5.0, burst=5)
 
 
 def guard_for_url(url: str) -> SourceGuard:
@@ -185,4 +188,4 @@ def install_yfinance_guard() -> None:
 
 
 def status() -> dict:
-    return {g.name: g.status() for g in (YAHOO_CHART, YAHOO_API)}
+    return {g.name: g.status() for g in (YAHOO_CHART, YAHOO_API, SEC)}
