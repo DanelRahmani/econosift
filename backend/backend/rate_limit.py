@@ -17,9 +17,14 @@ cooldown; while it is open, calls fail fast with ``YFRateLimitError`` instead
 of hitting Yahoo again, so callers serve what they have stored. The buckets
 trip separately: Yahoo can rate-limit the crumb/quoteSummary path while chart
 still answers.
+
+Requests made inside :func:`bulk` (large batch downloads) are low priority:
+they take a token only when no in-page request is waiting, so a two-ticker
+chart never queues behind a cold 500-ticker fan-out.
 """
 from __future__ import annotations
 
+import contextlib
 import functools
 import logging
 import random
@@ -34,6 +39,23 @@ COOLDOWN_429 = 30.0          # first cooldown after a 429, doubled on each repea
 COOLDOWN_MAX = 15 * 60.0
 ERROR_THRESHOLD = 5          # consecutive non-429 failures that open the circuit
 ERROR_COOLDOWN = 60.0
+
+_local = threading.local()
+
+
+@contextlib.contextmanager
+def bulk():
+    """Mark this thread's Yahoo requests as low priority (batch downloads)."""
+    prev = getattr(_local, "bulk", False)
+    _local.bulk = True
+    try:
+        yield
+    finally:
+        _local.bulk = prev
+
+
+def is_bulk() -> bool:
+    return getattr(_local, "bulk", False)
 
 
 class SourceGuard:
@@ -55,6 +77,7 @@ class SourceGuard:
         self._consecutive_errors = 0
         self._last_error: str | None = None
         self._requests = 0  # since process start; the Phase 66 target is a few hundred per day
+        self._high_waiting = 0  # normal-priority requests waiting for a token
 
     # -- circuit ---------------------------------------------------------------
     def _open(self, seconds: float, reason: str) -> None:
@@ -80,23 +103,33 @@ class SourceGuard:
             self._consecutive_errors = 0
 
     # -- bucket ----------------------------------------------------------------
-    def _acquire(self) -> None:
-        while True:
-            with self._lock:
-                now = self._clock()
-                if now < self._open_until:
-                    raise YFRateLimitError()
-                self._tokens = min(self.burst, self._tokens + (now - self._last) * self.rate)
-                self._last = now
-                if self._tokens >= 1:
-                    self._tokens -= 1
-                    self._requests += 1
-                    return
-                wait = (1 - self._tokens) / self.rate
-            self._sleep(wait + (random.uniform(0, self.jitter) if self.jitter else 0.0))
+    def _acquire(self, low: bool = False) -> None:
+        queued = False
+        try:
+            while True:
+                with self._lock:
+                    now = self._clock()
+                    if now < self._open_until:
+                        raise YFRateLimitError()
+                    self._tokens = min(self.burst, self._tokens + (now - self._last) * self.rate)
+                    self._last = now
+                    if self._tokens >= 1 and not (low and self._high_waiting):
+                        self._tokens -= 1
+                        self._requests += 1
+                        return
+                    if not low and not queued:
+                        self._high_waiting += 1
+                        queued = True
+                    # A bulk request yielding to a queued one re-checks after one token's time.
+                    wait = max(1 - self._tokens, 0.0) / self.rate or 1 / self.rate
+                self._sleep(wait + (random.uniform(0, self.jitter) if self.jitter else 0.0))
+        finally:
+            if queued:
+                with self._lock:
+                    self._high_waiting -= 1
 
     def call(self, fn, *args, **kwargs):
-        self._acquire()
+        self._acquire(low=is_bulk())
         try:
             result = fn(*args, **kwargs)
         except YFRateLimitError:

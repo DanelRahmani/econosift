@@ -3,10 +3,12 @@ from __future__ import annotations
 
 import logging
 import time
+from concurrent.futures import ThreadPoolExecutor
 import numpy as np
 import pandas as pd
 import yfinance as yf
 
+from .. import rate_limit
 from ..cache import cached
 
 log = logging.getLogger(__name__)
@@ -35,6 +37,28 @@ def benchmark_for(ticker: str) -> str:
     return DEFAULT_BENCHMARK
 
 
+# Batches this large (index universes) download as low-priority chunks: each
+# chunk runs sequentially in its own worker under rate_limit.bulk(), so the
+# batch still uses the Yahoo bucket fully but in-page requests go first.
+_BULK_MIN = 20
+_BULK_WORKERS = 4
+
+
+def _yf_download(symbols, **kwargs) -> pd.DataFrame:
+    symbols = list(symbols)
+    if len(symbols) < _BULK_MIN:
+        return yf.download(symbols, threads=True, **kwargs)
+
+    def one(chunk):
+        with rate_limit.bulk():
+            return yf.download(chunk, threads=False, **kwargs)
+
+    chunks = [symbols[i::_BULK_WORKERS] for i in range(_BULK_WORKERS)]
+    with ThreadPoolExecutor(_BULK_WORKERS, thread_name_prefix="yf-bulk") as ex:
+        parts = [p for p in ex.map(one, chunks) if p is not None and len(p)]
+    return pd.concat(parts, axis=1) if parts else pd.DataFrame()
+
+
 @cached("yf_close")
 def get_close_frame(symbols: tuple[str, ...], period: str) -> pd.DataFrame:
     """Return a DataFrame of adjusted close prices indexed by date.
@@ -43,13 +67,12 @@ def get_close_frame(symbols: tuple[str, ...], period: str) -> pd.DataFrame:
     """
     if not symbols:
         return pd.DataFrame()
-    raw = yf.download(
-        list(symbols),
+    raw = _yf_download(
+        symbols,
         period=period,
         interval="1d",
         auto_adjust=True,
         progress=False,
-        threads=True,
     )
     if raw is None or len(raw) == 0:
         return pd.DataFrame()
@@ -79,13 +102,12 @@ def get_volume_frame(symbols: tuple[str, ...], period: str) -> pd.DataFrame:
     """
     if not symbols:
         return pd.DataFrame()
-    raw = yf.download(
-        list(symbols),
+    raw = _yf_download(
+        symbols,
         period=period,
         interval="1d",
         auto_adjust=True,
         progress=False,
-        threads=True,
     )
     if raw is None or len(raw) == 0:
         return pd.DataFrame()
@@ -607,13 +629,12 @@ def get_ohlc_frame(symbols: tuple[str, ...], period: str, adjust: bool = True) -
     """
     if not symbols:
         return {}
-    raw = yf.download(
-        list(symbols),
+    raw = _yf_download(
+        symbols,
         period=period,
         interval="1d",
         auto_adjust=adjust,
         progress=False,
-        threads=True,
     )
     if raw is None or len(raw) == 0:
         return {}

@@ -116,3 +116,28 @@ def test_a_429_on_one_bucket_leaves_the_other_open_for_calls():
 
 def test_status_reports_both_yahoo_buckets():
     assert set(rl.status()) == {"yahoo_chart", "yahoo_api"}
+
+
+def test_bulk_request_yields_while_an_interactive_one_waits():
+    c = FakeClock()
+    g = _guard(c)
+    g._high_waiting = 1  # an in-page request is queued for a token
+    order = []
+
+    def sleep(s):
+        c.sleep(s)
+        if not order:  # the interactive request gets its token meanwhile
+            order.append("interactive")
+            g._high_waiting = 0
+
+    g._sleep = sleep
+    with rl.bulk():
+        g.call(lambda: order.append("bulk"))
+    assert order == ["interactive", "bulk"]
+
+
+def test_bulk_flag_is_scoped_to_the_context():
+    assert not rl.is_bulk()
+    with rl.bulk():
+        assert rl.is_bulk()
+    assert not rl.is_bulk()
