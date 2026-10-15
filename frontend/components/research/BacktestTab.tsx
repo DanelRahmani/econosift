@@ -1,5 +1,7 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { apiQuery } from "@/lib/queries";
 import { api } from "@/lib/api";
 import type { BacktestResponse, BacktestSignalDef } from "@/lib/types";
 import { useSourceScope } from "@/components/provenance/SourceScope";
@@ -48,7 +50,6 @@ function Kpi({ label, value, sub, tone }: { label: string; value: string; sub?: 
 }
 
 export function BacktestTab() {
-  const [signals, setSignals] = useState<BacktestSignalDef[]>([]);
   const [signal, setSignal] = useState("momentum_12_1");
   const [universe, setUniverse] = useState("sp500");
   const [rebalance, setRebalance] = useState("M");
@@ -63,9 +64,8 @@ export function BacktestTab() {
 
   const pal = chartPalette("dark");
 
-  useEffect(() => {
-    api.backtestSignals().then((r) => setSignals(r.signals)).catch(() => setSignals([]));
-  }, []);
+  const { data: signalsData } = useQuery(apiQuery("backtestSignals"));
+  const signals: BacktestSignalDef[] = signalsData?.signals ?? [];
 
   async function run() {
     setRunning(true);

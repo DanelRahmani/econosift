@@ -1,6 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { apiQuery } from "@/lib/queries";
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   Cell, ResponsiveContainer, Legend,
@@ -8,10 +10,9 @@ import {
 import { Card } from "@/components/ui";
 import { SearchBar } from "@/components/SearchBar";
 import { api } from "@/lib/api";
-import type { MomentsResponse, MomentsCrossSection } from "@/lib/types";
+import type { MomentsCrossSection } from "@/lib/types";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
-import { useRefreshNonce } from "@/lib/refresh";
 
 const PERIODS = ["1y", "2y", "3y", "5y"] as const;
 type Period = (typeof PERIODS)[number];
@@ -47,8 +48,6 @@ export function RealizedMomentsTab() {
   // --- Single-ticker moments ---
   const [ticker, setTicker] = useState("AAPL");
   const [period, setPeriod] = useState<Period>("3y");
-  const [data, setData] = useState<MomentsResponse | null>(null);
-  const [loading, setLoading] = useState(false);
   const [view, setView] = useState<"rvol" | "skew" | "kurt">("rvol");
 
   // --- Cross-section ---
@@ -57,24 +56,19 @@ export function RealizedMomentsTab() {
   const [xs, setXs] = useState<MomentsCrossSection | null>(null);
   const [xsLoading, setXsLoading] = useState(false);
 
-  const scope = useSourceScope(provOf(data));
   const xsScope = useSourceScope(provOf(xs));
 
-  const loadMoments = useCallback((t: string, p: Period) => {
-    if (!t.trim()) return;
-    setLoading(true);
-    api.moments(t.trim().toUpperCase(), p)
-      .then(setData)
-      .catch(() => setData(null))
-      .finally(() => setLoading(false));
-  }, []);
-
-  // Auto-load moments on mount and when ticker/period changes (🟢)
-  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
-  useEffect(() => {
-    loadMoments(ticker, period);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [period, refreshNonce]);  // only period change auto-triggers; ticker requires Enter/blur
+  // Auto-load moments on mount and when the committed ticker or period changes (🟢);
+  // typing a ticker only commits it on Enter/blur.
+  const [momentsTicker, setMomentsTicker] = useState(ticker);
+  const loadMoments = (t: string) => {
+    if (t.trim()) setMomentsTicker(t.trim().toUpperCase());
+  };
+  const { data = null, isFetching: loading } = useQuery({
+    ...apiQuery("moments", momentsTicker, period),
+    enabled: !!momentsTicker,
+  });
+  const scope = useSourceScope(provOf(data));
 
   const runCrossSection = () => {
     setXsLoading(true);
@@ -114,7 +108,7 @@ export function RealizedMomentsTab() {
             <label className="block text-xs text-text-muted mb-1">Ticker</label>
             <SearchBar onAdd={(sym) => {
               setTicker(sym.toUpperCase());
-              loadMoments(sym.toUpperCase(), period);
+              loadMoments(sym);
             }} />
             {ticker && (
               <span className="inline-flex items-center gap-1 mt-1.5 px-2 py-0.5 rounded-full bg-surface-alt border border-border text-xs font-mono">

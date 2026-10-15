@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { apiQuery } from "@/lib/queries";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
-import { api } from "@/lib/api";
-import type { Holding, RollingData, DateValuePoint } from "@/lib/types";
+import type { Holding, DateValuePoint } from "@/lib/types";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
 
@@ -18,22 +19,12 @@ const WINDOWS = [20, 60, 120, 252] as const;
 
 export function RollingMetrics({ holdings, period }: Props) {
   const [window, setWindow] = useState<number>(60);
-  const [data, setData] = useState<RollingData | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { data = null, isFetching: loading, isError } = useQuery({
+    ...apiQuery("portfolioRolling", holdings, period, window),
+    enabled: holdings.length > 0,
+  });
+  const error = isError ? "Failed to load rolling metrics" : null;
   const scope = useSourceScope(provOf(data));
-
-  useEffect(() => {
-    if (holdings.length === 0) return;
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-    api.portfolioRolling(holdings, period, window)
-      .then((d) => { if (!cancelled) setData(d); })
-      .catch(() => { if (!cancelled) setError("Failed to load rolling metrics"); })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
-  }, [holdings, period, window]);
 
   function thin(pts: DateValuePoint[], maxPts = 200): DateValuePoint[] {
     if (!pts || pts.length === 0) return [];

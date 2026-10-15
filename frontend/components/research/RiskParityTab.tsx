@@ -1,6 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { apiQuery } from "@/lib/queries";
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Cell,
   ResponsiveContainer, Legend,
@@ -8,10 +10,9 @@ import {
 import { Card } from "@/components/ui";
 import { SearchBar } from "@/components/SearchBar";
 import { api } from "@/lib/api";
-import type { RiskParityWeights, RiskParityBacktest } from "@/lib/types";
+import type { RiskParityBacktest } from "@/lib/types";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
-import { useRefreshNonce } from "@/lib/refresh";
 
 const PERIODS = ["1y", "3y", "5y"] as const;
 const COLORS = ["#6366f1", "#f59e0b", "#10b981", "#ef4444", "#3b82f6", "#a855f7", "#ec4899", "#14b8a6"];
@@ -32,30 +33,22 @@ export function RiskParityTab() {
   const [period, setPeriod] = useState<(typeof PERIODS)[number]>("3y");
   const [mode, setMode] = useState<"erc" | "invvol">("erc");
 
-  const [weights, setWeights] = useState<RiskParityWeights | null>(null);
-  const [loading, setLoading] = useState(false);
 
   const [backtest, setBacktest] = useState<RiskParityBacktest | null>(null);
   const [btLoading, setBtLoading] = useState(false);
 
-  const weightsScope = useSourceScope(provOf(weights));
   const backtestScope = useSourceScope(provOf(backtest));
 
   const tickers = input.split(",").map((t) => t.trim().toUpperCase()).filter(Boolean);
 
-  const loadWeights = useCallback(() => {
-    if (tickers.length < 2) return;
-    setLoading(true);
-    setBacktest(null);
-    api.riskParity(tickers, period, mode)
-      .then(setWeights)
-      .catch(() => setWeights(null))
-      .finally(() => setLoading(false));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [input, period, mode]);
+  const { data: weights = null, isFetching: loading } = useQuery({
+    ...apiQuery("riskParity", tickers, period, mode),
+    enabled: tickers.length >= 2,
+  });
+  const weightsScope = useSourceScope(provOf(weights));
 
-  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
-  useEffect(() => { loadWeights(); }, [loadWeights, refreshNonce]);
+  // A backtest belongs to the inputs it ran on.
+  useEffect(() => { setBacktest(null); }, [input, period, mode]);
 
   const runBacktest = () => {
     if (tickers.length < 2) return;

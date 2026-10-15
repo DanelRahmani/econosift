@@ -1,15 +1,16 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { apiQuery } from "@/lib/queries";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from "recharts";
 import { Card } from "@/components/ui";
 import { api } from "@/lib/api";
-import type { CarryTable, CarryBacktest, CarryRow } from "@/lib/types";
+import type { CarryBacktest, CarryRow } from "@/lib/types";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
-import { useRefreshNonce } from "@/lib/refresh";
 
 const tooltipStyle = {
   backgroundColor: "rgb(var(--surface-alt))",
@@ -26,8 +27,7 @@ function num(v: number | null, dp = 2, suffix = ""): string {
 }
 
 export function FxCarryTab() {
-  const [table, setTable] = useState<CarryTable | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { data: table = null, isLoading: loading } = useQuery(apiQuery("carryTable", "3y"));
   const [sort, setSort] = useState<SortKey>("carry");
 
   const [backtest, setBacktest] = useState<CarryBacktest | null>(null);
@@ -35,12 +35,6 @@ export function FxCarryTab() {
 
   const tableScope = useSourceScope(provOf(table));
   const backtestScope = useSourceScope(provOf(backtest));
-
-  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
-  useEffect(() => {
-    setLoading(true);
-    api.carryTable("3y").then(setTable).catch(() => setTable(null)).finally(() => setLoading(false));
-  }, [refreshNonce]);
 
   const runBacktest = () => {
     setBtLoading(true);

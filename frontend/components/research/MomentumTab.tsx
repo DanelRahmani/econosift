@@ -1,16 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { apiQuery } from "@/lib/queries";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell, ResponsiveContainer,
 } from "recharts";
 import Link from "next/link";
 import { Card } from "@/components/ui";
-import { api } from "@/lib/api";
-import type { MomentumResponse, MomentumRank } from "@/lib/types";
+import type { MomentumRank } from "@/lib/types";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
-import { useRefreshNonce } from "@/lib/refresh";
 
 const UNIVERSES = [
   { key: "dow", label: "Dow 30" },
@@ -65,29 +65,18 @@ function RankTable({ title, rows, accent, prov }: { title: string; rows: Momentu
 export function MomentumTab() {
   const [universe, setUniverse] = useState<Universe>("dow");
   const [signal, setSignal] = useState<Signal>("12m1m");
-  const [data, setData] = useState<MomentumResponse | null>(null);
-  const [loading, setLoading] = useState(false);
-  // Tracks the param combo currently loaded, so the heavy universes only fetch on demand.
-  const [loadedKey, setLoadedKey] = useState<string>("");
+  // Dow is cheap → auto-load. NDX/S&P 500 are throttle-prone → require the button,
+  // which records the param combo it ran for.
+  const [runKey, setRunKey] = useState<string>("");
+  const currentKey = `${universe}:${signal}`;
+  const { data: momentumData, isFetching: loading } = useQuery({
+    ...apiQuery("momentum", universe, signal),
+    enabled: universe === "dow" || runKey === currentKey,
+  });
+  const data = universe === "dow" || runKey === currentKey ? momentumData ?? null : null;
   const scope = useSourceScope(provOf(data));
 
-  const fetchData = useCallback((u: Universe, s: Signal) => {
-    setLoading(true);
-    api.momentum(u, s)
-      .then((d) => { setData(d); setLoadedKey(`${u}:${s}`); })
-      .catch(() => setData(null))
-      .finally(() => setLoading(false));
-  }, []);
-
-  // Dow is cheap → auto-load. NDX/S&P 500 are throttle-prone → require the button.
-  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
-  useEffect(() => {
-    if (universe === "dow") fetchData("dow", signal);
-    else setData(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [universe, signal, refreshNonce]);
-
-  const needsRun = universe !== "dow" && loadedKey !== `${universe}:${signal}`;
+  const needsRun = universe !== "dow" && runKey !== currentKey;
 
   const deciles = (data?.deciles ?? []).map((d) => ({
     decile: `D${d.decile}`,
@@ -122,7 +111,7 @@ export function MomentumTab() {
             </div>
           </div>
           {universe !== "dow" && (
-            <button onClick={() => fetchData(universe, signal)} disabled={loading}
+            <button onClick={() => setRunKey(currentKey)} disabled={loading}
               className="px-3 py-1.5 rounded-lg bg-danger/90 hover:bg-danger text-white text-xs font-semibold disabled:opacity-50">
               {loading ? "Running…" : "🔴 Run"}
             </button>

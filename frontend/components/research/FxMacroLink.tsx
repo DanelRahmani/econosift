@@ -1,31 +1,22 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { apiQuery } from "@/lib/queries";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { Card } from "@/components/ui";
-import { api } from "@/lib/api";
 import type { FxMacroLinkItem } from "@/lib/types";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf, type Provenance } from "@/lib/provenance";
-import { useRefreshNonce } from "@/lib/refresh";
 
 export function FxMacroLink() {
-  const [links, setLinks] = useState<FxMacroLinkItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data: linksData, isLoading: loading, error: linksError } = useQuery(apiQuery("fxMacroLink"));
+  const links: FxMacroLinkItem[] = linksData?.links || [];
+  const error = linksError instanceof Error ? linksError.message : null;
   const [selected, setSelected] = useState<number>(0);
   // the response is unwrapped into `links`, so its provenance map is kept alongside
-  const [linksProv, setLinksProv] = useState<Provenance | undefined>();
+  const linksProv: Provenance | undefined = linksData ? provOf(linksData) : undefined;
   const scope = useSourceScope(linksProv);
-
-  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
-  useEffect(() => {
-    setLoading(true);
-    api.fxMacroLink()
-      .then((r) => { setLinks(r.links || []); setLinksProv(provOf(r)); })
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
-  }, [refreshNonce]);
 
   const link = links[selected];
   const linkKey = `links.${link?.label}`;

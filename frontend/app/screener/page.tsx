@@ -1,8 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, Suspense } from "react";
+import { useCallback, useMemo, useState, Suspense } from "react";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
+import { apiQuery } from "@/lib/queries";
 import { api } from "@/lib/api";
-import type { PresetDef, ScreenerCacheRow, ScreenerUniverseResponse, SnowflakeBatchResponse } from "@/lib/types";
+import type { PresetDef, ScreenerCacheRow, SnowflakeBatchResponse } from "@/lib/types";
 import { Card, Skeleton, PageSkeleton } from "@/components/ui";
 import { SourceScope, useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf, type Provenance } from "@/lib/provenance";
@@ -15,7 +17,6 @@ import { Sparkline } from "@/components/screener/Sparkline";
 import { fmtNum, fmtPct, fmtLarge } from "@/lib/format";
 import { SnowflakeMini } from "@/components/markets/SnowflakeMini";
 import { DataFreshnessBadge } from "@/components/DataFreshnessBadge";
-import { useRefreshNonce } from "@/lib/refresh";
 import { useKeyboardShortcuts, tabKeys, tabStepKeys } from "@/lib/useKeyboardShortcuts";
 
 // ─── Constants ────────────────────────────────────────────────────────────
@@ -142,46 +143,20 @@ function ScreenerPageInner() {
     ...tabStepKeys(RESULT_TABS, (t) => t === resultTab, (t) => setUrlState({ tab: t })),
   }); // P2-07
 
-  const [presetDefs, setPresetDefs] = useState<PresetDef[]>([]);
-  const [data, setData] = useState<ScreenerUniverseResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [snowflake, setSnowflake] = useState<SnowflakeBatchResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  // Preset definitions load once; the universe whenever parameters change (the previous
+  // result stays on screen while a new sort or preset loads).
+  const { data: presetsData } = useQuery(apiQuery("screenerPresets"));
+  const presetDefs: PresetDef[] = presetsData?.presets ?? [];
+  const presetsStr = [...activePresets].join(",");
+  const universeQ = useQuery({
+    ...apiQuery("screenerUniverse", index, presetsStr, "", sortKey, sortDir, 500),
+    placeholderData: keepPreviousData,
+  });
+  const data = universeQ.data ?? null;
+  const loading = universeQ.isFetching;
+  const error = universeQ.error ? universeQ.error.message || "Failed to load screener data" : null;
   const [refreshing, setRefreshing] = useState(false);
   const scope = useSourceScope(provOf(data));
-
-  // Load preset definitions once
-  useEffect(() => {
-    let alive = true;
-    api.screenerPresets().then((r) => {
-      if (alive) setPresetDefs(r.presets);
-    }).catch(() => {});
-    return () => { alive = false; };
-  }, []);
-
-  // Fetch universe whenever parameters change
-  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
-  useEffect(() => {
-    let alive = true;
-    setLoading(true);
-    setError(null);
-
-    const presetsStr = [...activePresets].join(",");
-    api.screenerUniverse(index, presetsStr, "", sortKey, sortDir, 500)
-      .then((r) => {
-        if (!alive) return;
-        setData(r);
-      })
-      .catch((e) => {
-        if (!alive) return;
-        setError(e?.message ?? "Failed to load screener data");
-      })
-      .finally(() => {
-        if (alive) setLoading(false);
-      });
-
-    return () => { alive = false; };
-  }, [index, activePresets, sortKey, sortDir, refreshNonce]);
 
   const handleSetIndex = useCallback((v: IndexKey) => {
     setUrlState({ index: v });
@@ -218,14 +193,11 @@ function ScreenerPageInner() {
   const results = data?.results ?? [];
 
   // Fetch snowflake batch scores when switching to charts view
-  useEffect(() => {
-    if (viewMode !== "charts" || results.length === 0) return;
-    const tickers = results.map((r) => r.symbol).slice(0, 100); // cap at 100
-    api.snowflakeBatch(tickers)
-      .then(setSnowflake)
-      .catch(() => setSnowflake(null));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewMode, data, refreshNonce]);
+  const snowflakeTickers = results.map((r) => r.symbol).slice(0, 100); // cap at 100
+  const { data: snowflake = null } = useQuery({
+    ...apiQuery("snowflakeBatch", snowflakeTickers),
+    enabled: viewMode === "charts" && snowflakeTickers.length > 0,
+  });
 
   return (
     <main className="max-w-screen-2xl mx-auto px-4 py-6 space-y-6">

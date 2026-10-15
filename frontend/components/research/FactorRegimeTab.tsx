@@ -1,13 +1,12 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
-import { api } from "@/lib/api";
-import type { FactorRegimeData } from "@/lib/types";
+import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { apiQuery } from "@/lib/queries";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
 import { PageSkeleton, Card, chartPalette } from "@/components/ui";
 import { CHART_COLORS, fmtPctFromFraction } from "@/lib/format";
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, Legend, CartesianGrid } from "recharts";
-import { useRefreshNonce } from "@/lib/refresh";
 
 function signColor(v: number | null | undefined): string {
   if (v == null) return "";
@@ -27,15 +26,9 @@ function Kpi({ label, value, sub, color, big = false, prov }: {
 }
 
 export function FactorRegimeTab() {
-  const [data, setData] = useState<FactorRegimeData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { data = null, isLoading: loading } = useQuery(apiQuery("researchFactorRegime"));
   const pal = chartPalette("dark");
   const scope = useSourceScope(provOf(data));
-
-  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
-  useEffect(() => {
-    api.researchFactorRegime().then(setData).catch(() => setData(null)).finally(() => setLoading(false));
-  }, [refreshNonce]);
 
   const factorKeys = useMemo(() => (data?.factors ?? []).map((f) => f.factor), [data]);
   const cumulative = data?.cumulative ?? [];

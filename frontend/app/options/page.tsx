@@ -1,7 +1,8 @@
 "use client";
 
-import { Suspense, useEffect, useState, useCallback } from "react";
-import { api } from "@/lib/api";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { apiQuery } from "@/lib/queries";
 import { useTheme } from "@/components/ThemeProvider";
 import { Skeleton, TabButton } from "@/components/ui";
 import { SearchBar } from "@/components/SearchBar";
@@ -21,7 +22,6 @@ import type {
   IVSmilePoint,
   OIProfile,
 } from "@/lib/types";
-import { useRefreshNonce } from "@/lib/refresh";
 import { useKeyboardShortcuts, tabKeys, tabStepKeys } from "@/lib/useKeyboardShortcuts";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
@@ -50,131 +50,46 @@ function OptionsPageInner() {
   }); // P2-07
   const [showOTMOnly, setShowOTMOnly] = useState(false);
 
-  // Data
-  const [kpis, setKpis] = useState<OptionsKPIs | null>(null);
-  const [expiries, setExpiries] = useState<string[]>([]);
-  const [chain, setChain] = useState<OptionsChain | null>(null);
-  const [termStructure, setTermStructure] = useState<IVTermPoint[]>([]);
-  const [smile, setSmile] = useState<IVSmilePoint[]>([]);
-  const [oiProfile, setOiProfile] = useState<OIProfile | null>(null);
+  // Data: KPIs, expiries and term structure per ticker; chain, smile and OI profile per expiry.
+  const hasTicker = !!ticker.trim();
+  const kpisQ = useQuery({ ...apiQuery("optionsKPIs", ticker), enabled: hasTicker });
+  const expiriesQ = useQuery({ ...apiQuery("optionsExpiries", ticker), enabled: hasTicker });
+  const termQ = useQuery({ ...apiQuery("optionsTermStructure", ticker), enabled: hasTicker });
+  const hasExpiry = hasTicker && !!expiry;
+  const chainQ = useQuery({ ...apiQuery("optionsChain", ticker, expiry), enabled: hasExpiry });
+  const smileQ = useQuery({ ...apiQuery("optionsSmile", ticker, expiry), enabled: hasExpiry });
+  const oiQ = useQuery({ ...apiQuery("optionsOIProfile", ticker, expiry), enabled: hasExpiry });
+
+  const kpis: OptionsKPIs | null = kpisQ.data ?? null;
+  const expiries = useMemo<string[]>(() => expiriesQ.data?.expiries ?? [], [expiriesQ.data]);
+  const termStructure: IVTermPoint[] = termQ.data?.points ?? [];
+  const chain: OptionsChain | null = hasExpiry ? chainQ.data ?? null : null;
+  const smile: IVSmilePoint[] = (hasExpiry && smileQ.data?.points) || [];
+  const oiProfile: OIProfile | null = hasExpiry ? oiQ.data ?? null : null;
   // Expiries, term structure and smile each carry their own map (P2-32).
-  const [expiriesProv, setExpiriesProv] = useState<Provenance | undefined>();
-  const [termProv, setTermProv] = useState<Provenance | undefined>();
-  const [smileProv, setSmileProv] = useState<Provenance | undefined>();
+  const expiriesProv: Provenance | undefined = expiriesQ.data ? provOf(expiriesQ.data) : undefined;
+  const termProv: Provenance | undefined = termQ.data ? provOf(termQ.data) : undefined;
+  const smileProv: Provenance | undefined = hasExpiry && smileQ.data ? provOf(smileQ.data) : undefined;
 
   // The chain response has its own scope for the spot line.
   const expiriesScope = useSourceScope(expiriesProv);
   const chainScope = useSourceScope(provOf(chain));
 
   // Loading states
-  const [kpisLoading, setKpisLoading] = useState(false);
-  const [expiriesLoading, setExpiriesLoading] = useState(false);
-  const [chainLoading, setChainLoading] = useState(false);
-  const [termLoading, setTermLoading] = useState(false);
-  const [smileLoading, setSmileLoading] = useState(false);
-  const [oiLoading, setOiLoading] = useState(false);
+  const kpisLoading = kpisQ.isLoading;
+  const expiriesLoading = expiriesQ.isLoading;
+  const chainLoading = chainQ.isLoading;
+  const termLoading = termQ.isLoading;
+  const smileLoading = smileQ.isLoading;
+  const oiLoading = oiQ.isLoading;
 
-  // Fetch KPIs, expiries, and term structure when ticker changes
-  const fetchTickerData = useCallback(async () => {
-    if (!ticker.trim()) return;
-
-    // Reset expiry-dependent data
-    setChain(null);
-    setSmile([]);
-    setSmileProv(undefined);
-    setOiProfile(null);
-    setUrlState({ e: "" });
-    setExpiries([]);
-
-    // Parallel fetches
-    setKpisLoading(true);
-    setExpiriesLoading(true);
-    setTermLoading(true);
-
-    const [kpisResult, expiriesResult, termResult] = await Promise.allSettled([
-      api.optionsKPIs(ticker),
-      api.optionsExpiries(ticker),
-      api.optionsTermStructure(ticker),
-    ]);
-
-    setKpisLoading(false);
-    setExpiriesLoading(false);
-    setTermLoading(false);
-
-    if (kpisResult.status === "fulfilled") {
-      setKpis(kpisResult.value);
-    } else {
-      setKpis(null);
-    }
-
-    if (expiriesResult.status === "fulfilled") {
-      const exps = expiriesResult.value?.expiries ?? [];
-      setExpiries(exps);
-      setExpiriesProv(provOf(expiriesResult.value));
-      if (exps.length > 0) {
-        setUrlState({ e: exps[0] });
-      }
-    } else {
-      setExpiries([]);
-      setExpiriesProv(undefined);
-    }
-
-    if (termResult.status === "fulfilled") {
-      setTermStructure(termResult.value?.points ?? []);
-      setTermProv(provOf(termResult.value));
-    } else {
-      setTermStructure([]);
-      setTermProv(undefined);
-    }
-  }, [ticker]);
-
-  // Fetch chain, smile, and OI profile when expiry changes
-  const fetchExpiryData = useCallback(async () => {
-    if (!ticker.trim() || !expiry) return;
-
-    setChainLoading(true);
-    setSmileLoading(true);
-    setOiLoading(true);
-
-    const [chainResult, smileResult, oiResult] = await Promise.allSettled([
-      api.optionsChain(ticker, expiry),
-      api.optionsSmile(ticker, expiry),
-      api.optionsOIProfile(ticker, expiry),
-    ]);
-
-    setChainLoading(false);
-    setSmileLoading(false);
-    setOiLoading(false);
-
-    if (chainResult.status === "fulfilled") {
-      setChain(chainResult.value);
-    } else {
-      setChain(null);
-    }
-
-    if (smileResult.status === "fulfilled") {
-      setSmile(smileResult.value?.points ?? []);
-      setSmileProv(provOf(smileResult.value));
-    } else {
-      setSmile([]);
-      setSmileProv(undefined);
-    }
-
-    if (oiResult.status === "fulfilled") {
-      setOiProfile(oiResult.value);
-    } else {
-      setOiProfile(null);
-    }
-  }, [ticker, expiry]);
-
-  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
+  // Once a ticker's expiries are known, select the nearest one unless the URL names a listed one.
   useEffect(() => {
-    fetchTickerData();
-  }, [fetchTickerData, refreshNonce]);
-
-  useEffect(() => {
-    if (expiry) fetchExpiryData();
-  }, [fetchExpiryData, expiry, refreshNonce]);
+    if (!expiriesQ.data) return;
+    if (expiries.length > 0 && !expiries.includes(expiry)) setUrlState({ e: expiries[0] });
+    else if (expiries.length === 0 && expiry) setUrlState({ e: "" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [expiriesQ.data, expiries, expiry]);
 
   function handleSearch(sym: string) {
     setUrlState({ t: sym.toUpperCase(), e: "" });

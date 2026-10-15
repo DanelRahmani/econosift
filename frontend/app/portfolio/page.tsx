@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState, useCallback, Suspense } from "react";
-import { api } from "@/lib/api";
+import { useEffect, useState, Suspense } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { apiQuery } from "@/lib/queries";
 import { PageSkeleton, TabButton } from "@/components/ui";
 import { useUrlState } from "@/lib/useUrlState";
-import type { Holding, PortfolioAnalysis, CorrelationData, RiskContribData, CAPMData } from "@/lib/types";
+import type { Holding, CorrelationData, RiskContribData } from "@/lib/types";
 // RiskContribData is RiskContribItem[] (flat list), CorrelationData has matrix as number[][]
 
 import { PortfolioInput } from "@/components/portfolio/PortfolioInput";
@@ -82,90 +83,46 @@ function PortfolioPageInner() {
 
   const [holdings, setHoldings] = useState<Holding[]>(DEFAULT_HOLDINGS);
 
-  // Overview data
-  const [analyzeData, setAnalyzeData] = useState<PortfolioAnalysis | null>(null);
-  const [analyzeLoading, setAnalyzeLoading] = useState(false);
-  const [analyzeError, setAnalyzeError] = useState<string | null>(null);
+  // The holdings + period the last analysis ran on: set from localStorage on mount and by
+  // the Analyze button. Every tab's query keys off it, so a tab you return to is cached.
+  const [analyzed, setAnalyzed] = useState<{ holdings: Holding[]; period: Period } | null>(null);
+  const ready = !!analyzed && analyzed.holdings.length > 0;
+  const aH = analyzed?.holdings ?? [];
+  const aP = analyzed?.period ?? period;
 
-  // Risk tab data
-  const [corrData, setCorrData] = useState<CorrelationData | null>(null);
-  const [corrLoading, setCorrLoading] = useState(false);
-  const [riskContribData, setRiskContribData] = useState<RiskContribData | null>(null);
-  const [riskContribLoading, setRiskContribLoading] = useState(false);
-  const [riskTabFetched, setRiskTabFetched] = useState(false);
+  // Overview data
+  const analyzeQ = useQuery({ ...apiQuery("portfolioAnalyze", aH, aP), enabled: !!analyzed });
+  const analyzeData = analyzeQ.data ?? null;
+  const analyzeLoading = analyzeQ.isFetching;
+  const analyzeError = analyzeQ.isError ? "Failed to analyze portfolio. Check tickers and try again." : null;
+
+  // Risk tab data, fetched when the tab is first shown
+  const corrQ = useQuery({ ...apiQuery("portfolioCorrelation", aH, aP), enabled: ready && tab === "Risk" });
+  const riskContribQ = useQuery({ ...apiQuery("portfolioRiskContribution", aH, aP), enabled: ready && tab === "Risk" });
+  const corrData = corrQ.data ?? null;
+  const corrLoading = corrQ.isLoading;
+  const riskContribData = riskContribQ.data ?? null;
+  const riskContribLoading = riskContribQ.isLoading;
 
   // Attribution tab data
-  const [capmData, setCAPMData] = useState<CAPMData | null>(null);
-  const [capmLoading, setCAPMLoading] = useState(false);
-  const [attrTabFetched, setAttrTabFetched] = useState(false);
+  const capmQ = useQuery({ ...apiQuery("portfolioCAPM", aH, aP), enabled: ready && tab === "Attribution" });
+  const capmData = capmQ.data ?? null;
+  const capmLoading = capmQ.isLoading;
 
-  // Load from localStorage on mount
+  // Load from localStorage on mount and analyze it
   useEffect(() => {
     const stored = loadFromStorage();
     setHoldings(stored);
-  }, []);
-
-  const doAnalyze = useCallback(async (h: Holding[], p: Period) => {
-    setAnalyzeLoading(true);
-    setAnalyzeError(null);
-    try {
-      const d = await api.portfolioAnalyze(h, p);
-      setAnalyzeData(d);
-      // Reset tab-specific data when re-analyzing
-      setCorrData(null);
-      setRiskContribData(null);
-      setCAPMData(null);
-      setRiskTabFetched(false);
-      setAttrTabFetched(false);
-    } catch (e) {
-      setAnalyzeError("Failed to analyze portfolio. Check tickers and try again.");
-    } finally {
-      setAnalyzeLoading(false);
-    }
-  }, []);
-
-  // Auto-fetch on mount after loading from localStorage
-  useEffect(() => {
-    const stored = loadFromStorage();
-    setHoldings(stored);
-    doAnalyze(stored, period);
+    setAnalyzed({ holdings: stored, period });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function handleAnalyze() {
     saveToStorage(holdings);
-    doAnalyze(holdings, period);
+    const same = analyzed && analyzed.period === period && JSON.stringify(analyzed.holdings) === JSON.stringify(holdings);
+    if (same) void analyzeQ.refetch();
+    else setAnalyzed({ holdings, period });
   }
-
-  // Fetch Risk tab data when tab becomes active
-  useEffect(() => {
-    if (tab !== "Risk" || riskTabFetched || holdings.length === 0) return;
-    setRiskTabFetched(true);
-
-    setCorrLoading(true);
-    api.portfolioCorrelation(holdings, period)
-      .then(setCorrData)
-      .catch(() => setCorrData(null))
-      .finally(() => setCorrLoading(false));
-
-    setRiskContribLoading(true);
-    api.portfolioRiskContribution(holdings, period)
-      .then(setRiskContribData)
-      .catch(() => setRiskContribData(null))
-      .finally(() => setRiskContribLoading(false));
-  }, [tab, riskTabFetched, holdings, period]);
-
-  // Fetch Attribution tab data when tab becomes active
-  useEffect(() => {
-    if (tab !== "Attribution" || attrTabFetched || holdings.length === 0) return;
-    setAttrTabFetched(true);
-
-    setCAPMLoading(true);
-    api.portfolioCAPM(holdings, period)
-      .then(setCAPMData)
-      .catch(() => setCAPMData(null))
-      .finally(() => setCAPMLoading(false));
-  }, [tab, attrTabFetched, holdings, period]);
 
   const validHoldings = holdings.filter((h) => h.ticker.trim() !== "" && h.weight > 0);
 

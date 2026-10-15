@@ -1,7 +1,9 @@
 "use client";
 
-import { Suspense, useEffect, useState, useCallback } from "react";
+import { Suspense } from "react";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { staleTimeFor } from "@/lib/queryPolicy";
 import { useTheme } from "@/components/ThemeProvider";
 import { Skeleton, TabButton } from "@/components/ui";
 import { SearchBar } from "@/components/SearchBar";
@@ -23,7 +25,6 @@ import type {
   RollingMetricsResponse,
   ExtendedRiskResponse,
 } from "@/lib/types";
-import { useRefreshNonce } from "@/lib/refresh";
 import { useKeyboardShortcuts, tabKeys, tabStepKeys, periodKeys } from "@/lib/useKeyboardShortcuts";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
@@ -67,102 +68,54 @@ function RiskPageInner() {
     ...periodKeys(PERIODS, period, (p) => setUrlState({ p })),
   });
 
-  // Data state
-  const [baseMetrics, setBaseMetrics] = useState<RiskMetric[]>([]);
-  const [extendedData, setExtendedData] = useState<ExtendedRiskTicker[]>([]);
-  const [rollingData, setRollingData] = useState<RollingTickerMetrics[]>([]);
-  const [corrData, setCorrData] = useState<CorrelationResponse | null>(null);
-  // `provenance` maps of the responses whose arrays are unwrapped into the state above
-  const [baseProv, setBaseProv] = useState<Provenance | undefined>();
-  const [rollingProv, setRollingProv] = useState<Provenance | undefined>();
-  const [extendedProv, setExtendedProv] = useState<Provenance | undefined>();
+  // Data. Each query passes react-query's AbortSignal to the request, so a request a new
+  // period/ticker/window supersedes is cancelled: left running on a slow backend they hold the
+  // browser's 6 connections to this origin and the next ?p= navigation never starts.
+  const hasTickers = !!tickersStr.trim();
+  const b = benchmark || undefined;
+  const baseQ = useQuery({
+    queryKey: ["risk", tickersStr, "1y", 0.04, b],
+    queryFn: ({ signal }) => api.risk(tickersStr, "1y", 0.04, b, signal),
+    staleTime: staleTimeFor("risk"),
+    enabled: hasTickers,
+    placeholderData: keepPreviousData,
+  });
+  const rollingQ = useQuery({
+    queryKey: ["riskRolling", tickersStr, period, window, b],
+    queryFn: ({ signal }) => api.riskRolling(tickersStr, period, window, b, signal),
+    staleTime: staleTimeFor("riskRolling"),
+    enabled: hasTickers,
+    placeholderData: keepPreviousData,
+  });
+  const extendedQ = useQuery({
+    queryKey: ["riskExtended", tickersStr, period, b],
+    queryFn: ({ signal }) => api.riskExtended(tickersStr, period, b, signal),
+    staleTime: staleTimeFor("riskExtended"),
+    enabled: hasTickers,
+    placeholderData: keepPreviousData,
+  });
+  const corrTickers = tickersStr.split(",").map((t) => t.trim()).filter(Boolean);
+  const corrQ = useQuery({
+    queryKey: ["riskCorrelation", tickersStr, period, window],
+    queryFn: ({ signal }) => api.riskCorrelation(tickersStr, period, window, signal),
+    staleTime: staleTimeFor("riskCorrelation"),
+    enabled: corrTickers.length >= 2,
+    placeholderData: keepPreviousData,
+  });
 
-  const [baseLoading, setBaseLoading] = useState(false);
-  const [rollingLoading, setRollingLoading] = useState(false);
-  const [extendedLoading, setExtendedLoading] = useState(false);
-  const [corrLoading, setCorrLoading] = useState(false);
+  const baseMetrics: RiskMetric[] = baseQ.data?.metrics ?? [];
+  const rollingData: RollingTickerMetrics[] = rollingQ.data?.tickers ?? [];
+  const extendedData: ExtendedRiskTicker[] = extendedQ.data?.tickers ?? [];
+  const corrData: CorrelationResponse | null = corrTickers.length >= 2 ? corrQ.data ?? null : null;
+  // `provenance` maps of the responses whose arrays are unwrapped above
+  const baseProv: Provenance | undefined = baseQ.data ? provOf(baseQ.data) : undefined;
+  const rollingProv: Provenance | undefined = rollingQ.data ? provOf(rollingQ.data) : undefined;
+  const extendedProv: Provenance | undefined = extendedQ.data ? provOf(extendedQ.data) : undefined;
 
-  // Fetch base risk (for KPI row)
-  const fetchBase = useCallback(async (signal: AbortSignal) => {
-    if (!tickersStr.trim()) return;
-    setBaseLoading(true);
-    try {
-      const res = await api.risk(tickersStr, "1y", 0.04, benchmark || undefined, signal);
-      setBaseMetrics(res.metrics);
-      setBaseProv(provOf(res));
-    } catch {
-      if (signal.aborted) return;
-      setBaseMetrics([]);
-      setBaseProv(undefined);
-    } finally {
-      if (!signal.aborted) setBaseLoading(false);
-    }
-  }, [tickersStr, benchmark]);
-
-  // Fetch rolling
-  const fetchRolling = useCallback(async (signal: AbortSignal) => {
-    if (!tickersStr.trim()) return;
-    setRollingLoading(true);
-    try {
-      const res: RollingMetricsResponse = await api.riskRolling(tickersStr, period, window, benchmark || undefined, signal);
-      setRollingData(res.tickers ?? []);
-      setRollingProv(provOf(res));
-    } catch {
-      if (signal.aborted) return;
-      setRollingData([]);
-      setRollingProv(undefined);
-    } finally {
-      if (!signal.aborted) setRollingLoading(false);
-    }
-  }, [tickersStr, period, window, benchmark]);
-
-  // Fetch extended
-  const fetchExtended = useCallback(async (signal: AbortSignal) => {
-    if (!tickersStr.trim()) return;
-    setExtendedLoading(true);
-    try {
-      const res: ExtendedRiskResponse = await api.riskExtended(tickersStr, period, benchmark || undefined, signal);
-      setExtendedData(res.tickers ?? []);
-      setExtendedProv(provOf(res));
-    } catch {
-      if (signal.aborted) return;
-      setExtendedData([]);
-      setExtendedProv(undefined);
-    } finally {
-      if (!signal.aborted) setExtendedLoading(false);
-    }
-  }, [tickersStr, period, benchmark]);
-
-  // Fetch correlation
-  const fetchCorr = useCallback(async (signal: AbortSignal) => {
-    const tickers = tickersStr.split(",").map((t) => t.trim()).filter(Boolean);
-    if (tickers.length < 2) {
-      setCorrData(null);
-      return;
-    }
-    setCorrLoading(true);
-    try {
-      const res = await api.riskCorrelation(tickersStr, period, window, signal);
-      setCorrData(res);
-    } catch {
-      if (signal.aborted) return;
-      setCorrData(null);
-    } finally {
-      if (!signal.aborted) setCorrLoading(false);
-    }
-  }, [tickersStr, period, window]);
-
-  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
-  useEffect(() => {
-    // Cancel the requests a new period/ticker/window supersedes: left running on a slow backend they
-    // hold the browser's 6 connections to this origin and the next ?p= navigation never starts.
-    const ctrl = new AbortController();
-    fetchBase(ctrl.signal);
-    fetchRolling(ctrl.signal);
-    fetchExtended(ctrl.signal);
-    fetchCorr(ctrl.signal);
-    return () => ctrl.abort();
-  }, [fetchBase, fetchRolling, fetchExtended, fetchCorr, refreshNonce]);
+  const baseLoading = baseQ.isFetching;
+  const rollingLoading = rollingQ.isFetching;
+  const extendedLoading = extendedQ.isFetching;
+  const corrLoading = corrQ.isFetching;
 
   const primaryTicker = tickersStr.split(",")[0].trim().toUpperCase() || "AAPL";
   const firstBase = baseMetrics[0] ?? null;

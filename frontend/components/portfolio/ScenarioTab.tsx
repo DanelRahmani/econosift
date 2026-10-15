@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { apiQuery } from "@/lib/queries";
 import { api } from "@/lib/api";
 import { TabButton } from "@/components/ui";
 import type { Holding } from "@/lib/types";
@@ -13,7 +15,7 @@ interface Props {
 
 export function ScenarioTab({ holdings }: Props) {
   const [activeTab, setActiveTab] = useState<"Historical" | "Custom">("Historical");
-  const [histEpisodes, setHistEpisodes] = useState<any[]>([]);
+  const { data: histEpisodes = [] } = useQuery(apiQuery("scenarioHistorical"));
   const [stressResults, setStressResults] = useState<any>(null);
   const [stressData, setStressData] = useState<any>(null);
   const [loadingStress, setLoadingStress] = useState(false);
@@ -23,9 +25,6 @@ export function ScenarioTab({ holdings }: Props) {
   const stressScope = useSourceScope(provOf(stressData));
   const customScope = useSourceScope(provOf(customResult));
 
-  useEffect(() => {
-    api.scenarioHistorical().then(setHistEpisodes).catch(console.error);
-  }, []);
 
   const runHistorical = async () => {
     setLoadingStress(true);

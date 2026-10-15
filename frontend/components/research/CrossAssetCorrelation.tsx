@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { apiQuery } from "@/lib/queries";
 import { Card } from "@/components/ui";
-import { api } from "@/lib/api";
 import type { CrossAssetCorrelation } from "@/lib/types";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
-import { useRefreshNonce } from "@/lib/refresh";
 
 const ASSET_PRESETS: Record<string, string[]> = {
   "Stocks": ["SPY", "QQQ", "IWM", "EFA", "EEM"],
@@ -18,25 +18,21 @@ const ASSET_PRESETS: Record<string, string[]> = {
 const PERIODS = ["1y", "3y", "5y"] as const;
 
 export function CrossAssetCorrelation() {
-  const [data, setData] = useState<CrossAssetCorrelation | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [period, setPeriod] = useState<string>("3y");
   const [selectedAssets, setSelectedAssets] = useState<string[]>(["SPY", "TLT", "GLD", "EURUSD=X"]);
+  // Asset toggles apply on the button; a period change re-runs with the applied assets.
+  const [appliedAssets, setAppliedAssets] = useState<string[]>(selectedAssets);
+  const { data = null, isFetching: loading, error: queryError } = useQuery({
+    ...apiQuery("crossAssetCorrelation", appliedAssets, period),
+    enabled: appliedAssets.length >= 2,
+  });
+  const error = queryError instanceof Error ? queryError.message : null;
   const scope = useSourceScope(provOf(data));
 
   const fetchData = () => {
     if (selectedAssets.length < 2) return;
-    setLoading(true);
-    setError(null);
-    api.crossAssetCorrelation(selectedAssets, period)
-      .then(setData)
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
+    setAppliedAssets(selectedAssets);
   };
-
-  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
-  useEffect(() => { fetchData(); }, [period, refreshNonce]);
 
   const toggleAsset = (ticker: string) => {
     setSelectedAssets((prev) =>
