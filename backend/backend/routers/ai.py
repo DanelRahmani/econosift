@@ -78,10 +78,10 @@ def _cached_lookup(summary_type: str, context_key: str) -> AiSummary | None:
 def _save(summary_type: str, context_key: str, model: str, prompt: str, text: str,
           grounding: dict | None = None) -> None:
     """Persist a summary row. Best-effort — failures are logged, not raised."""
-    import os, time, sqlite3
+    import time, sqlite3
+    from ..database import DB_PATH
 
-    db_url = os.getenv("DATABASE_URL", "sqlite:///./data/axiomfinance.db")
-    db_path = db_url.replace("sqlite:///", "")
+    db_path = str(DB_PATH)
     now = _utcnow().isoformat()
 
     for attempt in range(5):

@@ -136,7 +136,7 @@ EconoSift ships as a **native desktop app** for Windows, Linux, and Apple Silico
 
 See [`desktop/README.md`](./desktop/README.md) for architecture and build details, and [`TAURI_BUILD.md`](./TAURI_BUILD.md) for the desktop release process.
 
-**Upgrade compatibility:** New desktop installs use an `EconoSift` app-data directory. Existing installs continue using their `AxiomFinance` data directory when it is present, so SQLite data and saved API keys are reused. The existing `axiomfinance.db` filename and legacy API response keys are retained for compatibility.
+**Upgrade compatibility:** New desktop installs use an `EconoSift` app-data directory. Existing installs continue using their `AxiomFinance` data directory when it is present, so saved API keys are reused. Since Phase 66 all data lives in one database, `econosift.db`, built fresh by the first-run backfill; the old `axiomfinance.db` and `screener_cache.db` are no longer read and can be deleted. Legacy API response keys are retained for compatibility.
 
 ---
 

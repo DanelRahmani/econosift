@@ -58,7 +58,7 @@ EconoSift is a self-hosted financial analytics dashboard. The system is split in
 | Reverse proxy | Nginx (Alpine image) | Routes `/api/*` → backend:8000, everything else → frontend:3000; gzip enabled |
 | Backend image | Python 3.12 (Dockerfile in `backend/`) | |
 | Frontend image | Node 20 (Dockerfile in `frontend/`) | Runs `next build` then `next start` |
-| Storage | Docker volumes | SQLite database persisted at `./data/axiomfinance.db`; Parquet cache at `./data/screener_cache/` |
+| Storage | Docker volumes | one SQLite database persisted at `./data/econosift.db` |
 
 ---
 

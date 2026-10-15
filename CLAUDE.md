@@ -99,7 +99,7 @@ Key architecture notes:
   palette, Trade exports chart, Risk arrow keys) while passing against local Docker; backend tests
   and typecheck are the reliable CI signals until that is fixed.
 - **Desktop safety:** never start the desktop backend from the repo root (its CWD fallback opens
-  the live Docker `./data/axiomfinance.db`). Do not install over the owner's EconoSift desktop
+  the live Docker `./data/econosift.db`). Do not install over the owner's EconoSift desktop
   install (`%APPDATA%\AxiomFinance`); verify a build with the frozen exe and a scratch
   `ECONOSIFT_DATA_DIR`. Never trigger `build-desktop.yml` (gated release flow via `PRODUCTION`).
 - **Git LFS:** pushes need the repo-local `lfs.https://github.com/DanelRahmani/econosift.git/info/lfs.locksverify false`

@@ -56,7 +56,7 @@ from `src-tauri/target/release/binaries/`, which `tauri build` does not refresh 
 that copy with the freshly staged backend; if you stage by hand, delete `target/release/binaries/` first, or a
 stale backend that ignores `ECONOSIFT_DATA_DIR` will write its database into the working directory. Never start
 the desktop backend from the repo root: its working-directory fallback would open the Docker stack's
-`./data/axiomfinance.db`.
+`./data/econosift.db`.
 
 ## Notes
 

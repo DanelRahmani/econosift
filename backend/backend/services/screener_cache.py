@@ -4,9 +4,9 @@ Stores one row per ticker per index-refresh cycle.  All reads/writes are
 thread-safe via a module-level lock (WAL mode allows concurrent readers, but
 we serialise writers to keep things simple).
 
-The DB path defaults to ``backend/data/screener_cache.db`` (computed relative
-to this file), but can be overridden via the ``SCREENER_DB_PATH`` environment
-variable — used by tests to inject a tmp_path DB without touching the real one.
+The tables live in the app's one database (``econosift.db``, Phase 66), but the
+path can be overridden via the ``SCREENER_DB_PATH`` environment variable — used
+by tests to inject a tmp_path DB without touching the real one.
 """
 from __future__ import annotations
 
@@ -24,8 +24,9 @@ from typing import Any
 # ---------------------------------------------------------------------------
 
 def _default_db_path() -> pathlib.Path:
-    """backend/data/screener_cache.db, relative to this file."""
-    return pathlib.Path(__file__).resolve().parents[2] / "data" / "screener_cache.db"
+    """The app database; screener_cache.db is no longer used."""
+    from ..database import DB_PATH
+    return DB_PATH
 
 
 def _db_path() -> pathlib.Path:
@@ -147,6 +148,8 @@ def _get_conn() -> sqlite3.Connection:
         path.parent.mkdir(parents=True, exist_ok=True)
         conn = sqlite3.connect(str(path), check_same_thread=False)
         conn.execute("PRAGMA journal_mode=WAL")
+        # Shares the file with the SQLAlchemy engine: wait for its writers.
+        conn.execute("PRAGMA busy_timeout=15000")
         conn.executescript(_DDL)
         # Phase 12 migration: add new technical columns if they don't exist yet
         _migrate_phase12(conn)

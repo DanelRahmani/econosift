@@ -13,13 +13,19 @@ from sqlalchemy.orm import sessionmaker, DeclarativeBase
 # working directory is unpredictable, which would scatter the SQLite DB.
 from .config import DATA_DIR
 
-_DEFAULT_DB_URL = f"sqlite:///{DATA_DIR.as_posix()}/axiomfinance.db"
+# One database for everything (Phase 66). It replaces axiomfinance.db and
+# screener_cache.db; those are not migrated and nothing reads them any more.
+_DEFAULT_DB_URL = f"sqlite:///{DATA_DIR.as_posix()}/econosift.db"
 DATABASE_URL = os.getenv("DATABASE_URL", _DEFAULT_DB_URL)
+
+# File path of the SQLite database, for code that opens it with sqlite3 directly.
+DB_PATH: pathlib.Path | None = None
 
 # Ensure the data directory exists for SQLite paths
 if DATABASE_URL.startswith("sqlite") and DATABASE_URL != "sqlite:///:memory:":
     db_path = DATABASE_URL.replace("sqlite:///", "")
-    pathlib.Path(db_path).parent.mkdir(parents=True, exist_ok=True)
+    DB_PATH = pathlib.Path(db_path)
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 engine = create_engine(
     DATABASE_URL,

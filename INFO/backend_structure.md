@@ -13,7 +13,7 @@ backend/
 │
 ├── data/
 │   ├── cb_meetings.json        # Pre-shipped 52 central bank meeting dates (Fed, ECB, BoE, BoJ, BoC, RBA, SNB)
-│   └── .gitkeep                # SQLite DB lives here at runtime: data/axiomfinance.db
+│   └── .gitkeep                # SQLite DB lives here at runtime: data/econosift.db
 │
 ├── backend/                    # Python package (importable as `backend`)
 │   ├── __init__.py
