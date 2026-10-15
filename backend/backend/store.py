@@ -92,7 +92,7 @@ CREATE TABLE IF NOT EXISTS quote_intraday (
 ) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS fundamental (
     symbol      TEXT NOT NULL,
-    concept     TEXT NOT NULL,
+    concept     TEXT NOT NULL,  -- statement label; '|Q' suffix = one fiscal quarter (sec_fundamentals)
     period_end  TEXT NOT NULL,
     filed       TEXT NOT NULL,  -- filing date: what was knowable when (point-in-time)
     value       REAL,
@@ -100,6 +100,14 @@ CREATE TABLE IF NOT EXISTS fundamental (
     form        TEXT,
     source      TEXT,
     PRIMARY KEY (symbol, concept, period_end, filed)
+) WITHOUT ROWID;
+-- Filings behind the stored SEC facts, so the nightly frames check can spot a new one.
+CREATE TABLE IF NOT EXISTS sec_filing (
+    cik     TEXT NOT NULL,
+    accn    TEXT NOT NULL,
+    filed   TEXT,
+    form    TEXT,
+    PRIMARY KEY (cik, accn)
 ) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS macro_series (
     series      TEXT NOT NULL,
@@ -199,7 +207,8 @@ def connect() -> Iterator:
 
 # Columns added after a table was first created; CREATE TABLE IF NOT EXISTS
 # does not add them to a database built by an earlier version.
-_ADDED_COLUMNS = {"quote_latest": {"currency": "TEXT", "name": "TEXT"}}
+_ADDED_COLUMNS = {"quote_latest": {"currency": "TEXT", "name": "TEXT"},
+                  "security": {"facts_at": "TEXT"}}  # UTC time SEC companyfacts were last stored
 
 
 def init_schema() -> None:
@@ -230,6 +239,25 @@ def upsert(table: str, rows: Sequence[dict], key: Sequence[str]) -> int:
     )
     with connect() as conn:
         conn.executemany(sql, [tuple(r[c] for c in cols) for r in rows])
+    return len(rows)
+
+
+def replace_fundamentals(symbols: Sequence[str], rows: Sequence[dict], source_prefix: str) -> int:
+    """Replace one source's ``fundamental`` rows for ``symbols`` with ``rows``.
+
+    A companyfacts document is a company's full history, so stored rows it no
+    longer has go too. Delete and insert share one transaction. An empty
+    ``rows`` changes nothing (never replace stored data with an empty result).
+    """
+    if not rows or not symbols:
+        return 0
+    cols = ("symbol", "concept", "period_end", "filed", "value", "unit", "form", "source")
+    with connect() as conn:
+        conn.executemany("DELETE FROM fundamental WHERE symbol = ? AND source LIKE ?",
+                         [(s, source_prefix + "%") for s in symbols])
+        conn.executemany(
+            f"INSERT OR REPLACE INTO fundamental ({', '.join(cols)}) VALUES ({', '.join('?' * len(cols))})",
+            [tuple(r[c] for c in cols) for r in rows])
     return len(rows)
 
 
@@ -299,7 +327,7 @@ def records(df: pd.DataFrame, cols: Sequence[str]) -> list[tuple]:
 def counts() -> dict[str, int]:
     """Row count per market-data table, for the Admin health panel."""
     tables = ("security", "price_daily", "quote_latest", "quote_intraday", "fundamental",
-              "macro_series", "fx_daily", "fetch_queue")
+              "sec_filing", "macro_series", "fx_daily", "fetch_queue")
     with connect() as conn:
         return {t: conn.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0] for t in tables}
 

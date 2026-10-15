@@ -32,6 +32,7 @@ PRIORITY_SNAPSHOT = 0
 PRIORITY_UNIVERSE = 1
 PRIORITY_REFETCH = 2    # history whose stored closes no longer match (a split)
 PRIORITY_ON_DEMAND = 3  # a symbol a page asked for that is not stored yet
+PRIORITY_FACTS = 4      # SEC companyfacts (backfill and changed filers)
 PRIORITY_HISTORY = 5
 
 # Index levels the dashboard shows intraday; yf.screen covers equities only,
@@ -214,6 +215,29 @@ def run_ciks(_key: str) -> int:
         rows = [(ciks[s], s) for s in syms if s in ciks]
         conn.executemany("UPDATE security SET cik = ? WHERE symbol = ?", rows)
     _mark_success("sec_ciks")
+    queue_facts_backfill()
+    return len(rows)
+
+
+def run_facts(cik: str) -> int:
+    """Store one company's SEC companyfacts (every symbol sharing the CIK) into `fundamental`."""
+    from . import sec_fundamentals
+    from .sources import source_sec
+
+    with store.connect() as conn:
+        syms = [r[0] for r in conn.execute("SELECT symbol FROM security WHERE cik = ? ORDER BY symbol", (cik,))]
+    if not syms:
+        return 0  # no tracked symbol has this CIK any more
+    doc = source_sec.companyfacts(cik)
+    rows = [r for s in syms for r in sec_fundamentals.rows(doc or {}, s)]
+    if not rows:
+        raise RuntimeError(f"no usable SEC facts for CIK {cik}")  # e.g. an IFRS filer; Yahoo fills in
+    store.replace_fundamentals(syms, rows, "sec:")
+    store.upsert("sec_filing", [dict(cik=cik, accn=a, filed=f, form=fm)
+                                for a, (f, fm) in sec_fundamentals.filings(doc).items()], ("cik", "accn"))
+    with store.connect() as conn:
+        conn.executemany("UPDATE security SET facts_at = ? WHERE symbol = ?", [(_now(), s) for s in syms])
+    _mark_success("sec_facts")
     return len(rows)
 
 
@@ -230,6 +254,7 @@ HANDLERS: dict[str, Callable[[str], int]] = {
     "history": run_history,
     "snapshot": run_snapshot,
     "ciks": run_ciks,
+    "facts": run_facts,
 }
 
 
@@ -257,6 +282,16 @@ def queue_universe() -> None:
 def sec_enabled() -> bool:
     from .sources import source_sec
     return source_sec.identity() is not None
+
+
+def queue_facts_backfill() -> None:
+    """Queue companyfacts for every CIK not stored yet (resumable: stored ones are skipped).
+    A CIK whose fetch failed (no XBRL facts) is not retried until something re-queues it."""
+    with store.connect() as conn:
+        ciks = [r[0] for r in conn.execute(
+            "SELECT DISTINCT cik FROM security WHERE cik IS NOT NULL AND facts_at IS NULL ORDER BY cik")]
+    for cik in ciks:
+        enqueue("facts", cik, PRIORITY_FACTS, retry_failed=False)
 
 
 def queue_ciks() -> None:
@@ -442,6 +477,10 @@ def status() -> dict:
 def sec_status() -> dict:
     """SEC fundamentals for Admin: whether an EDGAR identity is set, and CIK coverage."""
     with store.connect() as conn:
-        ciks = conn.execute("SELECT COUNT(*) FROM security WHERE cik IS NOT NULL").fetchone()[0]
-        row = conn.execute("SELECT last_success FROM source_health WHERE source = 'sec_ciks'").fetchone()
-    return {"identity": sec_enabled(), "ciks": ciks, "ciksAt": row[0] if row else None}
+        ciks, total, done = conn.execute(
+            "SELECT COUNT(cik), COUNT(DISTINCT cik), COUNT(DISTINCT CASE WHEN facts_at IS NOT NULL THEN cik END) "
+            "FROM security").fetchone()
+        stamps = dict(conn.execute(
+            "SELECT source, last_success FROM source_health WHERE source IN ('sec_ciks', 'sec_facts')"))
+    return {"identity": sec_enabled(), "ciks": ciks, "ciksAt": stamps.get("sec_ciks"),
+            "facts": {"total": total, "done": done, "lastAt": stamps.get("sec_facts")}}

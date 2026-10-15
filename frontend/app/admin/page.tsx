@@ -255,21 +255,13 @@ function StoreSection({ store }: { store: StoreStatus }) {
   if (store.error) {
     return <Card><div className="text-danger text-sm">Data store error: {store.error}</div></Card>;
   }
-  const total = store.backfill?.total ?? 0;
-  const done = store.backfill?.done ?? 0;
-  const pct = total ? Math.round((done / total) * 100) : 0;
   const errors = store.queue?.errors ?? [];
   return (
     <Card>
       <h2 className="text-sm font-semibold mb-4 text-text-secondary">Data Store</h2>
       <div className="mb-4">
-        <div className="flex justify-between text-xs text-text-muted mb-1">
-          <span>Price history backfill</span>
-          <span className="font-mono">{done.toLocaleString()} / {total.toLocaleString()} symbols ({pct}%)</span>
-        </div>
-        <div className="h-2 rounded-full bg-surface-alt overflow-hidden">
-          <div className="h-full bg-accent transition-all" style={{ width: `${pct}%` }} />
-        </div>
+        <Progress label="Price history backfill" done={store.backfill?.done ?? 0}
+                  total={store.backfill?.total ?? 0} unit="symbols" />
         <p className="text-xs text-text-muted mt-1">
           {store.running ? (store.current ? `Fetching ${store.current}` : "Fetcher idle") : "Fetcher not running"}
           {store.universeAt ? ` · index rosters as of ${store.universeAt.slice(0, 16).replace("T", " ")} UTC` : ""}
@@ -281,10 +273,15 @@ function StoreSection({ store }: { store: StoreStatus }) {
         </p>
       )}
       {store.sec?.identity && (
-        <p className="text-xs text-text-muted mb-4">
-          SEC: {store.sec.ciks.toLocaleString()} symbols mapped to a CIK
-          {store.sec.ciksAt ? ` · as of ${store.sec.ciksAt.slice(0, 16).replace("T", " ")} UTC` : ""}
-        </p>
+        <div className="mb-4">
+          <Progress label="SEC fundamentals backfill" done={store.sec.facts?.done ?? 0}
+                    total={store.sec.facts?.total ?? 0} unit="companies" />
+          <p className="text-xs text-text-muted mt-1">
+            {store.sec.ciks.toLocaleString()} symbols mapped to a CIK
+            {store.sec.ciksAt ? ` · as of ${store.sec.ciksAt.slice(0, 16).replace("T", " ")} UTC` : ""}
+            {store.sec.facts?.lastAt ? ` · last filing stored ${store.sec.facts.lastAt.slice(0, 16).replace("T", " ")} UTC` : ""}
+          </p>
+        </div>
       )}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
         <DbStat label="Queued" value={store.queue?.pending?.toLocaleString() ?? "—"} />
@@ -309,6 +306,21 @@ function StoreSection({ store }: { store: StoreStatus }) {
         </div>
       )}
     </Card>
+  );
+}
+
+function Progress({ label, done, total, unit }: { label: string; done: number; total: number; unit: string }) {
+  const pct = total ? Math.round((done / total) * 100) : 0;
+  return (
+    <>
+      <div className="flex justify-between text-xs text-text-muted mb-1">
+        <span>{label}</span>
+        <span className="font-mono">{done.toLocaleString()} / {total.toLocaleString()} {unit} ({pct}%)</span>
+      </div>
+      <div className="h-2 rounded-full bg-surface-alt overflow-hidden">
+        <div className="h-full bg-accent transition-all" style={{ width: `${pct}%` }} />
+      </div>
+    </>
   );
 }
 

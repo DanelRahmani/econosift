@@ -2161,7 +2161,13 @@ export interface StoreStatus {
     openUntil: string | null;
   }[];
   /** SEC fundamentals: off without an EDGAR identity. */
-  sec?: { identity: boolean; ciks: number; ciksAt: string | null };
+  sec?: {
+    identity: boolean;
+    ciks: number;
+    ciksAt: string | null;
+    /** companyfacts backfill, counted in companies (CIKs) */
+    facts?: { total: number; done: number; lastAt: string | null };
+  };
   error?: string;
 }
 
