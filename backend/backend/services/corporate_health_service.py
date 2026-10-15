@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import logging
 import math
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date
 
 import pandas as pd
@@ -806,18 +805,15 @@ def get_earnings_quality(universe: str = "dow") -> dict:
         return {}
 
     rows: list[dict] = []
-    with ThreadPoolExecutor(max_workers=20) as ex:
-        futures = {
-            ex.submit(_fetch_eq_inputs, m["symbol"], m.get("sector")): m["symbol"]
-            for m in members
-        }
-        for fut in as_completed(futures):
-            try:
-                row = fut.result()
-                if row is not None:
-                    rows.append(row)
-            except Exception:
-                logger.debug("earnings quality worker failed", exc_info=True)
+    # Serial on purpose: these are store reads now (Phase 68), and sqlite3 hands the GIL
+    # back and forth on every row, so threads made them ~20x slower than one loop.
+    for m in members:
+        try:
+            row = _fetch_eq_inputs(m["symbol"], m.get("sector"))
+            if row is not None:
+                rows.append(row)
+        except Exception:
+            logger.debug("earnings quality row failed for %s", m["symbol"], exc_info=True)
 
     result = compute_earnings_quality(rows)
     if not result:

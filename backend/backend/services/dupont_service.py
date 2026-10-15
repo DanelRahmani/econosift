@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import logging
 import math
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from .. import provenance as pv
 from ..cache import cached
@@ -82,22 +81,22 @@ def get_sector_dupont() -> dict:
         sector = c.get("sector", "Unknown") or "Unknown"
         sector_tickers.setdefault(sector, []).append(c["symbol"])
 
-    # Fetch DuPont components for all tickers in parallel
+    # DuPont components for every ticker, from the stored statements
     all_rows: list[dict] = []
     all_tickers: list[tuple[str, str]] = []
     for sector, tickers in sector_tickers.items():
         for t in tickers:
             all_tickers.append((t, sector))
 
-    with ThreadPoolExecutor(max_workers=20) as ex:
-        futures = {ex.submit(_fetch_one, t, s): (t, s) for t, s in all_tickers}
-        for fut in as_completed(futures):
-            try:
-                row = fut.result()
-                if row is not None:
-                    all_rows.append(row)
-            except Exception:
-                logger.debug("DuPont worker failed", exc_info=True)
+    # Serial on purpose: these are store reads now (Phase 68), and sqlite3 hands the GIL
+    # back and forth on every row, so threads made them ~20x slower than one loop.
+    for t, s in all_tickers:
+        try:
+            row = _fetch_one(t, s)
+            if row is not None:
+                all_rows.append(row)
+        except Exception:
+            logger.debug("DuPont row failed for %s", t, exc_info=True)
 
     if not all_rows:
         return {"sectors": [], "asOf": None, "tickerCount": 0, "error": "No financial data retrieved"}

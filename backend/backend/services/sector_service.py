@@ -4,7 +4,6 @@ from __future__ import annotations
 import logging
 import math
 import sqlite3
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date
 
 import numpy as np
@@ -219,17 +218,15 @@ def get_sector_fundamentals() -> list[dict]:
             "return1y": ret1y,
         }
 
-    results: list[dict] = [{}] * len(SECTOR_ETFS)
-    etf_list = list(SECTOR_ETFS.keys())
-    with ThreadPoolExecutor(max_workers=11) as ex:
-        futures = {ex.submit(_fetch_info, etf): i for i, etf in enumerate(etf_list)}
-        for fut in as_completed(futures):
-            idx = futures[fut]
-            try:
-                results[idx] = fut.result()
-            except Exception:
-                logger.exception("sector_fundamentals fetch failed for index %d", idx)
-                results[idx] = {"ticker": etf_list[idx], "sector": SECTOR_ETFS[etf_list[idx]]}
+    results: list[dict] = []
+    # Serial on purpose: these are store reads now (Phase 68), and sqlite3 hands the GIL
+    # back and forth on every row, so threads made them ~20x slower than one loop.
+    for etf, sector in SECTOR_ETFS.items():
+        try:
+            results.append(_fetch_info(etf))
+        except Exception:
+            logger.exception("sector_fundamentals failed for %s", etf)
+            results.append({"ticker": etf, "sector": sector})
 
     return results
 
