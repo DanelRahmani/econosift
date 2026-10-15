@@ -241,38 +241,36 @@ def refresh_daily_quotes() -> None:
 # ---------------------------------------------------------------------------
 
 def refresh_fx_rates() -> None:
-    """Fetch last 5 days of G10 FX spot rates from yfinance and upsert into daily_fx."""
+    """Fetch last 5 days of G10 FX spot rates from yfinance and upsert into fx_daily."""
     job_id = log_job_start("refresh_fx_rates")
     try:
         import yfinance as yf
-        from ..db_models import DailyFX
+        from .. import store
 
         G10_PAIRS = [
             ("EUR", "USD"), ("GBP", "USD"), ("JPY", "USD"), ("CHF", "USD"),
             ("AUD", "USD"), ("NZD", "USD"), ("CAD", "USD"), ("NOK", "USD"), ("SEK", "USD"),
         ]
-        rows = 0
-        with _get_session()() as session:
-            for base, quote in G10_PAIRS:
-                try:
-                    ticker_sym = f"{base}{quote}=X"
-                    t = yf.Ticker(ticker_sym)
-                    hist = t.history(period="5d")
-                    if hist.empty:
-                        continue
-                    for date_idx, row in hist.iterrows():
-                        date_val = date_idx.date() if hasattr(date_idx, "date") else date_idx
-                        session.merge(DailyFX(
-                            base_ccy=base,
-                            quote_ccy=quote,
-                            date=date_val,
-                            rate=_safe_float(row.get("Close")),
-                        ))
-                        rows += 1
-                except Exception as exc:
-                    logger.debug("refresh_fx_rates skip %s/%s: %s", base, quote, exc)
+        values: list[dict] = []
+        for base, quote in G10_PAIRS:
+            try:
+                ticker_sym = f"{base}{quote}=X"
+                t = yf.Ticker(ticker_sym)
+                hist = t.history(period="5d")
+                if hist.empty:
                     continue
-            session.commit()
+                for date_idx, row in hist.iterrows():
+                    date_val = date_idx.date() if hasattr(date_idx, "date") else date_idx
+                    values.append(dict(
+                        base=base,
+                        quote=quote,
+                        date=date_val.isoformat(),
+                        rate=_safe_float(row.get("Close")),
+                    ))
+            except Exception as exc:
+                logger.debug("refresh_fx_rates skip %s/%s: %s", base, quote, exc)
+                continue
+        rows = store.upsert("fx_daily", values, ("base", "quote", "date"))
 
         log_job_success(job_id, rows)
         logger.info("refresh_fx_rates: %d rows updated", rows)
@@ -286,10 +284,10 @@ def refresh_fx_rates() -> None:
 # ---------------------------------------------------------------------------
 
 def refresh_daily_macro() -> None:
-    """Fetch key FRED macro indicators and upsert into daily_macro table (US only)."""
+    """Fetch key FRED macro indicators and upsert into macro_series (US only)."""
     job_id = log_job_start("refresh_daily_macro")
     try:
-        from ..db_models import DailyMacro
+        from .. import store
         from .macro_expansion_service import _fetch_fred_series_sync
         from datetime import date as _date, timedelta
 
@@ -301,20 +299,13 @@ def refresh_daily_macro() -> None:
         start_str = (today - timedelta(days=90)).isoformat()
         raw = _fetch_fred_series_sync(series_ids, start=start_str)
 
-        rows = 0
-        with _get_session()() as session:
-            for indicator_id, points in raw.items():
-                for pt in points:
-                    if pt.get("value") is None:
-                        continue
-                    session.merge(DailyMacro(
-                        indicator_id=indicator_id,
-                        country="US",
-                        date=_date.fromisoformat(pt["date"]),
-                        value=pt["value"],
-                    ))
-                    rows += 1
-            session.commit()
+        values = [
+            dict(series=indicator_id, country="US", date=pt["date"], value=pt["value"], source="FRED")
+            for indicator_id, points in raw.items()
+            for pt in points
+            if pt.get("value") is not None
+        ]
+        rows = store.upsert("macro_series", values, ("series", "country", "date"))
 
         log_job_success(job_id, rows)
         logger.info("refresh_daily_macro: %d rows updated", rows)

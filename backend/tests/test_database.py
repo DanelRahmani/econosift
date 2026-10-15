@@ -65,8 +65,6 @@ def test_all_tables_exist(mem_engine):
     expected = {
         "daily_price",
         "daily_quote",
-        "daily_macro",
-        "daily_fx",
         "job_execution",
         "cache_entry",
     }
@@ -184,43 +182,6 @@ def test_job_execution_insert_and_query(session):
     assert result.status == "completed"
     assert result.rows_affected == 503
     assert result.error_message is None
-
-
-# ---------------------------------------------------------------------------
-# 5. DailyMacro — composite PK and index
-# ---------------------------------------------------------------------------
-
-def test_daily_macro_insert(session):
-    m = _models()
-    row = m.DailyMacro(
-        indicator_id="NY.GDP.MKTP.CD",
-        country="US",
-        date=date(2023, 1, 1),
-        value=26_950_000_000_000.0,
-    )
-    session.add(row)
-    session.flush()
-
-    result = session.query(m.DailyMacro).filter_by(
-        indicator_id="NY.GDP.MKTP.CD", country="US", date=date(2023, 1, 1)
-    ).one()
-    assert result.value == pytest.approx(26_950_000_000_000.0)
-
-
-# ---------------------------------------------------------------------------
-# 6. DailyFX — composite PK
-# ---------------------------------------------------------------------------
-
-def test_daily_fx_insert(session):
-    m = _models()
-    row = m.DailyFX(base_ccy="EUR", quote_ccy="USD", date=date(2024, 3, 1), rate=1.085)
-    session.add(row)
-    session.flush()
-
-    result = session.query(m.DailyFX).filter_by(
-        base_ccy="EUR", quote_ccy="USD", date=date(2024, 3, 1)
-    ).one()
-    assert result.rate == pytest.approx(1.085)
 
 
 # ---------------------------------------------------------------------------

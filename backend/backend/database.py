@@ -41,6 +41,10 @@ if "sqlite" in DATABASE_URL:
         cursor.execute("PRAGMA journal_mode=WAL")
         cursor.execute("PRAGMA synchronous=NORMAL")
         cursor.execute("PRAGMA busy_timeout=15000")
+        # Reads of 500 tickers x years of daily bars stay in memory.
+        cursor.execute("PRAGMA mmap_size=268435456")
+        cursor.execute("PRAGMA cache_size=-65536")
+        cursor.execute("PRAGMA temp_store=MEMORY")
         cursor.close()
 
 
@@ -65,6 +69,8 @@ def init_db():
     from . import db_models  # noqa: F401 — side-effect: registers ORM models
     Base.metadata.create_all(bind=engine)
     _add_missing_columns()
+    from . import store
+    store.init_schema()
 
 
 # Columns added to existing tables after release; create_all only creates missing tables.

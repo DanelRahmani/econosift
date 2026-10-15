@@ -2117,8 +2117,14 @@ export interface CacheStat {
 export interface DbHealth {
   daily_price?: number;
   daily_quote?: number;
-  daily_macro?: number;
-  daily_fx?: number;
+  security?: number;
+  price_daily?: number;
+  quote_latest?: number;
+  quote_intraday?: number;
+  fundamental?: number;
+  macro_series?: number;
+  fx_daily?: number;
+  fetch_queue?: number;
   job_execution?: number;
   cache_entries?: number;
   cache_size_kb?: number;

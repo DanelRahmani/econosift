@@ -29,13 +29,13 @@ def health():
     db_health: dict = {}
     try:
         from ..database import SessionLocal
-        from ..db_models import DailyPrice, DailyQuote, DailyMacro, DailyFX, JobExecution, CacheEntry, AiSummary
+        from ..db_models import DailyPrice, DailyQuote, JobExecution, CacheEntry, AiSummary
+        from .. import store
         with SessionLocal() as session:
             db_health = {
                 "daily_price": session.query(DailyPrice).count(),
                 "daily_quote": session.query(DailyQuote).count(),
-                "daily_macro": session.query(DailyMacro).count(),
-                "daily_fx":    session.query(DailyFX).count(),
+                **store.counts(),
                 "job_execution": session.query(JobExecution).count(),
                 "cache_entries": session.query(CacheEntry).count(),
                 "ai_summaries": session.query(AiSummary).count(),

@@ -66,22 +66,6 @@ class DailyQuote(Base):
     updated_at = Column(DateTime, default=_utcnow)
 
 
-class DailyMacro(Base):
-    """World Bank / FRED macro indicator values per country/date."""
-
-    __tablename__ = "daily_macro"
-
-    indicator_id = Column(String, nullable=False)
-    country = Column(String, nullable=False)
-    date = Column(Date, nullable=False)
-    value = Column(Float)
-
-    __table_args__ = (
-        PrimaryKeyConstraint("indicator_id", "country", "date"),
-        Index("ix_daily_macro_indicator_date", "indicator_id", "date"),
-    )
-
-
 class MetricSnapshot(Base):
     """Daily snapshot of a metric that has no free historical source.
 
@@ -99,21 +83,6 @@ class MetricSnapshot(Base):
 
     __table_args__ = (
         PrimaryKeyConstraint("metric", "key", "date"),
-    )
-
-
-class DailyFX(Base):
-    """FX spot rates per currency pair/date."""
-
-    __tablename__ = "daily_fx"
-
-    base_ccy = Column(String(3), nullable=False)
-    quote_ccy = Column(String(3), nullable=False)
-    date = Column(Date, nullable=False)
-    rate = Column(Float)
-
-    __table_args__ = (
-        PrimaryKeyConstraint("base_ccy", "quote_ccy", "date"),
     )
 
 
