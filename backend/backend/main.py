@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import asyncio
 import os
-import threading
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
@@ -26,7 +25,6 @@ from .routers import (
     yield_curve, policy, sovereign, scenario, wiki, corporate, dividend, insider,
     mergers, factbook, crossborder, stability, ai,
 )
-from .services import screener_service
 
 # Threads behind asyncio.to_thread. Python's default, min(32, cpu + 4), is sized
 # for CPU work, but nearly every call here waits on the network (yfinance, World
@@ -56,7 +54,6 @@ async def lifespan(app: FastAPI):
     # breaker, so no burst of page loads or jobs can flood Yahoo into 429s.
     rate_limit.install_yfinance_guard()
     init_db()
-    threading.Thread(target=screener_service.warm_all, daemon=True).start()
     scheduler = start_scheduler()
     yield
     if scheduler:

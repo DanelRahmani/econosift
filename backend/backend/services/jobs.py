@@ -379,6 +379,15 @@ def record_daily_snapshots() -> None:
 # Scheduler startup
 # ---------------------------------------------------------------------------
 
+# Jobs that call Yahoo run on cron only, after the US close: at boot they
+# stampeded Yahoo together with the user's first page load, and nothing
+# reads their tables yet. Boot runs only the non-Yahoo jobs, staggered.
+MARKET_TZ = "America/New_York"
+STARTUP_DELAY = 120   # seconds after boot before the first startup job
+STARTUP_GAP = 300     # seconds between startup jobs
+STARTUP_JOBS = (refresh_daily_macro, refresh_bulk_data)
+
+
 def start_scheduler():
     """Initialise and start APScheduler.
 
@@ -397,23 +406,25 @@ def start_scheduler():
         tz = os.getenv("SCHEDULER_TIMEZONE", "UTC")
         scheduler = BackgroundScheduler(timezone=tz)
 
+        from .screener_service import warm_all
+
         scheduler.add_job(
             refresh_daily_prices,
-            CronTrigger(hour=16, minute=0),
+            CronTrigger(day_of_week="mon-fri", hour=17, minute=30, timezone=MARKET_TZ),
             id="refresh_daily_prices",
             max_instances=1,
             replace_existing=True,
         )
         scheduler.add_job(
             refresh_daily_quotes,
-            CronTrigger(hour=17, minute=0),
+            CronTrigger(day_of_week="mon-fri", hour=18, minute=0, timezone=MARKET_TZ),
             id="refresh_daily_quotes",
             max_instances=1,
             replace_existing=True,
         )
         scheduler.add_job(
             refresh_fx_rates,
-            CronTrigger(hour="9,15,21", minute=0),
+            CronTrigger(hour="6,17,21", minute=0, timezone=MARKET_TZ),
             id="refresh_fx_rates",
             max_instances=1,
             replace_existing=True,
@@ -440,32 +451,32 @@ def start_scheduler():
             max_instances=1,
             replace_existing=True,
         )
+        scheduler.add_job(
+            # The screener's ~500-ticker refresh used to run at every boot.
+            warm_all,
+            CronTrigger(day_of_week="mon-fri", hour=19, minute=0, timezone=MARKET_TZ),
+            id="screener_warm_all",
+            max_instances=1,
+            replace_existing=True,
+        )
 
         scheduler.start()
         logger.info("APScheduler started with %d jobs", len(scheduler.get_jobs()))
 
-        # Fire each job once at startup so tables are populated immediately
+        # Run the non-Yahoo jobs once after boot, staggered, so tables fill
+        # without competing with the first page loads.
         import threading
         def _run_startup_jobs():
-            for fn, name in [
-                (refresh_daily_prices, "refresh_daily_prices"),
-                (refresh_daily_quotes, "refresh_daily_quotes"),
-                (refresh_fx_rates,     "refresh_fx_rates"),
-                (refresh_daily_macro,  "refresh_daily_macro"),
-            ]:
+            import time as _time
+            _time.sleep(STARTUP_DELAY)
+            for i, fn in enumerate(STARTUP_JOBS):
+                if i:
+                    _time.sleep(STARTUP_GAP)
                 try:
-                    logger.info("Running startup job: %s", name)
+                    logger.info("Running startup job: %s", fn.__name__)
                     fn()
                 except Exception as exc:
-                    logger.warning("Startup job %s failed: %s", name, exc)
-            # Bulk data runs async after a delay to let FRED/yfinance warm up
-            import time as _time
-            _time.sleep(10)
-            try:
-                logger.info("Running startup job: refresh_bulk_data")
-                refresh_bulk_data()
-            except Exception as exc:
-                logger.warning("Startup job refresh_bulk_data failed: %s", exc)
+                    logger.warning("Startup job %s failed: %s", fn.__name__, exc)
         threading.Thread(target=_run_startup_jobs, daemon=True).start()
 
         return scheduler
