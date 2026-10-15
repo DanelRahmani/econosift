@@ -10,7 +10,7 @@ import httpx
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from .. import cache
+from .. import cache, rate_limit
 from ..config import DATA_DIR, FRED_API_KEY, FINNHUB_API_KEY, GEMINI_API_KEY
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -64,6 +64,9 @@ def health():
             "geminiApiKey": bool(GEMINI_API_KEY),
         },
         "database": db_health,
+        # Per-source rate limiter / circuit breaker: an open circuit means the
+        # source is being skipped after 429s or repeated errors.
+        "sources": rate_limit.status(),
     }
 
 

@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from fastapi import Depends, FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 
-from . import cache
+from . import cache, rate_limit
 
 STALE_HEADER = "X-Data-Stale"
 # Sent by a page's Refresh button (P1-20): this GET recomputes the cached data
@@ -52,6 +52,9 @@ async def lifespan(app: FastAPI):
     # every service degrades quietly by design, which otherwise makes a broken
     # provider indistinguishable from a genuinely empty result.
     errorlog.install()
+    # Every yfinance request now passes one global token bucket + circuit
+    # breaker, so no burst of page loads or jobs can flood Yahoo into 429s.
+    rate_limit.install_yfinance_guard()
     init_db()
     threading.Thread(target=screener_service.warm_all, daemon=True).start()
     scheduler = start_scheduler()

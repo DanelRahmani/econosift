@@ -1,0 +1,95 @@
+"""Per-source token bucket + circuit breaker (Phase 65, item 4)."""
+import pytest
+from yfinance.exceptions import YFRateLimitError
+
+from backend import rate_limit as rl
+
+
+class FakeClock:
+    def __init__(self):
+        self.t = 1000.0
+        self.slept = 0.0
+
+    def now(self):
+        return self.t
+
+    def sleep(self, s):
+        self.slept += s
+        self.t += s
+
+
+def _guard(clock, **kw):
+    return rl.SourceGuard("test", rate=2.0, burst=4, clock=clock.now, sleep=clock.sleep, **kw)
+
+
+def test_bucket_allows_burst_then_throttles_to_rate():
+    c = FakeClock()
+    g = _guard(c)
+    for _ in range(4):
+        g.call(lambda: None)
+    assert c.slept == 0
+    for _ in range(4):
+        g.call(lambda: None)
+    assert c.slept == pytest.approx(2.0, abs=0.01)  # 4 more at 2/s
+
+
+def test_429_opens_circuit_with_exponential_cooldown():
+    c = FakeClock()
+    g = _guard(c)
+
+    def limited():
+        raise YFRateLimitError()
+
+    with pytest.raises(YFRateLimitError):
+        g.call(limited)
+    assert g.status()["state"] == "open"
+    first = g.status()["openForSeconds"]
+
+    calls = []
+    with pytest.raises(YFRateLimitError):  # fails fast, never reaches the source
+        g.call(lambda: calls.append(1))
+    assert calls == []
+
+    c.t += first + 1
+    with pytest.raises(YFRateLimitError):
+        g.call(limited)
+    assert g.status()["openForSeconds"] == pytest.approx(first * 2, abs=1)
+
+
+def test_success_closes_circuit_and_resets_backoff():
+    c = FakeClock()
+    g = _guard(c)
+    with pytest.raises(YFRateLimitError):
+        g.call(lambda: (_ for _ in ()).throw(YFRateLimitError()))
+    c.t += 10_000
+    assert g.call(lambda: "ok") == "ok"
+    st = g.status()
+    assert st["state"] == "closed" and st["consecutive429"] == 0
+
+
+def test_repeated_network_errors_open_circuit():
+    c = FakeClock()
+    g = _guard(c)
+    for _ in range(rl.ERROR_THRESHOLD):
+        with pytest.raises(ConnectionError):
+            g.call(lambda: (_ for _ in ()).throw(ConnectionError("down")))
+    assert g.status()["state"] == "open"
+
+
+def test_http_429_response_counts_as_rate_limit():
+    class Resp:
+        status_code = 429
+
+    c = FakeClock()
+    g = _guard(c)
+    assert g.call(lambda: Resp()).status_code == 429
+    assert g.status()["state"] == "open"
+
+
+def test_install_wraps_yfinance_request_once():
+    from yfinance.data import YfData
+    rl.install_yfinance_guard()
+    wrapped = YfData._make_request
+    rl.install_yfinance_guard()
+    assert YfData._make_request is wrapped
+    assert getattr(wrapped, "_econosift_guard", False)
