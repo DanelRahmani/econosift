@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiQuery } from "@/lib/queries";
 import type { MoverRow } from "@/lib/types";
-import { Card, Skeleton } from "@/components/ui";
+import { Card, Skeleton, DataAsOf } from "@/components/ui";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
 import { fmtNum, fmtLarge } from "@/lib/format";
@@ -33,7 +33,7 @@ export function TopMovers({ index = "sp500" }: { index?: string }) {
     <Card {...scope}>
       <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
         <h2 className="text-sm font-semibold text-text-secondary">Top Movers</h2>
-        <span className="text-xs text-text-muted font-mono">{data.asOf ?? "—"}</span>
+        <DataAsOf data={data} label="" />
       </div>
 
       <div className="flex flex-wrap gap-1 mb-3" data-hide-print>

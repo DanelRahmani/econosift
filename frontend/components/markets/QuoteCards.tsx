@@ -3,7 +3,7 @@
 import { useQueries } from "@tanstack/react-query";
 import { apiQuery } from "@/lib/queries";
 import type { Quote } from "@/lib/types";
-import { Card, Skeleton } from "@/components/ui";
+import { Card, Skeleton, DataAsOf } from "@/components/ui";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
 import { fmtPct, fmtPrice, currencySymbol } from "@/lib/format";
@@ -41,6 +41,7 @@ function QuoteCard({ ticker: t, q }: { ticker: string; q: Quote | null }) {
       <div className={`text-sm font-medium ${up ? "text-success" : "text-danger"}`} data-prov="changePercent">
         {q?.changePercent != null ? `${up ? "▲" : "▼"} ${fmtPct(Math.abs(q.changePercent))}` : "—"}
       </div>
+      <DataAsOf data={q} label="" className="block mt-1" />
     </Card>
   );
 }

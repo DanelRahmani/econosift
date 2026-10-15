@@ -3,8 +3,9 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { useValuationFull } from "@/lib/useValuationFull";
+import { isPending } from "@/lib/asOf";
 import type { ValuationFullResponse, FactorResponse } from "@/lib/types";
-import { Card, Skeleton } from "@/components/ui";
+import { Card, Skeleton, DataAsOf } from "@/components/ui";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
 import { fmtNum, fmtPctFromFraction } from "@/lib/format";
@@ -69,7 +70,9 @@ export function ValuationEngine({
         </Card>
       ) : (
         <div className="space-y-6">
-          {data.degraded && (
+          {isPending(data) ? (
+            <DataAsOf data={data} />
+          ) : data.degraded && (
             <div role="status" className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-text-secondary">
               {full.refreshing ? "Partial data, refreshing… " : "Partial data. "}{data.degradedReason}
             </div>

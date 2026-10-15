@@ -3,7 +3,7 @@
 import { AreaChart, Area, ResponsiveContainer, YAxis, Tooltip } from "recharts";
 import { useQuery } from "@tanstack/react-query";
 import { apiQuery } from "@/lib/queries";
-import { Card, Skeleton, chartTooltipStyle, chartPalette, SemiGauge } from "@/components/ui";
+import { Card, Skeleton, chartTooltipStyle, chartPalette, SemiGauge, DataAsOf } from "@/components/ui";
 import { useTheme } from "@/components/ThemeProvider";
 import { MetricTooltip } from "@/components/MetricTooltip";
 import { useSourceScope } from "@/components/provenance/SourceScope";
@@ -31,7 +31,7 @@ export function FearGreedGauge() {
         <h2 className="text-sm font-semibold text-text-secondary">
           <MetricTooltip metricKey="fearGreed">Fear &amp; Greed Index</MetricTooltip>
         </h2>
-        <span className="text-xs text-text-muted font-mono">{data.asOf ?? "—"}</span>
+        <DataAsOf data={data} label="" />
       </div>
 
       <div className="flex flex-col items-center" data-prov="index">

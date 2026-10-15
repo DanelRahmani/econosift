@@ -3,7 +3,7 @@
 import { Suspense } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiQuery } from "@/lib/queries";
-import { Card, PageSkeleton, ControlBar } from "@/components/ui";
+import { Card, PageSkeleton, ControlBar, DataAsOf } from "@/components/ui";
 import { TickerSearch } from "@/components/TickerSearch";
 import { useUrlState } from "@/lib/useUrlState";
 import { EarningsQuality } from "@/components/corporate/EarningsQuality";
@@ -71,6 +71,8 @@ function CorporatePageInner() {
           {loading ? "Loading…" : "Analyze"}
         </button>
       </ControlBar>
+
+      {data && <DataAsOf data={data} label="Fundamentals" className="block" />}
 
       {/* Loading */}
       {loading && <PageSkeleton text={`Fetching corporate health data for ${ticker}…`} />}

@@ -14,7 +14,7 @@ import {
 } from "recharts";
 import type { AnalystData } from "@/lib/types";
 import { fmtNum, fmtPctFromFraction, fmtPrice, fmtLarge, currencySymbol } from "@/lib/format";
-import { Card, chartPalette, chartTooltipStyle } from "@/components/ui";
+import { Card, chartPalette, chartTooltipStyle, DataAsOf } from "@/components/ui";
 import { useTheme } from "@/components/ThemeProvider";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -648,8 +648,8 @@ export function AnalystPanel({ analyst }: { analyst: AnalystData }) {
       </Card>
 
       {/* Footer */}
-      <p className="text-xs text-text-muted text-right">
-        Analyst data as of {analyst.asOf}
+      <p className="text-right">
+        <DataAsOf data={analyst} label="Analyst data" />
       </p>
     </div>
   );

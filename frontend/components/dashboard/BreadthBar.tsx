@@ -3,7 +3,7 @@
 import { LineChart, Line, ResponsiveContainer, YAxis } from "recharts";
 import { useQuery } from "@tanstack/react-query";
 import { apiQuery } from "@/lib/queries";
-import { Skeleton } from "@/components/ui";
+import { Skeleton, DataAsOf } from "@/components/ui";
 import { fmtNum } from "@/lib/format";
 import { MetricTooltip } from "@/components/MetricTooltip";
 import { useSourceScope } from "@/components/provenance/SourceScope";
@@ -36,7 +36,7 @@ export function BreadthBar({ index = "sp500" }: { index?: string }) {
           Market Breadth · S&amp;P 500
         </h2>
         <span className="text-xs text-text-muted font-mono">
-          {data.total} stocks · {String(data.asOf ?? "—")}
+          {data.total} stocks · <DataAsOf data={data} label="" />
         </span>
       </div>
 

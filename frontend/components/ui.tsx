@@ -1,6 +1,7 @@
 "use client";
 import { useRef, useState, useEffect, type HTMLAttributes, type ReactNode } from "react";
 import { RadialBarChart, RadialBar, PolarAngleAxis, ResponsiveContainer } from "recharts";
+import { asOfLabel, isPending } from "@/lib/asOf";
 
 export function Card({
   children,
@@ -305,6 +306,29 @@ export function EmptyState({ title, description }: { title: string; description?
       <h3 className="text-sm font-medium text-text-secondary">{title}</h3>
       {description && <p className="text-xs text-text-muted mt-1 max-w-xs">{description}</p>}
     </div>
+  );
+}
+
+/**
+ * When a panel's data was stored ("Prices as of 14:45 ET"), or "Loading data…" while the
+ * backend's fetcher still has it queued (`status: "pending"`; apiQuery polls until it lands).
+ * Renders nothing when the response carries no usable time.
+ */
+export function DataAsOf({ data, label = "Data", className = "" }: { data: unknown; label?: string; className?: string }) {
+  if (isPending(data)) {
+    return (
+      <span role="status" className={`inline-flex items-center gap-1.5 text-xs text-warning ${className}`} data-testid="data-pending">
+        <span className="w-1.5 h-1.5 rounded-full bg-warning animate-pulse" />
+        Loading data… queued for the next fetch
+      </span>
+    );
+  }
+  const when = asOfLabel(data as Parameters<typeof asOfLabel>[0]);
+  if (!when) return null;
+  return (
+    <span className={`text-xs text-text-muted font-mono ${className}`} data-testid="data-as-of">
+      {label ? `${label} as of` : "as of"} {when}
+    </span>
   );
 }
 

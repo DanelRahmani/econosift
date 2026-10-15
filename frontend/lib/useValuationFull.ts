@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./api";
+import { pendingRefetchInterval } from "./asOf";
 
 const DEGRADED_RETRY_MS = 15_000;
 const DEGRADED_MAX_FETCHES = 8; // ~2 min, then the page keeps the partial data and its notice
@@ -15,8 +16,10 @@ export function useValuationFull(ticker: string) {
     queryKey,
     queryFn: () => api.valuationFull(ticker),
     enabled: !!ticker,
+    // A ticker the fetcher has only queued polls like any pending response (lib/asOf.ts).
     refetchInterval: (q) =>
-      q.state.data?.degraded && q.state.dataUpdateCount < DEGRADED_MAX_FETCHES ? DEGRADED_RETRY_MS : false,
+      pendingRefetchInterval(q.state.data, q.state.dataUpdateCount) ||
+      (q.state.data?.degraded && q.state.dataUpdateCount < DEGRADED_MAX_FETCHES ? DEGRADED_RETRY_MS : false),
   });
   const updates = useQueryClient().getQueryState(queryKey)?.dataUpdateCount ?? 0;
   return { ...query, refreshing: !!query.data?.degraded && updates < DEGRADED_MAX_FETCHES };
