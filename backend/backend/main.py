@@ -55,7 +55,14 @@ async def lifespan(app: FastAPI):
     rate_limit.install_yfinance_guard()
     init_db()
     scheduler = start_scheduler()
+    # The fetcher fills econosift.db in the background (first run: a one-time
+    # history backfill; later runs resume or find it done).
+    from . import fetcher
+    from .services.jobs import STARTUP_DELAY
+    if os.getenv("FETCHER_ENABLED", "true").lower() == "true":
+        fetcher.start(STARTUP_DELAY)
     yield
+    fetcher.stop()
     if scheduler:
         scheduler.shutdown(wait=False)
 

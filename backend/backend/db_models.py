@@ -4,7 +4,6 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from sqlalchemy import (
-    BigInteger,
     Column,
     Date,
     DateTime,
@@ -25,26 +24,6 @@ def _utcnow() -> datetime:
     convention); staying naive keeps them directly comparable.
     """
     return datetime.now(timezone.utc).replace(tzinfo=None)
-
-
-class DailyPrice(Base):
-    """OHLCV price history per symbol/date."""
-
-    __tablename__ = "daily_price"
-
-    symbol = Column(String, nullable=False)
-    date = Column(Date, nullable=False)
-    open = Column(Float)
-    high = Column(Float)
-    low = Column(Float)
-    close = Column(Float)
-    adj_close = Column(Float)
-    volume = Column(BigInteger)
-
-    __table_args__ = (
-        PrimaryKeyConstraint("symbol", "date"),
-        Index("ix_daily_price_date", "date"),
-    )
 
 
 class DailyQuote(Base):

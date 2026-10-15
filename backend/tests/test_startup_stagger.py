@@ -11,7 +11,7 @@ from zoneinfo import ZoneInfo
 from backend.services import jobs
 
 ET = ZoneInfo("America/New_York")
-YAHOO_JOBS = {"refresh_daily_prices", "refresh_daily_quotes", "refresh_fx_rates", "screener_warm_all"}
+YAHOO_JOBS = {"history_rotation", "refresh_daily_quotes", "refresh_fx_rates", "screener_warm_all"}
 
 
 def _scheduled_jobs():

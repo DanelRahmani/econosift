@@ -16,6 +16,8 @@ from pathlib import Path
 # DATABASE_URL (the live ./data DB inside the container) would be wiped.
 _TEST_DB = Path(tempfile.gettempdir()) / "econosift_pytest.db"
 os.environ["DATABASE_URL"] = f"sqlite:///{_TEST_DB.as_posix()}"
+# The fetcher thread calls Yahoo; tests drive it directly instead.
+os.environ.setdefault("FETCHER_ENABLED", "false")
 
 import pytest
 from fastapi.testclient import TestClient

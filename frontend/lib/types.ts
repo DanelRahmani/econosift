@@ -2115,7 +2115,6 @@ export interface CacheStat {
   size: number;
 }
 export interface DbHealth {
-  daily_price?: number;
   daily_quote?: number;
   security?: number;
   price_daily?: number;

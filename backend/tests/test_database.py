@@ -63,52 +63,11 @@ def test_all_tables_exist(mem_engine):
     inspector = inspect(mem_engine)
     tables = set(inspector.get_table_names())
     expected = {
-        "daily_price",
         "daily_quote",
         "job_execution",
         "cache_entry",
     }
     assert expected <= tables, f"Missing tables: {expected - tables}"
-
-
-# ---------------------------------------------------------------------------
-# 2. DailyPrice — insert and select by (symbol, date)
-# ---------------------------------------------------------------------------
-
-def test_daily_price_insert_and_select(session):
-    m = _models()
-    row = m.DailyPrice(
-        symbol="AAPL",
-        date=date(2024, 1, 2),
-        open=185.0,
-        high=188.5,
-        low=184.0,
-        close=187.0,
-        adj_close=187.0,
-        volume=55_000_000,
-    )
-    session.add(row)
-    session.flush()
-
-    result = (
-        session.query(m.DailyPrice)
-        .filter_by(symbol="AAPL", date=date(2024, 1, 2))
-        .one()
-    )
-    assert result.close == pytest.approx(187.0)
-    assert result.volume == 55_000_000
-
-
-def test_daily_price_composite_pk_prevents_duplicate(session):
-    m = _models()
-    row1 = m.DailyPrice(symbol="MSFT", date=date(2024, 1, 3), close=400.0)
-    row2 = m.DailyPrice(symbol="MSFT", date=date(2024, 1, 3), close=401.0)
-    session.add(row1)
-    session.flush()
-
-    session.add(row2)
-    with pytest.raises(Exception):  # IntegrityError from SQLite
-        session.flush()
 
 
 # ---------------------------------------------------------------------------

@@ -119,56 +119,6 @@ def _get_all_tracked_tickers() -> list[str]:
 
 
 # ---------------------------------------------------------------------------
-# Job: refresh_daily_prices
-# ---------------------------------------------------------------------------
-
-def refresh_daily_prices() -> None:
-    """Fetch 1-year OHLCV history for up to 100 tracked tickers and upsert into daily_price."""
-    job_id = log_job_start("refresh_daily_prices")
-    try:
-        from .yfinance_service import get_ohlc_frame, get_close_frame
-        from ..db_models import DailyPrice
-
-        tickers = _get_all_tracked_tickers()
-        if not tickers:
-            log_job_success(job_id, 0)
-            return
-
-        batch = tickers[:100]
-        ohlc_frames = get_ohlc_frame(tuple(batch), "1y")
-        close_frame = get_close_frame(tuple(batch), "1y")
-
-        rows = 0
-        with _get_session()() as session:
-            for sym, df in ohlc_frames.items():
-                for date_idx, row in df.iterrows():
-                    adj_close = None
-                    if sym in close_frame.columns:
-                        adj_close = _safe_float(close_frame[sym].get(date_idx))
-                    date_val = date_idx.date() if hasattr(date_idx, "date") else date_idx
-                    session.merge(DailyPrice(
-                        symbol=sym,
-                        date=date_val,
-                        open=_safe_float(row.get("Open")),
-                        high=_safe_float(row.get("High")),
-                        low=_safe_float(row.get("Low")),
-                        close=_safe_float(row.get("Close")),
-                        adj_close=adj_close,
-                        volume=_safe_int(row.get("Volume")),
-                    ))
-                    rows += 1
-                # Per ticker, so other writers (the cache) get the lock between
-                # tickers instead of waiting out one 25k-row transaction.
-                session.commit()
-
-        log_job_success(job_id, rows)
-        logger.info("refresh_daily_prices: %d rows updated", rows)
-    except Exception as exc:
-        logger.error("refresh_daily_prices failed: %s", exc)
-        log_job_failure(job_id, str(exc))
-
-
-# ---------------------------------------------------------------------------
 # Job: refresh_daily_quotes
 # ---------------------------------------------------------------------------
 
@@ -398,11 +348,20 @@ def start_scheduler():
         scheduler = BackgroundScheduler(timezone=tz)
 
         from .screener_service import warm_all
+        from .. import fetcher
 
+        # The fetcher thread makes the calls; these only queue its work.
         scheduler.add_job(
-            refresh_daily_prices,
+            fetcher.queue_history_rotation,
             CronTrigger(day_of_week="mon-fri", hour=17, minute=30, timezone=MARKET_TZ),
-            id="refresh_daily_prices",
+            id="history_rotation",
+            max_instances=1,
+            replace_existing=True,
+        )
+        scheduler.add_job(
+            fetcher.queue_universe,
+            CronTrigger(day_of_week="sun", hour=3, minute=0, timezone=MARKET_TZ),
+            id="universe_refresh",
             max_instances=1,
             replace_existing=True,
         )

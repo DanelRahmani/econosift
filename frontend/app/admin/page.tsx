@@ -214,7 +214,7 @@ export default function AdminPage() {
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
                 <DbStat label="Cache Entries" value={data.database.cache_entries?.toLocaleString() ?? "—"} />
                 <DbStat label="Cache Size" value={data.database.cache_size_kb != null ? `${(data.database.cache_size_kb >= 1024 ? (data.database.cache_size_kb / 1024).toFixed(1) + " MB" : data.database.cache_size_kb + " KB")}` : "—"} />
-                <DbStat label="Price Rows" value={data.database.daily_price?.toLocaleString() ?? "—"} />
+                <DbStat label="Price Rows" value={data.database.price_daily?.toLocaleString() ?? "—"} />
                 <DbStat label="Quote Rows" value={data.database.daily_quote?.toLocaleString() ?? "—"} />
                 <DbStat label="Macro Rows" value={data.database.macro_series?.toLocaleString() ?? "—"} />
                 <DbStat label="FX Rows" value={data.database.fx_daily?.toLocaleString() ?? "—"} />
