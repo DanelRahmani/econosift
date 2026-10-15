@@ -4,6 +4,7 @@ import { CurrencyCrisisPanel } from "@/components/stability/CurrencyCrisisPanel"
 import { BankingStabilityPanel } from "@/components/stability/BankingStabilityPanel";
 import { ScrollableTabBar, TabButton } from "@/components/ui";
 import { useKeyboardShortcuts, tabKeys, tabStepKeys } from "@/lib/useKeyboardShortcuts";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 const TABS = ["Currency Crisis", "Banking Stability"] as const;
 
@@ -26,8 +27,10 @@ export default function StabilityPage() {
         ))}
       </ScrollableTabBar>
 
+      <ErrorBoundary key={tab}>
       {tab === "Currency Crisis" && <CurrencyCrisisPanel />}
       {tab === "Banking Stability" && <BankingStabilityPanel />}
+      </ErrorBoundary>
     </div>
   );
 }

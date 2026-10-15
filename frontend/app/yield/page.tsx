@@ -21,6 +21,7 @@ import {
 } from "recharts";
 import { useRefreshNonce } from "@/lib/refresh";
 import { useKeyboardShortcuts, tabKeys, tabStepKeys } from "@/lib/useKeyboardShortcuts";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 const TABS = YIELD_TABS;
 
@@ -367,6 +368,7 @@ function YieldPageInner() {
         ))}
       </ScrollableTabBar>
 
+      <ErrorBoundary key={tab}>
       {tab === "US Curve" && (
         <div className="bg-surface rounded-lg p-4 border border-border">
           <h2 className="text-sm font-medium mb-4 text-text-muted">US Treasury Spot Curve</h2>
@@ -441,6 +443,7 @@ function YieldPageInner() {
       {tab === "Sovereign Risk" && <SovereignRiskTab />}
       {tab === "Central Banks" && <CentralBanksTab />}
       {tab === "Default Risk" && <DefaultRiskTab />}
+      </ErrorBoundary>
     </div>
   );
 }

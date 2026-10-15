@@ -25,6 +25,7 @@ import type {
 } from "@/lib/types";
 import { useRefreshNonce } from "@/lib/refresh";
 import { useKeyboardShortcuts, tabKeys, tabStepKeys, periodKeys } from "@/lib/useKeyboardShortcuts";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 const PERIODS = ["1y", "2y", "3y"] as const;
 type Period = (typeof PERIODS)[number];
@@ -275,6 +276,7 @@ function RiskPageInner() {
 
       {/* Tab Content */}
       <div className="min-h-[400px]">
+        <ErrorBoundary key={tab}>
         {tab === "Rolling Metrics" && (
           <div className="space-y-4">
             <div className="flex gap-2 items-center">
@@ -331,6 +333,7 @@ function RiskPageInner() {
             <StressTestPanel ticker={primaryTicker} theme={theme} />
           </div>
         )}
+        </ErrorBoundary>
       </div>
     </main>
   );

@@ -27,6 +27,7 @@ import { TransactionLog } from "@/components/portfolio/TransactionLog";
 import { WalkthroughBanner } from "@/components/WalkthroughBanner";
 import { PORTFOLIO_TABS } from "@/lib/pageTabs";
 import { useKeyboardShortcuts, tabKeys, tabStepKeys, periodKeys } from "@/lib/useKeyboardShortcuts";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 const LS_KEY = "econosift_portfolio";
 const LEGACY_LS_KEY = "axiom_portfolio";
@@ -225,6 +226,7 @@ function PortfolioPageInner() {
 
       {/* Tab Content */}
       <div className="min-h-[400px] space-y-4">
+        <ErrorBoundary key={tab}>
         {/* ── Overview ── */}
         {tab === "Overview" && (
           <>
@@ -284,6 +286,7 @@ function PortfolioPageInner() {
         {tab === "Transactions" && (
           <TransactionLog />
         )}
+        </ErrorBoundary>
       </div>
     </main>
   );

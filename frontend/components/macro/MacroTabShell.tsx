@@ -6,6 +6,7 @@ import { RegimeOverlay } from "./RegimeOverlay";
 import { ScrollableTabBar, PageSkeleton, TabButton } from "@/components/ui";
 import { MACRO_TABS } from "@/lib/pageTabs";
 import { useKeyboardShortcuts, tabKeys, tabStepKeys } from "@/lib/useKeyboardShortcuts";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 const TABS = MACRO_TABS;
 
@@ -114,9 +115,11 @@ function MacroTabShellInner() {
         ))}
       </ScrollableTabBar>
       {/* Active tab content */}
+      <ErrorBoundary key={activeTab}>
       <Suspense fallback={<PageSkeleton text="Loading tab…" />}>
         <TabContent activeTab={activeTab} />
       </Suspense>
+      </ErrorBoundary>
     </div>
   );
 }

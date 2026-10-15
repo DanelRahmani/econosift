@@ -23,6 +23,7 @@ import type {
 } from "@/lib/types";
 import { useRefreshNonce } from "@/lib/refresh";
 import { useKeyboardShortcuts, tabKeys, tabStepKeys } from "@/lib/useKeyboardShortcuts";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 const TABS = ["Chain", "Volatility", "OI Profile", "Monte Carlo"] as const;
 type Tab = (typeof TABS)[number];
@@ -248,6 +249,7 @@ function OptionsPageInner() {
 
       {/* Tab content */}
       <div className="min-h-[400px]">
+        <ErrorBoundary key={tab}>
         {/* Chain Tab */}
         {tab === "Chain" && (
           <div className="space-y-3">
@@ -305,6 +307,7 @@ function OptionsPageInner() {
             )}
           </div>
         )}
+        </ErrorBoundary>
       </div>
     </main>
   );

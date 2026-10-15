@@ -32,6 +32,7 @@ import type {
 } from "@/lib/types";
 import { useRefreshNonce } from "@/lib/refresh";
 import { useKeyboardShortcuts, tabKeys, tabStepKeys, periodKeys } from "@/lib/useKeyboardShortcuts";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 const ValuationTab = lazy(() =>
   import("@/components/markets/ValuationTab").then((m) => ({ default: m.ValuationTab }))
@@ -301,6 +302,7 @@ function MarketsPageInner() {
         <Card><div className="text-text-muted">Search and add a ticker to begin.</div></Card>
       )}
 
+      <ErrorBoundary key={tab}>
       {tab === "Overview" && tickers.length > 0 && (
         <div className="space-y-6">
           <QuoteCards tickers={tickers} />
@@ -527,6 +529,7 @@ function MarketsPageInner() {
           <ShortInterestPanel />
         </Suspense>
       )}
+      </ErrorBoundary>
     </div>
   );
 }

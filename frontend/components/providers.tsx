@@ -5,6 +5,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from '@/lib/queryClient';
 import { LearningProvider } from '@/lib/learningContext';
 import { RefreshProvider } from '@/lib/refresh';
+import { setBackendStarting } from '@/lib/backendStatus';
 
 // Relative by default (Docker/web hit /api via nginx); the Tauri desktop build
 // sets NEXT_PUBLIC_API_URL=http://localhost:8000 in .env.production.
@@ -30,14 +31,23 @@ function BackendGate({ children }: { children: React.ReactNode }) {
     const MAX_WAIT = 45_000; // give up gating after 45s and render anyway
 
     async function poll() {
+      let released = false;
       while (!cancelled) {
         try {
           const res = await fetch(`${API_BASE}/api/health`, { cache: 'no-store' });
-          if (res.ok) break;
+          if (res.ok) {
+            setBackendStarting(false);
+            break;
+          }
         } catch {
           /* backend not up yet */
         }
-        if (Date.now() - start > MAX_WAIT) break;
+        if (Date.now() - start > MAX_WAIT && !released) {
+          // Render anyway, but keep polling: queries retry long until /health answers.
+          setBackendStarting(true);
+          released = true;
+          if (!cancelled) setReady(true);
+        }
         await new Promise((r) => setTimeout(r, 500));
       }
       if (!cancelled) setReady(true);

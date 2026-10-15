@@ -17,6 +17,7 @@ import { ScrollableTabBar } from "@/components/ui";
 import { useUrlState } from "@/lib/useUrlState";
 import { RESEARCH_TABS } from "@/lib/pageTabs";
 import { useKeyboardShortcuts, tabKeys, tabStepKeys } from "@/lib/useKeyboardShortcuts";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 const TABS = RESEARCH_TABS;
 type TabKey = (typeof TABS)[number]["key"];
@@ -60,6 +61,7 @@ function ResearchPageInner() {
         ))}
       </ScrollableTabBar>
 
+      <ErrorBoundary key={tab}>
       {tab === "riskparity" && <RiskParityTab />}
       {tab === "carry" && <FxCarryTab />}
       {tab === "momentum" && <MomentumTab />}
@@ -72,6 +74,7 @@ function ResearchPageInner() {
       {tab === "eventstudy" && <EventStudyTab />}
       {tab === "factorregime" && <FactorRegimeTab />}
       {tab === "backtest" && <BacktestTab />}
+      </ErrorBoundary>
     </main>
   );
 }

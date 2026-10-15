@@ -57,6 +57,10 @@ import { REFRESH_HEADER, requestDone, requestStarted } from "./refresh";
 // sets NEXT_PUBLIC_API_URL=http://localhost:8000 in .env.production.
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
+// A GET that hasn't answered in 25 s is treated as failed, so a panel shows an
+// error instead of a spinner that waits on a stuck request forever.
+const GET_TIMEOUT_MS = 25_000;
+
 async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
   const refreshing = requestStarted();
   let data: unknown;
@@ -69,11 +73,29 @@ async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
 }
 
 async function getJson(path: string, refreshing: boolean, signal?: AbortSignal): Promise<unknown> {
-  const res = await fetch(`${API_BASE}/api${path}`, {
-    cache: "no-store",
-    signal,
-    headers: refreshing ? { [REFRESH_HEADER]: "1" } : undefined,
-  });
+  const controller = new AbortController();
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, GET_TIMEOUT_MS);
+  const onAbort = () => controller.abort();
+  if (signal?.aborted) controller.abort();
+  signal?.addEventListener("abort", onAbort);
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}/api${path}`, {
+      cache: "no-store",
+      signal: controller.signal,
+      headers: refreshing ? { [REFRESH_HEADER]: "1" } : undefined,
+    });
+  } catch (err) {
+    if (timedOut) throw new Error(`API ${path} timed out after ${GET_TIMEOUT_MS / 1000} s`);
+    throw err;
+  } finally {
+    clearTimeout(timer);
+    signal?.removeEventListener("abort", onAbort);
+  }
   if (!res.ok) {
     // Surface the server's reason (FastAPI `detail`) so a page can say *why*
     // data is missing instead of a bare status code.
