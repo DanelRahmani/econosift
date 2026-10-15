@@ -1,17 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { apiQuery } from "@/lib/queries";
+import { useQuery } from "@tanstack/react-query";
 import {
   RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
   Radar, Tooltip, ResponsiveContainer,
 } from "recharts";
-import { api } from "@/lib/api";
-import type { SnowflakeResponse } from "@/lib/types";
 import { Card, Skeleton, chartPalette } from "@/components/ui";
 import { useTheme } from "@/components/ThemeProvider";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
-import { useRefreshNonce } from "@/lib/refresh";
 
 // Axis display names and which Markets tab to navigate to on click
 const AXES = [
@@ -40,21 +38,9 @@ interface Props {
 export function SnowflakeChart({ ticker, onAxisClick, compact = false }: Props) {
   const { theme } = useTheme();
   const palette = chartPalette(theme);
-  const [data, setData] = useState<SnowflakeResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data = null, isLoading: loading, isError } = useQuery({ ...apiQuery("snowflake", ticker), enabled: !!ticker });
+  const error = isError ? "Failed to load Snowflake score" : null;
   const scope = useSourceScope(provOf(data));
-
-  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
-  useEffect(() => {
-    if (!ticker) return;
-    setLoading(true);
-    setError(null);
-    api.snowflake(ticker)
-      .then(setData)
-      .catch(() => setError("Failed to load Snowflake score"))
-      .finally(() => setLoading(false));
-  }, [ticker, refreshNonce]);
 
   if (loading) {
     return (

@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { apiQuery } from "@/lib/queries";
 import {
   ComposedChart, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine, Bar, Legend,
@@ -9,12 +11,10 @@ import { Card, chartTooltipStyle, chartPalette } from "@/components/ui";
 import { useTheme } from "@/components/ThemeProvider";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
-import { api } from "@/lib/api";
 import { currencySymbol } from "@/lib/format";
 import type {
   TechnicalsResponse, BollingerPoint, IchimokuPoint, FibLevel, PivotSet,
 } from "@/lib/types";
-import { useRefreshNonce } from "@/lib/refresh";
 
 const PERIODS = ["1mo", "3mo", "6mo", "1y", "2y"] as const;
 type Period = (typeof PERIODS)[number];
@@ -141,23 +141,14 @@ export function TechnicalsTab({ ticker }: { ticker: string }) {
 
   const [period, setPeriod] = useState<Period>("1y");
   const [activeOverlays, setActiveOverlays] = useState<Set<Overlay>>(new Set(["bollinger"]));
-  const [data, setData] = useState<TechnicalsResponse | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { data = null, isLoading: loading, error: queryError } = useQuery({
+    ...apiQuery("fetchTechnicals", ticker, period),
+    enabled: !!ticker,
+  });
+  const error = queryError instanceof Error ? queryError.message : null;
   const [showSubCharts, setShowSubCharts] = useState(true);
   const scope = useSourceScope(provOf(data));
 
-  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
-  useEffect(() => {
-    if (!ticker) return;
-    setLoading(true);
-    setError(null);
-    api
-      .fetchTechnicals(ticker, period)
-      .then(setData)
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
-  }, [ticker, period, refreshNonce]);
 
   function toggleOverlay(o: Overlay) {
     setActiveOverlays((prev) => {

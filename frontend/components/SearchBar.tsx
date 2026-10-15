@@ -1,35 +1,25 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { api } from "@/lib/api";
+import { useQuery } from "@tanstack/react-query";
+import { apiQuery } from "@/lib/queries";
 import type { SearchResult } from "@/lib/types";
 
 export function SearchBar({ onAdd }: { onAdd: (symbol: string) => void }) {
   const [q, setQ] = useState("");
-  const [results, setResults] = useState<SearchResult[]>([]);
   const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
   const boxRef = useRef<HTMLDivElement>(null);
 
+  const [debounced, setDebounced] = useState("");
   useEffect(() => {
-    if (!q.trim()) {
-      setResults([]);
-      return;
-    }
-    const t = setTimeout(async () => {
-      setLoading(true);
-      try {
-        const r = await api.search(q.trim());
-        setResults(r.results);
-        setOpen(true);
-      } catch {
-        setResults([]);
-      } finally {
-        setLoading(false);
-      }
-    }, 300);
+    const t = setTimeout(() => setDebounced(q.trim()), 300);
     return () => clearTimeout(t);
   }, [q]);
+  const { data: searchData, isFetching: loading } = useQuery({ ...apiQuery("search", debounced), enabled: !!debounced });
+  const results: SearchResult[] = (q.trim() && searchData?.results) || [];
+  useEffect(() => {
+    if (searchData) setOpen(true);
+  }, [searchData]);
 
   useEffect(() => {
     function onClick(e: MouseEvent) {
@@ -44,7 +34,6 @@ export function SearchBar({ onAdd }: { onAdd: (symbol: string) => void }) {
   function pick(symbol: string) {
     onAdd(symbol.toUpperCase());
     setQ("");
-    setResults([]);
     setOpen(false);
   }
 

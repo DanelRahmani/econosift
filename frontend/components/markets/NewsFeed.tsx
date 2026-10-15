@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
-import type { NewsItem, Sentiment } from "@/lib/types";
+import { apiQuery } from "@/lib/queries";
+import { useQuery } from "@tanstack/react-query";
+import type { Sentiment } from "@/lib/types";
 import { Card, Skeleton } from "@/components/ui";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf, type Provenance } from "@/lib/provenance";
-import { useRefreshNonce } from "@/lib/refresh";
 
 const SENTIMENT_STYLE: Record<Sentiment, { dot: string; label: string; text: string }> = {
   positive: { dot: "bg-success", label: "Positive", text: "text-success" },
@@ -16,10 +16,6 @@ const SENTIMENT_STYLE: Record<Sentiment, { dot: string; label: string; text: str
 
 export function NewsFeed({ tickers }: { tickers: string[] }) {
   const [active, setActive] = useState<string>(tickers[0] ?? "");
-  const [items, setItems] = useState<NewsItem[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [prov, setProv] = useState<Provenance | undefined>(undefined);
-  const scope = useSourceScope(prov);
 
   // Keep the selected ticker valid as the basket changes.
   useEffect(() => {
@@ -27,17 +23,9 @@ export function NewsFeed({ tickers }: { tickers: string[] }) {
     if (!tickers.includes(active)) setActive(tickers[0]);
   }, [tickers, active]);
 
-  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
-  useEffect(() => {
-    if (!active) { setItems([]); setProv(undefined); return; }
-    let live = true;
-    setLoading(true);
-    api.news(active)
-      .then((r) => { if (live) { setItems(r.news); setProv(provOf(r)); } })
-      .catch(() => { if (live) { setItems([]); setProv(undefined); } })
-      .finally(() => live && setLoading(false));
-    return () => { live = false; };
-  }, [active, refreshNonce]);
+  const { data, isLoading: loading } = useQuery({ ...apiQuery("news", active), enabled: !!active });
+  const items = (active && data?.news) || [];
+  const scope = useSourceScope(active && data ? provOf(data) : undefined);
 
   if (!tickers.length) return null;
 

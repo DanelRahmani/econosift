@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { api } from "@/lib/api";
+import { useQuery } from "@tanstack/react-query";
+import { apiQuery } from "@/lib/queries";
 import { useValuationFull } from "@/lib/useValuationFull";
 import type { CountryRate, DcfResponse, DcfSensitivity, ValuationFullResponse } from "@/lib/types";
 import { Card, Skeleton } from "@/components/ui";
@@ -9,7 +10,6 @@ import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
 import { fmtNum, fmtPrice, fmtLarge, currencySymbol, fmtPctFromFraction } from "@/lib/format";
 import { NaReason } from "@/components/markets/NaReason";
-import { useRefreshNonce } from "@/lib/refresh";
 
 // ── Slider config ──────────────────────────────────────────────────────────
 interface Params {
@@ -90,22 +90,14 @@ export function DcfPanel({ tickers, sharedWacc = null }: { tickers: string[]; pe
   const [seededFor, setSeededFor] = useState<string>("");
   const [defaults, setDefaults] = useState<Params>(FALLBACK_PARAMS);
   const [defaultsFromBackend, setDefaultsFromBackend] = useState(false);
-  const [data, setData] = useState<DcfResponse | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(false);
-  const [countryRates, setCountryRates] = useState<CountryRate[]>([]);
   const [selectedCountry, setSelectedCountry] = useState<string>("");
-  const scope = useSourceScope(provOf(data));
   // Latest parent override, read when a ticker is (re)seeded so the reseed does not drop it.
   const sharedWaccRef = useRef(sharedWacc);
   sharedWaccRef.current = sharedWacc;
 
   // Load live risk-free rates from backend
-  useEffect(() => {
-    api.riskFreeRates().then((r) => {
-      if (r.rates?.length) setCountryRates(r.rates);
-    }).catch(() => {});
-  }, []);
+  const { data: ratesData } = useQuery(apiQuery("riskFreeRates"));
+  const countryRates: CountryRate[] = ratesData?.rates ?? [];
 
   // When country selection changes, update WACC
   function handleCountryChange(name: string) {
@@ -127,7 +119,6 @@ export function DcfPanel({ tickers, sharedWacc = null }: { tickers: string[]; pe
 
   useEffect(() => {
     setSelectedCountry("");
-    setData(null); // the previous ticker's result must not stay on screen while this one loads
   }, [selectedTicker]);
 
   // Seed the sliders with the backend's own DCF assumptions once per ticker. A provisional seed (fallback
@@ -167,30 +158,28 @@ export function DcfPanel({ tickers, sharedWacc = null }: { tickers: string[]; pe
     }
   }, [tickers, selectedTicker]);
 
-  // Debounced fetch – 500ms after any change (mirrors ValuationTab pattern)
-  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
+  // Debounced fetch â€“ 500ms after any change (mirrors ValuationTab pattern)
+  const [debounced, setDebounced] = useState<{ ticker: string; params: Params } | null>(null);
   useEffect(() => {
     if (!selectedTicker || seededFor !== selectedTicker) return;
-    const t = setTimeout(async () => {
-      setLoading(true);
-      setError(false);
-      try {
-        const r = await api.dcf(selectedTicker, {
-          fcf_growth: params.fcf_growth,
-          terminal_growth: params.terminal_growth,
-          wacc: params.wacc,
-          stage1_years: params.stage1_years,
-        });
-        setData(r);
-      } catch {
-        setError(true);
-        setData(null);
-      } finally {
-        setLoading(false);
-      }
-    }, 500);
+    const t = setTimeout(() => setDebounced({ ticker: selectedTicker, params }), 500);
     return () => clearTimeout(t);
-  }, [selectedTicker, seededFor, params, refreshNonce]);
+  }, [selectedTicker, seededFor, params]);
+  const dcfTicker = debounced?.ticker === selectedTicker ? selectedTicker : "";
+  const p = debounced?.params ?? params;
+  const { data: dcfData, isFetching: loading, isError: error } = useQuery({
+    ...apiQuery("dcf", dcfTicker, {
+      fcf_growth: p.fcf_growth,
+      terminal_growth: p.terminal_growth,
+      wacc: p.wacc,
+      stage1_years: p.stage1_years,
+    }),
+    enabled: !!dcfTicker,
+    // Moving a slider keeps the last result on screen; a new ticker starts empty.
+    placeholderData: (prev, prevQuery) => (prevQuery?.queryKey[1] === selectedTicker ? prev : undefined),
+  });
+  const data = dcfTicker ? dcfData ?? null : null;
+  const scope = useSourceScope(provOf(data));
 
   // ── Early states ──────────────────────────────────────────────────────────
   if (!tickers.length) {

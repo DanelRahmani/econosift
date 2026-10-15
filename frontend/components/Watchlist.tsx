@@ -1,13 +1,13 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { api } from "@/lib/api";
+import { useQueries } from "@tanstack/react-query";
+import { apiQuery } from "@/lib/queries";
 import type { Quote } from "@/lib/types";
 import { Card } from "@/components/ui";
 import { SourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
 import { fmtPct, fmtPrice, currencySymbol } from "@/lib/format";
-import { useRefreshNonce } from "@/lib/refresh";
 
 const STORAGE_KEY = "econosift-watchlist";
 const LEGACY_STORAGE_KEY = "axiom-watchlist";
@@ -26,7 +26,6 @@ interface Alert {
 
 export function Watchlist({ onSelect }: Props) {
   const [tickers, setTickers] = useState<string[]>([]);
-  const [quotes, setQuotes] = useState<Record<string, Quote | null>>({});
   const [alerts, setAlerts] = useState<Record<string, Alert>>({});
   const [input, setInput] = useState("");
   const [editing, setEditing] = useState<string | null>(null);
@@ -78,21 +77,22 @@ export function Watchlist({ onSelect }: Props) {
   }
 
   const tickersKey = tickers.join(",");
-  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
+  const results = useQueries({ queries: tickers.map((t) => apiQuery("quote", t)) });
+  const quotes: Record<string, Quote | null> = {};
+  tickers.forEach((t, i) => {
+    const r = results[i];
+    if (r?.data) quotes[t] = r.data;
+    else if (r?.isError) quotes[t] = null;
+  });
+  // Check price alerts whenever a quote arrives or refreshes.
+  const quotesStamp = results.map((r) => r.dataUpdatedAt).join(",");
   useEffect(() => {
-    if (!tickers.length) return;
-    let active = true;
-    tickers.forEach(async (t) => {
-      try {
-        const q = await api.quote(t);
-        if (active) { setQuotes((prev) => ({ ...prev, [t]: q })); checkAlert(t, q); }
-      } catch {
-        if (active) setQuotes((prev) => ({ ...prev, [t]: null }));
-      }
+    tickers.forEach((t, i) => {
+      const q = results[i]?.data;
+      if (q) checkAlert(t, q);
     });
-    return () => { active = false; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tickersKey, refreshNonce]);
+  }, [tickersKey, quotesStamp]);
 
   function add() {
     const sym = input.trim().toUpperCase();
@@ -106,7 +106,6 @@ export function Watchlist({ onSelect }: Props) {
   function remove(sym: string) {
     const next = tickers.filter((t) => t !== sym);
     setTickers(next);
-    setQuotes((prev) => { const r = { ...prev }; delete r[sym]; return r; });
     const na = { ...alerts }; delete na[sym]; persistAlerts(na);
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); } catch {}
   }

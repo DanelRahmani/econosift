@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { apiQuery } from "@/lib/queries";
 import { useRouter } from "next/navigation";
-import { api } from "@/lib/api";
 import { rankCommands, STATIC_COMMANDS, type CommandGroup, type CommandItem } from "@/lib/commandRegistry";
 
 /** Fired by the navbar button (and anything else) to open the palette. */
@@ -20,18 +21,13 @@ export function CommandPalette() {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
-  const [tickers, setTickers] = useState<CommandItem[]>([]);
-  const [wiki, setWiki] = useState<CommandItem[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
-  const requestId = useRef(0);
   const openRef = useRef(open);
   openRef.current = open;
 
   const close = useCallback(() => {
     setOpen(false);
     setQuery("");
-    setTickers([]);
-    setWiki([]);
     setActive(0);
   }, []);
 
@@ -63,43 +59,36 @@ export function CommandPalette() {
     if (open) setTimeout(() => inputRef.current?.focus(), 0);
   }, [open]);
 
-  // Live ticker and Wiki results, debounced; a slower stale response never overwrites a newer one.
+  // Live ticker and Wiki results, debounced; react-query keys by the query, so a slower stale
+  // response never overwrites a newer one.
+  const [debounced, setDebounced] = useState("");
   useEffect(() => {
-    const q = query.trim();
-    if (!open || !q) {
-      setTickers([]);
-      setWiki([]);
-      return;
-    }
-    const id = ++requestId.current;
-    const t = setTimeout(() => {
-      api.search(q).then((r) => {
-        if (id !== requestId.current) return;
-        setTickers((r.results ?? []).slice(0, 5).map((s) => ({
-          id: `ticker:${s.symbol}`,
-          group: "Tickers" as const,
-          label: `Open ${s.symbol} in Markets`,
-          hint: [s.name, s.exchange].filter(Boolean).join(" · "),
-          href: `/markets?t=${encodeURIComponent(s.symbol)}`,
-        })));
-      }).catch(() => { if (id === requestId.current) setTickers([]); });
-      if (q.length >= 2) {
-        api.wikiTerms(q).then((r) => {
-          if (id !== requestId.current) return;
-          setWiki((r.terms ?? []).slice(0, 5).map((w) => ({
-            id: `wiki:${w.slug}`,
-            group: "Wiki" as const,
-            label: w.term,
-            hint: "Wiki",
-            href: `/wiki?q=${encodeURIComponent(w.term)}&term=${encodeURIComponent(w.slug)}`,
-          })));
-        }).catch(() => { if (id === requestId.current) setWiki([]); });
-      } else {
-        setWiki([]);
-      }
-    }, 250);
+    const t = setTimeout(() => setDebounced(query.trim()), 250);
     return () => clearTimeout(t);
-  }, [query, open]);
+  }, [query]);
+  const live = open && !!query.trim() && !!debounced;
+  const { data: searchData } = useQuery({ ...apiQuery("search", debounced), enabled: live });
+  const { data: wikiData } = useQuery({ ...apiQuery("wikiTerms", debounced), enabled: live && debounced.length >= 2 });
+  const tickers = useMemo<CommandItem[]>(
+    () => (live && searchData ? (searchData.results ?? []).slice(0, 5).map((s) => ({
+      id: `ticker:${s.symbol}`,
+      group: "Tickers" as const,
+      label: `Open ${s.symbol} in Markets`,
+      hint: [s.name, s.exchange].filter(Boolean).join(" Â· "),
+      href: `/markets?t=${encodeURIComponent(s.symbol)}`,
+    })) : []),
+    [live, searchData],
+  );
+  const wiki = useMemo<CommandItem[]>(
+    () => (live && debounced.length >= 2 && wikiData ? (wikiData.terms ?? []).slice(0, 5).map((w) => ({
+      id: `wiki:${w.slug}`,
+      group: "Wiki" as const,
+      label: w.term,
+      hint: "Wiki",
+      href: `/wiki?q=${encodeURIComponent(w.term)}&term=${encodeURIComponent(w.slug)}`,
+    })) : []),
+    [live, debounced, wikiData],
+  );
 
   // Groups are ordered by their best local match (so "inflation" leads with the Macro › Inflation
   // tab, not the Macro page that only matches a keyword), then live tickers and Wiki terms.

@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
-import { useRefreshNonce } from "@/lib/refresh";
-import type { SectorsResponse } from "@/lib/types";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { apiQuery } from "@/lib/queries";
 import { Card, Skeleton } from "@/components/ui";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
@@ -21,20 +20,8 @@ function heatColor(pct: number | null): string {
 
 export function SectorHeatmap() {
   const [period, setPeriod] = useState("1mo");
-  const [data, setData] = useState<SectorsResponse | null>(null);
-  const [loading, setLoading] = useState(false);
+  const { data = null, isFetching: loading } = useQuery(apiQuery("sectors", period));
   const scope = useSourceScope(provOf(data));
-
-  const refreshNonce = useRefreshNonce(); // re-fetch on the page's Refresh (P1-20)
-  useEffect(() => {
-    let active = true;
-    setLoading(true);
-    api.sectors(period)
-      .then((r) => active && setData(r))
-      .catch(() => active && setData(null))
-      .finally(() => active && setLoading(false));
-    return () => { active = false; };
-  }, [period, refreshNonce]);
 
   return (
     <Card {...scope}>

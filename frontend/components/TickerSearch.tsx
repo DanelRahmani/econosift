@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { api } from "@/lib/api";
+import { useQuery } from "@tanstack/react-query";
+import { apiQuery } from "@/lib/queries";
 import type { SearchResult } from "@/lib/types";
 
 interface Props {
@@ -12,9 +13,7 @@ interface Props {
 
 export function TickerSearch({ value, onChange, placeholder = "Search ticker (AAPL, MSFT)…" }: Props) {
   const [q, setQ] = useState(value);
-  const [results, setResults] = useState<SearchResult[]>([]);
   const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
   const boxRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -24,25 +23,16 @@ export function TickerSearch({ value, onChange, placeholder = "Search ticker (AA
   }, [value]);
 
   // Debounced search
+  const [debounced, setDebounced] = useState("");
   useEffect(() => {
-    if (!q.trim()) {
-      setResults([]);
-      return;
-    }
-    const t = setTimeout(async () => {
-      setLoading(true);
-      try {
-        const r = await api.search(q.trim());
-        setResults(r.results);
-        setOpen(true);
-      } catch {
-        setResults([]);
-      } finally {
-        setLoading(false);
-      }
-    }, 300);
+    const t = setTimeout(() => setDebounced(q.trim()), 300);
     return () => clearTimeout(t);
   }, [q]);
+  const { data: searchData, isFetching: loading } = useQuery({ ...apiQuery("search", debounced), enabled: !!debounced });
+  const results: SearchResult[] = (q.trim() && searchData?.results) || [];
+  useEffect(() => {
+    if (searchData) setOpen(true);
+  }, [searchData]);
 
   // Click outside to close
   useEffect(() => {
@@ -59,7 +49,6 @@ export function TickerSearch({ value, onChange, placeholder = "Search ticker (AA
     const s = symbol.toUpperCase();
     onChange(s);
     setQ(s);
-    setResults([]);
     setOpen(false);
     inputRef.current?.blur();
   }

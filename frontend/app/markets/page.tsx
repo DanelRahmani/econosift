@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, Suspense, lazy, useMemo } from "react";
+import { apiQuery } from "@/lib/queries";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
@@ -30,7 +31,6 @@ import type {
   TreemapResponse, SectorReturnsResponse,
   SectorFundamentalsResponse, SectorRotationResponse, SectorDrillResponse,
 } from "@/lib/types";
-import { useRefreshNonce } from "@/lib/refresh";
 import { useKeyboardShortcuts, tabKeys, tabStepKeys, periodKeys } from "@/lib/useKeyboardShortcuts";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
@@ -81,10 +81,15 @@ function MarketsPageInner() {
   const [showWatchlist, setShowWatchlist] = useState(false);
 
   // Sector state
-  const [secReturns, setSecReturns] = useState<SectorReturnsResponse | null>(null);
-  const [secFundamentals, setSecFundamentals] = useState<SectorFundamentalsResponse | null>(null);
-  const [secRotation, setSecRotation] = useState<SectorRotationResponse | null>(null);
-  const [secLoading, setSecLoading] = useState(false);
+  // Sector state
+  const onSectors = tab === "Sectors";
+  const secReturnsQ = useQuery({ ...apiQuery("sectorReturns"), enabled: onSectors });
+  const secFundamentalsQ = useQuery({ ...apiQuery("sectorFundamentals"), enabled: onSectors });
+  const secRotationQ = useQuery({ ...apiQuery("sectorRotation"), enabled: onSectors });
+  const secReturns = secReturnsQ.data ?? null;
+  const secFundamentals = secFundamentalsQ.data ?? null;
+  const secRotation = secRotationQ.data ?? null;
+  const secLoading = secReturnsQ.isLoading || secFundamentalsQ.isLoading || secRotationQ.isLoading;
   const [secPeriod, setSecPeriod] = useState<keyof SectorReturnsResponse["periods"]>("1d");
   // One scope per card: the returns response feeds two cards.
   const secKpiScope = useSourceScope(provOf(secReturns));
@@ -92,32 +97,12 @@ function MarketsPageInner() {
   const secRotationScope = useSourceScope(provOf(secRotation));
   const secFundScope = useSourceScope(provOf(secFundamentals));
   const [selectedSector, setSelectedSector] = useState<string | null>(null);
-  const [drillData, setDrillData] = useState<SectorDrillResponse | null>(null);
+  const { data: drillQueryData, isLoading: drillLoading } = useQuery({
+    ...apiQuery("sectorDrill", selectedSector ?? ""),
+    enabled: !!selectedSector,
+  });
+  const drillData = selectedSector ? drillQueryData ?? null : null;
   const drillScope = useSourceScope(provOf(drillData));
-  const [drillLoading, setDrillLoading] = useState(false);
-
-  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
-  useEffect(() => {
-    if (tab !== "Sectors") return;
-    let alive = true;
-    setSecLoading(true);
-    Promise.all([api.sectorReturns(), api.sectorFundamentals(), api.sectorRotation()])
-      .then(([r, f, rot]) => { if (alive) { setSecReturns(r); setSecFundamentals(f); setSecRotation(rot); } })
-      .catch(() => {})
-      .finally(() => { if (alive) setSecLoading(false); });
-    return () => { alive = false; };
-  }, [tab, refreshNonce]);
-
-  useEffect(() => {
-    if (!selectedSector) { setDrillData(null); return; }
-    let alive = true;
-    setDrillLoading(true);
-    api.sectorDrill(selectedSector)
-      .then((d) => { if (alive) setDrillData(d); })
-      .catch(() => { if (alive) setDrillData(null); })
-      .finally(() => { if (alive) setDrillLoading(false); });
-    return () => { alive = false; };
-  }, [selectedSector, refreshNonce]);
 
   // Treemap state
   const [tmIndex, setTmIndex] = useState<"sp500" | "ndx" | "dow">("sp500");
@@ -134,20 +119,11 @@ function MarketsPageInner() {
           ? periodKeys(PERIODS, period, (p) => setUrlState({ p }))
           : {}),
   });
-  const [tmData, setTmData] = useState<TreemapResponse | null>(null);
-  const [tmLoading, setTmLoading] = useState(false);
+  const { data: tmData = null, isLoading: tmLoading } = useQuery({
+    ...apiQuery("treemap", tmIndex, tmPeriod),
+    enabled: tab === "Treemap",
+  });
   const tmScope = useSourceScope(provOf(tmData));
-
-  useEffect(() => {
-    if (tab !== "Treemap") return;
-    let alive = true;
-    setTmLoading(true);
-    api.treemap(tmIndex, tmPeriod)
-      .then((r) => { if (alive) setTmData(r); })
-      .catch(() => {})
-      .finally(() => { if (alive) setTmLoading(false); });
-    return () => { alive = false; };
-  }, [tab, tmIndex, tmPeriod, refreshNonce]);
 
   // Redirect old deprecated tabs
   useEffect(() => {
@@ -165,16 +141,12 @@ function MarketsPageInner() {
   }, []);
 
   const { data: prices, isLoading: pricesLoading } = useQuery({
-    queryKey: ["market-prices", tickersKey, period, benchmark ?? ""],
-    queryFn: () => api.prices(tickersKey, period, benchmark || undefined),
-    staleTime: 5 * 60 * 1000,
+    ...apiQuery("prices", tickersKey, period, benchmark || undefined),
     enabled: tickers.length > 0,
   });
 
   const { data: risk, isLoading: riskLoading } = useQuery({
-    queryKey: ["market-risk", tickersKey, period, benchmark ?? ""],
-    queryFn: () => api.risk(tickersKey, period, undefined, benchmark || undefined),
-    staleTime: 5 * 60 * 1000,
+    ...apiQuery("risk", tickersKey, period, undefined, benchmark || undefined),
     enabled: tickers.length > 0,
   });
 

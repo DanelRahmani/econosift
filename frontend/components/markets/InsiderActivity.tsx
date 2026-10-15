@@ -1,11 +1,10 @@
 "use client";
-import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
-import type { Form4Response, InsiderTransaction } from "@/lib/types";
+import { useQuery } from "@tanstack/react-query";
+import { apiQuery } from "@/lib/queries";
+import type { InsiderTransaction } from "@/lib/types";
 import { Card } from "@/components/ui";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
-import { useRefreshNonce } from "@/lib/refresh";
 
 function fmt(v: number | null): string {
   if (v == null) return "—";
@@ -35,25 +34,9 @@ function TypeBadge({ type }: { type: "Buy" | "Sell" }) {
 }
 
 export function InsiderActivity({ ticker }: { ticker: string }) {
-  const [data, setData] = useState<Form4Response | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data = null, isLoading: loading, isError } = useQuery({ ...apiQuery("marketForm4", ticker), enabled: !!ticker });
+  const error = isError ? "Failed to load insider transactions" : data?.error ?? null;
   const scope = useSourceScope(provOf(data));
-
-  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
-  useEffect(() => {
-    if (!ticker) return;
-    setLoading(true);
-    setError(null);
-    api
-      .marketForm4(ticker)
-      .then((d) => {
-        if (d.error) setError(d.error);
-        setData(d);
-      })
-      .catch(() => setError("Failed to load insider transactions"))
-      .finally(() => setLoading(false));
-  }, [ticker, refreshNonce]);
 
   return (
     <Card className="p-4" {...scope} data-prov-ctx={ticker}>

@@ -1,32 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
+import { useQueries } from "@tanstack/react-query";
+import { apiQuery } from "@/lib/queries";
 import type { Quote } from "@/lib/types";
 import { Card, Skeleton } from "@/components/ui";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
 import { fmtPct, fmtPrice, currencySymbol } from "@/lib/format";
-import { useRefreshNonce } from "@/lib/refresh";
 
 export function QuoteCards({ tickers }: { tickers: string[] }) {
-  const [quotes, setQuotes] = useState<Record<string, Quote | null>>({});
-
-  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
-  useEffect(() => {
-    let active = true;
-    tickers.forEach(async (t) => {
-      try {
-        const q = await api.quote(t);
-        if (active) setQuotes((prev) => ({ ...prev, [t]: q }));
-      } catch {
-        if (active) setQuotes((prev) => ({ ...prev, [t]: null }));
-      }
-    });
-    return () => {
-      active = false;
-    };
-  }, [tickers, refreshNonce]);
+  const results = useQueries({ queries: tickers.map((t) => apiQuery("quote", t)) });
+  const quotes: Record<string, Quote | null> = {};
+  tickers.forEach((t, i) => {
+    const r = results[i];
+    if (r.data) quotes[t] = r.data;
+    else if (r.isError) quotes[t] = null;
+  });
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">

@@ -1,11 +1,12 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { apiQuery } from "@/lib/queries";
 import { api } from "@/lib/api";
-import type { Holders13FResponse, Holder13F } from "@/lib/types";
+import type { Holder13F } from "@/lib/types";
 import { Card } from "@/components/ui";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
-import { useRefreshNonce } from "@/lib/refresh";
 
 function fmt(v: number | null, decimals = 0): string {
   if (v == null) return "—";
@@ -35,47 +36,25 @@ function ChangeCell({ v, pct }: { v: number | null; pct: number | null }) {
 }
 
 export function InstitutionalHolders({ ticker }: { ticker: string }) {
-  const [data, setData] = useState<Holders13FResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [loadingPrev, setLoadingPrev] = useState(false);
   const [prevError, setPrevError] = useState<string | null>(null);
+  // While the previous quarter downloads, check back every 15 s (the table stays on screen).
+  const { data = null, isLoading: loading, isError, refetch } = useQuery({
+    ...apiQuery("market13f", ticker),
+    enabled: !!ticker,
+    refetchInterval: (q) => (q.state.data?.change?.loading ? 15_000 : false),
+  });
+  const error = isError ? "Failed to load institutional holders" : data?.error ?? null;
   const scope = useSourceScope(provOf(data));
 
-  // `silent` re-fetches (polling the previous-quarter download) keep the table on screen.
-  const load = useCallback((silent: boolean) => {
-    if (!silent) setLoading(true);
-    setError(null);
-    api
-      .market13f(ticker)
-      .then((d) => {
-        setError(d.error ?? null);
-        setData(d);
-      })
-      .catch(() => setError("Failed to load institutional holders"))
-      .finally(() => setLoading(false));
-  }, [ticker]);
-
-  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
-  useEffect(() => {
-    if (ticker) load(false);
-  }, [load, refreshNonce]);
-
-  // While the previous quarter downloads, check back every 15 s.
-  useEffect(() => {
-    if (!data?.change?.loading) return;
-    const id = setTimeout(() => load(true), 15_000);
-    return () => clearTimeout(id);
-  }, [data, load]);
-
-  // 🟡 the ~100 MB download runs only when asked (P2-37).
+  // ðŸŸ¡ the ~100 MB download runs only when asked (P2-37).
   async function loadPrevious() {
     setLoadingPrev(true);
     setPrevError(null);
     try {
       const r = await api.market13fLoadPrevious();
       if (r.error) setPrevError(r.error);
-      else load(true);
+      else void refetch();
     } catch {
       setPrevError("Could not start the download");
     } finally {

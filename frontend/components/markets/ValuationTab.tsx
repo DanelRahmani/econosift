@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
+import { useQuery } from "@tanstack/react-query";
+import { apiQuery } from "@/lib/queries";
 import type { CountryRate } from "@/lib/types";
 import { Card } from "@/components/ui";
 import { useSourceScope } from "@/components/provenance/SourceScope";
@@ -22,18 +23,14 @@ export function ValuationTab({
   period?: string;
   onNavigateTab?: (tab: string) => void;
 }) {
-  const [countryRates, setCountryRates] = useState<CountryRate[]>([]);
   const [selectedCountry, setSelectedCountry] = useState("");
   const [customWacc, setCustomWacc] = useState<number | null>(null);
   const [showInfo, setShowInfo] = useState(false);
-  const [ratesProv, setRatesProv] = useState<Provenance | undefined>(undefined);
-  const ratesScope = useSourceScope(ratesProv);
 
-  useEffect(() => {
-    api.riskFreeRates().then((r) => {
-      if (r.rates?.length) { setCountryRates(r.rates); setRatesProv(provOf(r)); }
-    }).catch(() => {});
-  }, []);
+  const { data: ratesData } = useQuery(apiQuery("riskFreeRates"));
+  const countryRates: CountryRate[] = ratesData?.rates ?? [];
+  const ratesProv: Provenance | undefined = ratesData?.rates?.length ? provOf(ratesData) : undefined;
+  const ratesScope = useSourceScope(ratesProv);
 
   useEffect(() => {
     setSelectedCountry("");

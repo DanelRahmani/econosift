@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
+import { useQuery } from "@tanstack/react-query";
+import { apiQuery } from "@/lib/queries";
 import type { RatiosResponse, RatioGroup } from "@/lib/types";
 import { Card, Skeleton, ZScoreBadge } from "@/components/ui";
 import { useSourceScope } from "@/components/provenance/SourceScope";
@@ -12,7 +13,6 @@ import {
   RATIO_GUIDE, ratioTone, ratioRanges, TONE_TEXT, TONE_DOT,
   RISK_METRIC_GUIDES, type RiskMetricGuide,
 } from "@/lib/ratioGuide";
-import { useRefreshNonce } from "@/lib/refresh";
 
 const PCT_KEYS = new Set([
   "grossMargin", "operatingMargin", "netMargin", "ebitdaMargin",
@@ -317,8 +317,7 @@ function LegendCard() {
 
 export function RatiosTab({ tickers }: { tickers: string[] }) {
   const [selectedTicker, setSelectedTicker] = useState(tickers[0] ?? "");
-  const [data, setData] = useState<RatiosResponse | null>(null);
-  const [loading, setLoading] = useState(false);
+  const { data = null, isLoading: loading } = useQuery({ ...apiQuery("ratios", selectedTicker), enabled: !!selectedTicker });
   const scope = useSourceScope(provOf(data));
 
   useEffect(() => {
@@ -327,19 +326,6 @@ export function RatiosTab({ tickers }: { tickers: string[] }) {
     }
   }, [tickers, selectedTicker]);
 
-  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
-  useEffect(() => {
-    if (!selectedTicker) return;
-    let active = true;
-    setLoading(true);
-    api.ratios(selectedTicker)
-      .then((r) => active && setData(r))
-      .catch(() => active && setData(null))
-      .finally(() => active && setLoading(false));
-    return () => {
-      active = false;
-    };
-  }, [selectedTicker, refreshNonce]);
 
   return (
     <div className="space-y-4" {...scope} data-prov-ctx={selectedTicker}>
