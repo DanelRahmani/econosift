@@ -10,6 +10,7 @@ import threading
 import time
 import weakref
 from datetime import datetime, timezone
+import pandas as pd
 from cachetools import TTLCache
 
 log = logging.getLogger(__name__)
@@ -373,6 +374,10 @@ def _is_empty_result(result) -> bool:
     if result is None:
         return True
     if isinstance(result, (dict, list, tuple, set, str)) and len(result) == 0:
+        return True
+    # A failed yf.download returns an empty DataFrame; caching it blanked
+    # treemap/breadth/sector/risk for the whole TTL.
+    if isinstance(result, (pd.DataFrame, pd.Series)) and result.empty:
         return True
     if isinstance(result, dict) and (result.get("error") or result.get("status") == "unavailable"):
         return True
