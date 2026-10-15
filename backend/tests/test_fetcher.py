@@ -167,3 +167,11 @@ def test_admin_health_reports_store_progress(client):
     body = client.get("/api/admin/health").json()
     assert body["store"]["backfill"] == {"total": 0, "done": 0}
     assert body["store"]["queue"]["pending"] == 1
+
+
+def test_status_lists_request_sources_not_stored_series():
+    store.replace_series("zz_status", [("US", "2020", 1.0)], "Test")
+    fetcher._mark_success("constituents")
+    assert [s["source"] for s in fetcher.status()["sources"]] == ["constituents"]
+    with store.connect() as conn:
+        conn.execute("DELETE FROM macro_series WHERE series = 'zz_status'")

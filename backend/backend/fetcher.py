@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 
 MAX_ATTEMPTS = 3        # a task that failed this often stays in the queue as failed
 IDLE_WAIT = 5.0         # seconds to sleep when the queue is empty
+HEALTH_EVERY = 60.0     # seconds between request-log updates while idle (pages call Yahoo too)
 UNIVERSE_MAX_AGE = timedelta(days=7)
 INDEXES = ("sp500", "ndx", "dow")
 
@@ -311,9 +312,13 @@ def _loop(start_delay: float) -> None:
     universe_at = _last_success("constituents")
     if universe_at is None or datetime.now(timezone.utc) - universe_at > UNIVERSE_MAX_AGE:
         queue_universe()
+    logged = time.monotonic()
     while not _stop.is_set():
         try:
             busy = run_one()
+            if not busy and time.monotonic() - logged > HEALTH_EVERY:
+                record_source_health()
+                logged = time.monotonic()
         except Exception as exc:  # the DB itself failed; don't spin
             logger.error("fetcher loop error: %s", exc)
             busy = False
@@ -351,7 +356,7 @@ def status() -> dict:
         health = [dict(source=r[0], day=r[1], requestsToday=r[2], lastSuccess=r[3],
                        lastError=r[4], openUntil=r[5]) for r in conn.execute(
             "SELECT source, day, requests_today, last_success, last_error, open_until "
-            "FROM source_health ORDER BY source")]
+            "FROM source_health WHERE source NOT LIKE 'series:%' ORDER BY source")]
     return {
         "running": _thread is not None and _thread.is_alive(),
         "current": _current,
