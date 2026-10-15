@@ -209,7 +209,7 @@ one item per commit and push after each one. Open a PR to `DEV` only when the ow
 | **65.0 — Verify sources live** | Before writing code, run quick throwaway checks from the owner's machine against every endpoint in §7. Don't commit probe scripts or add tests for this. Record the results (works / limits / response shape) in a new §8 of this file, and adjust the plan where something doesn't work | Every source in §3 is marked ✅ verified or ❌ dropped, with a replacement |
 | **65 — Stop the bleeding** | Empty-DataFrame cache guard; fix the ~25 blocking `async` routes; nginx: no retry on timeout; frontend `retry: 1` + request timeout; stagger startup (no screener warm-up at boot); a global Yahoo rate limiter + circuit breaker wrapped around the existing yfinance calls | No app-wide freezes; no Yahoo 429 storms in the logs on a cold start; blank panels show an error instead |
 | **66 — One database + fetcher** ✅ | Consolidated `econosift.db` with the schema above, built fresh with no data migration; fetcher thread; bulk 15-min snapshot via `yf.screen` (decided in §8.1, no spike needed); one-time backfill with progress in Admin; `store.prices()` helper | Restart is instant and warm; one Yahoo request log shows ≤ a few hundred calls/day |
-| **67 — Read from the store** | Move treemap, breadth, sector, screener, risk, portfolio, technicals, markets to DB reads; `asOf` on responses; remove the old per-ticker paths and the now-unused cache code | **Zero** Yahoo calls on any page open for daily/snapshot data |
+| **67 — Read from the store** ✅ | Move treemap, breadth, sector, screener, risk, portfolio, technicals, markets to DB reads; `asOf` on responses; remove the old per-ticker paths and the now-unused cache code | **Zero** Yahoo calls on any page open for daily/snapshot data |
 | **68 — SEC fundamentals** | SEC companyfacts backfill + nightly frames change-detection → `fundamental`, with the §8.3 concept fallbacks; screener/valuation/ratios read from it; weekly rotating Yahoo refresh for estimates; optional free-key fallbacks in Admin | Screener refresh makes no per-ticker `.info` calls |
 | **69 — Frontend data layer** | `useQuery` migration, `asOf`/pending UI, per-panel error boundaries, lazy tabs, mocked e2e | Tab switches don't refetch; CI e2e green |
 | **70 — Backtesting v2** | Store-backed point-in-time backtests, strategy plugins, sandboxed runner, walk-forward | A user `.py` strategy uploads and backtests on PIT S&P 500 data |
@@ -375,3 +375,14 @@ decision holds. `pyarrow` stays in `requirements.txt` because edgartools needs i
   and treemap still over 120 s cold). Phase 67 moves them to the store.
 - Found and fixed: the Fama-French bulk parser stored 12 annual rows misdated `0020-01…12` instead of
   the ~1,200 monthly rows. Readers had always filtered them out and used the live API.
+
+### 8.8 Phase 67 gate (2026-10-15, Docker)
+
+- Cold cache, all 13 measured endpoints and 6 pages: **0 Yahoo chart and 0 API requests** (Phase 65: ~4,100).
+  Cold p50 0.51 s, p95 3.8 s (risk 3.8 s, breadth 3.3 s, Fear & Greed 3.0 s, movers 2.6 s, treemap 1.3 s);
+  warm p95 0.31 s. The §0 target (p95 < 300 ms for any page call from the DB) holds warm, not yet cold: the
+  slow cold endpoints compute over 500 symbols x 2 years in pandas, and a snapshot clears them every 15 min.
+- Not moved yet, by plan: company fundamentals (`Ticker.info`, statements) behind valuation, sector ETF
+  assets, corporate health, dividends, DuPont, snowflake (Phase 68); options chains stay on demand.
+- Still calling Yahoo outside the fetcher thread: the FX-rate job, the daily put/call and IV30 snapshot
+  job, and the nightly screener refresh (scheduled, after the close, never on a page open).
