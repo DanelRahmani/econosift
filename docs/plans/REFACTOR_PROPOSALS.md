@@ -210,7 +210,7 @@ one item per commit and push after each one. Open a PR to `DEV` only when the ow
 | **65 — Stop the bleeding** | Empty-DataFrame cache guard; fix the ~25 blocking `async` routes; nginx: no retry on timeout; frontend `retry: 1` + request timeout; stagger startup (no screener warm-up at boot); a global Yahoo rate limiter + circuit breaker wrapped around the existing yfinance calls | No app-wide freezes; no Yahoo 429 storms in the logs on a cold start; blank panels show an error instead |
 | **66 — One database + fetcher** ✅ | Consolidated `econosift.db` with the schema above, built fresh with no data migration; fetcher thread; bulk 15-min snapshot via `yf.screen` (decided in §8.1, no spike needed); one-time backfill with progress in Admin; `store.prices()` helper | Restart is instant and warm; one Yahoo request log shows ≤ a few hundred calls/day |
 | **67 — Read from the store** ✅ | Move treemap, breadth, sector, screener, risk, portfolio, technicals, markets to DB reads; `asOf` on responses; remove the old per-ticker paths and the now-unused cache code | **Zero** Yahoo calls on any page open for daily/snapshot data |
-| **68 — SEC fundamentals** | SEC companyfacts backfill + nightly frames change-detection → `fundamental`, with the §8.3 concept fallbacks; screener/valuation/ratios read from it; weekly rotating Yahoo refresh for estimates; optional free-key fallbacks in Admin | Screener refresh makes no per-ticker `.info` calls |
+| **68 — SEC fundamentals** ✅ | SEC companyfacts backfill + nightly frames change-detection → `fundamental`, with the §8.3 concept fallbacks; screener/valuation/ratios read from it; weekly rotating Yahoo refresh for estimates; optional free-key fallbacks in Admin | Screener refresh makes no per-ticker `.info` calls |
 | **69 — Frontend data layer** | `useQuery` migration, `asOf`/pending UI, per-panel error boundaries, lazy tabs, mocked e2e | Tab switches don't refetch; CI e2e green |
 | **70 — Backtesting v2** | Store-backed point-in-time backtests, strategy plugins, sandboxed runner, walk-forward | A user `.py` strategy uploads and backtests on PIT S&P 500 data |
 
@@ -386,3 +386,39 @@ decision holds. `pyarrow` stays in `requirements.txt` because edgartools needs i
   assets, corporate health, dividends, DuPont, snowflake (Phase 68); options chains stay on demand.
 - Still calling Yahoo outside the fetcher thread: the FX-rate job, the daily put/call and IV30 snapshot
   job, and the nightly screener refresh (scheduled, after the close, never on a page open).
+
+### 8.9 Phase 68 gate (2026-10-15, Docker)
+
+- **SEC backfill:** 548 tracked symbols mapped to a CIK from `company_tickers.json`; companyfacts for
+  **543 of 545 companies in 5 min 30 s with 550 SEC requests** (1 ticker map + 1 per company + 6 retries),
+  0 throttling at 5/s. ~1.6 companies/s, bound by parsing and writing, not by the rate limit. The two misses
+  are SPY (an ETF) and VYLR (no usable XBRL facts yet). 1.16 M `fundamental` rows and 49 k filings;
+  `econosift.db` grew from ~450 MB to ~680 MB.
+- **Screener refresh** (S&P 500, 501 rows): **0 Yahoo requests, 0 `Ticker` objects**. That meets the
+  phase's "done when".
+- **Page opens:** 0 Yahoo chart, 0 Yahoo API and 0 SEC requests across the measured fundamentals endpoints,
+  cold and warm. Cold, each endpoint alone: screener 0.16 s, valuation/full AAPL 3.9 s, DCF 0.04 s,
+  ratios 2.0 s, corporate health 0.4 s, earnings quality (Dow) 1.0 s, dividends 3.0 s, Snowflake 2.8 s,
+  sector fundamentals 0.09 s, **sector DuPont 15.3 s** (500 companies). Warm p50 0.012 s, p95 0.055 s, max 0.14 s.
+- **Found and fixed in the gate:**
+  - A line a company stopped tagging kept its last value as "current" (ABT gross profit from 2019, AOS
+    shares from 2015). Figures that end long before the company's newest period are now ignored.
+  - SEC's share count was on another basis than the quoted price for 15 of 517 (a split since the
+    filing, one class of several, ADS vs ordinary: APH, MNST, GOOG, PDD). **Plan deviation from §8.3:**
+    when SEC and the snapshot differ by more than 10%, the snapshot's count is used.
+  - Python's sqlite3 releases the GIL on every row, so the old 10–20-thread pools (earnings quality,
+    DuPont, sector ETFs) convoyed: 0.12 s on one thread became 11 s on ten, and they slowed every other
+    request too. These store-only loops now run serially.
+  - A bundle took ~86 ms; it now takes ~25 ms.
+- **Yahoo-only fields** (estimates, targets, Yahoo sector names, short interest, ETF statistics): weekly
+  rotation of ~75 symbols/day plus on demand. A fresh install has them only after the rotation reaches a
+  symbol; until then SEC + snapshot cover the statement-based keys, sector names map from GICS, and beta
+  is computed from stored prices.
+- **Item 7:** no free-key fundamentals fallback exists in §3 (both rows say "—"), so Admin gained nothing.
+- **Still calling Yahoo outside the fetcher** (not in this phase's items): options chains (on demand, by
+  plan); the **Calendar page's per-ticker fan-out** (`earnings_dates` + `.info` for ~500 members on page
+  open, missed in the Phase 67 notes); event-study earnings dates; the Markets news/events tabs.
+- **Open performance item:** 500-company passes (DuPont, S&P 500 earnings quality) still cost ~15–19 s
+  cold. Proposed fix: have the fetcher materialise one summary row per company after each facts/snapshot
+  update, so these pages read 500 rows instead of ~750 k.
+- Tests: 1,396 backend; tsc clean; Playwright 48/48 after rerunning 3 cold-start timeouts (yield/macro).
