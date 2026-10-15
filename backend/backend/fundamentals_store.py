@@ -18,7 +18,8 @@ records where each overridden key came from, for provenance.
 """
 from __future__ import annotations
 
-from datetime import date
+import json
+from datetime import date, datetime, timezone
 
 import numpy as np
 import pandas as pd
@@ -208,6 +209,66 @@ def _latest_col(df: pd.DataFrame | None) -> dict:
         return {}
     col = df.columns[0]
     return {str(k): (None if pd.isna(v) else float(v)) for k, v in df[col].items()}
+
+
+# ---------------------------------------------------------------------------
+# Per-company summaries (the 500-company pages)
+# ---------------------------------------------------------------------------
+
+SUMMARY_COLUMNS = 2     # latest and prior fiscal year: all DuPont and earnings quality read
+STATEMENT_NAMES = ("financials", "balance_sheet", "cashflow")
+
+
+def summary(symbol: str) -> dict | None:
+    """The last two annual columns of each statement, JSON-ready; None with no statements."""
+    st = statements(symbol)
+    if st["origin"] is None:
+        return None
+    out: dict = {"origin": st["origin"]}
+    for name in STATEMENT_NAMES:
+        df = st.get(f"{name}_df")
+        if df is None or df.empty:
+            continue
+        part = df.iloc[:, :SUMMARY_COLUMNS]
+        out[name] = {"ends": [c.date().isoformat() for c in part.columns],
+                     "rows": {str(k): [None if v != v else float(v) for v in vals]
+                              for k, vals in zip(part.index, part.values.tolist())}}
+    return out
+
+
+def store_summaries(symbols) -> int:
+    """Rebuild and store the summaries of ``symbols`` (fetcher thread, after their facts change)."""
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    rows = [dict(symbol=s, summary=json.dumps(sm), built_at=now)
+            for s in dict.fromkeys(symbols) if (sm := summary(s))]
+    return store.upsert("fundamental_summary", rows, ("symbol",))
+
+
+def _summary_frames(sm: dict) -> dict:
+    out: dict = {"origin": sm.get("origin")}
+    for name in STATEMENT_NAMES:
+        part = sm.get(name)
+        out[f"{name}_df"] = (pd.DataFrame(list(part["rows"].values()), index=list(part["rows"]),
+                                          columns=pd.DatetimeIndex(part["ends"]), dtype=float)
+                             if part and part["rows"] else None)
+    return out
+
+
+def annual_frames(symbols) -> dict[str, dict]:
+    """symbol -> {financials_df, balance_sheet_df, cashflow_df} (latest two fiscal years) for many
+    companies from one query. A company without a stored summary yet is built from its facts."""
+    syms = list(dict.fromkeys(symbols))
+    if not syms:
+        return {}
+    with store.connect() as conn:
+        stored = dict(conn.execute(f"SELECT symbol, summary FROM fundamental_summary "
+                                   f"WHERE symbol IN ({', '.join('?' * len(syms))})", syms).fetchall())
+    out = {}
+    for s in syms:
+        sm = json.loads(stored[s]) if s in stored else summary(s)
+        if sm:
+            out[s] = _summary_frames(sm)
+    return out
 
 
 # ---------------------------------------------------------------------------

@@ -25,11 +25,12 @@ def _clean(v) -> float | None:
         return None
 
 
-def _fetch_one(ticker: str, sector: str) -> dict | None:
-    """DuPont components for a single ticker from its stored annual statements."""
+def _fetch_one(ticker: str, sector: str, bundle: dict | None) -> dict | None:
+    """DuPont components for a single ticker from its stored annual statements
+    (``bundle``: its :func:`fundamentals_store.annual_frames` entry)."""
     try:
-        from . import yfinance_service as yfs
-        bundle = yfs.get_info(ticker)  # stored SEC/Yahoo statements, no Yahoo call
+        if not bundle:
+            return None
         # Income statement — get most recent annual row
         fin = bundle.get("financials_df")
         if fin is None or fin.empty:
@@ -90,9 +91,12 @@ def get_sector_dupont() -> dict:
 
     # Serial on purpose: these are store reads now (Phase 68), and sqlite3 hands the GIL
     # back and forth on every row, so threads made them ~20x slower than one loop.
+    # One query for every company's last two fiscal years (the stored per-company summaries).
+    from .. import fundamentals_store
+    frames = fundamentals_store.annual_frames([t for t, _ in all_tickers])
     for t, s in all_tickers:
         try:
-            row = _fetch_one(t, s)
+            row = _fetch_one(t, s, frames.get(t))
             if row is not None:
                 all_rows.append(row)
         except Exception:

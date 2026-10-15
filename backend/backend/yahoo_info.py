@@ -115,6 +115,9 @@ def fetch(symbol: str) -> int:
     if info.get("quoteType") == "EQUITY" and not has_sec_facts(symbol):
         stmt = statement_rows(symbol, t, info.get("financialCurrency") or info.get("currency"), now[:10])
         rows = store.replace_fundamentals([symbol], stmt, "yahoo")
+        if rows:
+            from . import fundamentals_store
+            fundamentals_store.store_summaries([symbol])
     put("info", symbol, _jsonable(info), now)
     return rows + 1
 

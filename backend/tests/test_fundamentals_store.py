@@ -7,7 +7,8 @@ import pytest
 from backend import cache, fundamentals_store as fs, store, yahoo_info
 from backend.services import yfinance_service as yfs
 
-TABLES = ("fetch_queue", "security", "fundamental", "yahoo_doc", "quote_latest", "price_daily", "source_health")
+TABLES = ("fetch_queue", "security", "fundamental", "fundamental_summary", "yahoo_doc", "quote_latest", "price_daily",
+          "source_health")
 
 
 @pytest.fixture(autouse=True)
@@ -176,3 +177,39 @@ def test_the_snapshot_share_count_wins_when_sec_is_on_another_basis():
     assert i["sharesOutstanding"] == 20.0 and i["bookValue"] == 27.5
     store.upsert("quote_latest", [dict(symbol="ACME", shares=10.5)], ("symbol",))  # within 10 %: SEC's stands
     assert fs.bundle("ACME")["info"]["sharesOutstanding"] == 10.0
+
+
+def test_stored_summaries_match_the_statements_and_are_read_in_one_query():
+    _store_acme()
+    assert fs.store_summaries(["ACME", "NONE"]) == 1          # nothing stored for NONE: no row
+    frames = fs.annual_frames(["ACME", "NONE"])
+    assert set(frames) == {"ACME"}
+    fin, full = frames["ACME"]["financials_df"], fs.bundle("ACME")["financials_df"]
+    assert list(fin.columns) == list(full.columns[:2])
+    assert fin.loc["Total Revenue"].tolist() == full.loc["Total Revenue"].iloc[:2].tolist()
+    assert frames["ACME"]["balance_sheet_df"].loc["Total Assets"].iloc[0] == 1000.0
+
+
+def test_a_company_without_a_stored_summary_is_built_on_read():
+    _store_acme()
+    frames = fs.annual_frames(["ACME"])                       # no store_summaries call
+    assert frames["ACME"]["financials_df"].loc["Net Income"].iloc[0] == 44.0
+
+
+def test_dupont_and_earnings_quality_read_summaries_not_bundles():
+    from backend.services import constituents, corporate_health_service as ch, dupont_service
+    _store_acme()
+    store.replace_fundamentals(["ACME"], [_fact("Operating Cash Flow", e, v, form="10-K") for e, v in
+                                          (("2025-12-31", 50.0), ("2024-12-31", 45.0))], "sec:cf")
+    fs.store_summaries(["ACME"])
+    members = [{"symbol": "ACME", "name": "Acme", "sector": "Health Care", "industry": "Pharma"}]
+    cache.clear_all("sector_dupont")
+    cache.clear_all("earnings_quality")
+    with patch.object(constituents, "get_constituents", return_value=members), \
+         patch.object(yfs, "get_info", side_effect=AssertionError("no full bundle per company")):
+        dup = dupont_service.get_sector_dupont()
+        eq = ch.get_earnings_quality("dow")
+    assert dup["tickerCount"] == 1 and dup["sectors"][0]["netMargin"] == pytest.approx(44 / 430, abs=1e-6)
+    assert eq["kpis"]["n"] == 1
+    cache.clear_all("sector_dupont")
+    cache.clear_all("earnings_quality")

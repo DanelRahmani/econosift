@@ -242,7 +242,7 @@ def run_ciks(_key: str) -> int:
 
 def run_facts(cik: str) -> int:
     """Store one company's SEC companyfacts (every symbol sharing the CIK) into `fundamental`."""
-    from . import cache, sec_fundamentals
+    from . import cache, fundamentals_store, sec_fundamentals
     from .sources import source_sec
 
     with store.connect() as conn:
@@ -259,6 +259,7 @@ def run_facts(cik: str) -> int:
     with store.connect() as conn:
         conn.executemany("UPDATE security SET facts_at = ? WHERE symbol = ?", [(_now(), s) for s in syms])
     _mark_success("sec_facts")
+    fundamentals_store.store_summaries(syms)
     cache.clear_all("yf_info")  # bundles built before these facts were stored
     return len(rows)
 
@@ -292,6 +293,15 @@ def run_frames(day: str) -> int:
         enqueue("facts", cik, PRIORITY_FACTS)
     _mark_success("sec_frames")
     return len(changed)
+
+
+def run_summaries(_key: str) -> int:
+    """Build the per-company summaries missing for stored statements (once, after an upgrade)."""
+    from . import fundamentals_store
+    with store.connect() as conn:
+        syms = [r[0] for r in conn.execute(
+            "SELECT DISTINCT symbol FROM fundamental WHERE symbol NOT IN (SELECT symbol FROM fundamental_summary)")]
+    return fundamentals_store.store_summaries(syms)
 
 
 def run_yahoo_info(symbol: str) -> int:
@@ -354,6 +364,7 @@ HANDLERS: dict[str, Callable[[str], int]] = {
     "yahoo_info": run_yahoo_info,
     "analyst": run_analyst,
     "job": run_job,
+    "summaries": run_summaries,
 }
 
 
@@ -531,6 +542,11 @@ def _loop(start_delay: float) -> None:
     universe_at = _last_success("constituents")
     if universe_at is None or datetime.now(timezone.utc) - universe_at > UNIVERSE_MAX_AGE:
         queue_universe()
+    with store.connect() as conn:
+        unsummarised = conn.execute("SELECT EXISTS (SELECT 1 FROM fundamental WHERE symbol NOT IN "
+                                    "(SELECT symbol FROM fundamental_summary))").fetchone()[0]
+    if unsummarised:
+        enqueue("summaries", "missing", PRIORITY_FACTS)
     ciks_at = _last_success("sec_ciks")
     if ciks_at is None or datetime.now(timezone.utc) - ciks_at > UNIVERSE_MAX_AGE:
         queue_ciks()

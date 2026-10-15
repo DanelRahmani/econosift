@@ -109,6 +109,13 @@ CREATE TABLE IF NOT EXISTS sec_filing (
     form    TEXT,
     PRIMARY KEY (cik, accn)
 ) WITHOUT ROWID;
+-- Per company, the last two annual columns of each statement as JSON (fundamentals_store):
+-- the 500-company pages (DuPont, earnings quality) read these instead of every fact.
+CREATE TABLE IF NOT EXISTS fundamental_summary (
+    symbol      TEXT PRIMARY KEY,
+    summary     TEXT NOT NULL,
+    built_at    TEXT NOT NULL
+);
 -- Yahoo-only data SEC lacks, as JSON per symbol (yahoo_info.py): 'info' = Ticker.info
 -- (estimates, targets, profile; weekly rotation), 'analyst' = the analyst panel (on demand).
 CREATE TABLE IF NOT EXISTS yahoo_doc (
@@ -336,7 +343,7 @@ def records(df: pd.DataFrame, cols: Sequence[str]) -> list[tuple]:
 def counts() -> dict[str, int]:
     """Row count per market-data table, for the Admin health panel."""
     tables = ("security", "price_daily", "quote_latest", "quote_intraday", "fundamental",
-              "sec_filing", "macro_series", "fx_daily", "fetch_queue")
+              "sec_filing", "fundamental_summary", "macro_series", "fx_daily", "fetch_queue")
     with connect() as conn:
         return {t: conn.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0] for t in tables}
 

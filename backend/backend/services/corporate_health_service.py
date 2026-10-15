@@ -748,11 +748,12 @@ def compute_earnings_quality(rows: list[dict]) -> dict:
     }
 
 
-def _fetch_eq_inputs(ticker: str, sector: str | None) -> dict | None:
-    """Raw earnings-quality inputs for a single ticker from its stored statements."""
+def _fetch_eq_inputs(ticker: str, sector: str | None, bundle: dict | None) -> dict | None:
+    """Raw earnings-quality inputs for a single ticker from its stored statements
+    (``bundle``: its :func:`fundamentals_store.annual_frames` entry)."""
     try:
-        from . import yfinance_service as yfs
-        bundle = yfs.get_info(ticker)
+        if not bundle:
+            return None
         fin = bundle.get("financials_df")
         bs = bundle.get("balance_sheet_df")
         cf = bundle.get("cashflow_df")
@@ -807,9 +808,11 @@ def get_earnings_quality(universe: str = "dow") -> dict:
     rows: list[dict] = []
     # Serial on purpose: these are store reads now (Phase 68), and sqlite3 hands the GIL
     # back and forth on every row, so threads made them ~20x slower than one loop.
+    # One query for every member's last two fiscal years (the stored per-company summaries).
+    frames = fs.annual_frames([m["symbol"] for m in members])
     for m in members:
         try:
-            row = _fetch_eq_inputs(m["symbol"], m.get("sector"))
+            row = _fetch_eq_inputs(m["symbol"], m.get("sector"), frames.get(m["symbol"]))
             if row is not None:
                 rows.append(row)
         except Exception:
