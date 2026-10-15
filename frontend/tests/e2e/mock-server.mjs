@@ -67,9 +67,11 @@ async function handleApi(req, res) {
     }).catch((e) => ({ ok: false, status: 502, text: async () => JSON.stringify({ detail: String(e) }) }));
     const text = await upstream.text();
     // Only answers worth replaying are kept: a timeout or 5xx while recording is not a fixture.
+    // Even masked API keys (first/last 4 characters) stay out of the repository.
+    const saved = text.replace(/("\w*ApiKey"\s*:\s*)"[^"]+"/g, '$1"abcd...wxyz"');
     if (upstream.status < 500) {
       mkdirSync(FIXTURES, { recursive: true });
-      writeFileSync(file, gzipSync(JSON.stringify({ key: `${req.method} ${req.url}`, status: upstream.status, body: text })));
+      writeFileSync(file, gzipSync(JSON.stringify({ key: `${req.method} ${req.url}`, status: upstream.status, body: saved })));
     }
     res.writeHead(upstream.status, { "content-type": "application/json" });
     res.end(text);
