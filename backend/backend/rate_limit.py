@@ -2,13 +2,21 @@
 
 Every yfinance HTTP request goes through ``YfData._make_request``; wrapping it
 once puts *all* Yahoo traffic (downloads, ``.info``, options, screen) behind a
-single token bucket, whatever thread or service makes the call.
+token bucket, whatever thread or service makes the call.
 
-Rate from the Phase 65.0 measurements (docs/plans/REFACTOR_PROPOSALS.md §8.2):
-200 chart calls ran clean up to 3/s, so Yahoo gets 2/s with a burst of 4.
-A 429 opens the circuit at once, with an exponentially growing cooldown;
-while it is open, calls fail fast with ``YFRateLimitError`` instead of
-hitting Yahoo again, so callers serve what they have stored.
+Yahoo gets two buckets, because its endpoints tolerate very different loads
+(docs/plans/REFACTOR_PROPOSALS.md §8.2). Price history (``/v8/finance/chart``,
+used by every download, quote and breadth/treemap fan-out) ran clean at 10
+concurrent calls/s, so it gets 8/s, burst 16. Everything else (quoteSummary
+``.info``, quote, options, screen, crumb) is what Yahoo throttles first, so it
+gets 2/s, burst 4. A single 2/s bucket for both starved every page behind the
+cold 500-ticker chart fan-outs.
+
+A 429 opens that bucket's circuit at once, with an exponentially growing
+cooldown; while it is open, calls fail fast with ``YFRateLimitError`` instead
+of hitting Yahoo again, so callers serve what they have stored. The buckets
+trip separately: Yahoo can rate-limit the crumb/quoteSummary path while chart
+still answers.
 """
 from __future__ import annotations
 
@@ -46,6 +54,7 @@ class SourceGuard:
         self._consecutive_429 = 0
         self._consecutive_errors = 0
         self._last_error: str | None = None
+        self._requests = 0  # since process start; the Phase 66 target is a few hundred per day
 
     # -- circuit ---------------------------------------------------------------
     def _open(self, seconds: float, reason: str) -> None:
@@ -81,6 +90,7 @@ class SourceGuard:
                 self._last = now
                 if self._tokens >= 1:
                     self._tokens -= 1
+                    self._requests += 1
                     return
                 wait = (1 - self._tokens) / self.rate
             self._sleep(wait + (random.uniform(0, self.jitter) if self.jitter else 0.0))
@@ -110,16 +120,22 @@ class SourceGuard:
                 "consecutive429": self._consecutive_429,
                 "consecutiveErrors": self._consecutive_errors,
                 "lastError": self._last_error,
+                "requests": self._requests,
                 "ratePerSecond": self.rate,
                 "burst": self.burst,
             }
 
 
-YAHOO = SourceGuard("yahoo", rate=2.0, burst=4, jitter=0.1)
+YAHOO_CHART = SourceGuard("yahoo_chart", rate=8.0, burst=16, jitter=0.05)
+YAHOO_API = SourceGuard("yahoo_api", rate=2.0, burst=4, jitter=0.1)
+
+
+def guard_for_url(url: str) -> SourceGuard:
+    return YAHOO_CHART if "/finance/chart/" in (url or "") else YAHOO_API
 
 
 def install_yfinance_guard() -> None:
-    """Route every yfinance HTTP request through :data:`YAHOO` (idempotent)."""
+    """Route every yfinance HTTP request through its Yahoo bucket (idempotent)."""
     from yfinance.data import YfData
 
     original = YfData._make_request
@@ -128,11 +144,12 @@ def install_yfinance_guard() -> None:
 
     @functools.wraps(original)
     def guarded(self, *args, **kwargs):
-        return YAHOO.call(original, self, *args, **kwargs)
+        url = kwargs.get("url", args[0] if args else "")
+        return guard_for_url(url).call(original, self, *args, **kwargs)
 
     guarded._econosift_guard = True
     YfData._make_request = guarded
 
 
 def status() -> dict:
-    return {"yahoo": YAHOO.status()}
+    return {g.name: g.status() for g in (YAHOO_CHART, YAHOO_API)}

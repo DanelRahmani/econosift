@@ -31,6 +31,7 @@ def test_bucket_allows_burst_then_throttles_to_rate():
     for _ in range(4):
         g.call(lambda: None)
     assert c.slept == pytest.approx(2.0, abs=0.01)  # 4 more at 2/s
+    assert g.status()["requests"] == 8
 
 
 def test_429_opens_circuit_with_exponential_cooldown():
@@ -93,3 +94,25 @@ def test_install_wraps_yfinance_request_once():
     rl.install_yfinance_guard()
     assert YfData._make_request is wrapped
     assert getattr(wrapped, "_econosift_guard", False)
+
+
+def test_chart_and_api_requests_use_separate_buckets():
+    assert rl.guard_for_url("https://query2.finance.yahoo.com/v8/finance/chart/AAPL") is rl.YAHOO_CHART
+    for url in ("https://query2.finance.yahoo.com/v10/finance/quoteSummary/AAPL",
+                "https://query1.finance.yahoo.com/v7/finance/options/AAPL",
+                "https://query1.finance.yahoo.com/v1/test/getcrumb", ""):
+        assert rl.guard_for_url(url) is rl.YAHOO_API
+    assert rl.YAHOO_CHART.rate > rl.YAHOO_API.rate
+
+
+def test_a_429_on_one_bucket_leaves_the_other_open_for_calls():
+    c = FakeClock()
+    chart, api = _guard(c), _guard(c)
+    with pytest.raises(YFRateLimitError):
+        api.call(lambda: (_ for _ in ()).throw(YFRateLimitError()))
+    assert api.status()["state"] == "open"
+    assert chart.call(lambda: "ok") == "ok"
+
+
+def test_status_reports_both_yahoo_buckets():
+    assert set(rl.status()) == {"yahoo_chart", "yahoo_api"}
