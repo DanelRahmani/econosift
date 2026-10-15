@@ -10,9 +10,18 @@ slow and things break, because every page fetches market data live from Yahoo, p
 we get rate-limited. The goal is an app that **feels snappy**, without changing how it looks.
 
 ## Setup
-1. `git fetch origin && git checkout refactor/data-layer && git pull`. Do **all** work on this
-   branch. Commit one item per commit (message about the "why") and push after each. Never push
-   to `DEV`, `main` or `PRODUCTION`; open a PR only when I ask.
+1. First, run these commands yourself (stash or commit any local changes first if `git status`
+   isn't clean):
+   ```bash
+   git status
+   git fetch origin
+   git checkout refactor/data-layer
+   git pull origin refactor/data-layer
+   git log --oneline -3   # top commit should be the "Plan: run refactor on refactor/data-layer…" commit
+   ```
+   Do **all** work on this branch. Commit one item per commit (message about the "why") and
+   push after each with `git push origin refactor/data-layer`. Never push to `DEV`, `main` or
+   `PRODUCTION`; open a PR only when I ask.
 2. Read `CLAUDE.md` (working agreements: Docker gate, CRLF line endings, never scrape HTML,
    never fabricate data, don't spend the Gemini quota, never trigger `build-desktop.yml`) and
    then **`docs/plans/REFACTOR_PROPOSALS.md`**. That file is the plan. Follow it.
