@@ -158,7 +158,7 @@ export function DcfPanel({ tickers, sharedWacc = null }: { tickers: string[]; pe
     }
   }, [tickers, selectedTicker]);
 
-  // Debounced fetch â€“ 500ms after any change (mirrors ValuationTab pattern)
+  // Debounced fetch – 500ms after any change (mirrors ValuationTab pattern)
   const [debounced, setDebounced] = useState<{ ticker: string; params: Params } | null>(null);
   useEffect(() => {
     if (!selectedTicker || seededFor !== selectedTicker) return;

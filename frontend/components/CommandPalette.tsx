@@ -74,7 +74,7 @@ export function CommandPalette() {
       id: `ticker:${s.symbol}`,
       group: "Tickers" as const,
       label: `Open ${s.symbol} in Markets`,
-      hint: [s.name, s.exchange].filter(Boolean).join(" Â· "),
+      hint: [s.name, s.exchange].filter(Boolean).join(" · "),
       href: `/markets?t=${encodeURIComponent(s.symbol)}`,
     })) : []),
     [live, searchData],
