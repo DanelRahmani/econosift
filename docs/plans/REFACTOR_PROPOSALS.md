@@ -211,7 +211,7 @@ one item per commit and push after each one. Open a PR to `DEV` only when the ow
 | **66 — One database + fetcher** ✅ | Consolidated `econosift.db` with the schema above, built fresh with no data migration; fetcher thread; bulk 15-min snapshot via `yf.screen` (decided in §8.1, no spike needed); one-time backfill with progress in Admin; `store.prices()` helper | Restart is instant and warm; one Yahoo request log shows ≤ a few hundred calls/day |
 | **67 — Read from the store** ✅ | Move treemap, breadth, sector, screener, risk, portfolio, technicals, markets to DB reads; `asOf` on responses; remove the old per-ticker paths and the now-unused cache code | **Zero** Yahoo calls on any page open for daily/snapshot data |
 | **68 — SEC fundamentals** ✅ | SEC companyfacts backfill + nightly frames change-detection → `fundamental`, with the §8.3 concept fallbacks; screener/valuation/ratios read from it; weekly rotating Yahoo refresh for estimates; optional free-key fallbacks in Admin | Screener refresh makes no per-ticker `.info` calls |
-| **69 — Frontend data layer** | `useQuery` migration, `asOf`/pending UI, per-panel error boundaries, lazy tabs, mocked e2e | Tab switches don't refetch; CI e2e green |
+| **69 — Frontend data layer** ✅ | `useQuery` migration, `asOf`/pending UI, per-panel error boundaries, lazy tabs, mocked e2e | Tab switches don't refetch; CI e2e green |
 | **70 — Backtesting v2** | Store-backed point-in-time backtests, strategy plugins, sandboxed runner, walk-forward | A user `.py` strategy uploads and backtests on PIT S&P 500 data |
 
 Phase 65 is small (days) and gives immediate relief. Phases 66–67 are what make the app fast.
@@ -423,3 +423,42 @@ decision holds. `pyarrow` stays in `requirements.txt` because edgartools needs i
   once after an upgrade (~2 min). DuPont 15.3 s → **0.49 s** cold, S&P 500 earnings quality ~19 s → **0.79 s**,
   Dow 0.11 s, with 0 external calls.
 - Tests: 1,396 backend; tsc clean; Playwright 48/48 after rerunning 3 cold-start timeouts (yield/macro).
+
+### 8.10 Phase 69 gate (2026-10-16, Docker)
+
+- **useQuery migration:** ~75 components and pages moved from hand-written `useEffect` fetches to react-query
+  through `apiQuery(name, ...args)` (key = api.ts method + arguments, stale time per data class: snapshot 1 min,
+  default 5 min, fundamentals 30 min, macro 1 h). Only infrastructure fetches remain in effects (BackendGate's
+  `/health` poll, the static world map, CountrySelector's World Bank typeahead). The Navbar Refresh invalidates
+  active queries, so `useRefreshNonce` is gone. 🟡/🔴 compute stays on buttons; Momentum's NDX/S&P run, Realized
+  Moments' ticker and the cross-asset toggles still apply only on the user's action.
+- **Tab switches (target 0 refetches within stale time), warm app, measured with Playwright:** Macro
+  Overview→Inflation→Overview **0**, Markets Overview→Valuation→Overview **0**, Research Risk Parity→FX Carry→back
+  **0**, Yield US Curve→Policy Tracker→back **0**, Dashboard→Markets→Dashboard (in-app navigation) **0** `/api`
+  requests on the return.
+- **Time to real content after in-app navigation (target < 1.5 s),** fresh query cache, warm backend, measured
+  until the page's landmark is visible and no skeleton is left: Dashboard 0.33–0.35 s, Markets 0.27–0.37 s,
+  Macro 0.14–0.15 s, Screener 0.12–0.13 s, Yield 0.23–0.26 s, Risk 0.29–0.30 s, Portfolio 0.27–0.37 s,
+  Options 0.27 s (3.6 s on its first open: the chain is fetched from Yahoo on demand, by plan).
+- **Pending ticker:** `/markets?t=U` (never requested before) showed "Loading data… queued for the next fetch"
+  after 1.0 s and the stored price "as of 16:00 ET" after 11 s, with one poll and no reload. `apiQuery` polls a
+  `status: "pending"` response every 10 s, at most 30 times.
+- **Error boundaries:** `PanelBoundary` around each Dashboard panel and the independent Markets, Valuation, Macro
+  Overview and Corporate panels; a malformed `/dashboard/movers` body now shows one error card while breadth,
+  indices and the yield curve render (`panel-boundary.spec.ts`).
+- **Charts:** Research, Portfolio and Yield tabs load on first open (Macro already did). 15 live chart sources
+  send more than 500 points (max-period prices 24,814; EPU 9,784; central-bank history 7,956; breakevens 5,951);
+  `capPoints()` thins them to 500 and keeps the dates recession shading is pinned to. Recharts animation is off
+  app-wide (`lib/chartDefaults.ts`).
+- **Mocked e2e:** `tests/e2e/mock-server.mjs` serves the static export and answers `/api` from 116 recorded
+  fixtures (1.6 MB gzipped; masked API keys redacted). A request without a fixture fails the run. CI's
+  Playwright job no longer boots Docker; CI also runs on `refactor/**` pushes. The first CI run caught one
+  timing-dependent unrecorded request (`/scenario/historical`), so every argument-free GET is now recorded.
+- **Gate:** backend 1,399 passed in the container; tsc clean; 15 frontend unit tests (`node --test`, no new
+  dependency); Docker rebuild + recreate, all 21 pages 200; Playwright live 49/49 after rerunning 1 cold-start
+  timeout (panel-boundary waited on a cold breadth right after the recreate); Playwright mocked 48 passed,
+  1 skipped (the nginx cache-header spec), stable over five runs at 2 and 4 workers; CI green on the branch
+  (typecheck, Playwright smoke, backend).
+- **Found, not fixed (outside this phase):** the quote provenance formula text is mis-encoded by the backend
+  (`âˆ'`, `Ã—` for − and ×); CountrySelector's typeahead uses a bare `/api` URL, so it misses the backend in the
+  desktop build (its name lookup two functions up already uses the base URL).
