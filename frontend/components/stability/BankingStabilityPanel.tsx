@@ -1,7 +1,6 @@
 "use client";
-import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
-import type { BankingStabilityData } from "@/lib/types";
+import { useQuery } from "@tanstack/react-query";
+import { apiQuery } from "@/lib/queries";
 import { Card } from "@/components/ui";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
@@ -10,7 +9,6 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Cell, ReferenceLine,
 } from "recharts";
-import { useRefreshNonce } from "@/lib/refresh";
 
 const GRID = "rgba(255,255,255,0.08)";
 
@@ -22,15 +20,8 @@ function signalColor(s: string): string {
 }
 
 export function BankingStabilityPanel() {
-  const [data, setData] = useState<BankingStabilityData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
+  const { data = null, isLoading: loading, isError: error } = useQuery(apiQuery("stabilityBanking"));
   const scope = useSourceScope(provOf(data));
-
-  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
-  useEffect(() => {
-    api.stabilityBanking().then(setData).catch(() => setError(true)).finally(() => setLoading(false));
-  }, [refreshNonce]);
 
   if (loading) return <div className="py-8 text-center text-text-muted">Loading banking stability data…</div>;
   if (error || !data) return <div className="py-8 text-center text-red-400">Failed to load data.</div>;

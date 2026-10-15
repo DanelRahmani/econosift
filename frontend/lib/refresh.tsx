@@ -3,18 +3,17 @@
 // Page Refresh button (P1-20). The backend serves cached data for up to 60
 // minutes, so re-running a request is not enough: a refresh sends
 // X-Cache-Refresh, which makes the backend recompute the cached entries the
-// request reads (an entry fetched in the last minute is served as is). Panels
-// re-run their requests when the nonce from <RefreshProvider> changes;
-// react-query panels are invalidated. Effects that run a "Calculate"/"Run
-// Analysis" computation must NOT depend on the nonce (compute tiers yellow/red).
+// request reads (an entry fetched in the last minute is served as is). Every
+// active react-query query is invalidated, so the open page's panels re-run;
+// "Calculate"/"Run Analysis" queries are disabled until clicked, so they are not
+// active and never re-run (compute tiers yellow/red).
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { queryClient } from "./queryClient";
 
 export const REFRESH_HEADER = "X-Cache-Refresh";
 export const COOLDOWN_MS = 60_000; // matches the backend's minimum entry age
-// Requests started this long after a click carry the header; panels re-run
-// theirs as soon as the nonce changes.
+// Requests started this long after a click carry the header.
 const WINDOW_MS = 10_000;
 
 let refreshUntil = 0;
@@ -60,14 +59,12 @@ function useStore() {
   return { oldest, pending, lastRefresh };
 }
 
-const RefreshContext = createContext<{ nonce: number; refresh: () => void }>({
-  nonce: 0,
+const RefreshContext = createContext<{ refresh: () => void }>({
   refresh: () => {},
 });
 
 /** App-wide: the Navbar's Refresh button re-fetches the open page. */
 export function RefreshProvider({ children }: { children: ReactNode }) {
-  const [nonce, setNonce] = useState(0);
   const pathname = usePathname();
   useEffect(() => {
     oldest = null; // the label covers the open page's responses only
@@ -80,15 +77,9 @@ export function RefreshProvider({ children }: { children: ReactNode }) {
     refreshUntil = now + WINDOW_MS;
     oldest = null;
     emit();
-    setNonce((n) => n + 1);
     void queryClient.invalidateQueries({ type: "active" });
   }, []);
-  return <RefreshContext.Provider value={{ nonce, refresh }}>{children}</RefreshContext.Provider>;
-}
-
-/** Add to a panel's effect dependencies so it re-fetches on Refresh. 0 outside a provider. */
-export function useRefreshNonce(): number {
-  return useContext(RefreshContext).nonce;
+  return <RefreshContext.Provider value={{ refresh }}>{children}</RefreshContext.Provider>;
 }
 
 export function useRefresh() {

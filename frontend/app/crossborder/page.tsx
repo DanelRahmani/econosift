@@ -1,11 +1,11 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
-import { api } from "@/lib/api";
-import type { CrossborderData, FactbookCountry } from "@/lib/types";
+import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { apiQuery } from "@/lib/queries";
+import type { FactbookCountry } from "@/lib/types";
 import { Card, PageSkeleton } from "@/components/ui";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
-import { useRefreshNonce } from "@/lib/refresh";
 
 function fmtUsd(v: number): string {
   if (v >= 1e12) return `$${(v / 1e12).toFixed(1)}T`;
@@ -15,19 +15,13 @@ function fmtUsd(v: number): string {
 }
 
 export default function CrossborderPage() {
-  const [data, setData] = useState<CrossborderData | null>(null);
-  const [countries, setCountries] = useState<FactbookCountry[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
+  const claimsQ = useQuery(apiQuery("crossborderClaims"));
+  const countriesQ = useQuery(apiQuery("factbookCountries"));
+  const data = claimsQ.data ?? null;
+  const countries = useMemo<FactbookCountry[]>(() => countriesQ.data ?? [], [countriesQ.data]);
+  const loading = claimsQ.isLoading || countriesQ.isLoading;
+  const error = claimsQ.isError || countriesQ.isError;
   const scope = useSourceScope(provOf(data));
-
-  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
-  useEffect(() => {
-    Promise.all([api.crossborderClaims(), api.factbookCountries()])
-      .then(([d, c]) => { setData(d); setCountries(c); })
-      .catch(() => setError(true))
-      .finally(() => setLoading(false));
-  }, [refreshNonce]);
 
   // Build lookup: iso3 → {flag, name} and iso2 → {flag, name}
   const flagMap = useMemo(() => {

@@ -1,7 +1,9 @@
 "use client";
 
 // cache-bust: 2026-06-28 api-keys-admin
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { apiQuery } from "@/lib/queries";
 import { api } from "@/lib/api";
 import type { HealthResponse, PrefetchStatus, BulkDatasetStatus, ConfigResponse, StoreStatus } from "@/lib/types";
 import { Card, Skeleton } from "@/components/ui";
@@ -16,29 +18,22 @@ function fmtUptime(sec: number): string {
 }
 
 export default function AdminPage() {
-  const [data, setData] = useState<HealthResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [pf, setPf] = useState<PrefetchStatus | null>(null);
+  const healthQ = useQuery({ ...apiQuery("health"), refetchInterval: 15_000 });
+  const data: HealthResponse | null = healthQ.data ?? null;
+  const loading = healthQ.isFetching;
+  const load = () => void healthQ.refetch();
+  const [pfStart, setPfStart] = useState<PrefetchStatus | null>(null);
   const [pfRunning, setPfRunning] = useState(false);
-
-  async function load() {
-    setLoading(true);
-    try {
-      setData(await api.health());
-    } catch {
-      setData(null);
-    } finally {
-      setLoading(false);
-    }
-  }
 
   const [clearing, setClearing] = useState(false);
 
+  const pfStartedAt = useRef(0);
   const startPrefetch = useCallback(async () => {
+    pfStartedAt.current = Date.now();
     setPfRunning(true);
     try {
       const res = await api.prefetchStart();
-      setPf(res.progress);
+      setPfStart(res.progress);
     } catch (e) {
       setPfRunning(false);
     }
@@ -58,23 +53,14 @@ export default function AdminPage() {
   }, [startPrefetch]);
 
   // Poll prefetch status while running
+  const pfQ = useQuery({ ...apiQuery("prefetchStatus"), enabled: pfRunning, refetchInterval: 2000 });
+  const pf: PrefetchStatus | null = (pfQ.dataUpdatedAt >= pfStartedAt.current && pfQ.data) || pfStart;
   useEffect(() => {
-    if (!pfRunning) return;
-    const id = setInterval(async () => {
-      try {
-        const s = await api.prefetchStatus();
-        setPf(s);
-        if (!s.running) setPfRunning(false);
-      } catch { setPfRunning(false); }
-    }, 2000);
-    return () => clearInterval(id);
-  }, [pfRunning]);
-
-  useEffect(() => {
-    load();
-    const id = setInterval(load, 15000);
-    return () => clearInterval(id);
-  }, []);
+    // Only a status fetched after this run started can end it (the cache may hold the last run's).
+    const failed = pfQ.isError && pfQ.errorUpdatedAt >= pfStartedAt.current;
+    const done = pfQ.dataUpdatedAt >= pfStartedAt.current && pfQ.data && !pfQ.data.running;
+    if (failed || done) setPfRunning(false);
+  }, [pfQ.isError, pfQ.errorUpdatedAt, pfQ.data, pfQ.dataUpdatedAt]);
 
   const pct = pf && pf.total ? Math.round((pf.done / pf.total) * 100) : 0;
 
@@ -454,17 +440,15 @@ function AppearanceSection() {
 }
 
 function ApiKeysSection() {
-  const [config, setConfig] = useState<ConfigResponse | null>(null);
+  const qc = useQueryClient();
+  const { data: config = null } = useQuery(apiQuery("config"));
+  const setConfig = (c: ConfigResponse) => qc.setQueryData(apiQuery("config").queryKey, c);
   const [editing, setEditing] = useState<"fred" | "finnhub" | "gemini" | null>(null);
   const [inputValue, setInputValue] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [restartBanner, setRestartBanner] = useState(false);
-
-  useEffect(() => {
-    api.config().then(setConfig).catch(() => setConfig(null));
-  }, []);
 
   const startEdit = (key: "fred" | "finnhub" | "gemini") => {
     setEditing(key);
@@ -674,31 +658,20 @@ function ApiKeysSection() {
 }
 
 function BulkDataSection() {
-  const [bulk, setBulk] = useState<Record<string, BulkDatasetStatus> | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-
-  const load = useCallback(async () => {
-    try {
-      const r = await api.bulkDataStatus();
-      setBulk(r.datasets);
-      return r.running;
-    } catch { setBulk(null); return false; }
-  }, []);
-
-  useEffect(() => { load(); }, [load]);
-
+  const refreshStarted = useRef(0);
   // Poll while a download is running, so a slow/failed source is reflected
   // instead of the button flipping back to "Refresh" after a single check.
+  const bulkQ = useQuery({ ...apiQuery("bulkDataStatus"), refetchInterval: refreshing ? 2000 : false });
+  const bulk: Record<string, BulkDatasetStatus> | null = bulkQ.data?.datasets ?? null;
   useEffect(() => {
-    if (!refreshing) return;
-    const id = setInterval(async () => {
-      const running = await load();
-      if (!running) setRefreshing(false);
-    }, 2000);
-    return () => clearInterval(id);
-  }, [refreshing, load]);
+    if (refreshing && bulkQ.data && !bulkQ.data.running && bulkQ.dataUpdatedAt > refreshStarted.current) {
+      setRefreshing(false);
+    }
+  }, [refreshing, bulkQ.data, bulkQ.dataUpdatedAt]);
 
   const doRefresh = async () => {
+    refreshStarted.current = Date.now();
     setRefreshing(true);
     try {
       await api.bulkDataRefresh();

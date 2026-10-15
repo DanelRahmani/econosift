@@ -1,12 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
-import type { EarningsQualityData } from "@/lib/types";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { apiQuery } from "@/lib/queries";
 import { Card, PageSkeleton, ToggleChip } from "@/components/ui";
 import { SourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
-import { useRefreshNonce } from "@/lib/refresh";
 
 const UNIVERSES: { key: "dow" | "ndx" | "sp500"; label: string }[] = [
   { key: "dow", label: "Dow 30" },
@@ -41,20 +40,10 @@ function qualityColor(v: number | null | undefined): string {
 
 export function EarningsQuality() {
   const [universe, setUniverse] = useState<"dow" | "ndx" | "sp500">("dow");
-  const [data, setData] = useState<EarningsQualityData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
-  useEffect(() => {
-    setLoading(true);
-    setError(null);
-    api
-      .corporateEarningsQuality(universe)
-      .then((d) => setData(d))
-      .catch((e) => setError(e instanceof Error ? e.message : "Failed to fetch data"))
-      .finally(() => setLoading(false));
-  }, [universe, refreshNonce]);
+  const eqQ = useQuery(apiQuery("corporateEarningsQuality", universe));
+  const data = eqQ.data ?? null;
+  const loading = eqQ.isLoading;
+  const error = eqQ.error ? (eqQ.error instanceof Error ? eqQ.error.message : "Failed to fetch data") : null;
 
   return (
     <div className="space-y-6">

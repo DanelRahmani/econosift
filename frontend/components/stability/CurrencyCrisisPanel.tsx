@@ -1,11 +1,9 @@
 "use client";
-import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
-import type { CurrencyCrisisData } from "@/lib/types";
+import { useQuery } from "@tanstack/react-query";
+import { apiQuery } from "@/lib/queries";
 import { Card } from "@/components/ui";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
-import { useRefreshNonce } from "@/lib/refresh";
 
 function signalColor(s: string): string {
   if (s === "red") return "text-danger";
@@ -20,15 +18,8 @@ function SignalDot({ color }: { color: string }) {
 }
 
 export function CurrencyCrisisPanel() {
-  const [data, setData] = useState<CurrencyCrisisData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
+  const { data = null, isLoading: loading, isError: error } = useQuery(apiQuery("stabilityCurrencyCrisis"));
   const scope = useSourceScope(provOf(data));
-
-  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
-  useEffect(() => {
-    api.stabilityCurrencyCrisis().then(setData).catch(() => setError(true)).finally(() => setLoading(false));
-  }, [refreshNonce]);
 
   if (loading) return <div className="py-8 text-center text-text-muted">Loading crisis early warning data…</div>;
   if (error || !data) return <div className="py-8 text-center text-red-400">Failed to load data.</div>;

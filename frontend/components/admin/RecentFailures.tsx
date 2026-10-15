@@ -1,7 +1,7 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { apiQuery } from "@/lib/queries";
 import { api } from "@/lib/api";
-import type { ErrorLogResponse } from "@/lib/types";
 import { Card } from "@/components/ui";
 
 /**
@@ -23,26 +23,11 @@ function relativeTime(iso: string): string {
 }
 
 export function RecentFailures() {
-  const [data, setData] = useState<ErrorLogResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [failed, setFailed] = useState(false);
-
-  const load = useCallback(() => {
-    api
-      .adminErrors(100)
-      .then((d) => {
-        setData(d);
-        setFailed(false);
-      })
-      .catch(() => setFailed(true))
-      .finally(() => setLoading(false));
-  }, []);
-
-  useEffect(() => {
-    load();
-    const id = setInterval(load, 30_000);
-    return () => clearInterval(id);
-  }, [load]);
+  const errorsQ = useQuery({ ...apiQuery("adminErrors", 100), refetchInterval: 30_000 });
+  const data = errorsQ.data ?? null;
+  const loading = errorsQ.isLoading;
+  const failed = errorsQ.isError;
+  const load = () => void errorsQ.refetch();
 
   async function clear() {
     try {

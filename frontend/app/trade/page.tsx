@@ -1,7 +1,6 @@
 "use client";
-import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
-import type { TradeData } from "@/lib/types";
+import { useQuery } from "@tanstack/react-query";
+import { apiQuery } from "@/lib/queries";
 import { Card, PageSkeleton } from "@/components/ui";
 import { shortCountryName, categoryBarHeight } from "@/lib/format";
 import { useSourceScope } from "@/components/provenance/SourceScope";
@@ -10,7 +9,6 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Cell, ReferenceLine,
 } from "recharts";
-import { useRefreshNonce } from "@/lib/refresh";
 
 const GRID = "rgba(255,255,255,0.08)";
 
@@ -29,15 +27,8 @@ function KpiCard({ label, value, unit = "%", sub, prov }: {
 }
 
 export default function TradePage() {
-  const [data, setData] = useState<TradeData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
+  const { data = null, isLoading: loading, isError: error } = useQuery(apiQuery("macroTrade"));
   const scope = useSourceScope(provOf(data));
-
-  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
-  useEffect(() => {
-    api.macroTrade().then(setData).catch(() => setError(true)).finally(() => setLoading(false));
-  }, [refreshNonce]);
 
   if (loading) {
     return (

@@ -1,8 +1,8 @@
 "use client";
 
-import { Suspense, useEffect, useState, useCallback } from "react";
-import { api } from "@/lib/api";
-import type { DividendAnalysisResponse } from "@/lib/types";
+import { Suspense } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { apiQuery } from "@/lib/queries";
 import { Card, PageSkeleton } from "@/components/ui";
 import { TickerSearch } from "@/components/TickerSearch";
 import { useUrlState } from "@/lib/useUrlState";
@@ -13,7 +13,6 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine,
 } from "recharts";
-import { useRefreshNonce } from "@/lib/refresh";
 
 const GRID = "rgba(255,255,255,0.08)";
 
@@ -32,40 +31,24 @@ function KpiCard({ label, value, sub, color, prov }: {
 function DividendsPageInner() {
   const [urlState, setUrlState] = useUrlState({ ticker: "" });
   const ticker = urlState.ticker;
-  const [data, setData] = useState<DividendAnalysisResponse | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [searched, setSearched] = useState(false);
+  // The ticker in the URL is the one analysed: set by the search box or the Analyze button.
+  const symbol = ticker.trim().toUpperCase();
+  const searched = !!symbol;
+  const q = useQuery({ ...apiQuery("dividendAnalysis", symbol), enabled: !!symbol });
+  const data = q.data && !q.data.error ? q.data : null;
+  const loading = q.isFetching;
+  const error = q.data?.error ?? (q.error ? (q.error instanceof Error ? q.error.message : "Failed") : null);
   const scope = useSourceScope(provOf(data));
-
-  const fetchAnalysis = useCallback((t: string) => {
+  const fetchAnalysis = (t: string) => {
     const trimmed = t.trim().toUpperCase();
     if (!trimmed) return;
-    setLoading(true);
-    setError(null);
-    setSearched(true);
-    api
-      .dividendAnalysis(trimmed)
-      .then((d) => {
-        if (d.error) setError(d.error);
-        else setData(d);
-      })
-      .catch((e) => setError(e instanceof Error ? e.message : "Failed"))
-      .finally(() => setLoading(false));
-  }, []);
-
-  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
-  useEffect(() => {
-    if (ticker) {
-      fetchAnalysis(ticker);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [refreshNonce]);
+    if (trimmed === symbol) void q.refetch();
+    else setUrlState({ ticker: trimmed });
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (ticker.trim()) {
-      setUrlState({ ticker: ticker.trim().toUpperCase() });
       fetchAnalysis(ticker);
     }
   };
@@ -89,7 +72,6 @@ function DividendsPageInner() {
         <TickerSearch
           value={ticker}
           onChange={(t) => {
-            setUrlState({ ticker: t });
             fetchAnalysis(t);
           }}
           placeholder="Search company name or ticker (KO, JNJ, PG)…"

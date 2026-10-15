@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, Suspense } from "react";
-import { api } from "@/lib/api";
-import type { CalendarEvent, CalendarResponse } from "@/lib/types";
+import { useCallback, useMemo, useState, Suspense } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { apiQuery } from "@/lib/queries";
+import type { CalendarEvent } from "@/lib/types";
 import { Card, Skeleton, PageSkeleton } from "@/components/ui";
 import { useUrlState } from "@/lib/useUrlState";
 import { useSourceScope } from "@/components/provenance/SourceScope";
@@ -14,7 +15,6 @@ import {
   type ImpactFilter,
   type TzDisplay,
 } from "@/components/calendar/CalendarFilters";
-import { useRefreshNonce } from "@/lib/refresh";
 
 // ─────────────────────────────────────────────
 // Constants
@@ -133,41 +133,16 @@ function CalendarPageInner() {
   const [monday, setMonday] = useState<Date>(() => getWeekMonday(new Date()));
 
   // ── Data state ────────────────────────────
-  const [data, setData] = useState<CalendarResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
+  const calQ = useQuery(apiQuery("calendar", index, toDateStr(monday), toDateStr(getSunday(monday))));
+  const data = calQ.data ?? null;
+  const loading = calQ.isLoading;
+  const error = calQ.isError;
   const scope = useSourceScope(provOf(data));
 
   // ── Filter state (in-memory, no refetch) ──
   const [filters, setFilters] = useState<CalendarFilterState>(defaultFilters);
 
   // ── Fetch ─────────────────────────────────
-  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
-  useEffect(() => {
-    let alive = true;
-    setLoading(true);
-    setError(false);
-
-    const start = toDateStr(monday);
-    const end = toDateStr(getSunday(monday));
-
-    api
-      .calendar(index, start, end)
-      .then((r) => {
-        if (alive) setData(r);
-      })
-      .catch(() => {
-        if (alive) setError(true);
-      })
-      .finally(() => {
-        if (alive) setLoading(false);
-      });
-
-    return () => {
-      alive = false;
-    };
-  }, [index, monday, refreshNonce]);
-
   // ── Derived: merge + derive countries ─────
   const allEvents = useMemo<CalendarEvent[]>(() => {
     if (!data) return [];

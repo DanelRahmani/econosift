@@ -1,15 +1,14 @@
 "use client";
 
-import { Suspense, useEffect, useState, useCallback } from "react";
-import { api } from "@/lib/api";
-import type { CorporateHealthResponse } from "@/lib/types";
+import { Suspense } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { apiQuery } from "@/lib/queries";
 import { Card, PageSkeleton, ControlBar } from "@/components/ui";
 import { TickerSearch } from "@/components/TickerSearch";
 import { useUrlState } from "@/lib/useUrlState";
 import { EarningsQuality } from "@/components/corporate/EarningsQuality";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
-import { useRefreshNonce } from "@/lib/refresh";
 
 function fmtNum(v: number | null | undefined): string {
   if (v === null || v === undefined) return "—";
@@ -24,40 +23,24 @@ function fmtPct(v: number | null | undefined): string {
 function CorporatePageInner() {
   const [urlState, setUrlState] = useUrlState({ ticker: "" });
   const ticker = urlState.ticker;
-  const [data, setData] = useState<CorporateHealthResponse | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [searched, setSearched] = useState(false);
+  // The ticker in the URL is the one analysed: set by the search box or the Analyze button.
+  const symbol = ticker.trim().toUpperCase();
+  const searched = !!symbol;
+  const q = useQuery({ ...apiQuery("corporateHealth", symbol), enabled: !!symbol });
+  const data = q.data && !q.data.error ? q.data : null;
+  const loading = q.isFetching;
+  const error = q.data?.error ?? (q.error ? (q.error instanceof Error ? q.error.message : "Failed to fetch data") : null);
   const scope = useSourceScope(provOf(data));
-
-  const fetchHealth = useCallback((t: string) => {
+  const fetchHealth = (t: string) => {
     const trimmed = t.trim().toUpperCase();
     if (!trimmed) return;
-    setLoading(true);
-    setError(null);
-    setSearched(true);
-    api
-      .corporateHealth(trimmed)
-      .then((d) => {
-        if (d.error) setError(d.error);
-        else setData(d);
-      })
-      .catch((e) => setError(e instanceof Error ? e.message : "Failed to fetch data"))
-      .finally(() => setLoading(false));
-  }, []);
-
-  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
-  useEffect(() => {
-    if (ticker) {
-      fetchHealth(ticker);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [refreshNonce]);
+    if (trimmed === symbol) void q.refetch();
+    else setUrlState({ ticker: trimmed });
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (ticker.trim()) {
-      setUrlState({ ticker: ticker.trim().toUpperCase() });
       fetchHealth(ticker);
     }
   };
@@ -76,7 +59,6 @@ function CorporatePageInner() {
         <TickerSearch
           value={ticker}
           onChange={(t) => {
-            setUrlState({ ticker: t });
             fetchHealth(t);
           }}
           placeholder="Search company name or ticker (AAPL, TSLA, GE)…"

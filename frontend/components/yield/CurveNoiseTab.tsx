@@ -1,6 +1,7 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
-import { api } from "@/lib/api";
+import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { apiQuery } from "@/lib/queries";
 import type { TreasuryNoiseData } from "@/lib/types";
 import { Card, ChartSkeleton, chartPalette } from "@/components/ui";
 import { useSourceScope } from "@/components/provenance/SourceScope";
@@ -15,7 +16,6 @@ import {
   CartesianGrid,
   ReferenceLine,
 } from "recharts";
-import { useRefreshNonce } from "@/lib/refresh";
 
 function fmt(v: number | null | undefined, decimals = 2, suffix = ""): string {
   return v != null ? `${v.toFixed(decimals)}${suffix}` : "—";
@@ -32,20 +32,15 @@ function Kpi({ label, value, sub, prov }: { label: string; value: string; sub: s
 }
 
 export function CurveNoiseTab() {
-  const [data, setData] = useState<TreasuryNoiseData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const noiseQ = useQuery(apiQuery("yieldNoise"));
+  const data = useMemo<TreasuryNoiseData | null>(
+    () => (noiseQ.isError ? { error: "unavailable" } : noiseQ.data ?? null),
+    [noiseQ.isError, noiseQ.data],
+  );
+  const loading = noiseQ.isLoading;
   const [full, setFull] = useState(false);
   const pal = chartPalette("dark");
   const scope = useSourceScope(provOf(data));
-
-  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
-  useEffect(() => {
-    api
-      .yieldNoise()
-      .then(setData)
-      .catch(() => setData({ error: "unavailable" }))
-      .finally(() => setLoading(false));
-  }, [refreshNonce]);
 
   const chart = useMemo(() => {
     const src = full ? data?.history ?? [] : data?.recent ?? [];

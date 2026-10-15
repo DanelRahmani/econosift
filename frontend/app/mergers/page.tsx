@@ -1,7 +1,6 @@
 "use client";
-import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
-import type { MAData } from "@/lib/types";
+import { useQuery } from "@tanstack/react-query";
+import { apiQuery } from "@/lib/queries";
 import { Card, KpiStrip, KpiTile } from "@/components/ui";
 import { useSourceScope } from "@/components/provenance/SourceScope";
 import { provOf } from "@/lib/provenance";
@@ -9,7 +8,6 @@ import { CHART_COLORS } from "@/lib/format";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
-import { useRefreshNonce } from "@/lib/refresh";
 
 const GRID = "rgb(var(--border))";
 
@@ -19,15 +17,8 @@ const GRID = "rgb(var(--border))";
  * only tickers shown are the ones Finnhub tagged the article with.
  */
 export default function MergersPage() {
-  const [data, setData] = useState<MAData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
+  const { data = null, isLoading: loading, isError: error } = useQuery(apiQuery("mergers"));
   const scope = useSourceScope(provOf(data));
-
-  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
-  useEffect(() => {
-    api.mergers().then(setData).catch(() => setError(true)).finally(() => setLoading(false));
-  }, [refreshNonce]);
 
   if (loading) {
     return (

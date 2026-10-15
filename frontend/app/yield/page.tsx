@@ -1,10 +1,10 @@
 "use client";
-import { useState, useEffect, Suspense } from "react";
+import { Suspense } from "react";
+import { apiQuery } from "@/lib/queries";
 import { useQuery } from "@tanstack/react-query";
-import { api } from "@/lib/api";
 import { asOf } from "@/lib/series";
 import { useUrlState } from "@/lib/useUrlState";
-import type { RatesData, GlobalYieldCountry } from "@/lib/types";
+import type { GlobalYieldCountry } from "@/lib/types";
 import { MultiCountryYieldChart } from "@/components/yield/MultiCountryYieldChart";
 import { Card as UiCard, PageSkeleton, ScrollableTabBar, TabButton } from "@/components/ui";
 import { CHART_COLORS } from "@/lib/format";
@@ -19,7 +19,6 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   BarChart, Bar, ReferenceLine,
 } from "recharts";
-import { useRefreshNonce } from "@/lib/refresh";
 import { useKeyboardShortcuts, tabKeys, tabStepKeys } from "@/lib/useKeyboardShortcuts";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
@@ -39,14 +38,8 @@ function KpiCard({ label, value, badge, prov, ctx }: { label: string; value: str
 
 // ─── US Rates Detail tab (merged from RatesYields) ──────────────────
 function USRatesDetailTab() {
-  const [data, setData] = useState<RatesData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { data = null, isLoading: loading } = useQuery(apiQuery("macroRates"));
   const scope = useSourceScope(provOf(data));
-
-  const refreshNonce = useRefreshNonce(); // re-fetch on the Navbar's Refresh (P1-20)
-  useEffect(() => {
-    api.macroRates().then(setData).catch(() => {}).finally(() => setLoading(false));
-  }, [refreshNonce]);
 
   if (loading) return <PageSkeleton text="Loading rates data…" />;
   if (!data) return <div className="text-text-muted text-sm py-8 text-center">Rates data unavailable.</div>;
@@ -329,10 +322,7 @@ function YieldPageInner() {
     onTabSwitch: tabKeys(TABS, (t) => setUrlState({ tab: t })),
     ...tabStepKeys(TABS, (t) => t === tab, (t) => setUrlState({ tab: t })),
   }); // P2-07
-  const { data, isLoading, error } = useQuery({
-    queryKey: ["yieldCurves"],
-    queryFn: api.yieldCurves,
-  });
+  const { data, isLoading, error } = useQuery(apiQuery("yieldCurves"));
   const scope = useSourceScope(provOf(data));
 
   if (isLoading) return <div className="p-8 text-text-muted">Loading yield curve data…</div>;
@@ -450,10 +440,7 @@ function YieldPageInner() {
 
 /* ─── Policy Tracker tab (merged from /policy) ─────────────────────── */
 function PolicyTrackerTab() {
-  const { data, isLoading, error } = useQuery({
-    queryKey: ["policyTracker"],
-    queryFn: api.policyTracker,
-  });
+  const { data, isLoading, error } = useQuery(apiQuery("policyTracker"));
   const scope = useSourceScope(provOf(data));
 
   if (isLoading) return <div className="p-8 text-text-muted">Loading policy data…</div>;
@@ -520,10 +507,7 @@ function PolicyTrackerTab() {
 
 /* ─── Sovereign Risk tab (merged from /policy) ─────────────────────── */
 function SovereignRiskTab() {
-  const { data, isLoading, error } = useQuery({
-    queryKey: ["sovereignRisk"],
-    queryFn: api.sovereignRisk,
-  });
+  const { data, isLoading, error } = useQuery(apiQuery("sovereignRisk"));
   const scope = useSourceScope(provOf(data));
 
   if (isLoading) return <div className="p-8 text-text-muted">Loading sovereign risk data…</div>;
@@ -576,10 +560,7 @@ function SovereignRiskTab() {
 
 /* ─── Default Risk tab (Phase 31) ──────────────────────────────────── */
 function DefaultRiskTab() {
-  const { data, isLoading, error } = useQuery({
-    queryKey: ["sovereignDefault"],
-    queryFn: api.sovereignDefaultProb,
-  });
+  const { data, isLoading, error } = useQuery(apiQuery("sovereignDefaultProb"));
   const scope = useSourceScope(provOf(data));
 
   if (isLoading) return <div className="p-8 text-text-muted">Computing sovereign risk scores…</div>;
