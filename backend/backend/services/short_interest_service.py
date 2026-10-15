@@ -29,11 +29,15 @@ _DEFAULT_UNIVERSE = [
 
 
 def _fetch_yf_short(ticker: str) -> dict | None:
-    """Fetch short interest from yfinance .info dict (free, always available)."""
+    """Short interest from the stored Yahoo info (fetcher, weekly rotation); a
+    ticker with none stored is queued and skipped for now."""
     try:
-        import yfinance as yf
-        t = yf.Ticker(ticker)
-        info = t.info or {}
+        from .. import fetcher, yahoo_info
+        got = yahoo_info.stored([ticker]).get(ticker)
+        if got is None:
+            fetcher.request_yahoo_info([ticker])
+            return None
+        info = got[0]
         si_pct = info.get("shortPercentOfFloat")  # decimal e.g. 0.0098 = 0.98%
         if si_pct is not None:
             si_pct = round(float(si_pct) * 100, 2)  # convert to %

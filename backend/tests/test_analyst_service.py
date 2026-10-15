@@ -71,9 +71,6 @@ def patch_ticker(monkeypatch):
 
     def _install(fake: _FakeTicker):
         monkeypatch.setattr(svc, "yf", _FakeYF(fake))
-        # Bust the cache so each test exercises fresh code paths
-        from backend.cache import _caches
-        _caches.pop("analyst", None)
         return svc
 
     return _install
@@ -95,7 +92,7 @@ class TestPriceTargetUpside:
             "currency": "USD",
         })
         svc = patch_ticker(fake)
-        result = svc.analyst_data("AAPL")
+        result = svc.fetch_analyst("AAPL")
 
         pt = result["priceTarget"]
         assert pt["meanPrice"] == 120.0
@@ -109,13 +106,13 @@ class TestPriceTargetUpside:
     def test_upside_none_when_price_missing(self, patch_ticker):
         fake = _make_ticker(info={"targetMeanPrice": 120.0, "currency": "USD"})
         svc = patch_ticker(fake)
-        result = svc.analyst_data("X")
+        result = svc.fetch_analyst("X")
         assert result["priceTarget"]["upsidePct"] is None
 
     def test_upside_none_when_mean_price_missing(self, patch_ticker):
         fake = _make_ticker(info={"currentPrice": 100.0, "currency": "USD"})
         svc = patch_ticker(fake)
-        result = svc.analyst_data("X")
+        result = svc.fetch_analyst("X")
         assert result["priceTarget"]["upsidePct"] is None
 
     def test_negative_upside(self, patch_ticker):
@@ -126,7 +123,7 @@ class TestPriceTargetUpside:
             "currency": "USD",
         })
         svc = patch_ticker(fake)
-        result = svc.analyst_data("X")
+        result = svc.fetch_analyst("X")
         pt = result["priceTarget"]
         assert pt["upsidePct"] is not None
         assert pt["upsidePct"] < 0
@@ -141,13 +138,13 @@ class TestMissingAttributes:
         fake = _make_ticker(info={"currency": "USD"})
         # .recommendations is None by default
         svc = patch_ticker(fake)
-        result = svc.analyst_data("X")
+        result = svc.fetch_analyst("X")
         assert result["consensus"]["history"] == []
 
     def test_no_earnings_dates_gives_empty_list(self, patch_ticker):
         fake = _make_ticker(info={"currency": "USD"})
         svc = patch_ticker(fake)
-        result = svc.analyst_data("X")
+        result = svc.fetch_analyst("X")
         assert result["earningsSurprises"] == []
 
     def test_no_estimates_dfs_falls_back_to_info_fields(self, patch_ticker):
@@ -158,7 +155,7 @@ class TestMissingAttributes:
             "revenueGrowth": 0.08,
         })
         svc = patch_ticker(fake)
-        result = svc.analyst_data("X")
+        result = svc.fetch_analyst("X")
         est = result["estimates"]
         assert est["forwardEps"] == 5.5
         assert est["forwardPE"] == 22.0
@@ -167,7 +164,7 @@ class TestMissingAttributes:
     def test_no_growth_estimates_gives_none(self, patch_ticker):
         fake = _make_ticker(info={"currency": "USD"})
         svc = patch_ticker(fake)
-        result = svc.analyst_data("X")
+        result = svc.fetch_analyst("X")
         assert result["growthEstimates"] is None
 
     def test_bad_numeric_in_info_does_not_raise(self, patch_ticker):
@@ -179,7 +176,7 @@ class TestMissingAttributes:
         })
         svc = patch_ticker(fake)
         # Must not raise
-        result = svc.analyst_data("X")
+        result = svc.fetch_analyst("X")
         assert result["priceTarget"]["meanPrice"] is None
         assert result["price"] is None
         assert result["consensus"]["recommendationMean"] is None
@@ -189,7 +186,7 @@ class TestMissingAttributes:
         bad_df = pd.DataFrame({"weirdCol": [1, 2]})
         fake = _make_ticker(info={"currency": "USD"}, recommendations=bad_df)
         svc = patch_ticker(fake)
-        result = svc.analyst_data("X")
+        result = svc.fetch_analyst("X")
         # history should still be a list (possibly with partial entries)
         assert isinstance(result["consensus"]["history"], list)
 
@@ -215,7 +212,7 @@ class TestConsensusHistory:
             recommendations=recs_df,
         )
         svc = patch_ticker(fake)
-        result = svc.analyst_data("MSFT")
+        result = svc.fetch_analyst("MSFT")
 
         assert result["consensus"]["recommendationMean"] == 1.8
         assert result["consensus"]["recommendationKey"] == "buy"
@@ -243,7 +240,7 @@ class TestEarningsSurprises:
         )
         fake = _make_ticker(info={"currency": "USD"}, earnings_dates=ed_df)
         svc = patch_ticker(fake)
-        result = svc.analyst_data("AAPL")
+        result = svc.fetch_analyst("AAPL")
 
         surprises = result["earningsSurprises"]
         assert len(surprises) == 3
@@ -265,7 +262,7 @@ class TestEarningsSurprises:
         )
         fake = _make_ticker(info={"currency": "USD"}, earnings_dates=ed_df)
         svc = patch_ticker(fake)
-        result = svc.analyst_data("X")
+        result = svc.fetch_analyst("X")
         assert len(result["earningsSurprises"]) <= 8
 
     def test_rows_without_actual_excluded(self, patch_ticker):
@@ -280,7 +277,7 @@ class TestEarningsSurprises:
         )
         fake = _make_ticker(info={"currency": "USD"}, earnings_dates=ed_df)
         svc = patch_ticker(fake)
-        result = svc.analyst_data("X")
+        result = svc.fetch_analyst("X")
         # Only the first row (with actual) should be included
         assert len(result["earningsSurprises"]) == 1
         assert result["earningsSurprises"][0]["epsActual"] == 2.18
@@ -294,7 +291,7 @@ class TestEmptyFaker:
     def test_full_shape_returned_with_safe_defaults(self, patch_ticker):
         fake = _make_ticker()  # no info, no attributes
         svc = patch_ticker(fake)
-        result = svc.analyst_data("EMPTY")
+        result = svc.fetch_analyst("EMPTY")
 
         # Top-level keys
         assert result["ticker"] == "EMPTY"
@@ -350,7 +347,7 @@ class TestEmptyFaker:
         monkeypatch.setattr(svc, "yf", _BrokenYF())
         _caches.pop("analyst", None)
 
-        result = svc.analyst_data("BROKEN")
+        result = svc.fetch_analyst("BROKEN")
         assert result["ticker"] == "BROKEN"
         assert result["price"] is None
         assert result["earningsSurprises"] == []
@@ -369,7 +366,7 @@ class TestGrowthEstimates:
         )
         fake = _make_ticker(info={"currency": "USD"}, growth_estimates=ge_df)
         svc = patch_ticker(fake)
-        result = svc.analyst_data("X")
+        result = svc.fetch_analyst("X")
 
         ge = result["growthEstimates"]
         assert ge is not None

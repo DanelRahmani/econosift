@@ -1765,6 +1765,8 @@ export interface SectorReturnsResponse {
 export interface SectorFundamentals {
   ticker: string;
   sector: string;
+  /** when the stored fund statistics were fetched (weekly) */
+  infoAsOf?: string | null;
   price: number | null;
   aum: number | null;
   trailingPE: number | null;

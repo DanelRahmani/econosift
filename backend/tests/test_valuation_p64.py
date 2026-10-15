@@ -130,7 +130,7 @@ def test_analyst_data_without_a_currency_exposes_none(monkeypatch):
             raise AttributeError(name)
 
     monkeypatch.setattr(analyst_service.yf, "Ticker", lambda t: _T())
-    out = analyst_service.analyst_data.__wrapped__("XYZ")
+    out = analyst_service.fetch_analyst("XYZ")
     assert out["currency"] is None
     assert out["unavailable"]["currency"] == "Yahoo reported no quote currency"
 

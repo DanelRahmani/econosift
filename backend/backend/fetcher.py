@@ -90,6 +90,27 @@ def request_history(symbols) -> list[str]:
     return missing
 
 
+def request_yahoo_info(symbols) -> list[str]:
+    """Queue Yahoo's company fields for requested symbols that have none stored;
+    returns the ones still pending (a symbol whose fetch failed is not pending).
+    Read path: writes the queue only."""
+    from . import yahoo_info
+
+    syms = list(dict.fromkeys(symbols))
+    if not syms:
+        return []
+    have = yahoo_info.stored(syms)
+    marks = ", ".join("?" * len(syms))
+    with store.connect() as conn:
+        failed = {r[0] for r in conn.execute(
+            f"SELECT key FROM fetch_queue WHERE kind = 'yahoo_info' AND attempts >= ? AND key IN ({marks})",
+            (MAX_ATTEMPTS, *syms))}
+    missing = [s for s in syms if s not in have and s not in failed]
+    for sym in missing:
+        enqueue("yahoo_info", sym, PRIORITY_ON_DEMAND, retry_failed=False)
+    return missing
+
+
 def _next_task() -> tuple[int, str, str] | None:
     with store.connect() as conn:
         return conn.execute(
@@ -272,6 +293,23 @@ def run_frames(day: str) -> int:
     return len(changed)
 
 
+def run_yahoo_info(symbol: str) -> int:
+    from . import yahoo_info
+    return yahoo_info.fetch(symbol)
+
+
+def run_analyst(symbol: str) -> int:
+    """Store the Markets analyst panel (targets, ratings, surprises, estimates) for one symbol."""
+    from . import yahoo_info
+    from .services import analyst_service
+
+    doc = analyst_service.fetch_analyst(symbol)
+    if not analyst_service.has_data(doc):
+        raise RuntimeError(f"Yahoo returned no analyst data for {symbol}")  # never store an empty result
+    yahoo_info.put("analyst", symbol, doc)
+    return 1
+
+
 def run_snapshot(key: str) -> int:
     from . import cache, snapshot
     rows = snapshot.run(key)
@@ -287,6 +325,8 @@ HANDLERS: dict[str, Callable[[str], int]] = {
     "ciks": run_ciks,
     "facts": run_facts,
     "frames": run_frames,
+    "yahoo_info": run_yahoo_info,
+    "analyst": run_analyst,
 }
 
 
@@ -324,6 +364,16 @@ def queue_facts_backfill() -> None:
             "SELECT DISTINCT cik FROM security WHERE cik IS NOT NULL AND facts_at IS NULL ORDER BY cik")]
     for cik in ciks:
         enqueue("facts", cik, PRIORITY_FACTS, retry_failed=False)
+
+
+def queue_yahoo_rotation() -> None:
+    """Daily: refresh Yahoo's company fields for the ~75 symbols stored longest ago
+    (plus the sector ETFs when they are due), so every one is refreshed weekly."""
+    from . import yahoo_info
+    from .services.sector_service import SECTOR_ETFS
+
+    for sym in yahoo_info.rotation(extra=tuple(SECTOR_ETFS)):
+        enqueue("yahoo_info", sym, PRIORITY_HISTORY)
 
 
 def queue_frames(today: datetime | None = None) -> None:

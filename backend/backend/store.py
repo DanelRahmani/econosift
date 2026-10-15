@@ -109,6 +109,15 @@ CREATE TABLE IF NOT EXISTS sec_filing (
     form    TEXT,
     PRIMARY KEY (cik, accn)
 ) WITHOUT ROWID;
+-- Yahoo-only data SEC lacks, as JSON per symbol (yahoo_info.py): 'info' = Ticker.info
+-- (estimates, targets, profile; weekly rotation), 'analyst' = the analyst panel (on demand).
+CREATE TABLE IF NOT EXISTS yahoo_doc (
+    kind        TEXT NOT NULL,
+    symbol      TEXT NOT NULL,
+    doc         TEXT NOT NULL,
+    fetched_at  TEXT NOT NULL,
+    PRIMARY KEY (kind, symbol)
+) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS macro_series (
     series      TEXT NOT NULL,
     country     TEXT NOT NULL,

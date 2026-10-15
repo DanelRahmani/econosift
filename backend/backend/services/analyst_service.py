@@ -1,19 +1,20 @@
 """Analyst-data service: price targets, consensus ratings, earnings surprises,
 forward estimates, and growth estimates — all sourced from yfinance.
 
-All attribute accesses are guarded; the function never raises.
+The fetcher thread builds the panel (:func:`fetch_analyst`) and stores it
+(Phase 68); a page reads only the stored copy (:func:`analyst_data`) and
+queues a fetch when there is none or it is over a week old.
 """
 from __future__ import annotations
 
 import math
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 import pandas as pd
 import yfinance as yf
 
 from .. import provenance as pv
-from ..cache import cached
 
 
 # ---------------------------------------------------------------------------
@@ -64,9 +65,43 @@ def _safe_call(t: Any, method: str, *args, **kwargs) -> pd.DataFrame | None:
 # Public API
 # ---------------------------------------------------------------------------
 
-@cached("analyst")
+MAX_AGE = timedelta(days=7)
+
+
+def _empty(ticker: str) -> dict:
+    return {"ticker": ticker, "currency": None, "price": None,
+            "priceTarget": {"meanPrice": None, "highPrice": None, "lowPrice": None, "medianPrice": None,
+                            "numberOfAnalysts": None, "upsidePct": None},
+            "consensus": {"recommendationMean": None, "recommendationKey": None, "history": []},
+            "earningsSurprises": [], "estimates": {}, "growthEstimates": None, "asOf": None}
+
+
 def analyst_data(ticker: str) -> dict:
-    """Return a rich analyst-data bundle for *ticker*.
+    """The stored analyst panel for *ticker*; ``status: "pending"`` (and a queued
+    fetch) when none is stored. A copy over a week old is served and refreshed."""
+    from .. import fetcher, yahoo_info
+
+    sym = ticker.upper()
+    got = yahoo_info.stored([sym], "analyst").get(sym)
+    if got is None:
+        fetcher.enqueue("analyst", sym, fetcher.PRIORITY_ON_DEMAND, retry_failed=False)
+        return {**_empty(sym), "status": "pending"}
+    doc, fetched_at = got
+    age = datetime.now(timezone.utc) - datetime.fromisoformat(fetched_at.replace("Z", "+00:00"))
+    if age > MAX_AGE:
+        fetcher.enqueue("analyst", sym, fetcher.PRIORITY_HISTORY)
+    return {**doc, "fetchedAt": fetched_at}
+
+
+def has_data(result: dict) -> bool:
+    """False for a panel Yahoo answered with nothing (never stored)."""
+    pt = result.get("priceTarget") or {}
+    return bool(result.get("price") is not None or pt.get("meanPrice") is not None
+                or result.get("earningsSurprises") or result.get("estimates"))
+
+
+def fetch_analyst(ticker: str) -> dict:
+    """Build the analyst panel for *ticker* from Yahoo (fetcher thread only).
 
     All sub-keys fall back to None / [] so callers never see KeyError or NaN.
     """
@@ -275,6 +310,8 @@ def provenance(result: dict, root: str = "analyst") -> dict:
 
     sym = result.get("ticker") or ""
     dates = [e["date"] for e in result.get("earningsSurprises") or [] if e.get("date")]
+    # A stored panel is dated by when the fetcher stored it, not by this request.
+    stamped = {"fetchedAt": result["fetchedAt"]} if result.get("fetchedAt") else {}
     prov: dict = {
         k(): pv.yahoo(sym, "Analyst data: price targets, consensus, earnings surprises and estimates",
                       note="Yahoo Finance aggregates these from contributing brokers."),
@@ -292,4 +329,7 @@ def provenance(result: dict, root: str = "analyst") -> dict:
                                       "revenueGrowth, earningsGrowth, earningsQuarterlyGrowth"),
         k("growthEstimates"): pv.yahoo(sym, "Ticker.growth_estimates"),
     }
+    for ref in prov.values():
+        if ref.get("provider") == "yahoo":
+            ref.update(stamped)
     return prov

@@ -321,6 +321,14 @@ def start_scheduler():
             max_instances=1,
             replace_existing=True,
         )
+        # Yahoo-only company fields (estimates, targets, profile): ~75 symbols a day.
+        scheduler.add_job(
+            fetcher.queue_yahoo_rotation,
+            CronTrigger(hour=20, minute=0, timezone=MARKET_TZ),
+            id="yahoo_info_rotation",
+            max_instances=1,
+            replace_existing=True,
+        )
         scheduler.add_job(
             refresh_fx_rates,
             CronTrigger(hour="6,17,21", minute=0, timezone=MARKET_TZ),

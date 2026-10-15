@@ -8,9 +8,9 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date
 
 import numpy as np
-import yfinance as yf
 
 from .. import provenance as pv
+from .. import cache
 from ..cache import cached
 from . import yfinance_service as yfs
 from . import regime_service
@@ -161,14 +161,19 @@ def get_sector_fundamentals() -> list[dict]:
     frame = yfs.get_close_frame(all_syms, "1y")
     frame = frame.sort_index() if frame is not None and not frame.empty else None
 
+    # Fund statistics (AUM, P/E, P/B, yield, beta) from the stored Yahoo info, refreshed
+    # weekly by the fetcher; an ETF with none stored yet is queued and shows blanks.
+    from .. import fetcher, yahoo_info
+    stored = yahoo_info.stored(all_syms)
+    if fetcher.request_yahoo_info([s for s in all_syms if s not in stored]):
+        cache.mark_incomplete()
+
     def _fetch_info(etf: str) -> dict:
-        info: dict = {}
-        try:
-            info = yf.Ticker(etf).info or {}
-        except Exception:
-            logger.exception("yf.Ticker(%s).info failed", etf)
+        info: dict = stored[etf][0] if etf in stored else {}
 
         price = _clean(info.get("regularMarketPrice") or info.get("currentPrice"))
+        if frame is not None and etf in frame.columns and frame[etf].notna().any():
+            price = _clean(frame[etf].dropna().iloc[-1])  # today's stored close beats a week-old quote
         aum = _clean(info.get("totalAssets"))
         trailing_pe = _clean(info.get("trailingPE"))
         price_to_book = _clean(info.get("priceToBook"))
@@ -199,6 +204,7 @@ def get_sector_fundamentals() -> list[dict]:
         return {
             "ticker": etf,
             "sector": SECTOR_ETFS[etf],
+            "infoAsOf": stored[etf][1] if etf in stored else None,
             "price": price,
             "aum": aum,
             "trailingPE": trailing_pe,

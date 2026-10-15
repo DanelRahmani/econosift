@@ -39,12 +39,14 @@ async def get_sector_fundamentals():
         rows = await asyncio.to_thread(sector_service.get_sector_fundamentals)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
-    info = pv.ref("yahoo", None, "Quote and fund statistics of the 11 sector SPDR ETFs (Ticker.info)")
+    info = pv.ref("yahoo", None, "Fund statistics of the 11 sector SPDR ETFs (Ticker.info)",
+                  note="The fetcher's stored copy, refreshed weekly; each row's infoAsOf says when.")
     closes = pv.ref("yahoo", None, "Daily adjusted close of the 11 sector SPDR ETFs, last 1 year", frequency="daily",
                     units="price, split- and dividend-adjusted")
     return pv.attach({"sectors": rows}, {
         "*": info,
-        "sectors.price": pv.yahoo(None, "info.regularMarketPrice, else currentPrice, of each sector ETF", units="price"),
+        "sectors.price": pv.yahoo(None, "Last stored daily close of each sector ETF (else the stored "
+                                        "info.regularMarketPrice)", units="price"),
         "sectors.aum": pv.yahoo(None, "info.totalAssets of each sector ETF", units="USD"),
         "sectors.trailingPE": pv.yahoo(None, "info.trailingPE of each sector ETF"),
         "sectors.priceToBook": pv.yahoo(None, "info.priceToBook of each sector ETF"),

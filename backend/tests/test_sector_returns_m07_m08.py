@@ -123,11 +123,6 @@ class TestTreemapYtd:
 # M-08 — table and chart share the N-session base
 # ---------------------------------------------------------------------------
 
-class _FakeTicker:
-    def __init__(self, sym):
-        self.info = {}
-
-
 class TestSectorTableMatchesChart:
     @pytest.fixture()
     def patch_all(self, monkeypatch):
@@ -140,7 +135,9 @@ class TestSectorTableMatchesChart:
             "SPY": [100.0 + i for i in range(130)],
         }, index=idx)
         monkeypatch.setattr(yfinance_service, "get_close_frame", lambda syms, period: frame)
-        monkeypatch.setattr(sector_service.yf, "Ticker", _FakeTicker)
+        # No stored ETF fund statistics, and nothing gets queued.
+        monkeypatch.setattr("backend.yahoo_info.stored", lambda syms, kind="info": {})
+        monkeypatch.setattr("backend.fetcher.request_yahoo_info", lambda syms: [])
 
     def test_three_month_is_63_sessions_back_in_both(self, patch_all):
         from backend.services import sector_service
@@ -177,7 +174,9 @@ class TestSectorTableMatchesChart:
         frame = pd.DataFrame({"XLK": [100.0 + i for i in range(40)],
                               "SPY": [100.0 + i for i in range(40)]}, index=idx)
         monkeypatch.setattr(yfinance_service, "get_close_frame", lambda syms, period: frame)
-        monkeypatch.setattr(sector_service.yf, "Ticker", _FakeTicker)
+        # No stored ETF fund statistics, and nothing gets queued.
+        monkeypatch.setattr("backend.yahoo_info.stored", lambda syms, kind="info": {})
+        monkeypatch.setattr("backend.fetcher.request_yahoo_info", lambda syms: [])
 
         assert _row(sector_service.get_sector_returns()["periods"]["3m"], "XLK")["changePercent"] is None
         assert _row(sector_service.get_sector_fundamentals(), "XLK")["return3m"] is None
@@ -226,7 +225,9 @@ class TestSessionBaseEverywhere:
         monkeypatch.setattr(constituents, "get_constituents", lambda idx: members)
         monkeypatch.setattr(yfinance_service, "get_close_frame", frame)
         monkeypatch.setattr(yfinance_service, "get_market_caps", lambda syms: {"XLK": 1e9})
-        monkeypatch.setattr(sector_service.yf, "Ticker", _FakeTicker)
+        # No stored ETF fund statistics, and nothing gets queued.
+        monkeypatch.setattr("backend.yahoo_info.stored", lambda syms, kind="info": {})
+        monkeypatch.setattr("backend.fetcher.request_yahoo_info", lambda syms: [])
 
     @pytest.mark.parametrize("period", ["1w", "1m", "3m", "1y"])
     def test_treemap_equals_sector_chart(self, patch_all, period):

@@ -28,7 +28,7 @@ def _surp(monkeypatch, df):
     from backend.cache import _caches
     monkeypatch.setattr(svc, "yf", _YF(_T(df)))
     _caches.pop("analyst", None)
-    return svc.analyst_data("ZZZ")["earningsSurprises"]
+    return svc.fetch_analyst("ZZZ")["earningsSurprises"]
 
 
 def test_surprise_fallback_is_percent(monkeypatch):
