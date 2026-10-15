@@ -2142,6 +2142,25 @@ export interface HealthResponse {
   };
   config: { fredApiKey: boolean; finnhubApiKey: boolean; geminiApiKey: boolean };
   database: DbHealth;
+  store?: StoreStatus;
+}
+
+/** The background fetcher: one-time history backfill, work queue, daily request log. */
+export interface StoreStatus {
+  running?: boolean;
+  current?: string | null;
+  backfill?: { total: number; done: number };
+  queue?: { pending: number; failed: number; errors: { kind: string; key: string; error: string | null }[] };
+  universeAt?: string | null;
+  sources?: {
+    source: string;
+    day: string | null;
+    requestsToday: number | null;
+    lastSuccess: string | null;
+    lastError: string | null;
+    openUntil: string | null;
+  }[];
+  error?: string;
 }
 
 export interface BulkDatasetStatus {

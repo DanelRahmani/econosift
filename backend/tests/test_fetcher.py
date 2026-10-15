@@ -160,3 +160,10 @@ def test_source_health_counts_todays_yahoo_requests():
         rows = dict(conn.execute("SELECT source, requests_today FROM source_health").fetchall())
     for name, st in base.items():
         assert rows[name] == st["requests"] + 3
+
+
+def test_admin_health_reports_store_progress(client):
+    fetcher.enqueue("history", "ZZF")
+    body = client.get("/api/admin/health").json()
+    assert body["store"]["backfill"] == {"total": 0, "done": 0}
+    assert body["store"]["queue"]["pending"] == 1

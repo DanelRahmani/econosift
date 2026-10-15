@@ -44,6 +44,13 @@ def health():
     except Exception as exc:
         db_health = {"error": str(exc)}
 
+    # The fetcher's backfill progress, queue and per-source request log (Phase 66).
+    try:
+        from .. import fetcher
+        store_status: dict = fetcher.status()
+    except Exception as exc:
+        store_status = {"error": str(exc)}
+
     return {
         "status": "ok",
         "uptimeSeconds": round(time.time() - _STARTED, 1),
@@ -65,6 +72,7 @@ def health():
         # Per-source rate limiter / circuit breaker: an open circuit means the
         # source is being skipped after 429s or repeated errors.
         "sources": rate_limit.status(),
+        "store": store_status,
     }
 
 

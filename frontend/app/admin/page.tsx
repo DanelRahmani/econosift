@@ -3,7 +3,7 @@
 // cache-bust: 2026-06-28 api-keys-admin
 import { useEffect, useState, useCallback } from "react";
 import { api } from "@/lib/api";
-import type { HealthResponse, PrefetchStatus, BulkDatasetStatus, ConfigResponse } from "@/lib/types";
+import type { HealthResponse, PrefetchStatus, BulkDatasetStatus, ConfigResponse, StoreStatus } from "@/lib/types";
 import { Card, Skeleton } from "@/components/ui";
 import { RecentFailures } from "@/components/admin/RecentFailures";
 import { useTheme, DEFAULT_COLORS, type ThemeColors } from "@/components/ThemeProvider";
@@ -226,6 +226,8 @@ export default function AdminPage() {
             <Card><div className="text-red-500 text-sm">DB Error: {data.database.error}</div></Card>
           )}
 
+          {data.store && <StoreSection store={data.store} />}
+
           {/* Bulk Data Status */}
           <BulkDataSection />
         </>
@@ -245,6 +247,56 @@ function Stat({ label, value, tone }: { label: string; value: string; tone?: "po
     <Card>
       <div className="text-xs text-text-muted mb-1">{label}</div>
       <div className={`text-lg font-mono ${tone === "pos" ? "text-success" : tone === "neg" ? "text-danger" : "text-text-primary"}`}>{value}</div>
+    </Card>
+  );
+}
+
+function StoreSection({ store }: { store: StoreStatus }) {
+  if (store.error) {
+    return <Card><div className="text-danger text-sm">Data store error: {store.error}</div></Card>;
+  }
+  const total = store.backfill?.total ?? 0;
+  const done = store.backfill?.done ?? 0;
+  const pct = total ? Math.round((done / total) * 100) : 0;
+  const errors = store.queue?.errors ?? [];
+  return (
+    <Card>
+      <h2 className="text-sm font-semibold mb-4 text-text-secondary">Data Store</h2>
+      <div className="mb-4">
+        <div className="flex justify-between text-xs text-text-muted mb-1">
+          <span>Price history backfill</span>
+          <span className="font-mono">{done.toLocaleString()} / {total.toLocaleString()} symbols ({pct}%)</span>
+        </div>
+        <div className="h-2 rounded-full bg-surface-alt overflow-hidden">
+          <div className="h-full bg-accent transition-all" style={{ width: `${pct}%` }} />
+        </div>
+        <p className="text-xs text-text-muted mt-1">
+          {store.running ? (store.current ? `Fetching ${store.current}` : "Fetcher idle") : "Fetcher not running"}
+          {store.universeAt ? ` · index rosters as of ${store.universeAt.slice(0, 16).replace("T", " ")} UTC` : ""}
+        </p>
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+        <DbStat label="Queued" value={store.queue?.pending?.toLocaleString() ?? "—"} />
+        <DbStat label="Failed" value={store.queue?.failed?.toLocaleString() ?? "—"} />
+        {(store.sources ?? []).filter((s) => s.source !== "constituents").map((s) => (
+          <DbStat key={s.source} label={`${s.source} requests today`} value={s.requestsToday?.toLocaleString() ?? "—"} />
+        ))}
+      </div>
+      {(store.sources ?? []).some((s) => s.openUntil) && (
+        <p className="text-xs text-danger mb-2">
+          Circuit open: {(store.sources ?? []).filter((s) => s.openUntil).map((s) => `${s.source} until ${s.openUntil}`).join(", ")}
+        </p>
+      )}
+      {errors.length > 0 && (
+        <div className="text-xs">
+          <div className="text-text-muted mb-1">Failed tasks (retried when re-queued)</div>
+          <ul className="space-y-0.5 font-mono">
+            {errors.map((e) => (
+              <li key={`${e.kind}:${e.key}`} className="text-danger break-words">{e.kind} {e.key}: {e.error}</li>
+            ))}
+          </ul>
+        </div>
+      )}
     </Card>
   );
 }
