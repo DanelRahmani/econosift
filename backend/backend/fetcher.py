@@ -27,7 +27,9 @@ UNIVERSE_MAX_AGE = timedelta(days=7)
 INDEXES = ("sp500", "ndx", "dow")
 
 # Priorities: lower runs first.
+PRIORITY_SNAPSHOT = 0
 PRIORITY_UNIVERSE = 1
+PRIORITY_REFETCH = 2    # history whose stored closes no longer match (a split)
 PRIORITY_HISTORY = 5
 
 
@@ -161,9 +163,15 @@ def run_history(symbol: str) -> int:
     return len(bars)
 
 
+def run_snapshot(key: str) -> int:
+    from . import snapshot
+    return snapshot.run(key)
+
+
 HANDLERS: dict[str, Callable[[str], int]] = {
     "universe": run_universe,
     "history": run_history,
+    "snapshot": run_snapshot,
 }
 
 
@@ -186,6 +194,18 @@ def queue_history_rotation(today: datetime | None = None) -> None:
 
 def queue_universe() -> None:
     enqueue("universe", "all", PRIORITY_UNIVERSE)
+
+
+def queue_snapshot(now: datetime | None = None) -> None:
+    """Every 15 min: queue a snapshot while the US market is open."""
+    from .snapshot import in_market_hours
+    if in_market_hours(now):
+        enqueue("snapshot", "intraday", PRIORITY_SNAPSHOT)
+
+
+def queue_close_snapshot() -> None:
+    """After the close: a snapshot that also writes today's daily bar."""
+    enqueue("snapshot", "close", PRIORITY_SNAPSHOT)
 
 
 # ---------------------------------------------------------------------------

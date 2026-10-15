@@ -26,25 +26,6 @@ def _utcnow() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
-class DailyQuote(Base):
-    """Latest fundamental snapshot per symbol."""
-
-    __tablename__ = "daily_quote"
-
-    symbol = Column(String, primary_key=True)
-    date = Column(Date)
-    price = Column(Float)
-    market_cap = Column(Float)
-    pe = Column(Float)
-    forward_pe = Column(Float)
-    div_yield = Column(Float)
-    beta = Column(Float)
-    high52 = Column(Float)
-    low52 = Column(Float)
-    avg_vol_20d = Column(Float)
-    updated_at = Column(DateTime, default=_utcnow)
-
-
 class MetricSnapshot(Base):
     """Daily snapshot of a metric that has no free historical source.
 

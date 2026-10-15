@@ -63,7 +63,6 @@ def test_all_tables_exist(mem_engine):
     inspector = inspect(mem_engine)
     tables = set(inspector.get_table_names())
     expected = {
-        "daily_quote",
         "job_execution",
         "cache_entry",
     }
@@ -141,25 +140,3 @@ def test_job_execution_insert_and_query(session):
     assert result.status == "completed"
     assert result.rows_affected == 503
     assert result.error_message is None
-
-
-# ---------------------------------------------------------------------------
-# 7. DailyQuote — single-column PK
-# ---------------------------------------------------------------------------
-
-def test_daily_quote_insert(session):
-    m = _models()
-    row = m.DailyQuote(
-        symbol="NVDA",
-        date=date(2024, 6, 25),
-        price=135.0,
-        market_cap=3_300_000_000_000.0,
-        pe=65.0,
-        beta=1.7,
-    )
-    session.add(row)
-    session.flush()
-
-    result = session.query(m.DailyQuote).filter_by(symbol="NVDA").one()
-    assert result.price == pytest.approx(135.0)
-    assert result.beta == pytest.approx(1.7)

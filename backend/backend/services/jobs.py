@@ -119,74 +119,6 @@ def _get_all_tracked_tickers() -> list[str]:
 
 
 # ---------------------------------------------------------------------------
-# Job: refresh_daily_quotes
-# ---------------------------------------------------------------------------
-
-def refresh_daily_quotes() -> None:
-    """Fetch latest fundamental snapshot for up to 50 tracked tickers and upsert into daily_quote."""
-    job_id = log_job_start("refresh_daily_quotes")
-    try:
-        from .yfinance_service import get_quote, get_info
-        from ..db_models import DailyQuote
-
-        tickers = _get_all_tracked_tickers()
-        today = datetime.now(timezone.utc).date()
-        rows = 0
-
-        from sqlalchemy.dialects.sqlite import insert as sqlite_insert
-
-        # Fetch first, then write in one short transaction: holding SQLite's
-        # write lock across ~50 network round trips blocked every other writer
-        # (cache, Admin "Clear cache") for the whole run (P1-16).
-        values: list[dict] = []
-        for sym in tickers[:50]:
-            try:
-                q = get_quote(sym)
-                if not q:
-                    continue
-                info: dict = {}
-                try:
-                    info = get_info(sym) or {}
-                except Exception:
-                    pass
-                values.append(dict(
-                    symbol=sym,
-                    date=today,
-                    price=_safe_float(q.get("price")),
-                    market_cap=_safe_float(info.get("marketCap")),
-                    pe=_safe_float(info.get("trailingPE")),
-                    forward_pe=_safe_float(info.get("forwardPE")),
-                    div_yield=_safe_float(info.get("dividendYield")),
-                    beta=_safe_float(info.get("beta")),
-                    high52=_safe_float(info.get("fiftyTwoWeekHigh")),
-                    low52=_safe_float(info.get("fiftyTwoWeekLow")),
-                    avg_vol_20d=_safe_float(
-                        info.get("averageVolume20days")
-                        or info.get("averageDailyVolume10Day")
-                    ),
-                    updated_at=_now_utc(),
-                ))
-            except Exception as exc:
-                logger.debug("refresh_daily_quotes skip %s: %s", sym, exc)
-
-        with _get_session()() as session:
-            for v in values:
-                stmt = sqlite_insert(DailyQuote).values(**v).on_conflict_do_update(
-                    index_elements=["symbol"],
-                    set_={k: val for k, val in v.items() if k != "symbol"},
-                )
-                session.execute(stmt)
-                rows += 1
-            session.commit()
-
-        log_job_success(job_id, rows)
-        logger.info("refresh_daily_quotes: %d rows updated", rows)
-    except Exception as exc:
-        logger.error("refresh_daily_quotes failed: %s", exc)
-        log_job_failure(job_id, str(exc))
-
-
-# ---------------------------------------------------------------------------
 # Job: refresh_fx_rates
 # ---------------------------------------------------------------------------
 
@@ -365,10 +297,19 @@ def start_scheduler():
             max_instances=1,
             replace_existing=True,
         )
+        # The one Yahoo job inside market hours: 5 bulk screen calls per run.
         scheduler.add_job(
-            refresh_daily_quotes,
-            CronTrigger(day_of_week="mon-fri", hour=18, minute=0, timezone=MARKET_TZ),
-            id="refresh_daily_quotes",
+            fetcher.queue_snapshot,
+            CronTrigger(day_of_week="mon-fri", hour="9-16", minute="0,15,30,45", timezone=MARKET_TZ),
+            id="snapshot_intraday",
+            max_instances=1,
+            replace_existing=True,
+        )
+        # Today's bar from the closing snapshot, then a confirmation pass.
+        scheduler.add_job(
+            fetcher.queue_close_snapshot,
+            CronTrigger(day_of_week="mon-fri", hour="16,17", minute=20, timezone=MARKET_TZ),
+            id="snapshot_close",
             max_instances=1,
             replace_existing=True,
         )
