@@ -153,20 +153,15 @@ def test_ohlson_without_a_currency_is_null_with_a_reason(monkeypatch):
     assert "no quote currency" in out["reason"].lower() or "no currency" in out["reason"].lower()
 
 
-def test_get_quote_without_a_currency_is_none(monkeypatch):
+def test_get_quote_without_a_currency_is_none():
+    from backend import store
     from backend.services import yfinance_service as yfs
 
-    class _T:
-        fast_info = {"last_price": 10.0, "previous_close": 9.0}
-
-        def history(self, **kw):
-            return pd.DataFrame()
-
-        def get_info(self):
-            return {}
-
-    monkeypatch.setattr(yfs.yf, "Ticker", lambda t: _T())
-    assert yfs.get_quote.__wrapped__("XYZ")["currency"] is None
+    store.init_schema()
+    with store.connect() as conn:
+        conn.execute("DELETE FROM quote_latest WHERE symbol = 'XYZ'")
+    store.upsert("quote_latest", [dict(symbol="XYZ", ts=1792008001, price=10.0, change_pct=11.1)], ("symbol",))
+    assert yfs.get_quote("XYZ")["currency"] is None  # unknown stays None; never assumed USD
 
 
 def test_kpis_without_a_currency_are_none_with_a_reason():
@@ -193,7 +188,7 @@ def test_technicals_report_the_quote_currency(monkeypatch):
     from backend.services import technicals_service as ts
     from backend.services import yfinance_service as yfs
 
-    monkeypatch.setattr(ts.yf, "download", lambda *a, **k: _ohlcv())
+    monkeypatch.setattr(ts.yfs, "get_daily_bars", lambda *a, **k: _ohlcv())
     monkeypatch.setattr(yfs, "get_quote", lambda t: {"currency": "EUR"})
     assert ts.get_technicals.__wrapped__("SAP.DE", "1y")["currency"] == "EUR"
 
@@ -202,7 +197,7 @@ def test_technicals_currency_is_none_when_unknown(monkeypatch):
     from backend.services import technicals_service as ts
     from backend.services import yfinance_service as yfs
 
-    monkeypatch.setattr(ts.yf, "download", lambda *a, **k: _ohlcv())
+    monkeypatch.setattr(ts.yfs, "get_daily_bars", lambda *a, **k: _ohlcv())
     monkeypatch.setattr(yfs, "get_quote", lambda t: {"currency": None})
     assert ts.get_technicals.__wrapped__("XYZ", "1y")["currency"] is None
 

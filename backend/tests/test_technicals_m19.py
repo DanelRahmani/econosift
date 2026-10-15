@@ -108,7 +108,7 @@ def test_get_technicals_pivots_follow_the_last_completed_period(monkeypatch):
     close = pd.Series(100.0 + np.arange(600) * 0.1, index=idx)
     frame = pd.DataFrame(
         {"Open": close, "High": close + 1.0, "Low": close - 1.0, "Close": close, "Volume": 1_000.0}, index=idx)
-    monkeypatch.setattr(ts.yf, "download", lambda *a, **k: frame)
+    monkeypatch.setattr(ts.yfs, "get_daily_bars", lambda *a, **k: frame)
     monkeypatch.setattr(ts, "_today", lambda: pd.Timestamp("2026-09-30"))
 
     pivots = ts.get_technicals.__wrapped__("AAPL", "1y")["pivotPoints"]
@@ -134,7 +134,7 @@ def _trending_frame(n: int = 300) -> pd.DataFrame:
 def test_bollinger_bands_use_the_population_standard_deviation(monkeypatch):
     pytest.importorskip("pandas_ta")
     frame = _trending_frame()
-    monkeypatch.setattr(ts.yf, "download", lambda *a, **k: frame)
+    monkeypatch.setattr(ts.yfs, "get_daily_bars", lambda *a, **k: frame)
 
     out = ts.get_technicals.__wrapped__("AAPL", "1y")
     last = out["bollinger"][-1]
@@ -149,7 +149,7 @@ def test_bollinger_bands_use_the_population_standard_deviation(monkeypatch):
 def test_senkou_spans_are_displaced_twenty_six_periods(monkeypatch):
     pytest.importorskip("pandas_ta")
     frame = _trending_frame()
-    monkeypatch.setattr(ts.yf, "download", lambda *a, **k: frame)
+    monkeypatch.setattr(ts.yfs, "get_daily_bars", lambda *a, **k: frame)
 
     out = ts.get_technicals.__wrapped__("AAPL", "2y")
     rows = {r["date"]: r for r in out["ichimoku"]}

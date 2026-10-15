@@ -56,7 +56,8 @@ def test_ff_asof_is_last_factor_date(monkeypatch):
     # prices extend past the factor data (to "today"); asOf must stay at the last aligned factor date
     pidx = pd.bdate_range("2026-05-01", "2026-10-02")
     prices = pd.Series(100 * np.cumprod(1 + rng.normal(0, 0.01, len(pidx))), index=pidx)
-    monkeypatch.setattr(yf, "download", lambda *a, **k: pd.DataFrame({"Close": prices.values}, index=prices.index))
+    from backend.services import yfinance_service as yfs
+    monkeypatch.setattr(yfs, "get_close_frame", lambda symbols, period: pd.DataFrame({symbols[0]: prices}))
     r = ff.factor_regression("FAKE", model="3", period="1y")
     assert "error" not in r
     assert r["asOf"] == "2026-08-31"

@@ -1,4 +1,7 @@
-"""M-06 quote change %, M-12 forward-EPS fallback, M-20 dual-class market caps. No network."""
+"""M-06 quote change %, M-12 forward-EPS fallback, M-20 dual-class market caps. No network.
+
+Since Phase 67 quotes and caps are read from econosift.db (the snapshot), never from Yahoo.
+"""
 from __future__ import annotations
 
 import pandas as pd
@@ -7,45 +10,62 @@ import pytest
 from backend.services import yfinance_service as yfs
 
 
-# ── M-06 ────────────────────────────────────────────────────────────────────
-class _QuoteTicker:
-    def __init__(self, closes, fast, meta=None):
-        self._closes, self.fast_info, self._meta = closes, fast, meta or {"shortName": "Acme"}
-
-    def history(self, **kw):
-        idx = pd.bdate_range("2026-09-28", periods=len(self._closes))
-        return pd.DataFrame({"Close": self._closes}, index=idx)
-
-    def get_info(self):
-        return self._meta
+# ── M-06 (Phase 67: quotes come from the store) ─────────────────────────────
+SYMS = ("ACME", "GOOGL", "GOOG", "BRK-B", "BRK-A", "AAPL", "BF-B", "BF-A")
 
 
-def _quote(monkeypatch, closes, fast):
-    monkeypatch.setattr(yfs.yf, "Ticker", lambda s: _QuoteTicker(closes, fast))
-    return yfs.get_quote.__wrapped__("ACME")
+@pytest.fixture(autouse=True)
+def _store():
+    from backend import store
+    store.init_schema()
+
+    def clean():
+        with store.connect() as conn:
+            for t in ("quote_latest", "price_daily", "security", "fetch_queue"):
+                conn.execute(f"DELETE FROM {t} WHERE {'key' if t == 'fetch_queue' else 'symbol'} IN "
+                             f"({','.join('?' * len(SYMS))})", SYMS)
+    clean()
+    yield store
+    clean()
 
 
-def test_quote_change_uses_last_two_daily_closes_not_fast_info_prev_close(monkeypatch):
+def _bars(store, closes):
+    days = pd.bdate_range("2026-09-28", periods=len(closes))
+    store.upsert("price_daily", [dict(symbol="ACME", date=d.date().isoformat(), open=c, high=c, low=c, close=c,
+                                      adj_close=c, volume=1.0) for d, c in zip(days, closes)], ("symbol", "date"))
+    store.upsert("security", [dict(symbol="ACME", name="Acme", history_at="2026-10-01T00:00:00Z")], ("symbol",))
+
+
+def test_quote_comes_from_the_latest_snapshot(_store, monkeypatch):
+    monkeypatch.setattr(yfs.yf, "Ticker", lambda s: pytest.fail("a quote must not call Yahoo"))
+    _bars(_store, [100.0, 110.0])
+    _store.upsert("quote_latest", [dict(symbol="ACME", ts=1792008001, price=111.0, change_pct=0.909091,
+                                        currency="USD", name="Acme Corp")], ("symbol",))
+    q = yfs.get_quote("ACME")
+    assert q == {"symbol": "ACME", "price": 111.0, "changePercent": 0.909091, "currency": "USD",
+                 "name": "Acme Corp"}
+
+
+def test_quote_without_a_snapshot_uses_the_last_two_daily_closes(_store):
     # closes 100, 110, 111 -> (111 / 110 - 1) * 100 = +0.909091 %.
-    # fast_info.previous_close is stale (the audit's AAPL +0.85 % vs +1.10 %): 111 / 110.06 would differ.
-    q = _quote(monkeypatch, [100.0, 110.0, 111.0],
-               {"last_price": 111.0, "previous_close": 100.0, "currency": "USD"})
+    _bars(_store, [100.0, 110.0, 111.0])
+    q = yfs.get_quote("ACME")
+    assert q["price"] == 111.0
     assert q["changePercent"] == pytest.approx(0.909091, abs=1e-5)
-    assert q["price"] == 111.0
+    assert q["name"] == "Acme" and q["currency"] is None
 
 
-def test_quote_price_and_change_come_from_the_same_bars(monkeypatch):
-    # fast_info last_price (112) is a tick ahead of the last daily bar (111): price follows the bar,
-    # so price/change agree with each other and with the treemap (last bar vs the one before).
-    q = _quote(monkeypatch, [100.0, 110.0, 111.0], {"last_price": 112.0, "previous_close": 90.0})
-    assert q["price"] == 111.0
-    assert q["changePercent"] == pytest.approx((111.0 / 110.0 - 1) * 100, abs=1e-9)
+def test_quote_with_a_single_bar_has_no_change(_store):
+    _bars(_store, [50.0])
+    q = yfs.get_quote("ACME")
+    assert q["price"] == 50.0 and q["changePercent"] is None
 
 
-def test_quote_falls_back_to_fast_info_with_a_single_bar(monkeypatch):
-    # New listing, one bar: (50 - 40) / 40 = +25 %.
-    q = _quote(monkeypatch, [50.0], {"last_price": 50.0, "previous_close": 40.0})
-    assert q["changePercent"] == pytest.approx(25.0)
+def test_unknown_symbol_is_queued_and_pending(_store):
+    q = yfs.get_quote("ACME")
+    assert q["status"] == "pending" and q["price"] is None
+    with _store.connect() as conn:
+        assert conn.execute("SELECT kind FROM fetch_queue WHERE key = 'ACME'").fetchone() == ("history",)
 
 
 # ── M-12 ────────────────────────────────────────────────────────────────────
@@ -81,41 +101,34 @@ _FAST = {
 }
 
 
-class _CapTicker:
-    def __init__(self, sym):
-        self.fast_info = _FAST[sym]
+def _caps(store, syms, **kw):
+    store.upsert("quote_latest", [dict(symbol=sym, ts=1792008001, market_cap=v["market_cap"], shares=v["shares"])
+                                  for sym, v in _FAST.items()], ("symbol",))
+    return yfs.get_market_caps(tuple(syms), **kw)
 
 
-def _caps(monkeypatch, syms):
-    monkeypatch.setattr(yfs.yf, "Ticker", _CapTicker)
-    monkeypatch.setattr(yfs.time, "sleep", lambda s: None)
-    return yfs.get_market_caps.__wrapped__(tuple(syms))
-
-
-def test_dual_class_issuer_counted_once(monkeypatch):
+def test_dual_class_issuer_counted_once(_store):
     # GOOGL + GOOG would add to 4.19e12 + 4.15e12 = 8.34e12; one area = 4.19e12 (GOOGL, the preferred class).
-    caps = _caps(monkeypatch, ["AAPL", "GOOG", "GOOGL"])
+    caps = _caps(_store, ["AAPL", "GOOG", "GOOGL"])
     assert caps == {"AAPL": 3.5e12, "GOOGL": 4.19e12}
     assert sum(caps.values()) == pytest.approx(7.69e12)
 
 
-def test_berkshire_classes_with_different_share_counts_are_merged(monkeypatch):
-    caps = _caps(monkeypatch, ["BRK-A", "BRK-B"])
+def test_berkshire_classes_with_different_share_counts_are_merged(_store):
+    caps = _caps(_store, ["BRK-A", "BRK-B"])
     assert caps == {"BRK-B": 1.064e12}
 
 
-def test_classes_with_distinct_caps_are_both_kept(monkeypatch):
+def test_classes_with_distinct_caps_are_both_kept(_store):
     # 15.0e9 vs 3.0e9: Yahoo gives per-class caps (ratio 5x), summing them is right.
-    caps = _caps(monkeypatch, ["BF-B", "BF-A"])
+    caps = _caps(_store, ["BF-B", "BF-A"])
     assert caps == {"BF-B": 15.0e9, "BF-A": 3.0e9}
 
 
-def test_single_class_requested_is_unchanged(monkeypatch):
-    assert _caps(monkeypatch, ["GOOG"]) == {"GOOG": 4.15e12}
+def test_single_class_requested_is_unchanged(_store):
+    assert _caps(_store, ["GOOG"]) == {"GOOG": 4.15e12}
 
 
-def test_one_per_issuer_can_be_switched_off(monkeypatch):
-    monkeypatch.setattr(yfs.yf, "Ticker", _CapTicker)
-    monkeypatch.setattr(yfs.time, "sleep", lambda s: None)
-    caps = yfs.get_market_caps.__wrapped__(("GOOG", "GOOGL"), one_per_issuer=False)
+def test_one_per_issuer_can_be_switched_off(_store):
+    caps = _caps(_store, ["GOOG", "GOOGL"], one_per_issuer=False)
     assert set(caps) == {"GOOG", "GOOGL"}

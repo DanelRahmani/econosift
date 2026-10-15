@@ -257,6 +257,20 @@ def _mark_used_stale() -> None:
         flag[0] = True
 
 
+def note_data_time(ts: float | None) -> None:
+    """Date the data read in this request by when its source produced it (a store read)."""
+    _note_fetch(ts)
+
+
+def mark_incomplete() -> None:
+    """Some of the data being read is still being fetched: a result built from it
+    is held as stale, not cached as fresh, and the response says it is refreshing."""
+    _mark_used_stale()
+    hook = _stale_hook.get()
+    if hook is not None:
+        hook(time.time())
+
+
 # ---------------------------------------------------------------------------
 # Stale-while-revalidate state, per (cache name, key). An entry is added when a
 # stale persisted value is first served and removed once a refresh stores a

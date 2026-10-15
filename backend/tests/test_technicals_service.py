@@ -166,7 +166,7 @@ def _ohlcv(tz: str | None) -> pd.DataFrame:
     )
 
 
-@pytest.mark.parametrize("tz", [None, "America/New_York", "UTC"])
+@pytest.mark.parametrize("tz", [None])  # the store keeps tz-naive calendar dates
 @pytest.mark.parametrize("period, first_date", [
     # last bar 2026-09-30; cutoff = last bar - calendar offset; first business day on/after it
     ("1mo", "2026-08-31"),   # 2026-09-30 - 1 month  = 2026-08-30 (Sun) -> Mon 2026-08-31
@@ -176,7 +176,7 @@ def _ohlcv(tz: str | None) -> pd.DataFrame:
     ("2y", "2024-09-30"),    # 2026-09-30 - 2 years  = 2024-09-30 (Mon)
 ])
 def test_technicals_display_window_is_a_calendar_window(monkeypatch, period, first_date, tz):
-    monkeypatch.setattr(ts.yf, "download", lambda *a, **k: _ohlcv(tz))
+    monkeypatch.setattr(ts.yfs, "get_daily_bars", lambda *a, **k: _ohlcv(tz))
 
     out = ts.get_technicals.__wrapped__("AAPL", period)
 

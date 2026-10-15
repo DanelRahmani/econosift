@@ -2,13 +2,13 @@
 from __future__ import annotations
 
 import logging
+import re
 import time
-from concurrent.futures import ThreadPoolExecutor
 import numpy as np
 import pandas as pd
 import yfinance as yf
 
-from .. import rate_limit
+from .. import cache
 from ..cache import cached
 
 log = logging.getLogger(__name__)
@@ -37,92 +37,85 @@ def benchmark_for(ticker: str) -> str:
     return DEFAULT_BENCHMARK
 
 
-# Batches this large (index universes) download as low-priority chunks: each
-# chunk runs sequentially in its own worker under rate_limit.bulk(), so the
-# batch still uses the Yahoo bucket fully but in-page requests go first.
-_BULK_MIN = 20
-_BULK_WORKERS = 4
+# ---------------------------------------------------------------------------
+# Daily prices, quotes and market caps come from econosift.db (Phase 67).
+# The fetcher thread is the only code that downloads them; a page asking for a
+# symbol that isn't stored yet queues its history and gets the rest now.
+# ---------------------------------------------------------------------------
+
+_CLOSE_HOUR_ET = 16
 
 
-def _yf_download(symbols, **kwargs) -> pd.DataFrame:
-    symbols = list(symbols)
-    if len(symbols) < _BULK_MIN:
-        return yf.download(symbols, threads=True, **kwargs)
+def _period_start(period: str) -> tuple[str | None, int | None]:
+    """``(start ISO date, last N bars)`` for a yfinance period string."""
+    today = pd.Timestamp.today().normalize()
+    if period in ("max", "", None):
+        return None, None
+    if period == "ytd":
+        return f"{today.year}-01-01", None
+    m = re.fullmatch(r"(\d+)(d|wk|mo|y)", period)
+    if not m:
+        raise ValueError(f"unknown period {period!r}")
+    n, unit = int(m.group(1)), m.group(2)
+    if unit == "d":  # yfinance: the last n trading days
+        return (today - pd.Timedelta(days=2 * n + 7)).date().isoformat(), n
+    offset = {"wk": pd.DateOffset(weeks=n), "mo": pd.DateOffset(months=n), "y": pd.DateOffset(years=n)}[unit]
+    return (today - offset).date().isoformat(), None
 
-    def one(chunk):
-        with rate_limit.bulk():
-            return yf.download(chunk, threads=False, **kwargs)
 
-    chunks = [symbols[i::_BULK_WORKERS] for i in range(_BULK_WORKERS)]
-    with ThreadPoolExecutor(_BULK_WORKERS, thread_name_prefix="yf-bulk") as ex:
-        parts = [p for p in ex.map(one, chunks) if p is not None and len(p)]
-    return pd.concat(parts, axis=1) if parts else pd.DataFrame()
+def _close_epoch(day: pd.Timestamp) -> float:
+    return pd.Timestamp(day.date()).replace(hour=_CLOSE_HOUR_ET).tz_localize("America/New_York").timestamp()
 
 
-@cached("yf_close")
+def _stored(symbols, period: str | None, fields: tuple[str, ...], start: str | None = None) -> dict[str, pd.DataFrame]:
+    """Stored daily bars for ``symbols``; queues the ones not stored yet.
+
+    The response is dated by the oldest last bar among the symbols returned,
+    and a result missing queued symbols is not cached as fresh.
+    """
+    from .. import fetcher, store
+
+    syms = list(dict.fromkeys(symbols))
+    if fetcher.request_history(syms):
+        cache.mark_incomplete()
+    last_n = None
+    if start is None and period is not None:
+        start, last_n = _period_start(period)
+    frames = store.frames(syms, fields, start=start)
+    if last_n:
+        frames = {f: df.tail(last_n) for f, df in frames.items()}
+    lead = frames[fields[0]]
+    if not lead.empty:
+        last = lead.apply(lambda col: col.last_valid_index()).dropna()
+        if len(last):
+            cache.note_data_time(_close_epoch(min(last)))
+    return frames
+
+
 def get_close_frame(symbols: tuple[str, ...], period: str) -> pd.DataFrame:
-    """Return a DataFrame of adjusted close prices indexed by date.
-
-    Columns are the requested symbols (those that returned data).
-    """
+    """Adjusted daily closes indexed by date; columns are the requested symbols that have data."""
     if not symbols:
         return pd.DataFrame()
-    raw = _yf_download(
-        symbols,
-        period=period,
-        interval="1d",
-        auto_adjust=True,
-        progress=False,
-    )
-    if raw is None or len(raw) == 0:
-        return pd.DataFrame()
-
-    # Normalise to a flat Close-price frame.
-    if isinstance(raw.columns, pd.MultiIndex):
-        if "Close" in raw.columns.get_level_values(0):
-            close = raw["Close"].copy()
-        else:
-            close = raw.xs("Close", axis=1, level=-1).copy()
-    else:
-        # Single ticker: pick Close column.
-        col = "Close" if "Close" in raw.columns else raw.columns[0]
-        close = raw[[col]].copy()
-        close.columns = [symbols[0]]
-
-    close = close.dropna(how="all")
-    return close
+    return _stored(symbols, period, ("adj_close",))["adj_close"].dropna(how="all")
 
 
-@cached("yf_volume")
 def get_volume_frame(symbols: tuple[str, ...], period: str) -> pd.DataFrame:
-    """Return a DataFrame of daily share volume indexed by date.
-
-    Mirrors :func:`get_close_frame` but pulls the Volume field — used for
-    unusual-volume screening over a large constituent universe.
-    """
+    """Daily share volume indexed by date, like :func:`get_close_frame`."""
     if not symbols:
         return pd.DataFrame()
-    raw = _yf_download(
-        symbols,
-        period=period,
-        interval="1d",
-        auto_adjust=True,
-        progress=False,
-    )
-    if raw is None or len(raw) == 0:
-        return pd.DataFrame()
+    return _stored(symbols, period, ("volume",))["volume"].dropna(how="all")
 
-    if isinstance(raw.columns, pd.MultiIndex):
-        if "Volume" in raw.columns.get_level_values(0):
-            vol = raw["Volume"].copy()
-        else:
-            vol = raw.xs("Volume", axis=1, level=-1).copy()
-    else:
-        col = "Volume" if "Volume" in raw.columns else raw.columns[-1]
-        vol = raw[[col]].copy()
-        vol.columns = [symbols[0]]
 
-    return vol.dropna(how="all")
+def get_daily_bars(ticker: str, start: str) -> pd.DataFrame:
+    """One symbol's adjusted Open/High/Low/Close and Volume since ``start``."""
+    f = _stored((ticker,), None, ("open", "high", "low", "close", "adj_close", "volume"), start=start)
+    if f["close"].empty or ticker not in f["close"]:
+        return pd.DataFrame(columns=["Open", "High", "Low", "Close", "Volume"])
+    factor = f["adj_close"][ticker] / f["close"][ticker]
+    return pd.DataFrame({
+        "Open": f["open"][ticker] * factor, "High": f["high"][ticker] * factor,
+        "Low": f["low"][ticker] * factor, "Close": f["adj_close"][ticker], "Volume": f["volume"][ticker],
+    }).dropna(subset=["Close"])
 
 
 # Share classes of one issuer. Yahoo reports the WHOLE-company cap at each class's price (live: GOOGL 4.19T and
@@ -165,81 +158,23 @@ def _one_per_issuer(caps: dict[str, float], shares: dict[str, float]) -> dict[st
     return {s: c for s, c in caps.items() if s not in drop}
 
 
-@cached("yf_mcap")
 def get_market_caps(symbols: tuple[str, ...], one_per_issuer: bool = True) -> dict[str, float]:
-    """Fetch market cap for each symbol via ``fast_info``, in parallel threads.
+    """Market cap per symbol from the latest stored snapshot.
 
-    This is the first threaded-batch fetch in the service — uses
-    ``ThreadPoolExecutor`` (max 10 workers) so the full constituent universe
-    (~500 tickers) completes in a few seconds rather than serially.  Any symbol
-    that fails or has no positive finite cap is silently omitted.  Never raises.
-
-    Returns ``{symbol: market_cap_float}`` for symbols with a valid cap only. With ``one_per_issuer`` (default)
-    a dual-class issuer appears once (see :func:`_one_per_issuer`); pass False for per-symbol caps.
+    Symbols without a positive cap in the snapshot are omitted. With
+    ``one_per_issuer`` (default) a dual-class issuer appears once (see
+    :func:`_one_per_issuer`); pass False for per-symbol caps.
     """
-    import math
-    from concurrent.futures import ThreadPoolExecutor, as_completed
+    from .. import store
 
     if not symbols:
         return {}
-
-    shares: dict[str, float] = {}
-
-    def _fetch_one(sym: str) -> tuple[str, float] | None:
-        def _call():
-            fi = yf.Ticker(sym).fast_info
-            try:
-                sh = fi["shares"]
-                if sh is not None and float(sh) > 0:
-                    shares[sym] = float(sh)
-            except Exception:
-                pass
-            mcap = None
-            try:
-                mcap = fi["market_cap"]
-            except Exception:
-                pass
-            if mcap is None:
-                try:
-                    mcap = fi["marketCap"]
-                except Exception:
-                    pass
-            if mcap is None:
-                try:
-                    mcap = getattr(fi, "market_cap", None)
-                except Exception:
-                    pass
-            if mcap is not None and not math.isnan(float(mcap)) and float(mcap) > 0:
-                return float(mcap)
-            return None
-        try:
-            val = _retry_yf(_call, max_retries=1, delay=1.5)
-            if val is not None:
-                return (sym, val)
-        except Exception:
-            pass
-        return None
-
-    import time as _time
-    result: dict[str, float] = {}
-    BATCH_SIZE = 10
-    syms_list = list(symbols)
-    with ThreadPoolExecutor(max_workers=8) as ex:
-        for i in range(0, len(syms_list), BATCH_SIZE):
-            batch = syms_list[i:i + BATCH_SIZE]
-            # Progressive backoff: 0.3s base, up to 2s for later batches
-            delay = min(0.3 + (i / BATCH_SIZE) * 0.05, 2.0)
-            if i > 0:
-                _time.sleep(delay)
-            futures = {ex.submit(_fetch_one, s): s for s in batch}
-            for fut in as_completed(futures):
-                try:
-                    pair = fut.result()
-                    if pair is not None:
-                        result[pair[0]] = pair[1]
-                except Exception:
-                    pass
-    return _one_per_issuer(result, shares) if one_per_issuer else result
+    quotes = store.quotes(symbols)
+    caps = {s: float(q["market_cap"]) for s, q in quotes.items() if q.get("market_cap") and q["market_cap"] > 0}
+    shares = {s: float(q["shares"]) for s, q in quotes.items() if q.get("shares") and q["shares"] > 0}
+    if caps:
+        cache.note_data_time(min(q["ts"] for s, q in quotes.items() if s in caps and q.get("ts")) or None)
+    return _one_per_issuer(caps, shares) if one_per_issuer else caps
 
 
 def _retry_yf(fn, max_retries=2, delay=1.0):
@@ -258,59 +193,32 @@ def _retry_yf(fn, max_retries=2, delay=1.0):
     return None
 
 
-@cached("yf_quote")
 def get_quote(ticker: str) -> dict:
-    t = yf.Ticker(ticker)
-    info = {}
-    try:
-        info = _retry_yf(lambda: t.fast_info or {})
-    except Exception:
-        info = {}
-    price = _safe(info, "last_price") or _safe(info, "lastPrice")
-    prev = _safe(info, "previous_close") or _safe(info, "previousClose")
-    currency = _safe(info, "currency") or None  # unknown stays None; never assumed USD
+    """Latest price and change: the 15-minute snapshot, else the last two stored daily bars.
 
-    # Change % = last daily bar vs the one before (the Treemap's 1d rule), not fast_info.previous_close, which
-    # Yahoo gets wrong (AAPL +0.85 % vs +1.10 %). Market open: the last bar is today's live bar, so the quote is
-    # today's move so far; market closed: the last session's move. Price comes from the same bar so the two agree.
-    bars = None
-    try:
-        h = _retry_yf(lambda: t.history(period="7d", interval="1d", auto_adjust=False))
-        closes = h["Close"].dropna() if h is not None and len(h) else None
-        if closes is not None and len(closes) >= 2:
-            bars = (float(closes.iloc[-1]), float(closes.iloc[-2]))
-    except Exception:
-        bars = None
-    if bars:
-        price, prev = bars
+    A symbol not stored yet is queued and returned with ``status: "pending"``.
+    """
+    from .. import fetcher, store
 
-    name = ticker
-    try:
-        meta = _retry_yf(lambda: t.get_info())
-    except Exception:
-        meta = {}
-    if meta:
-        name = meta.get("shortName") or meta.get("longName") or ticker
-        if price is None:
-            price = meta.get("currentPrice") or meta.get("regularMarketPrice")
-        if prev is None:
-            prev = meta.get("previousClose") or meta.get("regularMarketPreviousClose")
-        currency = meta.get("currency") or currency
-
-    change_pct = None
-    if price is not None and prev:
-        try:
-            change_pct = (price - prev) / prev * 100.0
-        except Exception:
-            change_pct = None
-
-    return {
-        "symbol": ticker,
-        "price": float(price) if price is not None else None,
-        "changePercent": float(change_pct) if change_pct is not None else None,
-        "currency": currency,
-        "name": name,
-    }
+    row = store.quotes([ticker]).get(ticker)
+    with store.connect() as conn:
+        sec = conn.execute("SELECT name FROM security WHERE symbol = ?", (ticker,)).fetchone()
+    name = (row or {}).get("name") or (sec[0] if sec and sec[0] else ticker)
+    if row and row.get("price") is not None:
+        if row.get("ts"):
+            cache.note_data_time(float(row["ts"]))
+        return {"symbol": ticker, "price": float(row["price"]),
+                "changePercent": float(row["change_pct"]) if row.get("change_pct") is not None else None,
+                "currency": row.get("currency"), "name": name}
+    closes = _stored((ticker,), "1mo", ("close",))["close"]
+    series = closes[ticker].dropna() if ticker in closes else pd.Series(dtype=float)
+    if len(series) >= 1:
+        price = float(series.iloc[-1])
+        change = (price / float(series.iloc[-2]) - 1) * 100 if len(series) >= 2 and series.iloc[-2] else None
+        return {"symbol": ticker, "price": price, "changePercent": change, "currency": None, "name": name}
+    fetcher.request_history([ticker])
+    return {"symbol": ticker, "price": None, "changePercent": None, "currency": None, "name": name,
+            "status": "pending"}
 
 
 def _info_failed(bundle: dict) -> bool:
@@ -431,15 +339,8 @@ def get_info(ticker: str) -> dict:
         if "beta" not in info or info["beta"] is None:
             try:
                 bench = benchmark_for(ticker)
-                frame = yf.download(
-                    [ticker, bench], period="2y", auto_adjust=True,
-                    progress=False, threads=False,
-                )
-                if frame is not None and not frame.empty:
-                    if isinstance(frame.columns, pd.MultiIndex):
-                        close = frame["Close"]
-                    else:
-                        close = frame
+                close = get_close_frame((ticker, bench), "2y")
+                if not close.empty:
                     if ticker in close.columns and bench in close.columns:
                         r = np.log(close[ticker] / close[ticker].shift(1)).dropna()
                         br = np.log(close[bench] / close[bench].shift(1)).dropna()
@@ -618,48 +519,25 @@ def _safe(d, key):
             return None
 
 
-@cached("yf_ohlc")
 def get_ohlc_frame(symbols: tuple[str, ...], period: str, adjust: bool = True) -> dict[str, pd.DataFrame]:
     """Return {symbol: DataFrame[Open,High,Low,Close]} for the requested symbols.
 
-    auto_adjust scales Open/High/Low/Close by the same split/dividend factor so
-    Garman-Klass high/low/open/close ratios remain valid after adjustment.
-    ``adjust=False`` returns prices as traded (split-adjusted only), which is
-    what published breadth counts — advancers, 52-week highs/lows — are based on.
+    ``adjust`` scales Open/High/Low/Close by the same split/dividend factor
+    (adjusted ÷ raw close) so Garman-Klass high/low/open/close ratios remain
+    valid. ``adjust=False`` returns prices as traded (split-adjusted only),
+    which is what published breadth counts — advancers, 52-week highs/lows —
+    are based on.
     """
     if not symbols:
         return {}
-    raw = _yf_download(
-        symbols,
-        period=period,
-        interval="1d",
-        auto_adjust=adjust,
-        progress=False,
-    )
-    if raw is None or len(raw) == 0:
-        return {}
-
-    _OHLC_FIELDS = {"Open", "High", "Low", "Close"}
-
-    if isinstance(raw.columns, pd.MultiIndex):
-        # Detect which level holds the OHLC field names (auto_adjust can flip order).
-        field_level = 0 if _OHLC_FIELDS & set(raw.columns.get_level_values(0)) else 1
-        tick_level = 1 - field_level
-        result: dict[str, pd.DataFrame] = {}
-        for sym in symbols:
-            try:
-                df = raw.xs(sym, axis=1, level=tick_level)[["Open", "High", "Low", "Close"]].dropna(how="any")
-                if len(df) > 0:
-                    result[sym] = df
-            except (KeyError, Exception):
-                pass
-        return result
-    else:
-        # Single-ticker: flat frame with OHLC columns.
-        try:
-            df = raw[["Open", "High", "Low", "Close"]].dropna(how="any")
-            if len(df) > 0:
-                return {symbols[0]: df}
-        except (KeyError, Exception):
-            pass
-        return {}
+    f = _stored(symbols, period, ("open", "high", "low", "close", "adj_close"))
+    result: dict[str, pd.DataFrame] = {}
+    for sym in symbols:
+        if sym not in f["close"]:
+            continue
+        factor = f["adj_close"][sym] / f["close"][sym] if adjust else 1.0
+        df = pd.DataFrame({c.capitalize(): f[c][sym] * factor for c in ("open", "high", "low", "close")})
+        df = df.dropna(how="any")
+        if len(df):
+            result[sym] = df
+    return result

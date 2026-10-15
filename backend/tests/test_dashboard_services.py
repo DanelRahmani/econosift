@@ -162,28 +162,28 @@ class TestBreadth:
 
 
 class TestMovers:
-    def test_gainers_sorted_desc(self, patch_universe):
+    def test_gainers_sorted_desc(self, monkeypatch, patch_universe):
         from backend.services.movers_service import top_movers
-        monkeypatch_vol(patch_universe)
+        monkeypatch_vol(monkeypatch, patch_universe)
         m = top_movers("sp500")
         chg = [r["changePercent"] for r in m["gainers"]]
         assert chg == sorted(chg, reverse=True)
 
-    def test_losers_include_decliner(self, patch_universe):
+    def test_losers_include_decliner(self, monkeypatch, patch_universe):
         from backend.services.movers_service import top_movers
-        monkeypatch_vol(patch_universe)
+        monkeypatch_vol(monkeypatch, patch_universe)
         m = top_movers("sp500")
         assert any(r["ticker"] == "BBB" for r in m["losers"])
 
-    def test_new_highs_contains_risers(self, patch_universe):
+    def test_new_highs_contains_risers(self, monkeypatch, patch_universe):
         from backend.services.movers_service import top_movers
-        monkeypatch_vol(patch_universe)
+        monkeypatch_vol(monkeypatch, patch_universe)
         m = top_movers("sp500")
         hi = {r["ticker"] for r in m["newHighs"]}
         assert {"AAA", "DDD"} <= hi
 
 
-def monkeypatch_vol(frame):
+def monkeypatch_vol(monkeypatch, frame):
     """Attach a synthetic volume frame: AAA spikes 3x, others normal."""
     import pytest as _p
     from backend.services import movers_service
@@ -191,7 +191,7 @@ def monkeypatch_vol(frame):
     vol = pd.DataFrame(
         {c: [1_000_000.0] * n for c in frame.columns}, index=frame.index)
     vol.iloc[-1, vol.columns.get_loc("AAA")] = 3_000_000.0
-    movers_service.yfs.get_volume_frame = lambda s, p: vol  # type: ignore
+    monkeypatch.setattr(movers_service.yfs, "get_volume_frame", lambda s, p: vol)
 
 
 class TestIndices:

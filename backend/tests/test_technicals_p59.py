@@ -44,7 +44,7 @@ def test_forward_senkou_without_a_span_frame_is_empty():
 def test_ichimoku_emits_26_forward_senkou_bars(monkeypatch):
     pytest.importorskip("pandas_ta")
     frame = _frame()
-    monkeypatch.setattr(ts.yf, "download", lambda *a, **k: frame)
+    monkeypatch.setattr(ts.yfs, "get_daily_bars", lambda *a, **k: frame)
 
     out = ts.get_technicals.__wrapped__("AAPL", "1y")
     last_price = out["prices"][-1]["date"]
@@ -73,7 +73,7 @@ def test_ichimoku_emits_26_forward_senkou_bars(monkeypatch):
 def test_chikou_at_t_is_the_close_26_bars_later(monkeypatch):
     pytest.importorskip("pandas_ta")
     frame = _frame()
-    monkeypatch.setattr(ts.yf, "download", lambda *a, **k: frame)
+    monkeypatch.setattr(ts.yfs, "get_daily_bars", lambda *a, **k: frame)
 
     out = ts.get_technicals.__wrapped__("AAPL", "1y")
     rows = {r["date"]: r for r in out["ichimoku"]}
@@ -153,7 +153,7 @@ def test_fib_upswing_when_the_high_comes_after_the_low():
 
 def test_get_technicals_exposes_the_fib_direction(monkeypatch):
     frame = _frame()
-    monkeypatch.setattr(ts.yf, "download", lambda *a, **k: frame)
+    monkeypatch.setattr(ts.yfs, "get_daily_bars", lambda *a, **k: frame)
     out = ts.get_technicals.__wrapped__("AAPL", "1y")
     tail = frame.tail(126)
     expect = "downswing" if tail["Low"].values.argmin() > tail["High"].values.argmax() else "upswing"
@@ -168,7 +168,7 @@ def test_week52_range_uses_intraday_highs_and_lows(monkeypatch):
     """The fixture's High/Low are close Â± 1.5, so the intraday 52-week high is the
     highest close of the last 252 bars + 1.5 (and the low that close âˆ’ 1.5)."""
     frame = _frame()
-    monkeypatch.setattr(ts.yf, "download", lambda *a, **k: frame)
+    monkeypatch.setattr(ts.yfs, "get_daily_bars", lambda *a, **k: frame)
     s = ts.get_technicals.__wrapped__("AAPL", "1y")["summary"]
     last = frame.tail(252)
     assert s["week52High"] == pytest.approx(last["Close"].max() + 1.5)

@@ -12,10 +12,10 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
-import yfinance as yf
 
 from .. import provenance as pv
 from ..cache import cached
+from . import yfinance_service as yfs
 
 try:
     import pandas_ta as ta  # type: ignore
@@ -238,20 +238,9 @@ def get_technicals(ticker: str, period: str = "1y") -> dict:
     fetch_days = period_map.get(period, 500)
     start = (datetime.now(timezone.utc) - timedelta(days=fetch_days)).strftime("%Y-%m-%d")
 
-    df = yf.download(ticker, start=start, progress=False, auto_adjust=True)
+    df = yfs.get_daily_bars(ticker, start)  # adjusted OHLCV from the store (Phase 67)
     if df is None or df.empty:
         return _empty_response(ticker, period)
-
-    # Flatten MultiIndex columns if present
-    if isinstance(df.columns, pd.MultiIndex):
-        df.columns = df.columns.get_level_values(0)
-
-    df = df[["Open", "High", "Low", "Close", "Volume"]].copy()
-    df.index = pd.to_datetime(df.index)
-    if df.index.tz is not None:
-        # yfinance may return a tz-aware index; keep the exchange-local calendar dates, tz-naive
-        df.index = df.index.tz_localize(None)
-    df = df.dropna(subset=["Close"])
 
     if len(df) < 30:
         return _empty_response(ticker, period)

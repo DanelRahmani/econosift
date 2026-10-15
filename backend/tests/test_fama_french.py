@@ -16,6 +16,7 @@ from datetime import date, timedelta
 
 import numpy as np
 import pandas as pd
+from backend.services import yfinance_service as yfs
 import pytest
 
 # ---------------------------------------------------------------------------
@@ -111,6 +112,13 @@ def patch_ff5(monkeypatch, synthetic_factors_5f):
     return synthetic_factors_5f
 
 
+def _as_close_frame(fake_download):
+    """Adapt a fake download (Close column) into get_close_frame's wide-frame shape."""
+    def _close_frame(symbols, period):
+        return fake_download(symbols[0])[["Close"]].rename(columns={"Close": symbols[0]})
+    return _close_frame
+
+
 def _make_yf_download_patch(factors: pd.DataFrame, true_betas: dict[str, float]):
     """Return a function that fakes yf.download returning a Close-column DataFrame."""
     prices = _make_price_series_from_factors(factors, true_betas)
@@ -134,7 +142,7 @@ class TestFF3FactorRegression:
         import yfinance as yf
         import backend.services.fama_french as ff_mod
 
-        monkeypatch.setattr(yf, "download", _make_yf_download_patch(patch_ff3, _TRUE_BETAS_3F))
+        monkeypatch.setattr(yfs, "get_close_frame", _as_close_frame(_make_yf_download_patch(patch_ff3, _TRUE_BETAS_3F)))
 
         result = ff_mod.factor_regression("FAKE", model="3", period="2y")
 
@@ -146,7 +154,7 @@ class TestFF3FactorRegression:
         import yfinance as yf
         import backend.services.fama_french as ff_mod
 
-        monkeypatch.setattr(yf, "download", _make_yf_download_patch(patch_ff3, _TRUE_BETAS_3F))
+        monkeypatch.setattr(yfs, "get_close_frame", _as_close_frame(_make_yf_download_patch(patch_ff3, _TRUE_BETAS_3F)))
         result = ff_mod.factor_regression("FAKE", model="3", period="2y")
 
         assert result["ticker"] == "FAKE"
@@ -157,7 +165,7 @@ class TestFF3FactorRegression:
         import yfinance as yf
         import backend.services.fama_french as ff_mod
 
-        monkeypatch.setattr(yf, "download", _make_yf_download_patch(patch_ff3, _TRUE_BETAS_3F))
+        monkeypatch.setattr(yfs, "get_close_frame", _as_close_frame(_make_yf_download_patch(patch_ff3, _TRUE_BETAS_3F)))
         result = ff_mod.factor_regression("FAKE", model="3", period="2y")
 
         assert set(result["betas"].keys()) == {"MktRF", "SMB", "HML"}
@@ -166,7 +174,7 @@ class TestFF3FactorRegression:
         import yfinance as yf
         import backend.services.fama_french as ff_mod
 
-        monkeypatch.setattr(yf, "download", _make_yf_download_patch(patch_ff3, _TRUE_BETAS_3F))
+        monkeypatch.setattr(yfs, "get_close_frame", _as_close_frame(_make_yf_download_patch(patch_ff3, _TRUE_BETAS_3F)))
         result = ff_mod.factor_regression("FAKE", model="3", period="2y")
 
         assert result["betas"]["MktRF"] == pytest.approx(_TRUE_BETAS_3F["Mkt-RF"], abs=0.15), (
@@ -177,7 +185,7 @@ class TestFF3FactorRegression:
         import yfinance as yf
         import backend.services.fama_french as ff_mod
 
-        monkeypatch.setattr(yf, "download", _make_yf_download_patch(patch_ff3, _TRUE_BETAS_3F))
+        monkeypatch.setattr(yfs, "get_close_frame", _as_close_frame(_make_yf_download_patch(patch_ff3, _TRUE_BETAS_3F)))
         result = ff_mod.factor_regression("FAKE", model="3", period="2y")
 
         assert result["betas"]["SMB"] == pytest.approx(_TRUE_BETAS_3F["SMB"], abs=0.20)
@@ -186,7 +194,7 @@ class TestFF3FactorRegression:
         import yfinance as yf
         import backend.services.fama_french as ff_mod
 
-        monkeypatch.setattr(yf, "download", _make_yf_download_patch(patch_ff3, _TRUE_BETAS_3F))
+        monkeypatch.setattr(yfs, "get_close_frame", _as_close_frame(_make_yf_download_patch(patch_ff3, _TRUE_BETAS_3F)))
         result = ff_mod.factor_regression("FAKE", model="3", period="2y")
 
         assert result["betas"]["HML"] == pytest.approx(_TRUE_BETAS_3F["HML"], abs=0.20)
@@ -196,7 +204,7 @@ class TestFF3FactorRegression:
         import yfinance as yf
         import backend.services.fama_french as ff_mod
 
-        monkeypatch.setattr(yf, "download", _make_yf_download_patch(patch_ff3, _TRUE_BETAS_3F))
+        monkeypatch.setattr(yfs, "get_close_frame", _as_close_frame(_make_yf_download_patch(patch_ff3, _TRUE_BETAS_3F)))
         result = ff_mod.factor_regression("FAKE", model="3", period="2y")
 
         assert result["rSquared"] >= 0.70, f"R² {result['rSquared']:.4f} too low"
@@ -205,7 +213,7 @@ class TestFF3FactorRegression:
         import yfinance as yf
         import backend.services.fama_french as ff_mod
 
-        monkeypatch.setattr(yf, "download", _make_yf_download_patch(patch_ff3, _TRUE_BETAS_3F))
+        monkeypatch.setattr(yfs, "get_close_frame", _as_close_frame(_make_yf_download_patch(patch_ff3, _TRUE_BETAS_3F)))
         result = ff_mod.factor_regression("FAKE", model="3", period="2y")
 
         assert 0.0 <= result["rSquared"] <= 1.0
@@ -214,7 +222,7 @@ class TestFF3FactorRegression:
         import yfinance as yf
         import backend.services.fama_french as ff_mod
 
-        monkeypatch.setattr(yf, "download", _make_yf_download_patch(patch_ff3, _TRUE_BETAS_3F))
+        monkeypatch.setattr(yfs, "get_close_frame", _as_close_frame(_make_yf_download_patch(patch_ff3, _TRUE_BETAS_3F)))
         result = ff_mod.factor_regression("FAKE", model="3", period="2y")
 
         assert result["nObs"] >= 200
@@ -223,7 +231,7 @@ class TestFF3FactorRegression:
         import yfinance as yf
         import backend.services.fama_french as ff_mod
 
-        monkeypatch.setattr(yf, "download", _make_yf_download_patch(patch_ff3, _TRUE_BETAS_3F))
+        monkeypatch.setattr(yfs, "get_close_frame", _as_close_frame(_make_yf_download_patch(patch_ff3, _TRUE_BETAS_3F)))
         result = ff_mod.factor_regression("FAKE", model="3", period="2y")
 
         assert set(result["tStats"].keys()) == {"alpha", "MktRF", "SMB", "HML"}
@@ -233,7 +241,7 @@ class TestFF3FactorRegression:
         import yfinance as yf
         import backend.services.fama_french as ff_mod
 
-        monkeypatch.setattr(yf, "download", _make_yf_download_patch(patch_ff3, _TRUE_BETAS_3F))
+        monkeypatch.setattr(yfs, "get_close_frame", _as_close_frame(_make_yf_download_patch(patch_ff3, _TRUE_BETAS_3F)))
         result = ff_mod.factor_regression("FAKE", model="3", period="2y")
 
         assert result["alpha"] == pytest.approx(result["alphaDaily"] * 252, rel=1e-6)
@@ -244,7 +252,7 @@ class TestFF3FactorRegression:
         import yfinance as yf
         import backend.services.fama_french as ff_mod
 
-        monkeypatch.setattr(yf, "download", _make_yf_download_patch(patch_ff3, _TRUE_BETAS_3F))
+        monkeypatch.setattr(yfs, "get_close_frame", _as_close_frame(_make_yf_download_patch(patch_ff3, _TRUE_BETAS_3F)))
         result = ff_mod.factor_regression("FAKE", model="3", period="2y")
 
         assert result["asOf"] == patch_ff3.index.max().date().isoformat()
@@ -260,7 +268,7 @@ class TestFF5FactorRegression:
         import yfinance as yf
         import backend.services.fama_french as ff_mod
 
-        monkeypatch.setattr(yf, "download", _make_yf_download_patch(patch_ff5, _TRUE_BETAS_5F))
+        monkeypatch.setattr(yfs, "get_close_frame", _as_close_frame(_make_yf_download_patch(patch_ff5, _TRUE_BETAS_5F)))
         result = ff_mod.factor_regression("FAKE", model="5", period="2y")
 
         assert "error" not in result, result.get("error")
@@ -270,7 +278,7 @@ class TestFF5FactorRegression:
         import yfinance as yf
         import backend.services.fama_french as ff_mod
 
-        monkeypatch.setattr(yf, "download", _make_yf_download_patch(patch_ff5, _TRUE_BETAS_5F))
+        monkeypatch.setattr(yfs, "get_close_frame", _as_close_frame(_make_yf_download_patch(patch_ff5, _TRUE_BETAS_5F)))
         result = ff_mod.factor_regression("FAKE", model="5", period="2y")
 
         assert result["betas"]["MktRF"] == pytest.approx(_TRUE_BETAS_5F["Mkt-RF"], abs=0.20)
@@ -279,7 +287,7 @@ class TestFF5FactorRegression:
         import yfinance as yf
         import backend.services.fama_french as ff_mod
 
-        monkeypatch.setattr(yf, "download", _make_yf_download_patch(patch_ff5, _TRUE_BETAS_5F))
+        monkeypatch.setattr(yfs, "get_close_frame", _as_close_frame(_make_yf_download_patch(patch_ff5, _TRUE_BETAS_5F)))
         result = ff_mod.factor_regression("FAKE", model="5", period="2y")
 
         assert result["rSquared"] >= 0.70
@@ -288,7 +296,7 @@ class TestFF5FactorRegression:
         import yfinance as yf
         import backend.services.fama_french as ff_mod
 
-        monkeypatch.setattr(yf, "download", _make_yf_download_patch(patch_ff5, _TRUE_BETAS_5F))
+        monkeypatch.setattr(yfs, "get_close_frame", _as_close_frame(_make_yf_download_patch(patch_ff5, _TRUE_BETAS_5F)))
         result = ff_mod.factor_regression("FAKE", model="5", period="2y")
 
         assert result["model"] == "5"

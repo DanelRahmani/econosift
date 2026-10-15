@@ -255,27 +255,11 @@ def factor_regression(
 
     # ---- Load ticker prices and compute daily simple returns --------------
     try:
-        import yfinance as yf
-        raw = yf.download(
-            ticker,
-            period=period,
-            interval="1d",
-            auto_adjust=True,
-            progress=False,
-        )
-        if raw is None or raw.empty:
+        from .yfinance_service import get_close_frame
+        raw = get_close_frame((ticker,), period)  # adjusted closes from the store (Phase 67)
+        if raw.empty or ticker not in raw:
             return {**base, "error": "price data unavailable"}
-
-        # Handle MultiIndex columns (single ticker still sometimes gets one).
-        if isinstance(raw.columns, pd.MultiIndex):
-            if "Close" in raw.columns.get_level_values(0):
-                prices = raw["Close"].squeeze()
-            else:
-                prices = raw.xs("Close", axis=1, level=-1).squeeze()
-        else:
-            prices = raw["Close"] if "Close" in raw.columns else raw.iloc[:, 0]
-
-        prices = prices.dropna()
+        prices = raw[ticker].dropna()
         if len(prices) < 30:
             return {**base, "error": "insufficient price history"}
 
