@@ -24,6 +24,9 @@ def _clean():
         conn.executemany("INSERT INTO index_membership (index_name, symbol, start) VALUES ('sp500', ?, '')",
                          [("AAA",), ("BBB",), ("CCC",)])
     yield
+    with store.connect() as conn:  # other modules read the stored roster
+        for t in ("security", "index_membership", "quote_latest", "quote_intraday", "fetch_queue"):
+            conn.execute(f"DELETE FROM {t}")
 
 
 def _quote(sym, price, prev=None):

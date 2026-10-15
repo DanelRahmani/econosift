@@ -137,14 +137,14 @@ def run_universe(_key: str) -> int:
     securities: dict[str, dict] = {}
     membership: list[dict] = []
     for index in INDEXES:
-        members = constituents.get_constituents(index)
+        members = constituents.get_constituents(index, live=True)
         if not members:
             raise RuntimeError(f"no constituents for {index}")
         for m in members:
             securities.setdefault(m["symbol"], dict(
                 symbol=m["symbol"], name=m.get("name"), sector=m.get("sector"),
                 industry=m.get("industry")))
-        changes = constituents.get_membership_changes(index)
+        changes = constituents.get_membership_changes(index, live=True)
         for sym, start, end in membership_intervals([m["symbol"] for m in members], changes):
             membership.append(dict(index_name=index, symbol=sym, start=start, end=end))
 

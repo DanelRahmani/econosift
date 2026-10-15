@@ -178,16 +178,48 @@ def _parse_constituents(wikitext: str, index: str) -> list[dict]:
     return out
 
 
-def get_constituents(index: str) -> list[dict]:
-    """Return ``[{"symbol", "name", "sector", "industry"}]`` for an index, cached weekly.
+def _stored_members(key: str) -> list[dict]:
+    """Today's roster as the fetcher stored it (security + index_membership)."""
+    from .. import store
+    with store.connect() as conn:
+        rows = conn.execute(
+            "SELECT s.symbol, s.name, s.sector, s.industry FROM index_membership m "
+            "JOIN security s ON s.symbol = m.symbol WHERE m.index_name = ? AND m.end IS NULL "
+            "ORDER BY s.symbol", (key,)).fetchall()
+    return [{"symbol": r[0], "name": r[1], "sector": r[2], "industry": r[3]} for r in rows]
 
-    ``industry`` is the GICS Sub-Industry where available (S&P 500), else ``None``.
-    On any fetch/parse failure we serve the last good cached value (even if
-    stale) and otherwise return an empty list — we never fabricate members.
+
+def _stored_changes(key: str) -> list[dict]:
+    """The change log rebuilt from stored membership intervals, newest first."""
+    from .. import store
+    with store.connect() as conn:
+        rows = conn.execute("SELECT symbol, start, end FROM index_membership WHERE index_name = ?",
+                            (key,)).fetchall()
+    out = [{"date": _dt.date.fromisoformat(start), "added": sym, "removed": None} for sym, start, _ in rows if start]
+    out += [{"date": _dt.date.fromisoformat(end), "added": None, "removed": sym} for sym, _, end in rows if end]
+    return sorted(out, key=lambda c: c["date"], reverse=True)
+
+
+def get_constituents(index: str, live: bool = False) -> list[dict]:
+    """Return ``[{"symbol", "name", "sector", "industry"}]`` for an index.
+
+    Pages read the roster the fetcher stores weekly (Phase 67); only the
+    fetcher passes ``live`` to read Wikipedia, as does a first start before
+    anything is stored. ``industry`` is the GICS Sub-Industry where available
+    (S&P 500), else ``None``. On any fetch/parse failure we serve the last good
+    cached value (even if stale) and otherwise return an empty list — we never
+    fabricate members.
     """
     key = ALIASES.get(index.strip().lower())
     if key is None:
         return []
+    if not live:
+        try:
+            stored = _stored_members(key)
+        except Exception:
+            stored = []
+        if stored:
+            return stored
 
     now = time.time()
     with _lock:
@@ -316,12 +348,23 @@ def _parse_changes(wikitext: str) -> list[dict]:
     return []
 
 
-def get_membership_changes(index: str) -> list[dict]:
-    """Index change log, newest first, cached weekly. Empty when unsupported."""
+def get_membership_changes(index: str, live: bool = False) -> list[dict]:
+    """Index change log, newest first. Empty when unsupported.
+
+    Pages read it back from the stored membership intervals; ``live`` (the
+    fetcher) reads Wikipedia, cached weekly.
+    """
     key = ALIASES.get(index.strip().lower())
     page = _CHANGES_PAGES.get(key or "")
     if page is None:
         return []
+    if not live:
+        try:
+            stored = _stored_changes(key)
+        except Exception:
+            stored = []
+        if stored:
+            return stored
 
     now = time.time()
     with _lock:

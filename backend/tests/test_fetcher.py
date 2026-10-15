@@ -19,6 +19,9 @@ def _clean():
         for t in TABLES:
             conn.execute(f"DELETE FROM {t}")
     yield
+    with store.connect() as conn:  # other modules read the stored roster
+        for t in TABLES:
+            conn.execute(f"DELETE FROM {t}")
 
 
 def _queue():
@@ -115,7 +118,7 @@ def test_universe_stores_rosters_and_queues_missing_history():
     }
     with store.connect() as conn:  # BBB already has its history
         conn.execute("INSERT INTO security (symbol, history_at) VALUES ('BBB', '2026-10-01T00:00:00Z')")
-    with patch("backend.services.constituents.get_constituents", side_effect=lambda i: members[i]), \
+    with patch("backend.services.constituents.get_constituents", side_effect=lambda i, live=False: members[i]), \
          patch("backend.services.constituents.get_membership_changes", return_value=[]):
         assert fetcher.run_universe("all") == 3 + len(fetcher.INTRADAY_EXTRAS)
     with store.connect() as conn:
