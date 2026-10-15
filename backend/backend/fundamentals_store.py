@@ -28,6 +28,8 @@ from . import store, yahoo_info
 
 ANNUAL_COLUMNS = 4      # Yahoo's annual statements show four years
 QUARTER_COLUMNS = 5
+SHARES_TOLERANCE = 0.10  # SEC vs snapshot share count; beyond it the quoted share basis wins
+YEARS_READ = 6          # periods older than this don't reach any column or trailing figure
 Q = "|Q"
 
 INCOME = ("Total Revenue", "Cost Of Revenue", "Gross Profit", "Operating Income", "Pretax Income",
@@ -70,12 +72,16 @@ def _f(v) -> float | None:
 # Facts
 # ---------------------------------------------------------------------------
 
-def facts(symbol: str, as_of: str | None = None) -> tuple[dict[str, dict[str, dict]], str | None]:
+def facts(symbol: str, as_of: str | None = None,
+          since: str | None = None) -> tuple[dict[str, dict[str, dict]], str | None]:
     """concept -> period_end -> {value, filed, source, form}: the version current
-    on ``as_of`` (default: the latest). SEC rows win over Yahoo's when a symbol
-    has both. Returns (facts, "sec" | "yahoo" | None)."""
+    on ``as_of`` (default: the latest), for periods ending on or after ``since``.
+    SEC rows win over Yahoo's when a symbol has both. Returns (facts, "sec" | "yahoo" | None)."""
     sql = "SELECT concept, period_end, filed, value, source, form FROM fundamental WHERE symbol = ?"
     params: list = [symbol]
+    if since:
+        sql += " AND period_end >= ?"
+        params.append(since)
     if as_of:
         sql += " AND filed <= ?"
         params.append(as_of)
@@ -109,57 +115,74 @@ def _ends(fx: dict, labels, quarterly: bool, n: int) -> list[str]:
     return sorted(ends, reverse=True)[:n]
 
 
-def _frame(fx: dict, labels, ends: list[str], quarterly: bool, flows: bool) -> pd.DataFrame | None:
-    if not ends:
-        return None
-    data = {}
+NAN = float("nan")
+
+
+def _rows(fx: dict, labels, ends: list[str], quarterly: bool, flows: bool) -> dict[str, list[float]]:
+    """label -> values at ``ends``, NaN where nothing was filed; all-NaN lines left out."""
+    out = {}
     for label in labels:
-        series = fx.get(label + Q if quarterly and flows else label, {})
-        vals = [series[e]["value"] if e in series else np.nan for e in ends]
-        if not all(np.isnan(v) for v in vals):
-            data[label] = vals
-    if not data:
-        return None
-    df = pd.DataFrame(data, index=pd.DatetimeIndex(pd.to_datetime(ends))).T
-    return df
+        series = fx.get(label + Q if quarterly and flows else label)
+        if not series:
+            continue
+        vals = [series[e]["value"] if e in series else NAN for e in ends]
+        if any(v == v for v in vals):
+            out[label] = vals
+    return out
 
 
-def _add_derived(df: pd.DataFrame | None, name: str) -> pd.DataFrame | None:
-    """Yahoo's convenience rows, computed per column from the filed lines."""
-    if df is None:
-        return None
-    rows = {}
+def _sum(*parts):
+    """Elementwise sum; NaN if any part is NaN (pandas' + semantics)."""
+    return [sum(vs) for vs in zip(*parts)]
 
+
+def _add_derived(rows: dict[str, list[float]], name: str, n: int) -> None:
+    """Yahoo's convenience rows, computed per column from the filed lines (in place)."""
     def g(label):
-        return df.loc[label] if label in df.index else pd.Series(np.nan, index=df.columns)
+        return rows.get(label) or [NAN] * n
 
+    extra: dict[str, list[float]] = {}
     if name == "financials":
-        if "Gross Profit" not in df.index or g("Gross Profit").isna().all():
-            rows["Gross Profit"] = g("Total Revenue") - g("Cost Of Revenue")
-        ebit = (g("Pretax Income") + g("Interest Expense")).fillna(g("Operating Income"))
-        rows["EBIT"] = ebit
-        rows["EBITDA"] = ebit + g("Depreciation And Amortization")
+        rev, cost = g("Total Revenue"), g("Cost Of Revenue")
+        extra["Gross Profit"] = _sum(rev, cost and [-c for c in cost])
+        ebit = [pi if pi == pi else op for pi, op in zip(_sum(g("Pretax Income"), g("Interest Expense")),
+                                                         g("Operating Income"))]
+        extra["EBIT"] = ebit
+        extra["EBITDA"] = _sum(ebit, g("Depreciation And Amortization"))
+        extra["Income Before Tax"] = g("Pretax Income")
     elif name == "balance_sheet":
         ltd, cur = g("Long Term Debt"), g("Current Debt")
-        total_debt = ltd.add(cur, fill_value=0).where(ltd.notna() | cur.notna())
-        rows["Total Debt"] = total_debt
-        rows["Common Stock Equity"] = g("Stockholders Equity")
-        rows["Working Capital"] = g("Current Assets") - g("Current Liabilities")
-        rows["Invested Capital"] = g("Stockholders Equity") + total_debt
-        rows["Receivables"] = g("Accounts Receivable")
-        if "Cash Cash Equivalents And Short Term Investments" not in df.index:
-            cash, sti = g("Cash And Cash Equivalents"), g("Other Short Term Investments")
-            rows["Cash Cash Equivalents And Short Term Investments"] = cash.add(sti, fill_value=0).where(cash.notna())
+        debt = [NAN if a != a and b != b else (a if a == a else 0.0) + (b if b == b else 0.0)
+                for a, b in zip(ltd, cur)]
+        equity = g("Stockholders Equity")
+        extra["Total Debt"] = debt
+        extra["Common Stock Equity"] = equity
+        extra["Working Capital"] = _sum(g("Current Assets"), [-v for v in g("Current Liabilities")])
+        extra["Invested Capital"] = _sum(equity, debt)
+        extra["Receivables"] = g("Accounts Receivable")
+        cash, sti = g("Cash And Cash Equivalents"), g("Other Short Term Investments")
+        extra["Cash Cash Equivalents And Short Term Investments"] = [
+            NAN if c != c else c + (t if t == t else 0.0) for c, t in zip(cash, sti)]
     elif name == "cashflow":
-        rows["Free Cash Flow"] = g("Operating Cash Flow") + g("Capital Expenditure")
-        rows["Total Cash From Operating Activities"] = g("Operating Cash Flow")
-    extra = pd.DataFrame({k: v for k, v in rows.items() if k not in df.index and not v.isna().all()}).T
-    return pd.concat([df, extra]) if not extra.empty else df
+        extra["Free Cash Flow"] = _sum(g("Operating Cash Flow"), g("Capital Expenditure"))
+        extra["Total Cash From Operating Activities"] = g("Operating Cash Flow")
+    for label, vals in extra.items():
+        existing = rows.get(label)
+        if (existing is None or not any(v == v for v in existing)) and any(v == v for v in vals):
+            rows[label] = vals
+
+
+def _frame(rows: dict[str, list[float]], ends: list[str]) -> pd.DataFrame | None:
+    if not rows or not ends:
+        return None
+    return pd.DataFrame(list(rows.values()), index=list(rows), columns=pd.DatetimeIndex(ends))
 
 
 def statements(symbol: str, as_of: str | None = None) -> dict:
     """Annual and quarterly statement frames (Yahoo layout: labels x period ends, newest first)."""
-    fx, origin = facts(symbol, as_of)
+    # Four annual columns and the trailing quarters reach back ~5 years; older periods aren't read.
+    since = (pd.Timestamp(as_of or date.today()) - pd.DateOffset(years=YEARS_READ)).date().isoformat()
+    fx, origin = facts(symbol, as_of, since)
     out: dict = {"origin": origin, "facts": fx}
     if origin is None:
         return out
@@ -172,8 +195,11 @@ def statements(symbol: str, as_of: str | None = None) -> dict:
         q_balance = _ends(fx, labels["balance_sheet"], False, QUARTER_COLUMNS + ANNUAL_COLUMNS)
         q_ends = sorted(set(q_ends) | set(q_balance), reverse=True)[:QUARTER_COLUMNS]
     for name, flows in flows_by_name.items():
-        out[f"{name}_df"] = _add_derived(_frame(fx, labels[name], annual_ends, False, flows), name)
-        out[f"{name}_q_df"] = _add_derived(_frame(fx, labels[name], q_ends, True, flows), name)
+        for key, ends, quarterly in ((f"{name}_df", annual_ends, False), (f"{name}_q_df", q_ends, True)):
+            rows = _rows(fx, labels[name], ends, quarterly, flows)
+            if rows:
+                _add_derived(rows, name, len(ends))
+            out[key] = _frame(rows, ends)
     return out
 
 
@@ -188,12 +214,28 @@ def _latest_col(df: pd.DataFrame | None) -> dict:
 # Trailing figures
 # ---------------------------------------------------------------------------
 
-def ttm(fx: dict, label: str) -> tuple[float | None, str | None]:
+STALE_QUARTER = 120     # days: a quarterly figure older than this vs the newest period is stale
+STALE_LATEST = 400      # days: the same for an annual figure or a balance-sheet line
+
+
+def newest_period(fx: dict) -> str | None:
+    """The company's latest reported period end (balance sheet or income statement)."""
+    ends = [e for c in ("Total Assets", "Net Income|Q", "Net Income", "Total Revenue|Q", "Total Revenue")
+            for e in (fx.get(c) or {})]
+    return max(ends) if ends else None
+
+
+def _stale(end: str, newest: str | None, max_days: int) -> bool:
+    """A line the company stopped tagging keeps its last value forever; don't read it as current."""
+    return bool(newest) and (date.fromisoformat(newest) - date.fromisoformat(end)).days > max_days
+
+
+def ttm(fx: dict, label: str, newest: str | None = None) -> tuple[float | None, str | None]:
     """Sum of the last four filed quarters; (value, last quarter end). None when the
-    four aren't consecutive (a quarter is missing)."""
+    four aren't consecutive (a quarter is missing) or end long before ``newest``."""
     q = fx.get(label + Q) or {}
     ends = sorted(q, reverse=True)[:4]
-    if len(ends) < 4:
+    if len(ends) < 4 or _stale(ends[0], newest, STALE_QUARTER):
         return None, None
     span = (date.fromisoformat(ends[0]) - date.fromisoformat(ends[3])).days
     if not 250 <= span <= 300:
@@ -201,20 +243,24 @@ def ttm(fx: dict, label: str) -> tuple[float | None, str | None]:
     return sum(q[e]["value"] for e in ends), ends[0]
 
 
-def latest(fx: dict, label: str) -> tuple[float | None, str | None]:
+def latest(fx: dict, label: str, newest: str | None = None) -> tuple[float | None, str | None]:
     series = fx.get(label) or {}
     if not series:
         return None, None
     end = max(series)
+    if _stale(end, newest, STALE_LATEST):
+        return None, None
     return series[end]["value"], end
 
 
-def _yoy_quarter(fx: dict, label: str) -> float | None:
+def _yoy_quarter(fx: dict, label: str, newest: str | None = None) -> float | None:
     """Latest quarter vs the same quarter a year earlier (Yahoo's revenueGrowth/earningsGrowth)."""
     q = fx.get(label + Q) or {}
     if not q:
         return None
     end = max(q)
+    if _stale(end, newest, STALE_QUARTER):
+        return None
     d = date.fromisoformat(end)
     prior = [e for e in q if 350 <= (d - date.fromisoformat(e)).days <= 380]
     if not prior:
@@ -229,6 +275,10 @@ def _sec_info(fx: dict) -> tuple[dict, dict]:
     """Statement-based info keys from SEC facts, and each key's (period, kind) for provenance."""
     out: dict = {}
     src: dict = {}
+    newest = newest_period(fx)
+
+    def current(label):  # the latest value, unless the company stopped reporting the line
+        return latest(fx, label, newest)
 
     def put(key, val, period, how):
         val = _f(val)
@@ -237,19 +287,19 @@ def _sec_info(fx: dict) -> tuple[dict, dict]:
             src[key] = (period, how)
 
     def flow(label):
-        v, end = ttm(fx, label)
+        v, end = ttm(fx, label, newest)
         if v is not None:
             return v, end, "ttm"
-        v, end = latest(fx, label)
+        v, end = current(label)
         return v, end, "annual"
 
     rev, rev_end, rev_how = flow("Total Revenue")
     ni, ni_end, ni_how = flow("Net Income")
     nic, _, _ = flow("Net Income Common Stockholders")
     op, op_end, op_how = flow("Operating Income")
-    cost, _, _ = flow("Cost Of Revenue")
+    cost, cost_end, cost_how = flow("Cost Of Revenue")
     gp, gp_end, gp_how = flow("Gross Profit")
-    if gp is None and rev is not None and cost is not None:
+    if gp is None and rev is not None and cost is not None and (cost_end, cost_how) == (rev_end, rev_how):
         gp, gp_end, gp_how = rev - cost, rev_end, rev_how
     da, _, _ = flow("Depreciation And Amortization")
     pretax, _, _ = flow("Pretax Income")
@@ -282,17 +332,17 @@ def _sec_info(fx: dict) -> tuple[dict, dict]:
     if ni and divs is not None and ni > 0:
         put("payoutRatio", -divs / ni, ni_end, ni_how)
 
-    equity, eq_end = latest(fx, "Stockholders Equity")
-    assets, as_end = latest(fx, "Total Assets")
-    ltd, ltd_end = latest(fx, "Long Term Debt")
-    cur_debt, cd_end = latest(fx, "Current Debt")
-    cash, cash_end = latest(fx, "Cash And Cash Equivalents")
-    sti, sti_end = latest(fx, "Other Short Term Investments")
-    combined, comb_end = latest(fx, "Cash Cash Equivalents And Short Term Investments")
-    ca, ca_end = latest(fx, "Current Assets")
-    cl, cl_end = latest(fx, "Current Liabilities")
-    inv, inv_end = latest(fx, "Inventory")
-    liab, liab_end = latest(fx, "Total Liabilities Net Minority Interest")
+    equity, eq_end = current("Stockholders Equity")
+    assets, as_end = current("Total Assets")
+    ltd, ltd_end = current("Long Term Debt")
+    cur_debt, cd_end = current("Current Debt")
+    cash, cash_end = current("Cash And Cash Equivalents")
+    sti, sti_end = current("Other Short Term Investments")
+    combined, comb_end = current("Cash Cash Equivalents And Short Term Investments")
+    ca, ca_end = current("Current Assets")
+    cl, cl_end = current("Current Liabilities")
+    inv, inv_end = current("Inventory")
+    liab, liab_end = current("Total Liabilities Net Minority Interest")
 
     put("totalAssets", assets, as_end, "latest")
     put("totalStockholderEquity", equity, eq_end, "latest")
@@ -317,12 +367,12 @@ def _sec_info(fx: dict) -> tuple[dict, dict]:
             put("debtToEquity", debt / equity * 100, eq_end, "latest")
     if assets and ni is not None:
         put("returnOnAssets", ni / assets, ni_end, ni_how)
-    rg = _yoy_quarter(fx, "Total Revenue")
+    rg = _yoy_quarter(fx, "Total Revenue", newest)
     put("revenueGrowth", rg, max(fx.get("Total Revenue" + Q) or {"": None}) or None, "yoy")
-    eg = _yoy_quarter(fx, "Net Income")
+    eg = _yoy_quarter(fx, "Net Income", newest)
     put("earningsGrowth", eg, max(fx.get("Net Income" + Q) or {"": None}) or None, "yoy")
 
-    shares, sh_end = latest(fx, "Shares Outstanding")
+    shares, sh_end = current("Shares Outstanding")
     put("sharesOutstanding", shares, sh_end, "latest")
     if shares and equity is not None:
         put("bookValue", equity / shares, eq_end, "latest")
@@ -341,9 +391,9 @@ def _security(symbol: str) -> dict:
 
 
 def _beta_from_store(symbol: str) -> float | None:
-    from .services.yfinance_service import benchmark_for, get_close_frame
+    from .services.yfinance_service import _period_start, benchmark_for
     bench = benchmark_for(symbol)
-    close = get_close_frame((symbol, bench), "2y")
+    close = store.prices([symbol, bench], start=_period_start("2y")[0])  # straight from the store
     if close.empty or symbol not in close.columns or bench not in close.columns:
         return None
     r = np.log(close[symbol] / close[symbol].shift(1))
@@ -390,9 +440,16 @@ def bundle(symbol: str, as_of: str | None = None) -> dict:
         if row:
             info["currentPrice"] = info["regularMarketPrice"] = float(row[1])
             sources["fields"]["currentPrice"] = sources["fields"]["regularMarketPrice"] = ("close", row[0])
-    if info.get("sharesOutstanding") is None and _f(quote.get("shares")) is not None:
-        info["sharesOutstanding"] = _f(quote["shares"])  # the §8.3 chain's last step
+    snap_shares, sec_shares = _f(quote.get("shares")), _f(info.get("sharesOutstanding"))
+    if snap_shares and (sec_shares is None or abs(sec_shares / snap_shares - 1) > SHARES_TOLERANCE):
+        # The §8.3 chain's last step, and the count that matches the quoted price when SEC's
+        # differs: a split since the filing, one class of several, or ADS vs ordinary shares.
+        info["sharesOutstanding"] = snap_shares
         sources["fields"]["sharesOutstanding"] = ("snapshot",)
+        equity = _f(info.get("totalStockholderEquity")) if origin == "sec" else None
+        if equity is not None:
+            info["bookValue"] = equity / snap_shares
+            sources["fields"]["bookValue"] = ("derived",)
     if not quote.get("market_cap") and _f(info.get("currentPrice")) and _f(info.get("sharesOutstanding")):
         info["marketCap"] = info["currentPrice"] * info["sharesOutstanding"]  # not a week-old stored cap
         sources["fields"]["marketCap"] = ("derived",)

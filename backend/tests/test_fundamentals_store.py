@@ -154,3 +154,25 @@ def test_a_foreign_listing_reads_yahoo_statements_and_its_last_close():
     assert b["financials"]["Total Revenue"] == 30.0 and b["balance_sheet"]["Total Assets"] == 50.0
     assert b["info"]["currentPrice"] == 700.0 and b["info"]["marketCap"] == 1400.0
     assert fs.statement_ref(b, "Income statement")["provider"] == "yahoo"
+
+
+def test_a_line_the_company_stopped_reporting_is_not_current():
+    # ABT stopped tagging GrossProfit in 2019 and AOS its cover-page share count in 2015:
+    # their last values must not pass for today's.
+    _store_acme()
+    store.replace_fundamentals(["ACME"], [
+        _fact("Gross Profit|Q", e, 999.0, filed="2019-12-01") for e in
+        ("2018-12-31", "2019-03-31", "2019-06-30", "2019-09-30")] + [
+        _fact("Inventory", "2015-06-30", 5.0, filed="2015-08-01")], "sec:test")
+    i = fs.bundle("ACME")["info"]
+    assert "grossProfits" not in i                  # and no TTM revenue minus an annual cost either
+    assert "quickRatio" not in i                    # 2015 inventory isn't today's
+
+
+def test_the_snapshot_share_count_wins_when_sec_is_on_another_basis():
+    _store_acme()  # SEC: 10 shares; equity 550
+    store.upsert("quote_latest", [dict(symbol="ACME", shares=20.0)], ("symbol",))  # a 2-for-1 split since
+    i = fs.bundle("ACME")["info"]
+    assert i["sharesOutstanding"] == 20.0 and i["bookValue"] == 27.5
+    store.upsert("quote_latest", [dict(symbol="ACME", shares=10.5)], ("symbol",))  # within 10 %: SEC's stands
+    assert fs.bundle("ACME")["info"]["sharesOutstanding"] == 10.0
