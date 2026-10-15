@@ -11,6 +11,13 @@ import pandas as pd
 import pytest
 
 
+def _to_wide(per_symbol):
+    """{symbol: OHLC frame} -> get_ohlc_wide's {"Open"|...: date x symbol frame}."""
+    import pandas as _pd
+    return {c: _pd.DataFrame({s: df[c] for s, df in per_symbol.items()})
+            for c in ("Open", "High", "Low", "Close")}
+
+
 @pytest.fixture(autouse=True)
 def _clear_caches(monkeypatch):
     """Isolate tests: the services are @cached by args, so clear between tests."""
@@ -59,7 +66,7 @@ def patch_universe(monkeypatch):
         constituents, "get_constituents",
         lambda index="sp500": [{"symbol": s, "name": f"{s} Corp", "sector": "Tech"} for s in syms],
     )
-    monkeypatch.setattr(breadth_service.yfs, "get_ohlc_frame", lambda s, p, **kw: _as_ohlc(frame))
+    monkeypatch.setattr(breadth_service.yfs, "get_ohlc_wide", lambda s, p, **kw: _to_wide(_as_ohlc(frame)))
     monkeypatch.setattr(movers_service.yfs, "get_close_frame", lambda s, p: frame)
     return frame
 
@@ -114,7 +121,7 @@ class TestBreadth:
     def test_empty_frame_is_unavailable_not_zero(self, monkeypatch):
         """Audit D-02: a failed download must read as unknown, never as 0."""
         from backend.services import breadth_service
-        monkeypatch.setattr(breadth_service.yfs, "get_ohlc_frame", lambda s, p, **kw: {})
+        monkeypatch.setattr(breadth_service.yfs, "get_ohlc_wide", lambda s, p, **kw: _to_wide({}))
         monkeypatch.setattr(breadth_service.constituents, "constituent_symbols", lambda i="sp500": ["AAA"])
         b = breadth_service.breadth("sp500")
         assert b["status"] == "unavailable"
@@ -139,7 +146,7 @@ class TestBreadth:
         # 3 of 4 printed = 75% < 90% coverage, so pad the universe.
         for k in range(8):
             frame[f"PAD{k}"] = np.linspace(10, 20, len(frame))
-        monkeypatch.setattr(breadth_service.yfs, "get_ohlc_frame", lambda s, p, **kw: _as_ohlc(frame))
+        monkeypatch.setattr(breadth_service.yfs, "get_ohlc_wide", lambda s, p, **kw: _to_wide(_as_ohlc(frame)))
         monkeypatch.setattr(breadth_service.constituents, "constituent_symbols",
                             lambda i="sp500": list(frame.columns))
         b = breadth_service.breadth("sp500")
@@ -154,7 +161,7 @@ class TestBreadth:
         close["EEE"] = [100.0] * (len(close) - 1) + [99.0]
         high = close.copy()
         high.loc[high.index[-1], "EEE"] = 101.0  # traded through the prior high
-        monkeypatch.setattr(breadth_service.yfs, "get_ohlc_frame", lambda s, p, **kw: _as_ohlc(close, high=high))
+        monkeypatch.setattr(breadth_service.yfs, "get_ohlc_wide", lambda s, p, **kw: _to_wide(_as_ohlc(close, high=high)))
         monkeypatch.setattr(breadth_service.constituents, "constituent_symbols",
                             lambda i="sp500": list(close.columns))
         b = breadth_service.breadth("sp500")
@@ -292,11 +299,27 @@ class TestPutCallHistory:
     """Audit L-01: put/call is ranked against its own history, not a fixed band."""
 
     def _run(self, monkeypatch, ratio, hist):
+        """The daily job records ``ratio`` after ``hist``; the page ranks the latest record."""
+        import datetime as dt
         from backend.services import feargreed_service as fg, snapshots
-        monkeypatch.setattr(fg, "_put_call_ratio", lambda: ratio)
-        monkeypatch.setattr(snapshots, "record", lambda *a, **k: None)
-        monkeypatch.setattr(snapshots, "history", lambda *a, **k: [(None, v) for v in hist])
+        rows = [(dt.date(2026, 1, 1) + dt.timedelta(days=i), v) for i, v in enumerate([*hist, ratio])]
+        monkeypatch.setattr(fg, "_put_call_ratio", lambda: pytest.fail("the page must not read option chains"))
+        monkeypatch.setattr(snapshots, "history", lambda *a, **k: rows)
         return fg._put_call()
+
+    def test_the_daily_job_reads_the_chains_and_records_the_ratio(self, monkeypatch):
+        from backend.services import feargreed_service as fg, snapshots
+        recorded = []
+        monkeypatch.setattr(fg, "_put_call_ratio", lambda: 2.2)
+        monkeypatch.setattr(snapshots, "record", lambda *a: recorded.append(a[:3]))
+        monkeypatch.setattr(snapshots, "history", lambda *a, **k: [(__import__("datetime").date(2026, 10, 14), 2.2)])
+        assert fg._put_call(live=True)["ratio"] == 2.2
+        assert recorded == [("spy_pcr_oi", "SPY", 2.2)]
+
+    def test_nothing_recorded_yet_is_none(self, monkeypatch):
+        from backend.services import feargreed_service as fg, snapshots
+        monkeypatch.setattr(snapshots, "history", lambda *a, **k: [])
+        assert fg._put_call() == {"score": None, "ratio": None, "historyDays": None, "asOf": None}
 
     def test_structurally_high_ratio_is_not_pinned_to_zero(self, monkeypatch):
         # SPY OI P/C lives around 2-2.5; a median day must score near 50.
@@ -305,7 +328,7 @@ class TestPutCallHistory:
         assert 40 <= out["score"] <= 60
 
     def test_insufficient_history_is_none_not_zero(self, monkeypatch):
-        out = self._run(monkeypatch, 2.4, [2.4] * 10)
+        out = self._run(monkeypatch, 2.4, [2.4] * 9)
         assert out["score"] is None and out["historyDays"] == 10 and out["ratio"] == 2.4
 
     def test_zero_open_interest_is_missing_not_a_ratio(self, monkeypatch):

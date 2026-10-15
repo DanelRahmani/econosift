@@ -156,7 +156,8 @@ def test_request_history_queues_only_unstored_symbols_and_leaves_failures_alone(
     assert fetcher.request_history(["HAVE", "NEW", "BAD"]) == ["NEW", "BAD"]
     with store.connect() as conn:
         conn.execute(f"UPDATE fetch_queue SET attempts = {fetcher.MAX_ATTEMPTS} WHERE key = 'BAD'")
-    fetcher.request_history(["BAD"])  # a page asking again must not retry a symbol Yahoo lacks
+    # A page asking again must not retry a symbol Yahoo lacks, nor wait for it.
+    assert fetcher.request_history(["BAD"]) == []
     assert ("history", "BAD", fetcher.MAX_ATTEMPTS) in _queue()
     with store.connect() as conn:
         assert {p for p, in conn.execute("SELECT priority FROM fetch_queue")} == {fetcher.PRIORITY_ON_DEMAND}

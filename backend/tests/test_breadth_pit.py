@@ -29,6 +29,13 @@ CHANGES = [
 ]
 
 
+def _to_wide(per_symbol):
+    """{symbol: OHLC frame} -> get_ohlc_wide's {"Open"|...: date x symbol frame}."""
+    import pandas as _pd
+    return {c: _pd.DataFrame({s: df[c] for s, df in per_symbol.items()})
+            for c in ("Open", "High", "Low", "Close")}
+
+
 @pytest.fixture(autouse=True)
 def _clear_caches():
     from backend import cache
@@ -56,7 +63,7 @@ def _patch(monkeypatch, roster=("A", "B"), changes=CHANGES, closes=CLOSES):
         seen["syms"] = tuple(syms)
         return _ohlc({s: v for s, v in closes.items() if s in syms})
 
-    monkeypatch.setattr(bs.yfs, "get_ohlc_frame", fake_download)
+    monkeypatch.setattr(bs.yfs, "get_ohlc_wide", lambda *a, **k: _to_wide(fake_download(*a, **k)))
     last = SESSIONS[-1]
     monkeypatch.setattr(bs, "_now_ny", lambda: dt.datetime(last.year, last.month, last.day, 17, 0,
                                                            tzinfo=bs._NY))

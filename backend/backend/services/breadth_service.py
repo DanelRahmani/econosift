@@ -115,12 +115,13 @@ def _ohlc_frames(index: str) -> dict:
     extra = sorted({s for c in in_window for s in (c.get("added"), c.get("removed"))
                     if s and s not in known})
     syms = tuple(roster + extra)
-    raw = yfs.get_ohlc_frame(syms, "2y", adjust=False)
-    if not raw:
+    raw = yfs.get_ohlc_wide(syms, "2y", adjust=False)
+    keep = raw["Close"].columns[raw["Close"].notna().any()]  # symbols with at least one bar
+    if not len(keep):
         return {}
-    close = pd.DataFrame({s: df["Close"] for s, df in raw.items()}).sort_index()
-    high = pd.DataFrame({s: df["High"] for s, df in raw.items()}).reindex(close.index)
-    low = pd.DataFrame({s: df["Low"] for s, df in raw.items()}).reindex(close.index)
+    close = raw["Close"][keep].sort_index()
+    high = raw["High"][keep].reindex(close.index)
+    low = raw["Low"][keep].reindex(close.index)
     idx = pd.to_datetime(close.index)
     close.index = (idx.tz_localize(None) if idx.tz is not None else idx).normalize()
     high.index = low.index = close.index

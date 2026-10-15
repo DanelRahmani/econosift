@@ -262,12 +262,14 @@ def frames(symbols: Iterable[str], fields: Sequence[str], start: str | None = No
         return {f: pd.DataFrame() for f in fields}
     df = pd.DataFrame(rows, columns=["symbol", "date", *fields])
     df["date"] = pd.to_datetime(df["date"])
+    wide = df.set_index(["date", "symbol"]).unstack("symbol").sort_index()  # one reshape for all fields
+    wide.index.name = None
+    cols = [s for s in syms if s in wide.columns.get_level_values("symbol")]
     out = {}
     for f in fields:
-        wide = df.pivot(index="date", columns="symbol", values=f)
-        wide.columns.name = None
-        wide.index.name = None
-        out[f] = wide[[s for s in syms if s in wide.columns]].sort_index()
+        frame = wide[f][cols]
+        frame.columns.name = None
+        out[f] = frame
     return out
 
 

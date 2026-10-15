@@ -67,18 +67,23 @@ def enqueue(kind: str, key: str, priority: int = PRIORITY_HISTORY, retry_failed:
 
 
 def request_history(symbols) -> list[str]:
-    """Queue history for requested symbols that aren't stored; returns those symbols.
+    """Queue history for requested symbols that aren't stored; returns the ones
+    still pending. A symbol whose fetch already failed (Yahoo has no data, e.g.
+    a delisted former member) is known-missing, not pending.
 
     Called on the read path: it only writes the queue, never calls a source.
     """
     syms = list(dict.fromkeys(symbols))
     if not syms:
         return []
+    marks = ", ".join("?" * len(syms))
     with store.connect() as conn:
         have = {r[0] for r in conn.execute(
-            f"SELECT symbol FROM security WHERE history_at IS NOT NULL AND symbol IN "
-            f"({', '.join('?' * len(syms))})", syms)}
-    missing = [s for s in syms if s not in have]
+            f"SELECT symbol FROM security WHERE history_at IS NOT NULL AND symbol IN ({marks})", syms)}
+        failed = {r[0] for r in conn.execute(
+            f"SELECT key FROM fetch_queue WHERE kind = 'history' AND attempts >= ? AND key IN ({marks})",
+            (MAX_ATTEMPTS, *syms))}
+    missing = [s for s in syms if s not in have and s not in failed]
     for sym in missing:
         enqueue("history", sym, PRIORITY_ON_DEMAND, retry_failed=False)
     return missing

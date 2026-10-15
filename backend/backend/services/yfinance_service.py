@@ -530,14 +530,21 @@ def get_ohlc_frame(symbols: tuple[str, ...], period: str, adjust: bool = True) -
     """
     if not symbols:
         return {}
-    f = _stored(symbols, period, ("open", "high", "low", "close", "adj_close"))
+    wide = get_ohlc_wide(symbols, period, adjust)
     result: dict[str, pd.DataFrame] = {}
-    for sym in symbols:
-        if sym not in f["close"]:
-            continue
-        factor = f["adj_close"][sym] / f["close"][sym] if adjust else 1.0
-        df = pd.DataFrame({c.capitalize(): f[c][sym] * factor for c in ("open", "high", "low", "close")})
-        df = df.dropna(how="any")
+    for sym in wide["Close"].columns:
+        df = pd.DataFrame({c: wide[c][sym] for c in ("Open", "High", "Low", "Close")}).dropna(how="any")
         if len(df):
             result[sym] = df
     return result
+
+
+def get_ohlc_wide(symbols: tuple[str, ...], period: str, adjust: bool = True) -> dict[str, pd.DataFrame]:
+    """Like :func:`get_ohlc_frame` but as ``{"Open"|"High"|"Low"|"Close": date x symbol frame}``,
+    for index-wide readers that would otherwise split 500 symbols apart and join them back.
+    A bar missing any of the four prices is NaN in all four."""
+    f = _stored(symbols, period, ("open", "high", "low", "close", "adj_close"))
+    factor = f["adj_close"] / f["close"] if adjust else 1.0
+    out = {c.capitalize(): f[c] * factor for c in ("open", "high", "low", "close")}
+    valid = out["Open"].notna() & out["High"].notna() & out["Low"].notna() & out["Close"].notna()
+    return {c: df.where(valid) for c, df in out.items()}

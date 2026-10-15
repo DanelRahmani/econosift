@@ -233,7 +233,7 @@ def record_daily_snapshots() -> None:
     try:
         from . import feargreed_service, options_engine, snapshots
         rows = 0
-        if feargreed_service._put_call().get("ratio") is not None:
+        if feargreed_service._put_call(live=True).get("ratio") is not None:
             rows += 1
         for ticker in sorted(set(snapshots.keys("iv30")) | {"SPY"}):
             try:

@@ -157,7 +157,7 @@ def _put_call_ratio() -> float | None:
         return None
 
 
-def _put_call() -> dict:
+def _put_call(live: bool = False) -> dict:
     """Put/call signal scored against its own recorded history.
 
     SPY is the market's main hedging vehicle, so its open-interest put/call
@@ -165,19 +165,27 @@ def _put_call() -> dict:
     mapping) pinned the score at 0 permanently (audit L-01). No free source
     publishes the history, so each day's ratio is recorded and today's value
     is ranked (inverted: more hedging = more fear) once enough sessions exist.
+
+    Only the daily job reads the option chains (``live``); the page ranks the
+    latest recorded ratio, so opening it makes no Yahoo call (Phase 67).
     """
     from . import snapshots
-    ratio = _put_call_ratio()
-    today = datetime.now(ZoneInfo("America/New_York")).date()
-    if ratio is None:
+    if live:
+        ratio = _put_call_ratio()
+        day = datetime.now(ZoneInfo("America/New_York")).date()
+        if ratio is None:
+            return {"score": None, "ratio": None, "historyDays": None, "asOf": None}
+        snapshots.record("spy_pcr_oi", "SPY", ratio, day)
+    hist_rows = snapshots.history("spy_pcr_oi", "SPY", _WINDOW)
+    if not hist_rows:
         return {"score": None, "ratio": None, "historyDays": None, "asOf": None}
-    snapshots.record("spy_pcr_oi", "SPY", ratio, today)
-    hist = [v for _, v in snapshots.history("spy_pcr_oi", "SPY", _WINDOW)]
+    day, ratio = hist_rows[-1]
+    hist = [v for _, v in hist_rows]
     score = None
     if len(hist) >= _PCR_MIN_HISTORY:
         score = _clip(100.0 - float(np.mean(np.array(hist) <= ratio)) * 100.0)
     return {"score": score, "ratio": round(ratio, 3), "historyDays": len(hist),
-            "asOf": today.isoformat()}
+            "asOf": day.isoformat()}
 
 
 def _signal(key: str, label: str, series: pd.Series, as_of) -> dict:
