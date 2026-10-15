@@ -36,7 +36,7 @@ No paid APIs required. Optional free FRED API key & FINNHUB API key for richer U
 | Layer | Technology |
 |-------|-----------|
 | **Backend** | Python 3.12, FastAPI, uvicorn |
-| **Data** | yfinance ≥0.2.40, pandas, numpy, scipy, pandas-datareader, fredapi, wbgapi, imfp, ecbdata, dbnomics |
+| **Data** | yfinance ≥1.7.0, pandas, numpy, scipy, pandas-datareader, fredapi, wbgapi, imfp, ecbdata, dbnomics |
 | **Quant** | arch (GARCH), pyarrow (parquet), pandas-ta, openpyxl, cachetools |
 | **Persistence** | SQLAlchemy ≥2.0, APScheduler ≥3.10, SQLite (WAL mode) |
 | **Frontend** | Next.js 14 (App Router), React 18, TypeScript, Tailwind CSS, Recharts |

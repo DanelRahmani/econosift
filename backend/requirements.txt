@@ -1,7 +1,7 @@
 setuptools
 fastapi
 uvicorn[standard]
-yfinance>=0.2.40
+yfinance>=1.7.0
 fredapi
 wbgapi
 ecbdata
