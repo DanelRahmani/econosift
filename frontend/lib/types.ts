@@ -2912,3 +2912,80 @@ export interface RiskDialBacktest {
   note?: string;
   costBps?: number;
 }
+
+// Strategy plugins (Phase 70)
+export interface SandboxCapabilities {
+  supported: boolean;
+  platform: string;
+  network?: string;
+  filesystem?: string;
+  memory?: string;
+  timeout?: string;
+  note?: string;
+}
+
+export interface StrategyInfo {
+  id: string;
+  name: string;
+  sha256: string;
+  builtIn: boolean;
+  uploadedAt: string | null;
+  bytes: number;
+}
+
+export interface StrategyList {
+  uploadsEnabled: boolean;
+  sandbox: SandboxCapabilities;
+  limits: { maxBytes: number; timeoutSeconds: number; memoryMB: number; maxGross: number };
+  strategies: StrategyInfo[];
+}
+
+export type StrategyParams = Record<string, number | string | boolean>;
+
+export interface StrategyRunBody {
+  strategyId: string;
+  index: "sp500" | "ndx" | "dow";
+  years: number;
+  rebalance: "W" | "M" | "Q";
+  costBps: number;
+  params: StrategyParams;
+}
+
+export interface WalkForwardBody extends StrategyRunBody {
+  trainYears: number;
+  testYears: number;
+  grid: Record<string, Array<number | string | boolean>>;
+  metric: "sharpe" | "cagr" | "totalReturn";
+}
+
+export interface StrategyMetrics {
+  totalReturn: number | null;
+  cagr: number | null;
+  vol: number | null;
+  sharpe: number | null;
+  maxDrawdown: number | null;
+  avgTurnover: number | null;
+  annualTurnover: number | null;
+  totalCost: number | null;
+  rebalances: number;
+  years: number;
+}
+
+export interface StrategyResult {
+  available: boolean;
+  metrics: StrategyMetrics;
+  equityCurve: { date: string; value: number }[];
+  drawdown: { date: string; value: number }[];
+  excluded: { symbol: string; firstDate: string; reason: string }[];
+  positionsWithoutExitPrice: number;
+  strategy: { name: string; sha256: string; bytes: number };
+  settings: Record<string, unknown>;
+  snapshot: Record<string, string | number | null>;
+  sandbox: Record<string, unknown>;
+  seconds: number;
+  externalRequestsDuringRun?: number;
+  rebalanceLog?: { date: string; members: number; positions: number; turnover: number; cost: number }[];
+  outOfSampleOnly?: boolean;
+  folds?: { trainStart: string; trainEnd: string; testStart: string; testEnd: string;
+            params: StrategyParams; testMetrics: StrategyMetrics }[];
+}

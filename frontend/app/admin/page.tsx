@@ -157,6 +157,7 @@ export default function AdminPage() {
 
           {/* API Keys */}
           <ApiKeysSection />
+          <StrategyUploadsSection />
 
           {/* Appearance / custom theme */}
           <AppearanceSection />
@@ -435,6 +436,66 @@ function AppearanceSection() {
         >Reset to default</button>
         {!valid && <span className="text-xs text-danger">Enter valid 6-digit hex colours (e.g. #142A43).</span>}
       </div>
+    </Card>
+  );
+}
+
+// Phase 70: uploading a strategy runs its code on this machine, so it is off until turned on here.
+function StrategyUploadsSection() {
+  const qc = useQueryClient();
+  const { data } = useQuery(apiQuery("strategyUploads"));
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function toggle() {
+    if (!data) return;
+    if (!data.enabled && !window.confirm(
+      "Turn on strategy uploads? An uploaded .py file runs as code on this machine. Only allow files you wrote or have read.")) {
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      qc.setQueryData(apiQuery("strategyUploads").queryKey, await api.setStrategyUploads(!data.enabled));
+      qc.invalidateQueries({ queryKey: ["strategies"] });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "could not change the setting");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const sb = data?.sandbox;
+  return (
+    <Card>
+      <div className="flex items-center justify-between mb-2">
+        <h2 className="text-sm font-semibold text-text-secondary">Strategy uploads</h2>
+        <button
+          onClick={toggle}
+          disabled={!data || busy || (sb != null && !sb.supported)}
+          className={`text-xs px-3 py-1 rounded border ${data?.enabled ? "border-danger text-danger" : "border-border"} disabled:opacity-50`}
+        >
+          {data?.enabled ? "On: turn off" : "Off: turn on"}
+        </button>
+      </div>
+      <p className="text-xs text-text-secondary">
+        Lets the Research → Strategy Lab tab upload <code>.py</code> strategies. They run as code on this machine, in a
+        short-lived process with no API keys.
+      </p>
+      {sb && (
+        <ul className="text-xs text-text-muted mt-2 space-y-0.5">
+          {sb.supported ? (
+            <>
+              <li>Network: {sb.network}</li>
+              <li>Files: {sb.filesystem}</li>
+              <li>Memory: {sb.memory}; time limit {sb.timeout}</li>
+            </>
+          ) : (
+            <li>{sb.note}</li>
+          )}
+        </ul>
+      )}
+      {error && <div className="text-xs text-danger mt-2">{error}</div>}
     </Card>
   );
 }

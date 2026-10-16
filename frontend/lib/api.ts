@@ -40,6 +40,8 @@ import type {
   NetLiquidityData, RecessionProbabilityData, EarningsQualityData, EventStudyData, FactorRegimeData,
   CreditConditionsData, OilShocksData, TreasuryNoiseData,
   BacktestResponse, BacktestSignalDef, BacktestRequestBody,
+  StrategyList, StrategyInfo, StrategyRunBody, WalkForwardBody, StrategyResult, SandboxCapabilities,
+
   RiskDialData, RiskDialBacktest,
   CurrencyCrisisData, BankingStabilityData, InequalityData,
   BusinessData, ShortInterestData, MAData,
@@ -131,6 +133,21 @@ async function put<T>(path: string, body: unknown): Promise<T> {
     const detail = await res.json().catch(() => ({}));
     const msg = (detail as Record<string, unknown>)?.detail || `${path} failed: ${res.status}`;
     throw new Error(String(msg));
+  }
+  return res.json() as Promise<T>;
+}
+
+// Writes whose error text matters to the user (a strategy's traceback, a refused upload).
+async function send<T>(method: "POST" | "PUT" | "DELETE", path: string, body?: unknown): Promise<T> {
+  const res = await fetch(`${API_BASE}/api${path}`, {
+    method,
+    headers: { "Content-Type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const detail = await res.json().then((b) => b?.detail).catch(() => null);
+    throw new Error(typeof detail === "string" ? detail : `API ${path} failed: ${res.status}`);
   }
   return res.json() as Promise<T>;
 }
@@ -600,6 +617,16 @@ export const api = {
   researchFactorRegime: () => get<FactorRegimeData>("/research/factor-regime"),
   backtestSignals: () => get<{ signals: BacktestSignalDef[] }>("/research/backtest/signals"),
   runBacktest: (body: BacktestRequestBody) => post<BacktestResponse>("/research/backtest", body),
+  strategies: () => get<StrategyList>("/research/strategies"),
+  strategySource: (id: string) =>
+    get<{ id: string; name: string; sha256: string; source: string }>(`/research/strategies/${encodeURIComponent(id)}/source`),
+  uploadStrategy: (name: string, source: string) => send<StrategyInfo>("POST", "/research/strategies", { name, source }),
+  deleteStrategy: (id: string) => send<{ deleted: string }>("DELETE", `/research/strategies/${encodeURIComponent(id)}`),
+  runStrategy: (body: StrategyRunBody) => send<StrategyResult>("POST", "/research/strategies/run", body),
+  walkForward: (body: WalkForwardBody) => send<StrategyResult>("POST", "/research/strategies/walkforward", body),
+  strategyUploads: () => get<{ enabled: boolean; sandbox: SandboxCapabilities }>("/admin/strategy-uploads"),
+  setStrategyUploads: (enabled: boolean) =>
+    send<{ enabled: boolean; sandbox: SandboxCapabilities }>("PUT", "/admin/strategy-uploads", { enabled }),
   scenarioHistorical: () => get<any>("/scenario/historical"),
   scenarioStress: (holdings: Holding[]) => post<any>("/scenario/historical/stress", { holdings }),
   scenarioCustom: (holdings: Holding[], shocks: Record<string, number>) =>

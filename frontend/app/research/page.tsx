@@ -20,6 +20,7 @@ const FxMacroLink = dynamic(() => import("@/components/research/FxMacroLink").th
 const MultiCountryPortfolio = dynamic(() => import("@/components/research/MultiCountryPortfolio").then((m) => ({ default: m.MultiCountryPortfolio })));
 const EventStudyTab = dynamic(() => import("@/components/research/EventStudyTab").then((m) => ({ default: m.EventStudyTab })));
 const BacktestTab = dynamic(() => import("@/components/research/BacktestTab").then((m) => ({ default: m.BacktestTab })));
+const StrategyLabTab = dynamic(() => import("@/components/research/StrategyLabTab").then((m) => ({ default: m.StrategyLabTab })));
 const FactorRegimeTab = dynamic(() => import("@/components/research/FactorRegimeTab").then((m) => ({ default: m.FactorRegimeTab })));
 
 const TABS = RESEARCH_TABS;
@@ -77,6 +78,7 @@ function ResearchPageInner() {
       {tab === "eventstudy" && <EventStudyTab />}
       {tab === "factorregime" && <FactorRegimeTab />}
       {tab === "backtest" && <BacktestTab />}
+      {tab === "strategies" && <StrategyLabTab />}
       </ErrorBoundary>
     </main>
   );

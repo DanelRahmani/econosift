@@ -26,6 +26,7 @@ export const RESEARCH_TABS = [
   { key: "eventstudy", label: "Event Study" },
   { key: "factorregime", label: "Factor Regime" },
   { key: "backtest", label: "Backtester" },
+  { key: "strategies", label: "Strategy Lab" },
 ] as const;
 
 export const MACRO_TABS = [
