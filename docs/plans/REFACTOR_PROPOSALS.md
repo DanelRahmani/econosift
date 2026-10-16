@@ -459,6 +459,6 @@ decision holds. `pyarrow` stays in `requirements.txt` because edgartools needs i
   timeout (panel-boundary waited on a cold breadth right after the recreate); Playwright mocked 48 passed,
   1 skipped (the nginx cache-header spec), stable over five runs at 2 and 4 workers; CI green on the branch
   (typecheck, Playwright smoke, backend).
-- **Found, not fixed (outside this phase):** the quote provenance formula text is mis-encoded by the backend
-  (`âˆ'`, `Ã—` for − and ×); CountrySelector's typeahead uses a bare `/api` URL, so it misses the backend in the
-  desktop build (its name lookup two functions up already uses the base URL).
+- **Found after the gate:** CountrySelector's typeahead used a bare `/api` URL, so it missed the backend in the
+  desktop build; it now uses the same base URL as its name lookup. The quote provenance text (`âˆ'`, `Ã—` for −
+  and ×) is **not** a bug: the API sends valid UTF-8, and those are its bytes shown by a Windows-1252 console.

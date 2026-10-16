@@ -80,7 +80,7 @@ export function CountrySelector({
       setLoading(true);
       try {
         const res = await fetch(
-          `/api/macro/search-countries?q=${encodeURIComponent(q.trim())}`
+          `${process.env.NEXT_PUBLIC_API_URL || ""}/api/macro/search-countries?q=${encodeURIComponent(q.trim())}`
         );
         const data = await res.json();
         const filtered = (data.countries || []).filter(
