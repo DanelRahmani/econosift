@@ -36,9 +36,8 @@ class Panel:
         """Advance to ``msg['asof']``: rescale stored bars, append new ones, add newly joined symbols."""
         for f, factors in (msg.get("rescale") or {}).items():
             frame = self.frames[f]
-            cols = [c for c in factors if c in frame.columns]
-            if cols:
-                frame[cols] = frame[cols] * pd.Series({c: factors[c] for c in cols})
+            if len(frame.columns):  # one multiply: per-column assignment fragments the frame (slow, memory)
+                self.frames[f] = frame * pd.Series(factors, dtype=float).reindex(frame.columns).fillna(1.0)
         if msg.get("append"):
             new = _block(msg["append"])
             for f in FIELDS:

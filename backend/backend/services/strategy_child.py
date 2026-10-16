@@ -139,6 +139,9 @@ def main() -> None:
 
     init = recv()
     source = init["source"]
+    # Opened before the chroot hides /proc; re-read at the end for this process's own peak.
+    # (ru_maxrss would include the parent's resident size carried across fork/exec.)
+    status_fd = os.open("/proc/self/status", os.O_RDONLY) if sys.platform == "linux" else None
     try:
         info = _lockdown(init["limits"])
     except Exception as exc:  # never run the code without the limits it was promised
@@ -176,9 +179,10 @@ def main() -> None:
                     send({"op": "weights", "weights": None, "type": type(weights).__name__})
             elif op == "end":
                 usage = {}
-                if sys.platform != "win32":
-                    import resource
-                    usage["maxrss_kb"] = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+                if status_fd is not None:
+                    for line in os.pread(status_fd, 16384, 0).decode().splitlines():
+                        if line.startswith("VmHWM:"):
+                            usage["vmhwm_kb"] = int(line.split()[1])
                 send({"op": "bye", **usage})
                 return
         except Exception as exc:  # the strategy's own frames only, not this file's

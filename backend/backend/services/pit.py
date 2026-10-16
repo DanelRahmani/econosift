@@ -67,6 +67,8 @@ class PITData:
         for f in FIELDS:  # one shared column order; a symbol with no bars has no column
             self.frames[f] = self.frames[f].reindex(columns=self.frames["adj_close"].columns)
         self.stored = set(self.frames["adj_close"].columns)
+        self.arrays = {f: self.frames[f].to_numpy(dtype=float) for f in FIELDS}  # the feed slices these
+        self._col_pos = {c: i for i, c in enumerate(self.frames["adj_close"].columns)}
         self._index = self.frames["adj_close"].index
         close_ff = self.frames["close"].ffill()
         self._close_over_adj = close_ff / self.frames["adj_close"].ffill()
@@ -83,6 +85,9 @@ class PITData:
         for sym, day, ratio in splits:
             self.splits.setdefault(sym, []).append((pd.Timestamp(day), float(ratio)))
         self.split_rows = len(splits)
+
+    def col_pos(self, cols: list[str]) -> np.ndarray:
+        return np.fromiter((self._col_pos[c] for c in cols), dtype=np.intp, count=len(cols))
 
     # -- membership -------------------------------------------------------
     def first_joined(self, sym: str) -> str:
@@ -157,12 +162,12 @@ def _facts(symbol: str, as_of: str) -> dict:
             for concept, ends in fx.items()}
 
 
-def _block(frames: dict[str, pd.DataFrame], rows, cols: list[str], scale: dict[str, pd.Series]) -> dict | None:
+def _block(data: "PITData", rows: np.ndarray, cols: list[str], scale: dict[str, pd.Series]) -> dict | None:
     if not cols or not rows.any():
         return None
-    idx = frames["adj_close"].index[rows]
-    return {"index": [d.date().isoformat() for d in idx], "columns": cols,
-            "data": {f: (frames[f].loc[rows, cols] * scale[f][cols]).to_numpy().tolist() for f in FIELDS}}
+    pos = data.col_pos(cols)
+    return {"index": [d.date().isoformat() for d in data.frames["adj_close"].index[rows]], "columns": cols,
+            "data": {f: (data.arrays[f][rows][:, pos] * scale[f].to_numpy()[pos]).tolist() for f in FIELDS}}
 
 
 class Feed:
@@ -199,8 +204,8 @@ class Feed:
         msg: dict = {"asof": _iso(t)}
         if self.asof is not None:
             msg["rescale"] = self._ratio(new_scale, self._scale, self.shown)
-            msg["append"] = _block(d.frames, (idx > self.asof) & (idx <= t), self.shown, new_scale)
-        msg["add"] = _block(d.frames, idx <= t, joined, new_scale)
+            msg["append"] = _block(d, np.asarray((idx > self.asof) & (idx <= t)), self.shown, new_scale)
+        msg["add"] = _block(d, np.asarray(idx <= t), joined, new_scale)
         self.shown = self.shown + joined
         self.asof, self._scale = t, new_scale
         return msg

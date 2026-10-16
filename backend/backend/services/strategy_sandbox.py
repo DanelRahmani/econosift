@@ -227,18 +227,17 @@ class SandboxRunner:
             if not self.timed_out and self.proc.returncode is None:
                 self._send({"op": "end"})
                 bye = self._recv()
-                if bye.get("op") == "bye" and isinstance(bye.get("maxrss_kb"), (int, float)):
-                    usage["childReportedPeakMB"] = round(bye["maxrss_kb"] / 1024, 1)
+                if bye.get("op") == "bye" and isinstance(bye.get("vmhwm_kb"), (int, float)):
+                    # The child's own figure (VmHWM of its address space after exec). The kernel's
+                    # ru_maxrss for it would include this backend's size at fork, so it is not used.
+                    usage["peakMemoryMB"] = round(bye["vmhwm_kb"] / 1024, 1)
         except StrategyError:
             pass
         finally:
             if sys.platform != "win32":
                 if self.proc.returncode is None:
-                    try:  # the kernel's figure for this child, not the child's own claim;
-                        # a child that ignores "end" is killed by the still-running watchdog
-                        _pid, status, ru = os.wait4(self.proc.pid, 0)
-                        self.proc.returncode = os.waitstatus_to_exitcode(status)
-                        usage["peakMemoryMB"] = round(ru.ru_maxrss / 1024, 1)
+                    try:  # a child that ignores "end" is killed by the still-running watchdog
+                        self.proc.wait()
                     except ChildProcessError:
                         pass
             else:
