@@ -140,6 +140,19 @@ CREATE TABLE IF NOT EXISTS fx_daily (
     rate    REAL,
     PRIMARY KEY (base, quote, date)
 ) WITHOUT ROWID;
+-- App settings set in Admin, e.g. whether strategy uploads are allowed (Phase 70).
+CREATE TABLE IF NOT EXISTS app_setting (
+    key     TEXT PRIMARY KEY,
+    value   TEXT
+);
+-- Uploaded strategy files (Phase 70): the source is kept, so a run names its exact code by hash.
+CREATE TABLE IF NOT EXISTS strategy (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    name        TEXT NOT NULL,
+    sha256      TEXT NOT NULL UNIQUE,
+    source      TEXT NOT NULL,
+    uploaded_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS source_health (
     source          TEXT PRIMARY KEY,
     last_success    TEXT,

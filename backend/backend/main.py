@@ -23,7 +23,7 @@ from .routers import (
     portfolio, screener, admin, dashboard, treemap, calendar, risk, options,
     market_data, snowflake, sector, technicals, atlas, research, credit,
     yield_curve, policy, sovereign, scenario, wiki, corporate, dividend, insider,
-    mergers, factbook, crossborder, stability, ai,
+    mergers, factbook, crossborder, stability, ai, strategies,
 )
 
 # Threads behind asyncio.to_thread. Python's default, min(32, cpu + 4), is sized
@@ -128,6 +128,7 @@ app.add_middleware(
     expose_headers=[STALE_HEADER],
 )
 app.add_middleware(DeduplicationMiddleware)
+app.state.allowed_origins = frozenset(_DEFAULT_ORIGINS + _extra_origins)  # strategies.same_origin_only
 
 
 @app.get("/health")
@@ -169,3 +170,4 @@ app.include_router(factbook.router)
 app.include_router(crossborder.router)
 app.include_router(stability.router)
 app.include_router(ai.router)
+app.include_router(strategies.router)
