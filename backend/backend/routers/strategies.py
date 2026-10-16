@@ -207,3 +207,25 @@ async def run_strategy(req: StrategyRun):
 
     return await asyncio.to_thread(_exclusive, go)
 
+
+
+class WalkForwardRun(StrategyRun):
+    trainYears: int = Field(default=3, ge=1, le=10)
+    testYears: int = Field(default=1, ge=1, le=5)
+    grid: dict[str, list[ParamValue]] = Field(default_factory=dict, max_length=5)
+    metric: str = Field(default="sharpe", pattern="^(sharpe|cagr|totalReturn)$")
+
+
+@router.post("/api/research/strategies/walkforward", dependencies=[Depends(same_origin_only)])
+async def walk_forward_strategy(req: WalkForwardRun):
+    """Walk-forward over a parameter grid, out-of-sample results only, in the sandbox. Red tier."""
+    s = _runnable(req.strategyId)
+    start, end = _window(req)
+
+    def go():
+        return se.walk_forward(s["source"], s["name"], index=req.index, start=start, end=end,
+                               train_years=req.trainYears, test_years=req.testYears, grid=req.grid,
+                               rebalance=req.rebalance, cost_bps=req.costBps, metric=req.metric,
+                               runner_factory=strategy_sandbox.SandboxRunner)
+
+    return await asyncio.to_thread(_exclusive, go)
