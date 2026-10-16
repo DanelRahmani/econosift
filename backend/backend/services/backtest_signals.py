@@ -1,7 +1,9 @@
 """Signal adapters for the backtester — Phase 43 (task D2).
 
-Turns the price series the platform already fetches into (dates x tickers)
-signal frames that `backtest_engine.run_backtest` can rank.
+Turns stored daily prices into (dates x tickers) signal frames that
+`backtest_engine.run_backtest` can rank. Since Phase 70 the prices come from
+the store over the point-in-time universe (`pit.PITData`), not a live download
+of today's members.
 
 Every adapter here is **price-derived**. That is deliberate: yfinance
 fundamentals are latest-restatement rather than as-reported-then (P3-14), so a
@@ -15,18 +17,16 @@ t, which satisfies it by construction.
 """
 from __future__ import annotations
 
-import hashlib
 import logging
 
 import numpy as np
 import pandas as pd
 
-from . import constituents
-from . import yfinance_service as yfs
+from .. import store
+from . import constituents, pit
 
 log = logging.getLogger(__name__)
 
-# Enough history for a 12-month lookback plus a usable backtest window.
 _DEFAULT_PERIOD = "10y"
 
 
@@ -112,51 +112,71 @@ def available_signals() -> list[dict]:
     ]
 
 
+def _period_start(period: str, end: pd.Timestamp) -> pd.Timestamp:
+    """'10y' -> ten years before ``end``; 'max' -> the start of the membership log's coverage."""
+    if period == "max":
+        return pd.Timestamp("2000-01-01")
+    if period.endswith("y") and period[:-1].isdigit() and 0 < int(period[:-1]) <= 30:
+        return end - pd.DateOffset(years=int(period[:-1]))
+    raise ValueError(f"unsupported period {period!r}; use e.g. '10y' or 'max'")
+
+
 def build_signal(
     signal_key: str,
     universe: str = "sp500",
     period: str = _DEFAULT_PERIOD,
-    max_tickers: int = 120,
-) -> tuple[pd.DataFrame, pd.DataFrame, dict]:
-    """Fetch prices and build the requested signal frame.
+    point_in_time: bool = True,
+) -> tuple[pd.DataFrame, pd.DataFrame, dict, object]:
+    """Build the requested signal frame from stored prices (Phase 70: no downloads).
 
-    Returns ``(signal, prices, meta)``. The universe is capped because a full
-    500-name download is slow and rate-limited; the cap is reported in meta so
-    the UI can say so rather than quietly implying full coverage.
+    Returns ``(signal, prices, meta, universe_as_of)``. Prices cover every symbol
+    that was an index member during the window, including former members
+    where Yahoo still has history. ``universe_as_of(date)`` is the tradable set
+    on a rebalance date: the members on that date (or, with ``point_in_time``
+    off, today's members, which is survivorship-biased). Members with no stored
+    price are excluded and listed in ``meta["excluded"]``, never filled.
     """
     entry = SIGNALS.get(signal_key)
     if entry is None:
         raise ValueError(f"unknown signal '{signal_key}'")
     builder, label, _desc, is_fundamental = entry
 
-    symbols = constituents.constituent_symbols(universe)
-    if not symbols:
-        raise ValueError(f"no constituents available for universe '{universe}'")
+    index = constituents.ALIASES.get(universe.lower(), universe.lower())
+    with store.connect() as conn:
+        last = conn.execute("SELECT MAX(date) FROM price_daily").fetchone()[0]
+    if not last:
+        raise ValueError("no stored prices yet: the first backfill is still running")
+    end = pd.Timestamp(last)
+    data = pit.PITData(index, _period_start(period, end), end)
 
-    truncated = len(symbols) > max_tickers
-    if truncated:
-        # Deterministic subset so repeated runs are comparable — ordered by a
-        # hash of the ticker, not alphabetically: the first 120 names A→Z are
-        # an arbitrary slice that over-represents a few sectors (audit C-32).
-        symbols = sorted(symbols, key=lambda t: hashlib.md5(t.encode()).hexdigest())[:max_tickers]
-
-    prices = yfs.get_close_frame(tuple(symbols), period)
-    if prices is None or prices.empty:
-        raise ValueError("price download returned no data")
-
-    prices = prices.dropna(axis=1, how="all").ffill()
+    prices = data.frames["adj_close"].dropna(axis=1, how="all").ffill(limit=pit.GAP_DAYS)
+    if prices.empty:
+        raise ValueError(f"no stored prices for {universe} members")
     signal = builder(prices)
+
+    excluded: dict[str, str] = {}
+    current = {s for s, iv in data.intervals.items() if any(e is None for _, e in iv)}
+
+    def universe_as_of(day):
+        tradable, gaps = data.members(day)
+        for g in gaps:
+            excluded.setdefault(g["symbol"], g["reason"])
+        return tradable if point_in_time else [s for s in tradable if s in current]
 
     meta = {
         "signal": signal_key,
         "label": label,
         "universe": universe,
         "period": period,
-        "tickersRequested": len(symbols),
+        "tickersRequested": len(data.intervals),
         "tickersWithData": int(prices.shape[1]),
-        "universeTruncated": truncated,
-        "universeSampling": "hash-ordered sample of current constituents" if truncated else "all current constituents",
-        "maxTickers": max_tickers,
+        "universeTruncated": False,
+        "universeSampling": ("every member on each rebalance date, former members included" if point_in_time
+                             else "today's members only (survivorship-biased)"),
+        "maxTickers": None,
         "isFundamental": is_fundamental,
+        "dataSource": "store",
+        "excluded": excluded,  # filled while the engine walks the rebalance dates
+        "snapshot": data.snapshot(),
     }
-    return signal, prices, meta
+    return signal, prices, meta, universe_as_of

@@ -210,18 +210,9 @@ async def list_backtest_signals():
 
 
 def _run_backtest_sync(req: "BacktestRequest") -> dict:
-    signal, prices, meta = backtest_signals.build_signal(
-        req.signal, universe=req.universe, period=req.period
+    signal, prices, meta, universe_fn = backtest_signals.build_signal(
+        req.signal, universe=req.universe, period=req.period, point_in_time=req.pointInTimeUniverse
     )
-
-    universe_fn = None
-    if req.pointInTimeUniverse:
-        import datetime as _dt
-
-        from ..services import constituents
-
-        def universe_fn(d: _dt.date, _u=req.universe):
-            return constituents.members_as_of(_u, d)["symbols"]
 
     result = run_backtest(
         signal,
@@ -234,17 +225,21 @@ def _run_backtest_sync(req: "BacktestRequest") -> dict:
         allow_lookahead=req.allowLookahead,
         is_fundamental=meta["isFundamental"],
     )
+    result.setdefault("settings", {})["universePointInTime"] = req.pointInTimeUniverse
+    meta["excluded"] = [dict(symbol=s, reason=r) for s, r in sorted(meta["excluded"].items())]
     result["meta"] = meta
-    price_ref = pv.ref("yahoo", None, f"Daily adjusted close of each {req.universe} member",
-                    frequency="daily", observed=pv.last_date(prices))
+    price_ref = pv.ref("yahoo", None, f"Stored daily adjusted close of each {req.universe} member, "
+                       "former members included where Yahoo still has history",
+                       frequency="daily", observed=pv.last_date(prices))
     members = pv.ref("wikipedia", None, f"{req.universe} constituents"
-                     + (" as of each rebalance date (reconstructed from the change log)"
-                        if req.pointInTimeUniverse else " (current members, so survivorship-biased)"))
+                     + (" on each rebalance date (stored membership intervals from the change log)"
+                        if req.pointInTimeUniverse else " (today's members only, so survivorship-biased)"))
     return pv.attach(result, {
         "*": pv.derived(
             f"each {req.rebalance} rebalance: rank members on the '{req.signal}' signal known at that date, "
             f"form {req.nQuantiles} equal-weight quantile portfolios, hold to the next rebalance; "
-            f"{'top minus bottom quantile; ' if req.longShort else ''}costs {req.costBps} bps per unit turnover",
+            f"{'top minus bottom quantile; ' if req.longShort else ''}costs {req.costBps} bps per unit turnover; "
+            "members without stored prices are excluded and listed",
             [price_ref, members], title="Signal backtest"),
     })
 
@@ -253,8 +248,8 @@ def _run_backtest_sync(req: "BacktestRequest") -> dict:
 async def post_backtest(req: BacktestRequest):
     """Backtest a cross-sectional signal. Compute tier: red — never auto-fired.
 
-    Downloads a price panel and runs a quantile sort, so it takes tens of
-    seconds on a cold cache.
+    Reads stored prices over the point-in-time universe (no downloads) and
+    runs a quantile sort.
     """
     try:
         return await asyncio.to_thread(_run_backtest_sync, req)
