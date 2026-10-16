@@ -212,7 +212,7 @@ one item per commit and push after each one. Open a PR to `DEV` only when the ow
 | **67 — Read from the store** ✅ | Move treemap, breadth, sector, screener, risk, portfolio, technicals, markets to DB reads; `asOf` on responses; remove the old per-ticker paths and the now-unused cache code | **Zero** Yahoo calls on any page open for daily/snapshot data |
 | **68 — SEC fundamentals** ✅ | SEC companyfacts backfill + nightly frames change-detection → `fundamental`, with the §8.3 concept fallbacks; screener/valuation/ratios read from it; weekly rotating Yahoo refresh for estimates; optional free-key fallbacks in Admin | Screener refresh makes no per-ticker `.info` calls |
 | **69 — Frontend data layer** ✅ | `useQuery` migration, `asOf`/pending UI, per-panel error boundaries, lazy tabs, mocked e2e | Tab switches don't refetch; CI e2e green |
-| **70 — Backtesting v2** | Store-backed point-in-time backtests, strategy plugins, sandboxed runner, walk-forward | A user `.py` strategy uploads and backtests on PIT S&P 500 data |
+| **70 — Backtesting v2** ✅ | Store-backed point-in-time backtests, strategy plugins, sandboxed runner, walk-forward | A user `.py` strategy uploads and backtests on PIT S&P 500 data |
 
 Phase 65 is small (days) and gives immediate relief. Phases 66–67 are what make the app fast.
 
@@ -462,3 +462,47 @@ decision holds. `pyarrow` stays in `requirements.txt` because edgartools needs i
 - **Found after the gate:** CountrySelector's typeahead used a bare `/api` URL, so it missed the backend in the
   desktop build; it now uses the same base URL as its name lookup. The quote provenance text (`âˆ'`, `Ã—` for −
   and ×) is **not** a bug: the API sends valid UTF-8, and those are its bytes shown by a Windows-1252 console.
+
+### 8.11 Phase 70 gate (2026-10-16, Docker)
+
+- **Point-in-time data:** the universe job now queues history for every former index member once (lowest
+  priority, never retried after Yahoo says it has none). 120 former S&P 500 members gained history: 653 of the
+  861 symbols that were ever members have stored bars. **210 have none on Yahoo** (e.g. ANSS, CTLT, DFS, DAY;
+  acquired or delisted). They are listed in each result's `excluded`, never filled. A 10-year S&P 500 run touches
+  726 members, 613 of them with prices; 109 are excluded at some rebalance date.
+- **No look-ahead, by construction:** `pit.Feed` hands the strategy's process only members on t, bars up to t for
+  symbols that had joined by t (a future joiner's past is hidden too), and SEC facts filed **before** t. Stored
+  Yahoo closes are adjusted for every later split (AAPL on 2020-08-28 is stored at 124.81; it traded at ~499),
+  so every view is rescaled to what was quoted on t. Tests: a sentinel future bar is nowhere in the child's
+  memory, a later split/dividend changes nothing visible, a filing dated t or a later restatement is invisible.
+- **Survivorship difference** (momentum 12-1, S&P 500, 10y, monthly, 5 quintiles, 10 bps): top-quintile CAGR
+  **14.75%** on today's members vs **13.50%** point-in-time (+1.25 pp of bias); the old live 120-name sample gave
+  11.26%. Signal backtests now read the store (0 downloads) with unchanged response shapes.
+- **Done-when run:** an uploaded `low_vol.py` (50 lowest-volatility members, monthly) over the PIT S&P 500,
+  2016-10-31 to 2026-10-15, 121 rebalances: **30 s** end to end (was 67 s before the gate fixed a per-column
+  rescale in the child), sandbox **peak 235 MB** (the child's VmHWM; the kernel's `ru_maxrss` read 1.2-1.3 GB
+  because Linux carries the parent's resident size across fork/exec), **0 external requests** during the run, CAGR
+  9.75%, Sharpe 0.71, max drawdown -33.8%, turnover 210%/yr, costs 4.2%. Two runs gave identical equity curves and
+  snapshots. The bundled 12-1 example: 42 s, 235 MB, CAGR 15.2%. Walk-forward of `low_vol.py` (train 3y / test 1y,
+  grid n = 25/50/100, 7 folds, 22 passes in one child): 101 s, 235 MB, out-of-sample CAGR 7.9%, Sharpe 0.55.
+- **Refused, as intended** (uploaded strategies, live Docker): `urllib` and `sqlite3` cannot even be imported in the
+  chroot; a raw `_socket.socket()` past the Python guard fails with EPERM (seccomp); `open('/app/data/econosift.db')`
+  and `/app/.env` fail with EACCES (chroot, user nobody); `os.fork()` fails (RLIMIT_NPROC); a 3 GB allocation
+  raises MemoryError; a busy loop is killed at the timeout. A strategy asserting it never sees a bar after
+  `ctx.date` passes on every date, rewound walk-forward windows included.
+- **Sandbox by platform:** Docker (root) = chroot + nobody + rlimits + seccomp. Linux non-root = rlimits +
+  seccomp, files readable/deletable by that user (stated in the UI). Windows source run = Job object (memory cap,
+  one process), **no network or filesystem isolation** (stated in the UI). Frozen desktop build = uploads refused
+  (no interpreter for the child). Uploads are off by default; toggle, upload and run refuse browser requests from
+  origins outside the CORS list. `/security-review` of the runner and upload path: no high-confidence findings.
+- **Known limits, not fixed:** a position whose stored prices end before the next rebalance (an acquisition) is
+  carried at its last stored price; the 10-year runs had 100 such position-periods, counted in the result.
+  Delisting returns are not available from Yahoo. A reused ticker (a new company on an old member's symbol) is only
+  caught when its history starts after the membership interval.
+- **Gate:** backend 1,438+ passed in the container; tsc clean; Docker rebuild + recreate, all 21 pages 200; Playwright
+  live 50/50 after rerunning 3 cold-start timeouts (Dashboard breadth, Macro commodities, risk dial; breadth is
+  2.4 s cold alone); Playwright mocked: the new Strategy Lab fixtures are recorded; the full mocked run is CI's job.
+- **Open follow-ups for the owner to schedule** (outside Phases 65-70, all still call Yahoo outside the fetcher):
+  the **Calendar page's per-ticker fan-out** (`earnings_dates` + `.info` for ~500 members on page open), the
+  **event-study earnings dates**, and the **Markets news/events tabs**. Also: desktop support for strategy uploads
+  (the frozen build would need a child entry point), and Yahoo-free delisting returns.
