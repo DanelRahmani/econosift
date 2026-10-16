@@ -132,6 +132,33 @@ def test_universe_stores_rosters_and_queues_missing_history():
     assert fetcher._last_success("constituents") is not None
 
 
+def test_universe_queues_former_members_once_and_rotation_skips_them():
+    """Phase 70: point-in-time backtests need former members' history where Yahoo still has it."""
+    members = {i: [{"symbol": "NOW", "name": None, "sector": None, "industry": None}] for i in fetcher.INDEXES}
+    changes = [{"date": date(2020, 1, 2), "added": "NOW", "removed": "GONE"}]
+    with patch("backend.services.constituents.get_constituents", side_effect=lambda i, live=False: members[i]),          patch("backend.services.constituents.get_membership_changes",
+               side_effect=lambda i, live=False: changes if i == "sp500" else []):
+        fetcher.run_universe("all")
+        queued = {k: p for kind, k, p in _queue_with_priority() if kind == "history"}
+        assert queued["GONE"] == fetcher.PRIORITY_FORMER and queued["NOW"] == fetcher.PRIORITY_HISTORY
+        with store.connect() as conn:  # Yahoo had no history for GONE: a re-run must not retry it
+            conn.execute("UPDATE fetch_queue SET attempts = ? WHERE key = 'GONE'", (fetcher.MAX_ATTEMPTS,))
+        fetcher.run_universe("all")
+        assert dict((k, a) for _, k, a in _queue())["GONE"] == fetcher.MAX_ATTEMPTS
+    with store.connect() as conn:
+        conn.execute("DELETE FROM fetch_queue")
+        conn.execute("UPDATE security SET history_at = 'x'")
+        conn.execute("INSERT INTO security (symbol, history_at) VALUES ('GONE', 'x')")
+    for day in range(12, 17):  # a whole weekday cycle re-fetches current members, never a former one
+        fetcher.queue_history_rotation(datetime(2026, 10, day, tzinfo=timezone.utc))
+    assert "GONE" not in {k for _, k, _ in _queue()} and "NOW" in {k for _, k, _ in _queue()}
+
+
+def _queue_with_priority():
+    with store.connect() as conn:
+        return conn.execute("SELECT kind, key, priority FROM fetch_queue").fetchall()
+
+
 def test_universe_with_a_missing_roster_fails_instead_of_storing_a_partial_one():
     with patch("backend.services.constituents.get_constituents", return_value=[]), \
          pytest.raises(RuntimeError):

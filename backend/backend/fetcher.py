@@ -34,6 +34,7 @@ PRIORITY_REFETCH = 2    # history whose stored closes no longer match (a split)
 PRIORITY_ON_DEMAND = 3  # a symbol a page asked for that is not stored yet
 PRIORITY_FACTS = 4      # SEC companyfacts (backfill and changed filers)
 PRIORITY_HISTORY = 5
+PRIORITY_FORMER = 6    # former index members, for point-in-time backtests (Phase 70)
 
 # Index levels the dashboard shows intraday; yf.screen covers equities only,
 # so these are filled by chart calls in every snapshot (4 calls a run).
@@ -189,6 +190,14 @@ def run_universe(_key: str) -> int:
             "SELECT symbol FROM security WHERE history_at IS NULL ORDER BY symbol")]
     for sym in missing:
         enqueue("history", sym, PRIORITY_HISTORY)
+    # Former members: Yahoo still has history for some. A symbol it had none for
+    # keeps its failed attempts (retry_failed=False) instead of being retried weekly.
+    with store.connect() as conn:
+        former = [r[0] for r in conn.execute(
+            "SELECT m.symbol FROM index_membership m LEFT JOIN security s USING (symbol) "
+            "WHERE s.history_at IS NULL GROUP BY m.symbol HAVING SUM(m.end IS NULL) = 0 ORDER BY m.symbol")]
+    for sym in former:
+        enqueue("history", sym, PRIORITY_FORMER, retry_failed=False)
     return len(securities)
 
 
@@ -380,7 +389,9 @@ def queue_history_rotation(today: datetime | None = None) -> None:
         return
     with store.connect() as conn:
         syms = [r[0] for r in conn.execute(
-            "SELECT symbol FROM security WHERE history_at IS NOT NULL ORDER BY symbol")]
+            "SELECT symbol FROM security WHERE history_at IS NOT NULL AND symbol NOT IN ("
+            "SELECT symbol FROM index_membership GROUP BY symbol HAVING SUM(end IS NULL) = 0) "
+            "ORDER BY symbol")]  # a former member's history no longer changes
     for sym in syms[day::5]:
         enqueue("history", sym, PRIORITY_HISTORY)
 
